@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dicom_node"
+version = "0.0.1"
+authors = [
+  {name="Christoffer Vilstrup Jensen", email="christoffer.vilstrup.jensen@regionh.dk"},
+]
+description = "A small toolkit / library for dicom communication written similar to dcmtk"
+readme = "README.md"
+license = {file="LICENSE"}
+requires-python = ">= 3.10"
+dependencies=["numpy>=1.23.0", "pydicom>=2.3.0", "pynetdicom>=2.0.2"]
+
+
+[project.urls]
+"Homepage" = "https://github.com/Rigshospitalet-KFNM/DicomNode"
+"Bug Tracker" = "https://github.com/Rigshospitalet-KFNM/DicomNode/issues"
+
+[project.scripts]
+omnitool = "dicom_node.bin.omnitool:entry_func"
