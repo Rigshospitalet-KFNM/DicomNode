@@ -1,8 +1,14 @@
-from typing import Dict, Tuple
+from logging import Logger
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
+
+import pydicom
 from pydicom.values import convert_SQ, convert_string
 from pydicom import Dataset, Sequence
 from pydicom.datadict import DicomDictionary, keyword_dict
+
+from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
   """ Updated the dicom dictionary with a set of new private tags,
@@ -24,7 +30,7 @@ def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str
   new_names_dirc = dict([(val[4], tag) for tag, val in new_dict_items.items()])
   keyword_dict.update(new_names_dirc)
 
-def load_private_tags(
+def apply_private_tags(
     dataset : Dataset,
     private_tags : Dict[int, Tuple[str, str, str, str, str]] = {},
     is_implicit_VR = True,
@@ -45,7 +51,7 @@ def load_private_tags(
 
   >>> ds = Dataset()
   >>> ds.add_new(0x13374269, 'UN', self.test_string.encode())
-  >>> io.load_private_tags(ds, {0x13374269 : ("LO", "1", "New Private Tag", "", "NewPrivateTag")})
+  >>> io.apply_private_tags(ds, {0x13374269 : ("LO", "1", "New Private Tag", "", "NewPrivateTag")})
   >>> ds
     (1337, 4269) Private tag data                    LO: 'hello world'
 
@@ -59,7 +65,7 @@ def load_private_tags(
         ds_sq = convert_SQ(ds.value, is_implicit_VR , is_little_endian)
         seq_list = []
         for sq in ds_sq:
-          sq = load_private_tags(sq, private_tags=private_tags, is_little_endian=is_little_endian, is_implicit_VR=is_implicit_VR)
+          sq = apply_private_tags(sq, private_tags=private_tags, is_little_endian=is_little_endian, is_implicit_VR=is_implicit_VR)
           seq_list.append(sq)
         dataset.add_new(ds.tag, private_tags[ds.tag][0], Sequence(seq_list))
       elif private_tags[ds.tag][0] == 'LO':
@@ -69,6 +75,29 @@ def load_private_tags(
         dataset.add_new(ds.tag, private_tags[ds.tag][0], ds.value)
     elif ds.VR == 'SQ':
       for ds_sq in ds:
-        load_private_tags(ds_sq, private_tags=private_tags, is_little_endian=is_little_endian, is_implicit_VR=is_implicit_VR)
-
+        apply_private_tags(ds_sq, private_tags=private_tags, is_little_endian=is_little_endian, is_implicit_VR=is_implicit_VR)
   return dataset
+
+def load_dicom(
+  dicomPath : Path,
+  private_tags : Optional[Dict[int, Tuple[str, str, str, str, str]]] = None
+  ):
+
+  return pydicom.dcmread(dicomPath)
+
+def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str, str, str, str]]:
+  private_tags = {}
+  with dicPath.open() as f:
+    while line := f.readline():
+      try:
+        parsedTags = read_private_tag(line)
+        if parsedTags:
+          (tag, data) = parsedTags
+          private_tags[tag] = data
+
+      except PrivateTagParserReadException as E:
+        if not strict:
+          raise E
+        else:
+          print(f"Line: {line} could not be parsed")
+  return private_tags

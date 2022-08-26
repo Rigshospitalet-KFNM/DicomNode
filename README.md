@@ -9,9 +9,12 @@ To install this library
 
 
 ## Usage
-
+The omnitool can perform a number of basic functions such as displaying
 
 
 ## Tests
 
-To run tests, 
+To run tests
+
+## Contributing
+This package is 

@@ -37,21 +37,21 @@ class lib_io_test_case(TestCase):
     self.assertIn("NewPrivateSequence", keyword_dict)
 
 
-  def test_load_private_tags_exampel(self):
+  def test_apply_private_tags_exampel(self):
     ds = Dataset()
     ds.add_new( self.test_tag, 'UN', self.test_string.encode())
-    io.load_private_tags(ds, self.test_private_tag_dict)
+    io.apply_private_tags(ds, self.test_private_tag_dict)
     self.assertEqual(ds[self.test_tag], self.test_data_element)
 
-  def test_load_private_tags_Sequence(self):
+  def test_apply_private_tags_Sequence(self):
     ds = Dataset()
     seq_ds = Dataset()
     seq_ds.add_new(self.test_tag, 'UN', self.test_string.encode())
     ds.add_new(self.test_tag_sq, 'SQ', Sequence([seq_ds]))
-    io.load_private_tags(ds, self.test_private_tag_dict)
+    io.apply_private_tags(ds, self.test_private_tag_dict)
     self.assertEqual(ds[self.test_tag_sq][0][self.test_tag], self.test_data_element)
 
-  def test_load_private_tags_unknown_sequence(self):
+  def test_apply_private_tags_unknown_sequence(self):
     ds = Dataset()
     seq_ds = Dataset()
     seq_ds.add_new(self.test_tag, 'UN', self.test_string.encode())
@@ -63,11 +63,11 @@ class lib_io_test_case(TestCase):
     buffer.seek(0)
     seq_bytes = buffer.read()
     ds.add_new(self.test_tag_sq, 'UN', seq_bytes)
-    io.load_private_tags(ds, self.test_private_tag_dict)
+    io.apply_private_tags(ds, self.test_private_tag_dict)
     self.assertEqual(ds[self.test_tag_sq][0][self.test_tag], self.test_data_element)
 
-  def test_load_private_tags_known_tags(self):
+  def test_apply_private_tags_known_tags(self):
     ds = Dataset()
     ds.Modality = DataElement(0x00080060, 'CS', 'OT')
-    io.load_private_tags(ds, self.test_private_tag_dict)
+    io.apply_private_tags(ds, self.test_private_tag_dict)
     self.assertEqual(ds.Modality, DataElement(0x00080060, 'CS', 'OT'))
