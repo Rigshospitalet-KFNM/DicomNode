@@ -1,8 +1,12 @@
-from argparse import _SubParsersAction, ArgumentParser, Namespace, ArgumentTypeError
+"""This is a script part of the omnitool for displaying a dicomfile"""
+
+__author__ = "Chirstoffer Vilstrup Jensen"
+
+from argparse import _SubParsersAction, Namespace
 
 from pathlib import Path
 from dicomnode.lib.utils import str2bool
-from dicomnode.lib.io import load_dicom, load_private_tags
+from dicomnode.lib.io import load_dicom, load_private_tags_from_args
 
 from pprint import pprint
 
@@ -14,8 +18,5 @@ def get_parser(subparser : _SubParsersAction):
   module_parser.add_argument('--strictParsing', type=str2bool, nargs='?', const=False, default=False, help="Stop if a private tag is not parsed correctly")
 
 def entry_func(args : Namespace):
-  privateTags = None
-  if args.privatetags:
-    load_private_tags(args.privatetags)
-
-  pprint(load_dicom(args.dicomfile, private_tags=privateTags))
+  private_tags = load_private_tags_from_args(args)
+  pprint(load_dicom(args.dicomfile, private_tags=private_tags))
