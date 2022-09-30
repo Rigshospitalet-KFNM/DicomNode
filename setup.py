@@ -14,7 +14,8 @@ if __name__ == '__main__':
     install_requires=[
       'numpy>=1.23.0',
       'pydicom>=2.3.0',
-     'pynetdicom>=2.0.2'
+      'pynetdicom>=2.0.2',
+      'psutil>=5.9.2',
     ],
     extras_require = {
      "test" : ["coverage"]
