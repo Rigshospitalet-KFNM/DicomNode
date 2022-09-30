@@ -19,7 +19,6 @@ def get_parser(subparser : _SubParsersAction):
   module_parser.add_argument(
     '--keepuids', type=str2bool, nargs='?', const=False, default=False,
       help="toggle to retain SOPInstanceID StudyUID and SeriesUID")
-  module_parser.add_argument('--key', type=Path, help="Keyfile for anonmization")
   module_parser.add_argument('--pidpf', type=str, default=_PPrefix)
   module_parser.add_argument('--pnpf', type=str, default=BASE_ANONYMIZED_PATIENT_NAME)
   module_parser.add_argument('--sid', type=str, default="")
