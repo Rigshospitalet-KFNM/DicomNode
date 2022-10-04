@@ -1,5 +1,4 @@
 from argparse import ArgumentTypeError
-from types import NoneType
 from typing import Any, Callable, Union
 from pydicom import Dataset
 
@@ -23,6 +22,6 @@ def getTag(Tag : int) -> Callable[[Dataset], Any]:
     if Tag in Dataset:
       return Dataset[Tag]
     else:
-      return NoneType
+      return None
   return retfunc
 

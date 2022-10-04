@@ -1,13 +1,12 @@
 from pathlib import Path
 from pprint import pprint, pformat
-from types import NoneType
 from typing import Any, List, Optional, Union, Dict, Callable
 
 from pydicom import Dataset, FileDataset, write_file
 from pydicom.uid import UID, generate_uid
 from math import ceil, log10
 
-
+from abc import ABC, abstractclassmethod
 
 from dicomnode.lib.utils import prefixInt
 
@@ -119,8 +118,8 @@ class IdentityMapping():
       base_string += f"\n  Patient Mapping\n{pformat(self.PatientMapping, indent=4)}"
     return base_string
 
-
-class TreeInterface():
+class TreeInterface(ABC):
+  @abstractclassmethod
   def add_image(self, _dicom : Dataset) -> None:
     raise NotImplemented
 
@@ -129,20 +128,23 @@ class TreeInterface():
       self.add_image(dicom)
 
   def _apply_mapping(self, func : Callable[[Dataset], Any],
-                    index_map : Dict,
+                    index_map : Optional[Dict],
                     UIDMapping : Optional[IdentityMapping] = None) -> Dict[str, Any]:
     new_data = {}
     ret_dir = {}
     for ID, tree in self.data.items():
       ret_dir.update(tree.apply_mapping(func, UIDMapping))
-      if ID in index_map:
-        new_data[index_map[ID]] = tree
+      if index_map:
+        if ID in index_map:
+          new_data[index_map[ID]] = tree
+        else:
+          new_data[ID]
       else:
         new_data[ID] = tree
     self.data = new_data
     return ret_dir
 
-
+  @abstractclassmethod
   def apply_mapping(self, func : Callable[[Dataset], Any],
                     UIDMapping : Optional[IdentityMapping] = None) -> Dict[str, Any]:
     """Applies a callable function to all dataset in the Tree.
@@ -154,7 +156,7 @@ class TreeInterface():
     Then that should be included as the UIDMapping
 
     Args:
-        func (Callable[[Dataset], NoneType]): Function to be applied to each dataset
+        func (Callable[[Dataset], ]): Function to be applied to each dataset
         UIDMapping (Optional[IdentityMapping], optional): Mapping of UID to applied to the TreeInterface. Defaults to None.
     """
     raise NotImplemented
@@ -229,10 +231,14 @@ class SeriesTree(TreeInterface):
     ret_dict = {}
     for SOPInstanceUID, dataset in self.data.items():
       ret_val = func(dataset)
-      if SOPInstanceUID in UIDMapping.SOPUIDMapping:
-        newSOPinstance = UIDMapping.SOPUIDMapping[SOPInstanceUID]
-        new_data[newSOPinstance] = dataset
-        ret_dict[newSOPinstance] = ret_val
+      if UIDMapping:
+        if SOPInstanceUID in UIDMapping.SOPUIDMapping:
+          newSOPinstance = UIDMapping.SOPUIDMapping[SOPInstanceUID]
+          new_data[newSOPinstance] = dataset
+          ret_dict[newSOPinstance] = ret_val
+        else:
+          new_data[newSOPinstance] = dataset
+          ret_dict[newSOPinstance] = ret_val
       else:
         new_data[SOPInstanceUID] = dataset
         ret_dict[SOPInstanceUID] = ret_val
@@ -286,7 +292,10 @@ class StudyTree(TreeInterface):
     self.images += 1
 
   def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    return self._apply_mapping(func, UIDMapping.SeriesUIDMapping, UIDMapping)
+    if UIDMapping:
+      return self._apply_mapping(func, UIDMapping.SeriesUIDMapping, UIDMapping)
+    else:
+      return self._apply_mapping(func, None, None)
 
   def __str__(self) -> str:
     seriesStr = f""
@@ -319,7 +328,11 @@ class PatientTree(TreeInterface):
     self.images += 1
 
   def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    return self._apply_mapping(func, UIDMapping.StudyUIDMapping, UIDMapping)
+    if UIDMapping:
+      return self._apply_mapping(func, UIDMapping.StudyUIDMapping, UIDMapping)
+    else:
+      return self._apply_mapping(func, None, None)
+
 
   def __str__(self) -> str:
     studyStr = ""
@@ -354,7 +367,10 @@ class DicomTree(TreeInterface):
     self.images += 1
 
   def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    return self._apply_mapping(func, UIDMapping.PatientMapping, UIDMapping)
+    if UIDMapping:
+      return self._apply_mapping(func, UIDMapping.PatientMapping, UIDMapping)
+    else:
+      return self._apply_mapping(func, None, None)
 
   def __str__(self) -> str:
     patientStr = f""

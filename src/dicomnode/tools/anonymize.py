@@ -19,12 +19,12 @@ def get_parser(subparser : _SubParsersAction):
   module_parser.add_argument(
     '--keepuids', type=str2bool, nargs='?', const=False, default=False,
       help="toggle to retain SOPInstanceID StudyUID and SeriesUID")
-  module_parser.add_argument('--pidpf', type=str, default=_PPrefix)
-  module_parser.add_argument('--pnpf', type=str, default=BASE_ANONYMIZED_PATIENT_NAME)
-  module_parser.add_argument('--sid', type=str, default="")
+  module_parser.add_argument('--key', type=Path, help="Path to key file for anonymization,this files will contain Personal information!")
+  module_parser.add_argument('--pidpf', type=str, default=_PPrefix, help="Prefix for PatientID, so anonymized PatientID will be <pidpf>XXXX where X is the patient number")
+  module_parser.add_argument('--pnpf', type=str, default=BASE_ANONYMIZED_PATIENT_NAME, help="Prefix for PatientName, so anonymized PatientName will be <pnpf>XXXX where X is the patient number")
+  module_parser.add_argument('--sid', type=str, default="", help="Overwrites the StudyID with <sid>XXXX where X is the patient number")
   module_parser.add_argument('--overwrite', type=str2bool, nargs='?', const=False, default=False,
       help="Delete the directory / file at the destination")
-
 
 def entry_func(args : Namespace):
   # This is first to find the DicomPath to fail fast.
@@ -34,6 +34,10 @@ def entry_func(args : Namespace):
     target = args.DicomPath.parent / ("anon_" + args.DicomPath.name)
   else:
     raise FileNotFoundError("Dicom path is not a file or Directory")
+
+  if args.key and args.key.exists():
+    key_removal_command = f"rm {str(args.key)}"
+    raise FileExistsError(f"Key file already exists, run: {key_removal_command}")
 
   if target.exists():
     if args.overwrite:

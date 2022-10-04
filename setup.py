@@ -5,7 +5,7 @@ print(find_packages(where="src"))
 
 if __name__ == '__main__':
   setup(name='dicomnode',
-    version='0.0.1',
+    version='0.0.2',
     description='Test',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
@@ -16,11 +16,11 @@ if __name__ == '__main__':
       'pydicom>=2.3.0',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
+      'nibabel>=4.0.2'
     ],
     extras_require = {
      "test" : ["coverage"]
     },
-
     entry_points={
       'console_scripts': [
       'omnitool=dicomnode.bin.omnitool:entry_func'

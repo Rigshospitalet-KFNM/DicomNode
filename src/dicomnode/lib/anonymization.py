@@ -1,5 +1,4 @@
 
-from types import NoneType
 from pydicom import Dataset
 from pydicom.valuerep import VR
 from pydicom.tag import BaseTag
@@ -14,7 +13,7 @@ def anonymize_dataset(
   UIDMapping : IdentityMapping,
   PatientName : str = BASE_ANONYMIZED_PATIENT_NAME,
   StudyID : Optional[str] = "Study"
-  ) -> Callable[[Dataset], NoneType]:
+  ) -> Callable[[Dataset], None]:
   """Creates a function
 
   Args:
@@ -23,9 +22,9 @@ def anonymize_dataset(
       StudyID (Optional[str], optional): _description_. Defaults to "Study".
 
   Returns:
-      Callable[[Dataset], NoneType]: _description_
+      Callable[[Dataset], None]: _description_
   """
-  def retfunc(dataset) -> NoneType:
+  def retfunc(dataset) -> None:
     newPatientID = UIDMapping.PatientMapping[dataset.PatientID]
     dataset.PatientID = newPatientID
     PatientNumber = newPatientID[-UIDMapping.prefixSize:]
