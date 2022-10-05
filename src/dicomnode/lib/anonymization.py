@@ -32,8 +32,9 @@ def anonymize_dataset(
       dataset.StudyID = f"{StudyID}_{PatientNumber}"
 
     def anon_ds(ds):
-      if 'meta' in ds:
-        anon_ds(ds.meta)
+      if hasattr(ds, 'file_meta'):
+        anon_ds(ds.file_meta)
+
       for dataElement in ds.iterall():
         vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
         if type(dataElement.VR) == VR: # The VR might be very wierd

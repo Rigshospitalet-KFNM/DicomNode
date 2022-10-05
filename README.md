@@ -39,4 +39,4 @@ To run tests you need to install the extra packages for testing with:
 > `pip install git+https://github.com/Rigshospitalet-KFNM/DicomNode.git[test]`
 
 Then run the tests with:
-> `coverage run -m unittest discover -s src/dicomnode && coverage report --show-missing`
+> `coverage run runtests.py && coverage report --show-missing`

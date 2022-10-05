@@ -18,7 +18,6 @@ def get_parser(subparser : _SubParsersAction):
   module_parser.add_argument('--strictParsing', type=str2bool, nargs='?', const=False, default=False, help="Stop if a private tag is not parsed correctly")
 
 def entry_func(args : Namespace):
-  print(args)
   private_tags = load_private_tags_from_args(args)
   for dicomfile in args.dicomfile:
     pprint(load_dicom(dicomfile, private_tags=private_tags))

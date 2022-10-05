@@ -40,7 +40,7 @@ class IdentityMapping():
   def add_SeriesUID(self, SeriesInstanceUID : UID) -> UID :
     return self._add_to_mapping(SeriesInstanceUID.name, self.SeriesUIDMapping)
 
-  def add_SOPInstance(self, SOPInstanceUID : UID) -> UID:
+  def add_SOPUID(self, SOPInstanceUID : UID) -> UID:
     return self._add_to_mapping(SOPInstanceUID.name, self.SOPUIDMapping)
 
   def add_Patient(self, PatientID : str, patient_prefix : str = _PPrefix  ) -> str:
@@ -74,54 +74,47 @@ class IdentityMapping():
         self.fill_from_PatientTree(studyTree)
 
 
-  def get_mapping(self, UID : Union[UID, str]) -> Optional[Union[UID, str]]:
-    if type(UID) == UID:
-      UID = UID.name
-      if UID in self.StudyUIDMapping:
-        return self.StudyUIDMapping[UID]
-      if UID in self.SeriesUIDMapping:
-        return self.SeriesUIDMapping[UID]
-      if UID in self.SOPUIDMapping:
-        return self.SOPUIDMapping[UID]
+  def get_mapping(self, uid : Union[UID, str]) -> Optional[Union[UID, str]]:
+    if isinstance(uid, UID):
+      uid = uid.name
+      if uid in self.StudyUIDMapping:
+        return self.StudyUIDMapping[uid]
+      if uid in self.SeriesUIDMapping:
+        return self.SeriesUIDMapping[uid]
+      if uid in self.SOPUIDMapping:
+        return self.SOPUIDMapping[uid]
     else:
-      if UID in self.PatientMapping:
-        return self.PatientMapping[UID]
-      if UID in self.StudyUIDMapping:
-        return self.StudyUIDMapping[UID]
-      if UID in self.SeriesUIDMapping:
-        return self.SeriesUIDMapping[UID]
-      if UID in self.SOPUIDMapping:
-        return self.SOPUIDMapping[UID]
+      if uid in self.PatientMapping:
+        return self.PatientMapping[uid]
+      if uid in self.StudyUIDMapping:
+        return self.StudyUIDMapping[uid]
+      if uid in self.SeriesUIDMapping:
+        return self.SeriesUIDMapping[uid]
+      if uid in self.SOPUIDMapping:
+        return self.SOPUIDMapping[uid]
     return None
 
   def __str__(self) -> str:
     base_string = f"Identity Mapping"
-    # SOP instances
-    if len(self.SOPUIDMapping) > 25:
-      base_string += f"\n  SOP Mapping with {len(self.SOPUIDMapping)} Mappings"
-    elif len(self.SOPUIDMapping) > 0:
-      base_string += f"\n  SOP Mapping\n{pformat(self.SOPUIDMapping, indent=4)}"
-    # Series
-    if len(self.SeriesUIDMapping) > 25:
-      base_string += f"\n  Series Mapping with {len(self.SeriesUIDMapping)}"
-    elif len(self.SeriesUIDMapping) > 0:
-      base_string += f"\n  Series Mapping\n{pformat(self.SeriesUIDMapping, indent=4)}"
-    # Studies
-    if len(self.StudyUIDMapping) > 25:
-      base_string += f"\n  Study Mapping with {len(self.StudyUIDMapping)} Mappings"
-    elif len(self.StudyUIDMapping) > 0:
-      base_string += f"\n  Study Mapping\n{pformat(self.StudyUIDMapping, indent=4)}"
     # Patients
-    if len(self.PatientMapping) > 25:
-      base_string += f"\n  Patient Mapping with {len(self.PatientMapping)} Mappins"
-    elif len(self.PatientMapping) > 0:
+    if len(self.PatientMapping) > 0:
       base_string += f"\n  Patient Mapping\n{pformat(self.PatientMapping, indent=4)}"
+    # Studies
+    if len(self.StudyUIDMapping) > 0:
+      base_string += f"\n  Study Mapping with {len(self.StudyUIDMapping)} Mappings"
+        # Series
+    if len(self.SeriesUIDMapping) > 0:
+      base_string += f"\n  Series Mapping with {len(self.SeriesUIDMapping)}"
+    # SOP instances
+    if len(self.SOPUIDMapping) > 0:
+      base_string += f"\n  SOP Mapping with {len(self.SOPUIDMapping)} Mappings"
+
     return base_string
 
 class TreeInterface(ABC):
   @abstractclassmethod
   def add_image(self, _dicom : Dataset) -> None:
-    raise NotImplemented
+    raise NotImplemented #pragma: no cover
 
   def add_images(self, listOfDicom : List[Dataset]) -> None:
     for dicom in listOfDicom:
@@ -138,7 +131,7 @@ class TreeInterface(ABC):
         if ID in index_map:
           new_data[index_map[ID]] = tree
         else:
-          new_data[ID]
+          new_data[ID] = tree
       else:
         new_data[ID] = tree
     self.data = new_data
@@ -159,7 +152,7 @@ class TreeInterface(ABC):
         func (Callable[[Dataset], ]): Function to be applied to each dataset
         UIDMapping (Optional[IdentityMapping], optional): Mapping of UID to applied to the TreeInterface. Defaults to None.
     """
-    raise NotImplemented
+    raise NotImplemented #pragma: no cover
 
   def save_tree(self, target: Path) -> None:
     if(len(self.data) == 1):
@@ -182,15 +175,18 @@ class TreeInterface(ABC):
         int: Number of Pictures trimmed
     """
     trimmed_total = 0
+    new_data = {}
     for ID, tree in self.data.items():
       trimmed = tree.trim_tree(filter_function)
       if tree.images == 0:
-        del tree[ID]
-      elif tree.images < 0:
-        raise ValueError("Removed more images than possible!")
+        pass # Delete the entry
+      elif tree.images < 0: #pragma: no cover
+        raise ValueError("Removed more images than possible!") #pragma: no cover
+      else: # tree.images > 0
+        new_data[ID] = tree
       trimmed_total += trimmed
       self.images -= trimmed
-
+    self.data = new_data
     return trimmed_total
 
   def __init__(self, dcm: Optional[Union[List[Dataset], Dataset]] = None) -> None:
@@ -247,11 +243,14 @@ class SeriesTree(TreeInterface):
 
   def trim_tree(self, filterfunc: Callable[[Dataset], bool]) -> int:
     trimmed = 0
+    new_data = {}
     for SOPInstanceUID, dataset in self.data.items():
-      if not filterfunc(dataset):
-        del self.data[SOPInstanceUID]
+      if filterfunc(dataset):
+        new_data[SOPInstanceUID] = dataset
+      else:
         trimmed += 1
         self.images -= 1
+    self.data = new_data
     return trimmed
 
   def save_tree(self, target: Path) -> None:

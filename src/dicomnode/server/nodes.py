@@ -52,3 +52,12 @@ class AbstractPipeline():
 
   def dispatch(self, process_return_value):
     pass
+
+  def post_init(self) -> None:
+    """This function is called just before the server is started.
+      The idea being that a user change this function to run some arbitrary code before the Dicom node starts.
+      This would often be 
+
+
+    """
+    pass
