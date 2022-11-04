@@ -111,5 +111,5 @@ class Lib_anonymization(TestCase):
 
     self.assertEqual(self.dataset_3_seq_ds_1.ReviewerName, "Anon_Reviewer Name")
     self.assertEqual(self.dataset_3_seq_ds_2.ReviewerName, "Anon_Reviewer Name")
-    self.assertEqual(self.dataset_4.OtherPatientNames, "Anon_Other Patient_Names")
-    self.assertEqual(self.dataset_5.ResponsiblePersone, "Anon_Responsible Person")
+    self.assertEqual(self.dataset_4.OtherPatientNames, "Anon_Other Patient Names")
+    self.assertEqual(self.dataset_5.ResponsiblePerson, "Anon_Responsible Person")

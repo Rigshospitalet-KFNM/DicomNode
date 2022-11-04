@@ -192,8 +192,14 @@ class lib_studyTree(TestCase):
     removed_images = dt.trim_tree(filterfunc)
     self.assertEqual(removed_images + dt.images, len(self.datasets))
 
-###### IdentityMapping #########
+  # Interface is actually an interface
+  def test_interface(self):
+    class Tree(TreeInterface):
+      pass
 
+    self.assertRaises(TypeError, Tree)
+
+###### IdentityMapping #########
   def test_create_IdentityMapping(self):
     im = IdentityMapping()
 
