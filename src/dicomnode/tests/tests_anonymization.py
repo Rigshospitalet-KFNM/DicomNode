@@ -5,7 +5,7 @@ from pydicom.valuerep import VR
 from pydicom.uid import generate_uid, MediaStorageDirectoryStorage
 from dicomnode.lib.anonymization import anonymize_dataset
 
-from dicomnode.lib.studyTree import DicomTree, IdentityMapping
+from dicomnode.lib.imageTree import DicomTree, IdentityMapping
 
 class Lib_anonymization(TestCase):
   def setUp(self) -> None:
@@ -103,7 +103,7 @@ class Lib_anonymization(TestCase):
 
   def test_anonymization(self):
     anonymization_function = anonymize_dataset(self.im)
-    self.dt.apply_mapping(anonymization_function, self.im)
+    self.dt.map(anonymization_function, self.im)
 
     for ds in self.datasets:
       self.assertNotIn(ds.PatientName,self.patientNames)

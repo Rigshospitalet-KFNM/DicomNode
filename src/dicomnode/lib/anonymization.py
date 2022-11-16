@@ -5,7 +5,7 @@ from pydicom.tag import BaseTag
 
 from typing import Callable, Optional
 
-from dicomnode.lib.studyTree import IdentityMapping
+from dicomnode.lib.imageTree import IdentityMapping
 
 BASE_ANONYMIZED_PATIENT_NAME = "Anonymized_PatientName"
 
@@ -24,7 +24,7 @@ def anonymize_dataset(
   Returns:
       Callable[[Dataset], None]: _description_
   """
-  def retfunc(dataset) -> None:
+  def retFunc(dataset) -> None:
     newPatientID = UIDMapping.PatientMapping[dataset.PatientID]
     dataset.PatientID = newPatientID
     PatientNumber = newPatientID[-UIDMapping.prefixSize:]
@@ -52,4 +52,4 @@ def anonymize_dataset(
             dataElement.value = newUID
     anon_ds(dataset)
 
-  return retfunc
+  return retFunc

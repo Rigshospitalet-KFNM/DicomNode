@@ -6,7 +6,7 @@ from pydicom import Dataset, FileDataset, write_file
 from pydicom.uid import UID, generate_uid
 from math import ceil, log10
 
-from abc import ABC, abstractclassmethod
+from abc import ABC, abstractclassmethod, abstractmethod
 
 from dicomnode.lib.utils import prefixInt
 
@@ -111,8 +111,8 @@ class IdentityMapping():
 
     return base_string
 
-class TreeInterface(ABC):
-  @abstractclassmethod
+class ImageTreeInterface(ABC):
+  @abstractmethod
   def add_image(self, _dicom : Dataset) -> None:
     raise NotImplemented #pragma: no cover
 
@@ -120,13 +120,13 @@ class TreeInterface(ABC):
     for dicom in listOfDicom:
       self.add_image(dicom)
 
-  def _apply_mapping(self, func : Callable[[Dataset], Any],
+  def _map(self, func : Callable[[Dataset], Any],
                     index_map : Optional[Dict],
                     UIDMapping : Optional[IdentityMapping] = None) -> Dict[str, Any]:
     new_data = {}
     ret_dir = {}
     for ID, tree in self.data.items():
-      ret_dir.update(tree.apply_mapping(func, UIDMapping))
+      ret_dir.update(tree.map(func, UIDMapping))
       if index_map:
         if ID in index_map:
           new_data[index_map[ID]] = tree
@@ -137,9 +137,9 @@ class TreeInterface(ABC):
     self.data = new_data
     return ret_dir
 
-  @abstractclassmethod
-  def apply_mapping(self, func : Callable[[Dataset], Any],
-                    UIDMapping : Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  @abstractmethod
+  def map(self, func: Callable[[Dataset], Any],
+                    UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     """Applies a callable function to all dataset in the Tree.
     If the function changes the keys, namly:
       SOPInstanceUID
@@ -174,8 +174,8 @@ class TreeInterface(ABC):
     Returns:
         int: Number of Pictures trimmed
     """
-    trimmed_total = 0
-    new_data = {}
+    trimmed_total:int = 0
+    new_data: Dict[str, Union[Dataset, ImageTreeInterface]] = {}
     for ID, tree in self.data.items():
       trimmed = tree.trim_tree(filter_function)
       if tree.images == 0:
@@ -190,17 +190,17 @@ class TreeInterface(ABC):
     return trimmed_total
 
   def __init__(self, dcm: Optional[Union[List[Dataset], Dataset]] = None) -> None:
-    self.data : Dict[str, Union[UID, str]] = {} # Dict containing Images, Series, Studies or Patients
-    self.images : int = 0 # The total number of images of this tree and it's subtrees
+    self.data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
+    self.images: int = 0 # The total number of images of this tree and it's subtrees
 
     if dcm:
-      if type(dcm) == Dataset or type(dcm) == FileDataset: # Here maybe use instance of
+      if isinstance(dcm, Dataset):
         self.add_image(dcm)
       else:
         self.add_images(dcm)
 
 
-class SeriesTree(TreeInterface):
+class SeriesTree(ImageTreeInterface):
   """Final Layer of the DicomTree that contains the data.
   """
   SeriesDescription = "Tree of Undefined Series"
@@ -222,7 +222,7 @@ class SeriesTree(TreeInterface):
     self.data[dicom.SOPInstanceUID.name] = dicom
     self.images += 1
 
-  def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     new_data = {}
     ret_dict = {}
     for SOPInstanceUID, dataset in self.data.items():
@@ -266,7 +266,7 @@ class SeriesTree(TreeInterface):
   def __str__(self) -> str:
     return f"{self.SeriesDescription} with {self.images} images"
 
-class StudyTree(TreeInterface):
+class StudyTree(ImageTreeInterface):
   """A Study tree is a data object that contains all studies with the same study ID
   """
   StudyDescription = f"Undefined Study Description"
@@ -290,11 +290,11 @@ class StudyTree(TreeInterface):
       self.data[dicom.SeriesInstanceUID.name] = SeriesTree(dicom)
     self.images += 1
 
-  def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     if UIDMapping:
-      return self._apply_mapping(func, UIDMapping.SeriesUIDMapping, UIDMapping)
+      return self._map(func, UIDMapping.SeriesUIDMapping, UIDMapping)
     else:
-      return self._apply_mapping(func, None, None)
+      return self._map(func, None, None)
 
   def __str__(self) -> str:
     seriesStr = f""
@@ -303,7 +303,7 @@ class StudyTree(TreeInterface):
     return f"{self.StudyDescription} with {self.images} images with Series:\n{seriesStr}"
 
 
-class PatientTree(TreeInterface):
+class PatientTree(ImageTreeInterface):
   """A Tree of Dicom images under one patient, based around Patient ID
   """
   TreeName : str = "Unknown Tree"
@@ -326,11 +326,11 @@ class PatientTree(TreeInterface):
       self.data[dicom.StudyInstanceUID.name] = StudyTree(dicom)
     self.images += 1
 
-  def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     if UIDMapping:
-      return self._apply_mapping(func, UIDMapping.StudyUIDMapping, UIDMapping)
+      return self._map(func, UIDMapping.StudyUIDMapping, UIDMapping)
     else:
-      return self._apply_mapping(func, None, None)
+      return self._map(func, None, None)
 
 
   def __str__(self) -> str:
@@ -339,8 +339,8 @@ class PatientTree(TreeInterface):
       studyStr += f"    {study}"
     return f"Patient {self.TreeName} with {self.images} images\n{studyStr}"
 
-class DicomTree(TreeInterface):
-  """This is a Root node of a tree stucture that sort Dicom Images in the following Path
+class DicomTree(ImageTreeInterface):
+  """This is a Root node of an ImageTree structure that sort Dicom Images in the following way:
 
   The Structure is as follows:
                      DicomTree\n
@@ -365,11 +365,11 @@ class DicomTree(TreeInterface):
       self.data[dicom.PatientID] = tree
     self.images += 1
 
-  def apply_mapping(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     if UIDMapping:
-      return self._apply_mapping(func, UIDMapping.PatientMapping, UIDMapping)
+      return self._map(func, UIDMapping.PatientMapping, UIDMapping)
     else:
-      return self._apply_mapping(func, None, None)
+      return self._map(func, None, None)
 
   def __str__(self) -> str:
     patientStr = f""

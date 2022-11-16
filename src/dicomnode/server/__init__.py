@@ -1,2 +1,2 @@
 from . import nodes
-from . import inputDataClass
+from . import input

@@ -12,14 +12,12 @@ if __name__ == '__main__':
     package_dir={"":"src"},
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
-      'numpy>=1.23.0',
-      'pydicom>=2.3.0',
+      'pydicom>=2.3.1',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
-      'nibabel>=4.0.2'
     ],
     extras_require = {
-     "test" : ["coverage"]
+     "test" : ["coverage"],
     },
     python_requires='>=3.9.1',
     entry_points={

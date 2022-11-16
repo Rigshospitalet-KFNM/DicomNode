@@ -5,7 +5,7 @@ from pydicom import Dataset
 from pydicom.uid import generate_uid, UID, MediaStorageDirectoryStorage
 from unittest import TestCase
 
-from dicomnode.lib.studyTree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, TreeInterface
+from dicomnode.lib.imageTree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
 
 class lib_studyTree(TestCase):
   def setUp(self) -> None:
@@ -179,7 +179,7 @@ class lib_studyTree(TestCase):
       ds.Modality = 'OT'
 
     dt = DicomTree(self.datasets)
-    dt.apply_mapping(writeModality)
+    dt.map(writeModality)
 
     for ds in self.datasets:
       self.assertEqual(ds.Modality, "OT")
@@ -194,7 +194,7 @@ class lib_studyTree(TestCase):
 
   # Interface is actually an interface
   def test_interface(self):
-    class Tree(TreeInterface):
+    class Tree(ImageTreeInterface):
       pass
 
     self.assertRaises(TypeError, Tree)

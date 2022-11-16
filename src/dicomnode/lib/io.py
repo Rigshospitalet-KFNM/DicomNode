@@ -6,14 +6,12 @@ from typing import Dict, Optional, Tuple
 from psutil import virtual_memory
 
 import pydicom
-from pydicom.values import convert_SQ, convert_string
 from pydicom import Dataset, Sequence
+from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict
 
-
-
 from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
-from dicomnode.lib.studyTree import DicomTree
+from dicomnode.lib.imageTree import DicomTree
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
   """ Updated the dicom dictionary with a set of new private tags,
@@ -37,10 +35,10 @@ def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str
 
 
 def apply_private_tags(
-    dataset : Dataset,
-    private_tags : Dict[int, Tuple[str, str, str, str, str]] = {},
-    is_implicit_VR = True,
-    is_little_endian = True
+    dataset: Dataset,
+    private_tags: Dict[int, Tuple[str, str, str, str, str]] = {},
+    is_implicit_VR:bool = True,
+    is_little_endian:bool = True
   ):
   """_summary_
 
@@ -86,11 +84,16 @@ def apply_private_tags(
 
 
 def load_dicom(
-  dicomPath : Path,
-  private_tags : Optional[Dict[int, Tuple[str, str, str, str, str]]] = None
+    dicomPath: Path,
+    private_tags: Optional[Dict[int, Tuple[str, str, str, str, str]]] = None
   ):
-
   return pydicom.dcmread(dicomPath)
+
+def save_dicom(
+    dicomPath: Path,
+    dicom: Dataset
+  ):
+  pydicom.write_file(dicomPath, Dataset)
 
 
 def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str, str, str, str]]:

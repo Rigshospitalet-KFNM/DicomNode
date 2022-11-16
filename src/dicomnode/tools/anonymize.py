@@ -7,7 +7,7 @@ from shutil import rmtree
 from argparse import _SubParsersAction, Namespace
 from dicomnode.lib.anonymization import anonymize_dataset, BASE_ANONYMIZED_PATIENT_NAME
 from dicomnode.lib.io import discover_dicom_files
-from dicomnode.lib.studyTree import DicomTree, IdentityMapping, _PPrefix
+from dicomnode.lib.imageTree import DicomTree, IdentityMapping, _PPrefix
 
 
 from dicomnode.lib.utils import str2bool
@@ -59,7 +59,7 @@ def entry_func(args : Namespace):
     change_UIDs=not args.keepuids
   )
 
-  tree.apply_mapping(anonymize_dataset(
+  tree.map(anonymize_dataset(
     identityMapping,
     PatientName=args.pnpf,
     StudyID=args.sid

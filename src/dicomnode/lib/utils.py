@@ -36,3 +36,7 @@ def getTag(Tag : int) -> Callable[[Dataset], Any]:
       return None
   return retfunc
 
+def staticfy(func):
+  def wrapper(self,*args, **kwargs):
+    return func(*args, **kwargs)
+  return wrapper
