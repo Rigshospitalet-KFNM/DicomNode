@@ -14,3 +14,6 @@ class InvalidRootDataDirectory(Exception):
 
 class InvalidDataset(Exception):
   """Raised when attempting to add dataset, which doesn't fulfil some requirements"""
+
+class InvalidQueryDataset(InvalidDataset):
+  """Raised when attempting to query with an invalid dataset"""
