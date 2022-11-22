@@ -10,36 +10,95 @@ It's primary file format for medical image equipment. An Analogy is dicom is to 
 
 The Dicom standard what an should be capable of doing and can be found at:
 
-**https://www.dicomstandard.org/current**
+**<https://www.dicomstandard.org/current>**
 
-If you click a little bit around in it, you'll find that it's big, verbose and not very readable. This is because it not very restrictive, yet at the same time tries to standardize optional content. It also means there's A LOT of details and finical details that'll be missing for the guide. This guide is mostly focused around usage of Dicom files, and thus many technical details will be left out. 
+If you click a little bit around in it, you'll find that it's big, verbose and not very readable. This is because it not very restrictive, yet at the same time tries to standardize optional content. It also means there's A LOT of details and finical details that'll be missing for the guide. This guide is mostly focused around usage of Dicom files, and thus many technical details will be left out.
 
 A warning: Images produced by medical equipment may be in the dicom format, but might not comply with the dicom standard. It's your application responsibility to check, that the images you receive and produce comply with the dicom standard. There's a number of tools in library to help with this job.
 
+This is a python library, that builds on top of the python library pydicom **<https://pydicom.github.io/pydicom/stable/>** and getting familiar with that library will definitely help you.
+
 ## The Dicom file
 
-A dicom file is a dictionary with integers keys and just about anything as values. The standard is this mapping between tags and values. For instance the tag: `0x0010010` means the patients Name. So if a program conform to the dicom standard it'll read and write the patient's name to and from the value associated with the tag `0x00100010`. All tags are in the range of `0` to `4294967295`, or in hex `0xFFFFFFFF`. Most tags have been restricted by the standard.
+A dicom file is a dictionary with integers keys and just about anything as values. To get started using pydicom you can create an empty dataset the following way:
 
-Along a value associated to a tag is a value representation **(VR)**, which tells how the program should interpret the ones and zeroes forming the value. For instance the patient name tag have a `VR` of `PN`. Which means that the program should assume is formatted as string. However the dicom standard also imposes additional restrictions upon that string: Namely it should be formatted as: family name complex, given name complex, middle name, name prefix, name suffix. Where each component is separated by a '^' character.
+```python
+from pydicom.dataset import Dataset
 
-It also specifies that a each component is a maximum of 64 characters. 
+dataset = Dataset()
+```
+
+### Tags
+
+Tags are the way to index into a dicom dataset. All tags are in the range of `0` to `4294967295` easily readable in hex `0xFFFFFFFF`. The dicom standard is this mapping between tags and values.  Most tags have been restricted by the standard. For instance the tag: `0x0010010` means the patients Name. So if a program conform to the dicom standard it'll read and write the patient's name to and from the value associated with the tag `0x00100010`.
+
+To check if a tag is in a dataset and if it is access the you can use the following code:
+
+```python
+if 0x00100010 in dataset:
+  data_element = dataset[0x00100010]
+```
+
+This returns a `pydicom.DataElement` object which consists of a tag, value, value multiplicity and value representation.
+
+### Value representation
+
+A value representation **(VR)**, informs on how to interpret the ones and zeroes forming the value. For instance the patient name tag have a `VR` of `PN`. Which means that the program should assume the value is formatted as string. However the dicom standard also imposes additional restrictions upon that string: Namely it should be formatted as: family name complex, given name complex, middle name, name prefix, name suffix. Where each component is separated by a '^' character.
+
+It also specifies that a each component is a maximum of 64 characters.
 
 From experience this is the most often broken part of the dicom standard, where programs simply just store the name as a string, instead of formatting it.
 
-All the Value representation can be found at **https://dicom.nema.org/dicom/2013/output/chtml/part05/sect_6.2.html**
+All the Value representation can be found at **<https://dicom.nema.org/dicom/2013/output/chtml/part05/sect_6.2.html>**
 
-Finally a tag also have a value multiplicity **(VM)**. This indicates how many instances of the values should exists. For instance the tag `0x00280034` describes how what the aspect ratio of the underlying picture. So if the stored picture is HD, then it has a 16:9 aspect ratio and the values for the tag `0x00280034` should be set to `[16,9]`. A value multiplicity might be a range. For instance if a tag has value multiplicity of 1-n that means there can be any number of values associated with the tag.
-
-Finally a tag might be present but value is associated with that, but more on that later. 
-
-### Sequences
+#### Sequences
 
 There's a few very special VR, and one of them is the Sequence VR `SQ`. A Sequence is a list of zero or more dicom objects stores inside of the tag. This is often used to store associated values, which doesn't fit within a single tag. It's clearly specified in the standard that each dicom object of a sequence may have different tags, however for your own sanity make sure that each object of a sequence have the same tags.
 
-A Sequence always have a VM of 1. 
+#### UID
 
-### UID & SOP Classes
+Most dicom objects have a few unique identifiers **(UID)** which determines something uniquely about the image, There's a few UIDs that is important to know about:
 
-Most dicom objects have a few unique identifiers **(UID)** which determines something uniquely about the image.
+* SOPInstanceUID - This is the ID of the image, it should uniquely determine the image.
+* SeriesInstanceUID - Medical images are often related and belongs to series. For instance in a tomogram and then each image would belong to the same series.
+* StudyInstanceUID - This relates all pictures which relates to same study. if some post processing processing have been applied to some images, they would have the same StudyInstanceUID while having different SeriesInstanceUIDs.
+* SOPClassUID - This describes what type of image the file is. But more on this later.
 
+You can determine the origin of a picture by looking at the prefix of the instance UID.
 
+For instance the prefix `1.2.826.0.1.3680043.10.1083` indicates that the image have been generated by dicomnode library.
+
+To generate an UID use the `gen_uid` method: In the following example it generate UIDs for a series:
+
+```python
+from dicomnode.lib.dicom import gen_uid
+
+SeriesUID = gen_uid()
+for dataset in datasets:
+  dataset.SeriesInstanceUID = SeriesUID
+  dataset.SOPInstanceUID = gen_uid()
+```
+
+### Value multiplicity
+
+A tag also have a value multiplicity **(VM)**. This indicates how many instances of the values should exists. For instance the tag `0x00280034` describes how what the aspect ratio of the underlying picture. So if the stored picture is HD, then it has a 16:9 aspect ratio and the values for the tag `0x00280034` should be set to `[16,9]`. A value multiplicity might be a range. For instance if a tag has value multiplicity of 1-n that means there can be any number of values associated with the tag.
+
+### Tag groups and Private Tags
+
+A Tag can be divided into groups: Consider the tag `0xGGGGEEEE` where the number formed by `0xGGGG` is the group number and `0xEEEE` is the element number. That's why you might see a tag defined as `(GGGG,EEEE)` which implies the tag `0xGGGGEEEE`. A tag group's tags contain information about a certain topic.
+For instance the tag group `0x0010` contain information on the patient, such as height, weight date of birth and so on.
+
+All the tag groups defined by the standard have an even number, this is because they are what is considered public tags. Private tags are application specific
+Tags, that should be considered application specific. Private tags are placed in uneven tag groups, since private tags are unknown to other application, they will appear with the VR: `UN` or unknown. Since these are group tags are chosen in private, you might choose a group which is used by an other application. This will result in a bad time, so be better at choosing. *(Or you can use the library private tag module, and then blame me for conflicts.)*
+
+Before you can use, private tags you must reserve them first. To do this you must create a data element with tag `0xGGGG00XX` where `XX` is in the range of 1-255 with the VR `LO` and a VM of 1. It's consider good karma, to write the name of your application in reserving tag.
+
+Each reserve tag, reserves a 255 tag range. namely: `0xGGGGXX(00-FF)`. As an example assume we choose to reserve the subgroup of 35 we would create a tag with tag value `0xGGGG0035` at which point we would have the tags `0xGGGG3500,0xGGGG3501, ... , 0xGGGG35FF`
+
+It's forbidden to store some data in a private tag, which have an equivalent public tag.
+
+## Dicom Image
+
+All dicom images should have a SOPClassUID, this value informs what type of image the file is. The list of valid classes can be found at **<https://dicom.nema.org/dicom/2013/output/chtml/part04/sect_B.5.html>**. For each type of image a number of modules is either Mandatory **(M)**, Conditional **(C)** or optional **(U)**. Each module consists of a set number of tags, which is again either required, required but no value is required or optional. Again a tag may be conditionally required or conditionally required with out value.
+
+It is highly recommended to use the public tags if applicable and being verbose in filling public tags. In other words, if you can fill a tag within a module with some valid data, it's recommended you do so. This is because other dicom application might have some functionality dependant on optional tags.

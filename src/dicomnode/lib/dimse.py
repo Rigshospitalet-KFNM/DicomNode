@@ -9,6 +9,8 @@ from enum import Enum
 import logging
 from typing import Iterable, Callable, Optional
 
+from threading import Thread
+
 from pydicom import Dataset
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
@@ -85,28 +87,44 @@ def send_images(SCU_AE: str, address: Address, dicom_images: Iterable[Dataset], 
     logger.error(error_message)
     raise CouldNotCompleteDIMSEMessage("Could not connect")
 
-def send_move(SCU_AE: str, address : Address, dataset : Dataset, query_level: QueryLevels = QueryLevels.PATIENT):
-  """This function sends 
-  
+def send_move(SCU_AE: str,
+              address : Address,
+              dataset : Dataset,
+              query_level: QueryLevels. = QueryLevels.PATIENT
+  ) -> None:
+  """This function sends a C-move to the address, as the SCU_AE to the SCU_AE
+
+  Args:
+    SCU_AE (str):
+    address (Address):
+    dataset (dataset):
+
+  Kwargs:
+    query_level (QueryLevel, optional):
+
+  Raises:
+    InvalidQueryDataset:
+    Could
 
   """
-  query_request_context = PatientRootQueryRetrieveInformationModelMove
-
-  ae = ApplicationEntity(SCU_AE)
-  ae.add_requested_context(query_request_context)
-  
   if "QueryRetrieveLevel" not in dataset:
     dataset.QueryRetrieveLevel = query_level
 
   if query_level == QueryLevels.PATIENT and 'PatientID' not in dataset:
+    logger.error("Attempted to send a move at Patient level without a PatientID tag")
     raise InvalidQueryDataset
 
   if query_level == QueryLevels.STUDY and 'StudyInstanceUID' not in dataset:
+    logger.error("Attempted to send a move at Study level without a StudyInstanceUID tag")
     raise InvalidQueryDataset
 
   if query_level == QueryLevels.SERIES and 'SeriesInstanceUID' not in dataset:
+    logger.error("Attempted to send a move at Series level without a SeriesInstanceUID tag")
     raise InvalidQueryDataset
 
+  query_request_context = PatientRootQueryRetrieveInformationModelMove
+  ae = ApplicationEntity(SCU_AE)
+  ae.add_requested_context(query_request_context)
   assoc = ae.associate(
     address.ip,
     address.port,
@@ -121,9 +139,9 @@ def send_move(SCU_AE: str, address : Address, dataset : Dataset, query_level: Qu
         logger.debug(f"status: {status}")
         logger.debug(f"identifier: {identifier}")
       else:
-        logger.debug("Failed to send")
-        logger.debug(f"status: {status}")
-        logger.debug(f"identifier: {identifier}")
+        logger.error("Failed to complete C-Move")
+        logger.error(f"status: {status}")
+        logger.error(f"identifier: {identifier}")
         successful_send = False
 
     assoc.release()
@@ -139,3 +157,26 @@ def send_move(SCU_AE: str, address : Address, dataset : Dataset, query_level: Qu
 
   if not successful_send:
     raise CouldNotCompleteDIMSEMessage
+
+def send_move_daemon(SCU_AE: str,
+                     address : Address,
+                     dataset : Dataset,
+                     query_level: QueryLevels= QueryLevels.PATIENT
+  ) -> Thread:
+  """Creates a thread, that sends a C-Move to the target.
+
+  The main reason you want to use this function over the standard send C-Move
+  is you don't want to wait for the result to terminate.
+
+  Args:
+      SCU_AE (str): The AE
+      address (Address): _description_
+      dataset (Dataset): _description_
+      query_level (QueryLevels, optional): _description_. Defaults to QueryLevels.PATIENT.
+
+  Returns:
+      Thread: _description_
+  """
+  daemon = Thread(target=send_move, daemon=True, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
+  daemon.run()
+  return daemon
