@@ -13,6 +13,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from typing import Iterator, List, Callable, Any
 from pydicom import Dataset
 
+from dicomnode.lib.imageTree import DicomTree
 
 def identity_grinder(image_generator: Iterator[Dataset] ) -> Iterator[Dataset]:
   """This is an identity function. The iterator is not called.
@@ -27,6 +28,9 @@ def identity_grinder(image_generator: Iterator[Dataset] ) -> Iterator[Dataset]:
 
 def list_grinder(image_generator: Iterator[Dataset]) -> List[Dataset]:
   return list(image_generator)
+
+def dicom_tree_grinder(image_generator: Iterator[Dataset]) -> DicomTree:
+  return DicomTree(image_generator)
 
 def many_meta_grinder(*grinders: Callable[[Iterator[Dataset]], Any]) -> Callable[[Iterator[Dataset]], List[Any]]:
   """This meta grinder combines any number of grinders

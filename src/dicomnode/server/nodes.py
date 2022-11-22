@@ -61,7 +61,7 @@ class AbstractPipeline(ABC):
   #Logging Configuration
   backup_weeks: int = 8
   log_path: Optional[str | Path] = None
-  log_level: int = logging.DEBUG
+  log_level: int = logging.INFO
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
   disable_pynetdicom_logger: bool = True
 
@@ -82,6 +82,7 @@ class AbstractPipeline(ABC):
     """
     self.ae.require_called_aet = self.require_called_aet
     self.ae.require_calling_aet = self.require_calling_aet
+
     self.ae.start_server(
       (self.ip,self.port),
       block=blocking,
@@ -111,7 +112,7 @@ class AbstractPipeline(ABC):
       )
     self.logger = getLogger("dicomnode")
     if self.disable_pynetdicom_logger:
-      getLogger("pynetdicom").setLevel(logging.ERROR)
+      getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
 
     # Handler setup
     # class needs to be instantiated before handlers can be defined
@@ -125,7 +126,7 @@ class AbstractPipeline(ABC):
     }
 
     # Load state
-    self.in_memory = self.root_data_directory is not None
+    self.in_memory = self.root_data_directory is None
     if not self.in_memory:
       if not self.root_data_directory:
         raise IncorrectlyConfigured("set data storage without specifying where")
@@ -140,10 +141,9 @@ class AbstractPipeline(ABC):
         self.root_data_directory.mkdir()
 
     self.__data_state = PipelineTree(
-      self.root_data_directory,
       self.patient_identifier_tag,
       self.input,
-      in_memory=self.in_memory
+      root_data_directory=self.root_data_directory
     )
 
     # Validates that Pipeline is configured correctly.
@@ -163,6 +163,7 @@ class AbstractPipeline(ABC):
         return 0xB006 # Element discarded
     except Exception as E:
       self.logger.critical("User Filter function crashed")
+
       return 0xA801
 
     if self.patient_identifier_tag in dataset:
@@ -171,36 +172,47 @@ class AbstractPipeline(ABC):
         self.__data_state.add_image(dataset)
         self.__updated_patients[event.assoc.name].add(patientID)
       except InvalidDataset:
+        self.logger.debug(f"Received dataset is not accepted by any inputs")
         return 0xB006
     else:
+      self.logger.debug(f"Node: Received dataset, doesn't have patient Identifier tag")
       return 0xB007
 
     return 0x0000
 
   def __association_accepted(self, event: evt.Event):
-    self.logger.info(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
+    self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
         self.__updated_patients[event.assoc.name] = set()
 
   def __association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    for updated_patient_ID in self.__updated_patients[event.assoc.name]:
-      if PatientData := self.__data_state.validate_patient_ID(updated_patient_ID):
+    for patient_ID in self.__updated_patients[event.assoc.name]:
+      if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:
+        self.logger.debug(f"Calling Processing for user: {patient_ID}")
         try:
           result = self.process(PatientData)
         except Exception:
           self.logger.critical("User Error in processing Data")
         else:
-          self.dispatch(result)
+          if self.dispatch(result):
+            PatientData._cleanup()
+
+
+      else:
+        self.logger.debug(f"Dataset was not valid for {patient_ID}")
     del self.__updated_patients[event.assoc.name]
 
-  def dispatch(self, images: Iterable[Dataset]):
+  def dispatch(self, images: Iterable[Dataset]) -> bool:
     for address in self.endpoints:
       try:
         send_images(self.ae_title, address, images)
       except CouldNotCompleteDIMSEMessage:
         self.logger.error(f"Could not send response to {address}")
+        return False
+      else:
+        return True
 
 
   def filter(self, dataset : Dataset) -> bool:

@@ -1,4 +1,5 @@
 from . import anonymization
+from . import dicom
 from . import dimse
 from . import exceptions
 from . import grinders

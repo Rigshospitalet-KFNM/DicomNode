@@ -60,7 +60,7 @@ from dicomnode.server.input import AbstractInput
 class MyInput(AbstractInput):
   required_tags: List[int] = [0x00080018, 0x7FE00010] # SOPInstanceUID, Pixel Data
   required_values: Dict[int, Any] = {}
-  image_grinder: Callable[[Iterator[Dataset]], GrindType] = staticmethod(grinder_function)
+  image_grinder: Callable[[Iterator[Dataset]], GrindType] = grinder_function
 
   def validate(self) -> bool:
     ...

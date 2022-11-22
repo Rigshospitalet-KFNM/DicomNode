@@ -3,6 +3,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+
 from psutil import virtual_memory
 
 import pydicom
@@ -11,7 +12,6 @@ from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict
 
 from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
-from dicomnode.lib.imageTree import DicomTree
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
   """ Updated the dicom dictionary with a set of new private tags,
@@ -93,7 +93,7 @@ def save_dicom(
     dicomPath: Path,
     dicom: Dataset
   ):
-  pydicom.write_file(dicomPath, Dataset)
+  dicom.save_as(dicomPath, write_like_original=False)
 
 
 def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str, str, str, str]]:
@@ -123,25 +123,3 @@ def load_private_tags_from_args(args : Namespace) -> Dict[int, Tuple[str,str,str
   if args.privatetags:
     private_tags = load_private_tags(args.privatetags, args.strictParsing)
   return private_tags
-
-def discover_dicom_files(path : Path, tree : DicomTree) -> None:
-  """Fills a DicomTree with studies found at <path>.
-  Recursively searches a Directory for dicomfiles.
-  Skipping files it cannot open.
-
-  Args:
-      path (Path): _description_
-      tree (DicomTree): The DicomTree to filled.
-  """
-  if path.is_file():
-    try:
-      dataset = load_dicom(path)
-      mem = virtual_memory()
-      if mem.available < 100*1024*1024: # This should be moved into a constants file
-        print("Limited Memory available")
-      tree.add_image(dataset)
-    except Exception as E:
-      print(E)
-  elif path.is_dir():
-    for p in path.glob('*'):
-      discover_dicom_files(p, tree)

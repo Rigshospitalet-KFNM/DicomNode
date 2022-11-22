@@ -1,16 +1,26 @@
+import logging
 from pathlib import Path
 from pprint import pprint, pformat
 from typing import Any, List, Optional, Union, Dict, Callable
 
+
+
+from pydicom.errors import InvalidDicomError
 from pydicom import Dataset, FileDataset, write_file
-from pydicom.uid import UID, generate_uid
+from pydicom.uid import UID
 from math import ceil, log10
+
+from psutil import virtual_memory
 
 from abc import ABC, abstractclassmethod, abstractmethod
 
+from dicomnode.lib.dicom import gen_uid
+from dicomnode.lib.io import save_dicom, load_dicom
 from dicomnode.lib.utils import prefixInt
 
 _PPrefix = "AnonymizedPatientID_"
+
+logger = logging.getLogger("dicomnode")
 
 class IdentityMapping():
   """
@@ -20,18 +30,18 @@ class IdentityMapping():
     Note to the Note: It might be possible to resolve it with a type hint
     'dicomnode.lib.studyTree.DicomTree'
   """
-  def __init__(self, prefixSize = 4) -> None:
+  def __init__(self, prefix_size = 4) -> None:
     self.StudyUIDMapping : Dict[str, UID] = {}
     self.SeriesUIDMapping : Dict[str, UID] = {}
     self.SOPUIDMapping : Dict[str, UID] = {}
     self.PatientMapping : Dict[str, str] = {}
-    self.prefixSize = prefixSize
+    self.prefix_size = prefix_size
 
   def _add_to_mapping(self, uid : str , mapping : Dict) -> UID:
     if uid in mapping:
       return mapping[uid]
     else:
-      mapping[uid] = generate_uid() # Well Here we include some clever prefix
+      mapping[uid] = gen_uid() # Well Here we include some clever prefix
       return mapping[uid]
 
   def add_StudyUID(self, StudyInstanceUID : UID) -> UID:
@@ -47,7 +57,7 @@ class IdentityMapping():
     if PatientID in self.PatientMapping:
       return self.PatientMapping[PatientID]
     else:
-      anonymized_PatientID = f"{patient_prefix}{prefixInt(len(self.PatientMapping), self.prefixSize)}"
+      anonymized_PatientID = f"{patient_prefix}{prefixInt(len(self.PatientMapping), self.prefix_size)}"
       self.PatientMapping[PatientID] = anonymized_PatientID
       return anonymized_PatientID
 
@@ -67,7 +77,7 @@ class IdentityMapping():
       self.fill_from_StudyTree(studyTree)
 
   def fill_from_DicomTree(self, dicomTree : 'DicomTree', patient_prefix : str = _PPrefix, change_UIDs : bool = True):
-    self.prefixSize = max(ceil(log10(len(dicomTree.data))),1)
+    self.prefix_size = max(ceil(log10(len(dicomTree.data))),1)
     for patientID, studyTree in dicomTree.data.items():
       self.add_Patient(patientID, patient_prefix)
       if change_UIDs:
@@ -137,6 +147,27 @@ class ImageTreeInterface(ABC):
     self.data = new_data
     return ret_dir
 
+  def discover(self, path: Path):
+    """Fills a DicomTree with studies found at <path>.
+      Recursively searches a Directory for dicom files.
+      Skipping files it cannot open.
+
+    Args:
+      path (Path): Path
+    """
+    if path.is_file():
+      try:
+        dataset = load_dicom(path)
+        mem = virtual_memory()
+        if mem.available < 100*1024*1024: # This should be moved into a constants file
+          print("Limited Memory available")
+        self.add_image(dataset)
+      except InvalidDicomError as E:
+        logger.error(f"Attempting to load a none dicom file at: {path}")
+    elif path.is_dir():
+      for p in path.iterdir():
+        self.discover(p)
+
   @abstractmethod
   def map(self, func: Callable[[Dataset], Any],
                     UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
@@ -189,6 +220,17 @@ class ImageTreeInterface(ABC):
     self.data = new_data
     return trimmed_total
 
+  def __iter__(self) -> Dataset:
+    for subtree in self.data.values():
+      if isinstance(subtree, ImageTreeInterface):
+        for subtreeVal in subtree:
+          yield subtreeVal
+      else:
+        yield subtree
+
+  def __len__(self):
+    return self.images
+
   def __init__(self, dcm: Optional[Union[List[Dataset], Dataset]] = None) -> None:
     self.data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
     self.images: int = 0 # The total number of images of this tree and it's subtrees
@@ -198,7 +240,6 @@ class ImageTreeInterface(ABC):
         self.add_image(dcm)
       else:
         self.add_images(dcm)
-
 
 class SeriesTree(ImageTreeInterface):
   """Final Layer of the DicomTree that contains the data.
@@ -256,12 +297,12 @@ class SeriesTree(ImageTreeInterface):
   def save_tree(self, target: Path) -> None:
     if len(self.data) == 1:
       for _, v in self.data.items(): # Only Iterated once
-        write_file(target, v)
+        save_dicom(target, v)
     else:
       target.mkdir()
       for k, v in self.data.items(): # Only Iterated once
         file_target = target / k
-        write_file(file_target, v)
+        save_dicom(file_target, v)
 
   def __str__(self) -> str:
     return f"{self.SeriesDescription} with {self.images} images"

@@ -16,11 +16,18 @@ from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 
 logger = logging.getLogger("dicomnode")
 
-@dataclass(frozen=True)
+@dataclass
 class Address:
   ip: str
   port: int
   ae_title: str # SCP ae title
+
+@dataclass(init=False)
+class ResponseAddress(Address):
+  """Dynamic address of target"""
+
+  def __init__(self):
+    pass
 
 def send_image(SCU_AE: str, address: Address, dicom_image: Dataset ) -> Dataset:
   ae = ApplicationEntity(ae_title=SCU_AE)
@@ -39,7 +46,7 @@ def send_image(SCU_AE: str, address: Address, dicom_image: Dataset ) -> Dataset:
       IP: {address.ip}
       Port: {address.port}
       SCP AE: {address.ae_title}
-      SCU AE:{SCU_AE}
+      SCU AE: {SCU_AE}
     """
     logger.error(error_message)
     raise CouldNotCompleteDIMSEMessage("Could not connect")

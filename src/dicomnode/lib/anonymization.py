@@ -9,7 +9,26 @@ from dicomnode.lib.imageTree import IdentityMapping
 
 BASE_ANONYMIZED_PATIENT_NAME = "Anonymized_PatientName"
 
-def anonymize_dataset(
+
+def anonymize_dataset(ds: Dataset):
+      if hasattr(ds, 'file_meta'):
+        anonymize_dataset(ds.file_meta)
+
+      for dataElement in ds.iterall():
+        vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
+        if type(dataElement.VR) == VR: # The VR might be very wierd
+          vr = str(vr)
+          _, vr = vr.split('.')
+        if dataElement.tag == BaseTag(0x00100010): # PatientName tag value
+          dataElement.value  = f"{PatientName}_{PatientNumber}"
+        elif vr == "PN":
+          dataElement.value = "Anon_" + dataElement.name
+        elif vr == "SQ":
+          for seq in dataElement:
+            anonymize_dataset(seq)
+
+
+def anonymize_dicom_tree(
   UIDMapping : IdentityMapping,
   PatientName : str = BASE_ANONYMIZED_PATIENT_NAME,
   StudyID : Optional[str] = "Study"
@@ -27,7 +46,7 @@ def anonymize_dataset(
   def retFunc(dataset) -> None:
     newPatientID = UIDMapping.PatientMapping[dataset.PatientID]
     dataset.PatientID = newPatientID
-    PatientNumber = newPatientID[-UIDMapping.prefixSize:]
+    PatientNumber = newPatientID[-UIDMapping.prefix_size:]
     if StudyID:
       dataset.StudyID = f"{StudyID}_{PatientNumber}"
 

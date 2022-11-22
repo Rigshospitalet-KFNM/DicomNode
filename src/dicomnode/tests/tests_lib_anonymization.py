@@ -2,9 +2,10 @@ from unittest import TestCase
 
 from pydicom import Dataset, DataElement, Sequence
 from pydicom.valuerep import VR
-from pydicom.uid import generate_uid, MediaStorageDirectoryStorage
-from dicomnode.lib.anonymization import anonymize_dataset
+from pydicom.uid import MediaStorageDirectoryStorage
+from dicomnode.lib.anonymization import anonymize_dicom_tree
 
+from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping
 
 class Lib_anonymization(TestCase):
@@ -21,16 +22,16 @@ class Lib_anonymization(TestCase):
 
     self.patientNames = [self.patientID_1, self.patientName_2, self.patientName_3]
 
-    self.studyUID_1 = generate_uid()
-    self.studyUID_2 = generate_uid()
-    self.studyUID_3 = generate_uid()
+    self.studyUID_1 = gen_uid()
+    self.studyUID_2 = gen_uid()
+    self.studyUID_3 = gen_uid()
 
-    self.seriesUID_1 = generate_uid()
-    self.seriesUID_2 = generate_uid()
-    self.seriesUID_3 = generate_uid()
+    self.seriesUID_1 = gen_uid()
+    self.seriesUID_2 = gen_uid()
+    self.seriesUID_3 = gen_uid()
 
     self.dataset_1 = Dataset()
-    self.dataset_1_SOPInstanceUID = generate_uid()
+    self.dataset_1_SOPInstanceUID = gen_uid()
     self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_1.SOPInstanceUID = self.dataset_1_SOPInstanceUID
     self.dataset_1.SeriesInstanceUID = self.seriesUID_1
@@ -41,7 +42,7 @@ class Lib_anonymization(TestCase):
 
 
     self.dataset_2 = Dataset()
-    self.dataset_2_SOPInstanceUID = generate_uid()
+    self.dataset_2_SOPInstanceUID = gen_uid()
     self.dataset_2.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_2.SOPInstanceUID = self.dataset_2_SOPInstanceUID
     self.dataset_2.SeriesInstanceUID = self.seriesUID_1
@@ -51,7 +52,7 @@ class Lib_anonymization(TestCase):
     self.dataset_2.ensure_file_meta()
 
     self.dataset_3 = Dataset()
-    self.dataset_3_SOPInstanceUID = generate_uid()
+    self.dataset_3_SOPInstanceUID = gen_uid()
     self.dataset_3.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_3.SOPInstanceUID = self.dataset_3_SOPInstanceUID
     self.dataset_3.SeriesInstanceUID = self.seriesUID_2
@@ -66,7 +67,7 @@ class Lib_anonymization(TestCase):
     self.dataset_3.ReferencedPatientSequence = Sequence([self.dataset_3_seq_ds_1, self.dataset_3_seq_ds_2])
 
     self.dataset_4 = Dataset()
-    self.dataset_4_SOPInstanceUID = generate_uid()
+    self.dataset_4_SOPInstanceUID = gen_uid()
     self.dataset_4.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_4.SOPInstanceUID = self.dataset_4_SOPInstanceUID
     self.dataset_4.SeriesInstanceUID = self.seriesUID_1
@@ -77,7 +78,7 @@ class Lib_anonymization(TestCase):
     self.dataset_4.ensure_file_meta()
 
     self.dataset_5 = Dataset()
-    self.dataset_5_SOPInstanceUID = generate_uid()
+    self.dataset_5_SOPInstanceUID = gen_uid()
     self.dataset_5.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_5.SOPInstanceUID = self.dataset_5_SOPInstanceUID
     self.dataset_5.SeriesInstanceUID = self.seriesUID_1
@@ -88,7 +89,7 @@ class Lib_anonymization(TestCase):
     self.dataset_5.ensure_file_meta()
 
     self.dataset_6 = Dataset()
-    self.dataset_6_SOPInstanceUID = generate_uid()
+    self.dataset_6_SOPInstanceUID = gen_uid()
     self.dataset_6.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
     self.dataset_6.SOPInstanceUID = self.dataset_5_SOPInstanceUID
     self.dataset_6.SeriesInstanceUID = self.seriesUID_3
@@ -102,7 +103,7 @@ class Lib_anonymization(TestCase):
     self.im.fill_from_DicomTree(self.dt)
 
   def test_anonymization(self):
-    anonymization_function = anonymize_dataset(self.im)
+    anonymization_function = anonymize_dicom_tree(self.im)
     self.dt.map(anonymization_function, self.im)
 
     for ds in self.datasets:

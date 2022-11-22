@@ -5,8 +5,7 @@ from shutil import rmtree
 
 
 from argparse import _SubParsersAction, Namespace
-from dicomnode.lib.anonymization import anonymize_dataset, BASE_ANONYMIZED_PATIENT_NAME
-from dicomnode.lib.io import discover_dicom_files
+from dicomnode.lib.anonymization import anonymize_dicom_tree, BASE_ANONYMIZED_PATIENT_NAME
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping, _PPrefix
 
 
@@ -50,7 +49,8 @@ def entry_func(args : Namespace):
       raise FileExistsError(error_message)
 
   tree = DicomTree()
-  discover_dicom_files(args.DicomPath, tree)
+  tree.discover(args.DicomPath)
+
 
   identityMapping = IdentityMapping()
   identityMapping.fill_from_DicomTree(
@@ -59,7 +59,7 @@ def entry_func(args : Namespace):
     change_UIDs=not args.keepuids
   )
 
-  tree.map(anonymize_dataset(
+  tree.map(anonymize_dicom_tree(
     identityMapping,
     PatientName=args.pnpf,
     StudyID=args.sid

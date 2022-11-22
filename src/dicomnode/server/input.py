@@ -9,21 +9,37 @@ from pathlib import Path
 from pydicom import Dataset
 from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, TypeVar
 
+import logging
 
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.grinders import identity_grinder
 from dicomnode.lib.imageTree import ImageTreeInterface
 from dicomnode.lib.utils import staticfy
 
 
-GrindType = TypeVar('GrindType')
-
 class AbstractInput(ImageTreeInterface, ABC):
   required_tags: List[int] = [0x00080018, 0x7FE00010] # InstanceUID, Pixel Data
   private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
   required_values: Dict[int, Any] = {}
-  image_grinder: Callable[[Iterator[Dataset]], GrindType] = identity_grinder
+  image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
+
+  def __init__(self, instance_directory: Optional[Path] = None):
+    self.__instance_directory: Optional[Path] = instance_directory
+    self.data: Dict[str, Dataset] = {}
+    self.images = 0
+
+    self.logger= logging.getLogger("dicomnode")
+
+    if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
+      self.required_tags.append(0x00080018)
+
+    if self.__instance_directory is not None:
+      if not self.__instance_directory.exists():
+        self.__instance_directory.mkdir(exist_ok=True)
+      for image_path in self.__instance_directory.iterdir():
+        dcm = load_dicom(image_path, self.private_tags)
+        self.add_image(dcm)
 
   @abstractmethod
   def validate(self) -> bool:
@@ -32,9 +48,16 @@ class AbstractInput(ImageTreeInterface, ABC):
     Returns:
         bool: If there's sufficient data to start processing
     """
-    return False
+    raise NotImplementedError #pragma: no cover
 
-  def get_data(self) -> GrindType:
+  def _clean_up(self) -> None:
+    """Removes any files, stored by the Input"""
+    if self.__instance_directory is not None:
+      for dicom in self.data.values():
+        p = self.__getPath(dicom)
+        p.unlink()
+
+  def get_data(self) -> Any:
     """This function retrieves all the data stores in the input,
     and makes it ready for processing
 
@@ -43,24 +66,8 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     return staticfy(self.image_grinder)(self.data.values())
 
-  def __init__(self, instance_directory: Optional[Path] = None, in_memory: bool = False):
-    self.__instance_directory: Path = instance_directory
-    self.in_memory = in_memory
-    self.data: Dict[str, Dataset] = {}
-    self.images = 0
-
-    if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
-      self.required_tags.push(0x00080018)
-
-    if not self.in_memory:
-      for image_path in self.__instance_directory.iterdir():
-        dcm = load_dicom(image_path, self.private_tags)
-        self.add_image(dcm)
-
-
   def map(self, func: Callable[[Dataset], Any], UIDMapping) -> List[Any]:
     pass
-
 
   def __getPath(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
@@ -70,7 +77,13 @@ class AbstractInput(ImageTreeInterface, ABC):
 
     Returns:
         Path: The path for that dataset.
+
+    Raises:
+      IncorrectlyConfigured : Calls to this function require a dictory
     """
+    if self.__instance_directory is None:
+      raise IncorrectlyConfigured
+
     image_name: str = ""
     if 0x00080060 in dicom: # Modality
       image_name += f"{dicom.Modality}_"
@@ -97,18 +110,21 @@ class AbstractInput(ImageTreeInterface, ABC):
     # Dataset Validation
     for required_tag in self.required_tags:
       if required_tag not in dicom:
+        self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         raise InvalidDataset()
 
     for required_tag, required_value in self.required_values.items():
       if required_tag not in dicom:
+        self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         raise InvalidDataset()
-      if dicom[required_tag] != required_value:
+      if dicom[required_tag].value != required_value:
+        self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
         raise InvalidDataset()
 
     # Save the dataset
     self.data[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
     self.images += 1
-    if not self.in_memory:
+    if self.__instance_directory is not None:
       dicom_path:Path = self.__getPath(dicom)
       if not dicom_path.exists():
         save_dicom(dicom_path, dicom)

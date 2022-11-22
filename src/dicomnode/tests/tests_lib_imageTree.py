@@ -1,13 +1,24 @@
 
-from asyncore import write
-from curses import pair_content
+from pathlib import Path
+import shutil
+
 from pydicom import Dataset
-from pydicom.uid import generate_uid, UID, MediaStorageDirectoryStorage
+from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
 from unittest import TestCase
 
+from dicomnode.lib.dicom import gen_uid
+from dicomnode.lib.io import load_dicom
 from dicomnode.lib.imageTree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
 
-class lib_studyTree(TestCase):
+def get_test_dataset() -> Dataset:
+  dataset = Dataset()
+  dataset.SOPClassUID = SecondaryCaptureImageStorage
+  dataset.is_little_endian = True
+  dataset.is_implicit_VR = True
+
+  return dataset
+
+class lib_imageTree(TestCase):
   def setUp(self) -> None:
     self.patientID_1 = "testID_1"
     self.patientID_2 = "testID_2"
@@ -15,69 +26,64 @@ class lib_studyTree(TestCase):
     self.patientName_1 = "TestP1"
     self.patientName_2 = "TestP2"
 
-    self.studyUID_1 = generate_uid()
-    self.studyUID_2 = generate_uid()
+    self.studyUID_1 = gen_uid()
+    self.studyUID_2 = gen_uid()
 
-    self.seriesUID_1 = generate_uid()
-    self.seriesUID_2 = generate_uid()
+    self.seriesUID_1 = gen_uid()
+    self.seriesUID_2 = gen_uid()
 
-    self.dataset_1 = Dataset()
-    self.dataset_1_SOPInstanceUID = generate_uid()
-    self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
+    self.dataset_1 = get_test_dataset()
+    self.dataset_1_SOPInstanceUID = gen_uid()
     self.dataset_1.SOPInstanceUID = self.dataset_1_SOPInstanceUID
     self.dataset_1.SeriesInstanceUID = self.seriesUID_1
     self.dataset_1.StudyInstanceUID = self.studyUID_1
     self.dataset_1.PatientID = self.patientID_1
     self.dataset_1.PatientName = self.patientName_1
-    self.dataset_1.ensure_file_meta()
+    self.dataset_1.fix_meta_info()
 
 
-    self.dataset_2 = Dataset()
-    self.dataset_2_SOPInstanceUID = generate_uid()
-    self.dataset_1.MediaStorageSOPClassUID = self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
+    self.dataset_2 = get_test_dataset()
+    self.dataset_2_SOPInstanceUID = gen_uid()
     self.dataset_2.SOPInstanceUID = self.dataset_2_SOPInstanceUID
     self.dataset_2.SeriesInstanceUID = self.seriesUID_1
     self.dataset_2.StudyInstanceUID = self.studyUID_1
     self.dataset_2.PatientID = self.patientID_1
     self.dataset_2.PatientName = self.patientName_1
-    self.dataset_2.ensure_file_meta()
+    self.dataset_2.fix_meta_info()
 
-    self.dataset_3 = Dataset()
-    self.dataset_3_SOPInstanceUID = generate_uid()
-    self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
+    self.dataset_3 = get_test_dataset()
+    self.dataset_3_SOPInstanceUID = gen_uid()
     self.dataset_3.SOPInstanceUID = self.dataset_3_SOPInstanceUID
     self.dataset_3.SeriesInstanceUID = self.seriesUID_2
     self.dataset_3.StudyInstanceUID = self.studyUID_1
     self.dataset_3.PatientID = self.patientID_1
     self.dataset_3.PatientName = self.patientName_1
-    self.dataset_3.ensure_file_meta()
+    self.dataset_3.fix_meta_info()
 
-    self.dataset_4 = Dataset()
-    self.dataset_4_SOPInstanceUID = generate_uid()
-    self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
+    self.dataset_4 = get_test_dataset()
+    self.dataset_4_SOPInstanceUID = gen_uid()
     self.dataset_4.SOPInstanceUID = self.dataset_4_SOPInstanceUID
     self.dataset_4.SeriesInstanceUID = self.seriesUID_1
     self.dataset_4.StudyInstanceUID = self.studyUID_2
     self.dataset_4.PatientID = self.patientID_2
     self.dataset_4.PatientName = self.patientName_2
-    self.dataset_4.ensure_file_meta()
+    self.dataset_4.fix_meta_info()
 
-    self.dataset_5 = Dataset()
-    self.dataset_5_SOPInstanceUID = generate_uid()
-    self.dataset_1.MediaStorageSOPClassUID = MediaStorageDirectoryStorage
+    self.dataset_5 = get_test_dataset()
+    self.dataset_5_SOPInstanceUID = gen_uid()
     self.dataset_5.SOPInstanceUID = self.dataset_5_SOPInstanceUID
     self.dataset_5.SeriesInstanceUID = self.seriesUID_1
     self.dataset_5.StudyInstanceUID = self.studyUID_2
     self.dataset_5.PatientID = self.patientID_2
     self.dataset_5.PatientName = self.patientName_2
-    self.dataset_5.ensure_file_meta()
+    self.dataset_5.fix_meta_info()
 
     self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5]
 
     self.empty_dataset = Dataset()
 
 
-  ##### Test for creating the datastructure DicomTrees #####
+  ##### Test for creating the data structure DicomTrees #####
   def test_create_DicomTree_createEmptyDataset(self):
     dt = DicomTree()
     # Assertions
@@ -89,7 +95,7 @@ class lib_studyTree(TestCase):
     dt = DicomTree(self.dataset_1)
     pt = dt.data[self.dataset_1.PatientID]
     stt = pt.data[self.dataset_1.StudyInstanceUID]
-    setree = stt.data[self.dataset_1.SeriesInstanceUID]
+    seTree = stt.data[self.dataset_1.SeriesInstanceUID]
     # Assertions
     self.assertEqual(dt.images, 1)
     self.assertEqual(len(dt.data), 1)
@@ -97,9 +103,9 @@ class lib_studyTree(TestCase):
     self.assertEqual(pt.images, 1)
     self.assertTrue(isinstance(stt, StudyTree))
     self.assertEqual(stt.images, 1)
-    self.assertTrue(isinstance(setree, SeriesTree))
-    self.assertEqual(setree.images, 1)
-    self.assertEqual(setree.data[self.dataset_1.SOPInstanceUID], self.dataset_1)
+    self.assertTrue(isinstance(seTree, SeriesTree))
+    self.assertEqual(seTree.images, 1)
+    self.assertEqual(seTree.data[self.dataset_1.SOPInstanceUID], self.dataset_1)
 
   def test_create_DicomTree_ManyPictures(self):
     dt = DicomTree(self.datasets)
@@ -112,12 +118,12 @@ class lib_studyTree(TestCase):
     # Assertions
     self.assertEqual(dt.images, len(self.datasets))
 
-  def test_Dicomtree_add_image(self):
+  def test_DicomTree_add_image(self):
     dt = DicomTree()
     dt.add_image(self.dataset_1)
     pt = dt.data[self.dataset_1.PatientID]
     stt = pt.data[self.dataset_1.StudyInstanceUID]
-    setree = stt.data[self.dataset_1.SeriesInstanceUID]
+    seTree = stt.data[self.dataset_1.SeriesInstanceUID]
     # Assertions
     self.assertEqual(dt.images, 1)
     self.assertEqual(dt.images, 1)
@@ -126,9 +132,9 @@ class lib_studyTree(TestCase):
     self.assertEqual(pt.images, 1)
     self.assertTrue(isinstance(stt, StudyTree))
     self.assertEqual(stt.images, 1)
-    self.assertTrue(isinstance(setree, SeriesTree))
-    self.assertEqual(setree.images, 1)
-    self.assertEqual(setree.data[self.dataset_1.SOPInstanceUID], self.dataset_1)
+    self.assertTrue(isinstance(seTree, SeriesTree))
+    self.assertEqual(seTree.images, 1)
+    self.assertEqual(seTree.data[self.dataset_1.SOPInstanceUID], self.dataset_1)
 
   def test_DicomTree_to_str_method_pictures(self):
     dt = DicomTree(self.datasets)
@@ -185,11 +191,11 @@ class lib_studyTree(TestCase):
       self.assertEqual(ds.Modality, "OT")
 
   def test_DicomTree_trimTree(self):
-    def filterfunc(ds):
+    def filterFunc(ds):
       return ds.PatientID == self.patientID_1
 
     dt = DicomTree(self.datasets)
-    removed_images = dt.trim_tree(filterfunc)
+    removed_images = dt.trim_tree(filterFunc)
     self.assertEqual(removed_images + dt.images, len(self.datasets))
 
   # Interface is actually an interface
@@ -212,7 +218,7 @@ class lib_studyTree(TestCase):
     self.assertEqual(len(im.SeriesUIDMapping), 0)
     self.assertEqual(len(im.SOPUIDMapping), 0)
     self.assertEqual(len(im.PatientMapping), 0)
-    self.assertEqual(im.prefixSize, 4)
+    self.assertEqual(im.prefix_size, 4)
 
   def test_create_IM_with_DT(self):
     im = IdentityMapping()
@@ -266,7 +272,7 @@ class lib_studyTree(TestCase):
     self.assertEqual(study_uid_ret_1, study_str_ret_1)
     self.assertEqual(series_uid_ret_1, series_str_ret_1)
 
-    self.assertIsNone(im.get_mapping(generate_uid(prefix='1.3.')))
+    self.assertIsNone(im.get_mapping(gen_uid()))
 
   def test_IdentityMapping_str(self):
     im = IdentityMapping()
@@ -279,3 +285,35 @@ class lib_studyTree(TestCase):
   Study Mapping with 2 Mappings
   Series Mapping with 2
   SOP Mapping with 5 Mappings""")
+
+  # Saving tree
+  def test_save_tree(self):
+    testDir = Path(self._testMethodName)
+    DT = DicomTree(self.datasets)
+    DT.save_tree(testDir)
+
+    self.assertTrue((testDir / self.patientID_1).exists())
+    self.assertTrue((testDir / self.patientID_2).exists())
+
+    shutil.rmtree(testDir)
+
+  def test_save_file(self):
+    dicom_path = Path(self._testMethodName)
+    DT = DicomTree(self.dataset_1)
+    DT.save_tree(dicom_path)
+    self.assertTrue(dicom_path.exists())
+    self.assertTrue(dicom_path.is_file())
+
+    dicom = load_dicom(dicom_path)
+
+    self.assertEqual(dicom, self.dataset_1)
+    dicom_path.unlink()
+
+
+  # Test Iteration
+  def test_iteration(self):
+    DT = DicomTree(self.datasets)
+    for image in DT:
+      self.assertIn(image, self.datasets)
+
+
