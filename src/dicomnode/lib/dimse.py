@@ -22,9 +22,9 @@ from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryD
 logger = logging.getLogger("dicomnode")
 
 class QueryLevels(Enum):
-  PATIENT : "PATIENT"
-  STUDY   : "STUDY"
-  SERIES  : "SERIES"
+  PATIENT="PATIENT"
+  STUDY="STUDY"
+  SERIES="SERIES"
 
 
 @dataclass
@@ -90,7 +90,7 @@ def send_images(SCU_AE: str, address: Address, dicom_images: Iterable[Dataset], 
 def send_move(SCU_AE: str,
               address : Address,
               dataset : Dataset,
-              query_level: QueryLevels. = QueryLevels.PATIENT
+              query_level: QueryLevels = QueryLevels.PATIENT
   ) -> None:
   """This function sends a C-move to the address, as the SCU_AE to the SCU_AE
 

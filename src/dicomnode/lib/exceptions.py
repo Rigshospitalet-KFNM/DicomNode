@@ -1,19 +1,20 @@
 class IncorrectlyConfigured(Exception):
-  """Raised when the server attempt to start, but have not been correctly
-  configured."""
+  """Server attempts to start incorrectly configured"""
 
 class CouldNotCompleteDIMSEMessage(Exception):
-  """Raised when a user attempts to send a DIMSE message,
-  when it's unsuccessful this message is raised
-  """
+  """A DIMSE message was unsuccessful"""
 
 class InvalidRootDataDirectory(Exception):
-  """Raised when attempting to create a pipelineTree and
-  the root data directory is invalid
-  """
+  """creating a pipelineTree with invalid root data directory"""
 
 class InvalidDataset(Exception):
-  """Raised when attempting to add dataset, which doesn't fulfil some requirements"""
+  """Adding a dataset, which doesn't fulfil some requirements"""
+
+class InvalidTagType(Exception):
+  """Added an invalid type of tag"""
 
 class InvalidQueryDataset(InvalidDataset):
-  """Raised when attempting to query with an invalid dataset"""
+  """Querying with an invalid dataset"""
+
+class MissingModule(ImportError):
+  """Missing an module"""

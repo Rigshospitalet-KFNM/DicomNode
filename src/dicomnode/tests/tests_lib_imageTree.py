@@ -28,9 +28,15 @@ class lib_imageTree(TestCase):
 
     self.studyUID_1 = gen_uid()
     self.studyUID_2 = gen_uid()
+    self.studyUID_3 = gen_uid()
+    self.studyUID_4 = gen_uid()
 
     self.seriesUID_1 = gen_uid()
     self.seriesUID_2 = gen_uid()
+    self.seriesUID_3 = gen_uid()
+    self.seriesUID_4 = gen_uid()
+    self.seriesUID_5 = gen_uid()
+
 
     self.dataset_1 = get_test_dataset()
     self.dataset_1_SOPInstanceUID = gen_uid()
@@ -55,6 +61,7 @@ class lib_imageTree(TestCase):
     self.dataset_3_SOPInstanceUID = gen_uid()
     self.dataset_3.SOPInstanceUID = self.dataset_3_SOPInstanceUID
     self.dataset_3.SeriesInstanceUID = self.seriesUID_2
+    self.dataset_3.SeriesDescription = "Test Series Description"
     self.dataset_3.StudyInstanceUID = self.studyUID_1
     self.dataset_3.PatientID = self.patientID_1
     self.dataset_3.PatientName = self.patientName_1
@@ -62,23 +69,33 @@ class lib_imageTree(TestCase):
 
     self.dataset_4 = get_test_dataset()
     self.dataset_4_SOPInstanceUID = gen_uid()
-    self.dataset_4.SOPInstanceUID = self.dataset_4_SOPInstanceUID
-    self.dataset_4.SeriesInstanceUID = self.seriesUID_1
+    self.dataset_4.SOPInstanceUID = self.dataset_3_SOPInstanceUID
+    self.dataset_4.SeriesInstanceUID = self.seriesUID_3
     self.dataset_4.StudyInstanceUID = self.studyUID_2
-    self.dataset_4.PatientID = self.patientID_2
-    self.dataset_4.PatientName = self.patientName_2
+    self.dataset_4.PatientID = self.patientID_1
+    self.dataset_4.PatientName = self.patientName_1
+    self.dataset_4.StudyDescription = "Test Study Description"
     self.dataset_4.fix_meta_info()
 
     self.dataset_5 = get_test_dataset()
     self.dataset_5_SOPInstanceUID = gen_uid()
-    self.dataset_5.SOPInstanceUID = self.dataset_5_SOPInstanceUID
-    self.dataset_5.SeriesInstanceUID = self.seriesUID_1
-    self.dataset_5.StudyInstanceUID = self.studyUID_2
+    self.dataset_5.SOPInstanceUID = self.dataset_4_SOPInstanceUID
+    self.dataset_5.SeriesInstanceUID = self.seriesUID_4
+    self.dataset_5.StudyInstanceUID = self.studyUID_3
     self.dataset_5.PatientID = self.patientID_2
     self.dataset_5.PatientName = self.patientName_2
     self.dataset_5.fix_meta_info()
 
-    self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5]
+    self.dataset_6 = get_test_dataset()
+    self.dataset_6_SOPInstanceUID = gen_uid()
+    self.dataset_6.SOPInstanceUID = self.dataset_5_SOPInstanceUID
+    self.dataset_6.SeriesInstanceUID = self.seriesUID_5
+    self.dataset_6.StudyInstanceUID = self.studyUID_4
+    self.dataset_6.PatientID = self.patientID_2
+    self.dataset_6.PatientName = self.patientName_2
+    self.dataset_6.fix_meta_info()
+
+    self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
 
     self.empty_dataset = Dataset()
 
@@ -138,14 +155,19 @@ class lib_imageTree(TestCase):
 
   def test_DicomTree_to_str_method_pictures(self):
     dt = DicomTree(self.datasets)
-    self.assertEqual(str(dt), f"""Dicom Tree with {len(self.datasets)} images
-  Patient StudyTree of TestP1 with 3 images
+    self.maxDiff = 10000
+    self.assertEqual(str(dt), f"""Dicom Tree with 6 images
+  Patient StudyTree of TestP1 with 4 images
     Undefined Study Description with 3 images with Series:
       Tree of Undefined Series with 2 images
+      Tree of Test Series Description with 1 images
+    Tree of Test Study Description with 1 images with Series:
       Tree of Undefined Series with 1 images
   Patient StudyTree of TestP2 with 2 images
-    Undefined Study Description with 2 images with Series:
-      Tree of Undefined Series with 2 images
+    Undefined Study Description with 1 images with Series:
+      Tree of Undefined Series with 1 images
+    Undefined Study Description with 1 images with Series:
+      Tree of Undefined Series with 1 images
 """)
   # Invalid Adding Data to trees
   def test_DicomTree_add_Invalid_dataset(self):
@@ -156,7 +178,7 @@ class lib_imageTree(TestCase):
     st = PatientTree()
     self.assertRaises(ValueError, st.add_image, self.empty_dataset)
 
-  def test_PatintTree_add_missing_patient_ID(self):
+  def test_PatientTree_add_missing_patient_ID(self):
     new_DS = Dataset()
     new_DS.StudyInstanceUID = self.studyUID_1
 
@@ -178,6 +200,48 @@ class lib_imageTree(TestCase):
     st = SeriesTree()
     self.assertRaises(ValueError, st.add_image, self.empty_dataset)
 
+  def test_multiple_patient_in_Patient_tree(self):
+    PT = PatientTree(self.dataset_1)
+    self.assertRaises(KeyError, PT.add_image, self.dataset_5)
+
+  def test_multiple_Study_in_StudyTree(self):
+    ST = StudyTree(self.dataset_1)
+    self.assertRaises(KeyError, ST.add_image, self.dataset_4)
+
+  def test_multiple_Series_in_SeriesTree(self):
+    SeT = SeriesTree(self.dataset_1)
+    self.assertRaises(KeyError, SeT.add_image, self.dataset_3)
+
+  def test_duplicate_image_addition(self):
+    DT = DicomTree(self.dataset_1)
+    self.assertRaises(ValueError,DT.add_image,self.dataset_1)
+
+  def test_no_SOPInstanceUID(self):
+    SeT = SeriesTree()
+    ds = Dataset()
+    ds.SeriesInstanceUID = self.seriesUID_1
+    self.assertRaises(ValueError, SeT.add_image, ds)
+
+  def test_discover(self):
+    dicom_path = Path(self._testMethodName)
+    DT = DicomTree(self.datasets)
+    DT.save_tree(dicom_path)
+    dummyFile =  dicom_path / "dummy.txt"
+    dummyFile.touch()
+
+    new_DT = DicomTree()
+    new_DT.discover(dicom_path)
+
+    self.assertEqual(new_DT.images, len(self.datasets))
+
+    for ds in new_DT:
+      self.assertIn(ds, self.datasets)
+
+    self.assertTrue(dicom_path.exists())
+    self.assertTrue(dicom_path.is_dir())
+
+    shutil.rmtree(dicom_path)
+
 
   # Functions of DicomTree
   def test_DicomTree_apply_mapping(self):
@@ -186,6 +250,17 @@ class lib_imageTree(TestCase):
 
     dt = DicomTree(self.datasets)
     dt.map(writeModality)
+
+    for ds in self.datasets:
+      self.assertEqual(ds.Modality, "OT")
+
+  def test_DicomTree_apply_mapping_with_empty_IM(self):
+    def writeModality(ds : Dataset):
+      ds.Modality = 'OT'
+
+    IM = IdentityMapping()
+    dt = DicomTree(self.datasets)
+    dt.map(writeModality, IM)
 
     for ds in self.datasets:
       self.assertEqual(ds.Modality, "OT")
@@ -282,8 +357,8 @@ class lib_imageTree(TestCase):
     self.assertEqual(str(im), """Identity Mapping
   Patient Mapping
 {'testID_1': 'AnonymizedPatientID_0', 'testID_2': 'AnonymizedPatientID_1'}
-  Study Mapping with 2 Mappings
-  Series Mapping with 2
+  Study Mapping with 4 Mappings
+  Series Mapping with 5
   SOP Mapping with 5 Mappings""")
 
   # Saving tree
@@ -315,5 +390,3 @@ class lib_imageTree(TestCase):
     DT = DicomTree(self.datasets)
     for image in DT:
       self.assertIn(image, self.datasets)
-
-

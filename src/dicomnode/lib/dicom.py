@@ -1,10 +1,9 @@
-"""_summary_
+"""Library methods for manipulation of pydicom.dataset objects
 """
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
 
 from dicomnode.lib.exceptions import InvalidDataset
-
 
 from pydicom import Dataset
 from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian
@@ -36,9 +35,6 @@ def make_meta(dicom: Dataset) -> None:
   dicom.file_meta.ImplementationVersionName = f"{DICOMNODE_IMPLEMENTATION_NAME} {DICOMNODE_VERSION}"
   dicom.file_meta.MediaStorageSOPClassUID = dicom.SOPClassUID
   dicom.file_meta.MediaStorageSOPInstanceUID = dicom.SOPInstanceUID
-
-  print(f"is_le: {dicom.is_little_endian}")
-  print(f"is_iVR: {dicom.is_implicit_VR}")
 
   if dicom.is_little_endian and dicom.is_implicit_VR:
     dicom.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian

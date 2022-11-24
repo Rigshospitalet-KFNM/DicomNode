@@ -18,6 +18,8 @@ if __name__ == '__main__':
     ],
     extras_require = {
      "test" : ["coverage"],
+     "numpy" : ["numpy"],
+     "all" : ["numpy", "coverage"],
     },
     python_requires='>=3.9.1',
     entry_points={

@@ -130,9 +130,11 @@ class ImageTreeInterface(ABC):
     for dicom in listOfDicom:
       self.add_image(dicom)
 
-  def _map(self, func : Callable[[Dataset], Any],
-                    index_map : Optional[Dict],
-                    UIDMapping : Optional[IdentityMapping] = None) -> Dict[str, Any]:
+  def _map(self,
+           func : Callable[[Dataset], Any],
+           index_map : Optional[Dict],
+           UIDMapping : Optional[IdentityMapping] = None
+    ) -> Dict[str, Any]:
     new_data = {}
     ret_dir = {}
     for ID, tree in self.data.items():
@@ -153,14 +155,14 @@ class ImageTreeInterface(ABC):
       Skipping files it cannot open.
 
     Args:
-      path (Path): Path
+      path (Path): Path that will be searched through
     """
     if path.is_file():
       try:
         dataset = load_dicom(path)
         mem = virtual_memory()
         if mem.available < 100*1024*1024: # This should be moved into a constants file
-          print("Limited Memory available")
+          print("Limited Memory available") #pragma: no cover
         self.add_image(dataset)
       except InvalidDicomError as E:
         logger.error(f"Attempting to load a none dicom file at: {path}")
@@ -172,7 +174,7 @@ class ImageTreeInterface(ABC):
   def map(self, func: Callable[[Dataset], Any],
                     UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
     """Applies a callable function to all dataset in the Tree.
-    If the function changes the keys, namly:
+    If the function changes the keys, namely:
       SOPInstanceUID
       SeriesInstanceUID
       StudyInstanceUID
@@ -251,9 +253,9 @@ class SeriesTree(ImageTreeInterface):
       raise ValueError("Dicom image doesn't have a SeriesInstanceUID")
     if not hasattr(dicom, 'SOPInstanceUID'):
       raise ValueError("Dicom image doesn't have a SOPInstanceUID")
-    if hasattr(self, 'SeriesInstanceID'):
+    if hasattr(self, 'SeriesInstanceUID'):
       if self.SeriesInstanceUID != dicom.SeriesInstanceUID.name:
-        raise KeyError("Attempting to add an image to a series where it doesn't belog")
+        raise KeyError("Attempting to add an image to a series where it doesn't belong")
     else:
       self.SeriesInstanceUID = dicom.SeriesInstanceUID.name
       if hasattr(dicom, 'SeriesDescription'):
@@ -270,12 +272,12 @@ class SeriesTree(ImageTreeInterface):
       ret_val = func(dataset)
       if UIDMapping:
         if SOPInstanceUID in UIDMapping.SOPUIDMapping:
-          newSOPinstance = UIDMapping.SOPUIDMapping[SOPInstanceUID]
-          new_data[newSOPinstance] = dataset
-          ret_dict[newSOPinstance] = ret_val
+          newSOPInstanceUID = UIDMapping.SOPUIDMapping[SOPInstanceUID]
+          new_data[newSOPInstanceUID] = dataset
+          ret_dict[newSOPInstanceUID] = ret_val
         else:
-          new_data[newSOPinstance] = dataset
-          ret_dict[newSOPinstance] = ret_val
+          new_data[SOPInstanceUID] = dataset
+          ret_dict[SOPInstanceUID] = ret_val
       else:
         new_data[SOPInstanceUID] = dataset
         ret_dict[SOPInstanceUID] = ret_val
@@ -317,7 +319,7 @@ class StudyTree(ImageTreeInterface):
       raise ValueError("Dicom image doesn't have a StudyInstanceUID")
     if not hasattr(dicom, 'SeriesInstanceUID'):
       raise ValueError("Dicom image doesn't have a SeriesInstanceUID")
-    if hasattr(self, 'StudyInstanceID'):
+    if hasattr(self, 'StudyInstanceUID'):
       if self.StudyInstanceUID != dicom.StudyInstanceUID.name:
         raise KeyError("Attempting to add an image to a study where it doesn't belog")
     else:
@@ -358,7 +360,7 @@ class PatientTree(ImageTreeInterface):
       if self.PatientID != dicom.PatientID:
         raise KeyError("Attempting to add an image of an patient to the wrong tree")
     else:
-      self.PaitentID = dicom.PatientID
+      self.PatientID = dicom.PatientID
       if hasattr(dicom, 'PatientName'):
         self.TreeName = f"StudyTree of {dicom.PatientName}"
     if tree := self.data.get(dicom.StudyInstanceUID.name):

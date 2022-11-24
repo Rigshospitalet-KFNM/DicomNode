@@ -45,18 +45,18 @@ General_Study_required_tags: List[int] = [
   0x00080050, # AccessionNumber
   0x00080090, # ReferringPhysicianName
   0x0020000D, # StudyInstanceUID
-  0x00200010, # StudyID  
-] 
+  0x00200010, # StudyID
+]
 
 General_Series_required_tags: List[int] = [
   0x00080060, # Modality
-  0x0020000E, # SeriesInstanceUID 
+  0x0020000E, # SeriesInstanceUID
   0x00200011, # SeriesNumber
 ]
 
 General_Equipment_required_tags: List[int] = [
   0x00080070, # Manufacturer
-] 
+]
 
 General_Image_required_tags: List[int] = [
   0x00200013 # InstanceNumber
@@ -118,7 +118,7 @@ NM_Image_Pixel_required_tags: List[int] = [
 
 NM_Multi_Frame_required_tags: List[int] = [
   0x00280009, # FrameIncrementPointer
-  0x00540011, # 
+  0x00540011, #
   0x00540021,
 ]
 
@@ -143,7 +143,7 @@ RT_Image_required_tags = [
   0x00280100, # BitsAllocated
   0x00280101, # BitsStored,
   0x00280102, # HighBit
-  0x00280103, # Representation
+  0x00280103, # PixelRepresentation
   0x30020002, # RTImageLabel
   0x3002000E, # XRayImageReceptorAngle
   0x30020011, # ImagePlanePixelSpacing
@@ -151,6 +151,26 @@ RT_Image_required_tags = [
   0x30020020, # RadiationMachineName
   0x30020022, # RadiationMachineSADAttribute
   0x30020026, # RTImageSID
+  0x300A00B3, # PrimaryDosimeterUnit
+]
+
+RT_image = [
+  0x00080008, # ImageType
+  0x00080064, # ConversionType
+  0x00280002, # SamplesPerPixel
+  0x00280004, # PhotometricInterpretation
+  0x00280100, # BitsAllocated
+  0x00280101, # BitsStored,
+  0x00280102, # HighBit
+  0x00280103, # PixelRepresentation
+  0x30020002, # RTImageLabel
+  0x3002000C, # RTImagePlane
+  0x3002000E, # XRayImageReceptorAngle
+  0x30020011, # ImagePlanePixelSpacing
+  0x30020012, # RTImagePosition,
+  0x30020020, # RadiationMachineName
+  0x30020022, # RadiationMachineSAD
+  0x30020022, # RTImageSID
   0x300A00B3, # PrimaryDosimeterUnit
 ]
 
@@ -173,6 +193,7 @@ Patient_required_tags: List[int] = [
   0x00100010, # PatientName
   0x00100020, # PatientID
   0x00100030, # PatientsBirthDate
+  0x00100040, # PatientSex
 ]
 
 PET_Series_required_tags: List[int] = [

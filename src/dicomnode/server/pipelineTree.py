@@ -25,8 +25,7 @@ class InputContainer(ImageTreeInterface):
 
   def __init__(self,
                args: Dict[str, Type],
-               container_path : Optional[str | Path],
-               header_tags: List[int]= []
+               container_path : Optional[str | Path]
     ) -> None:
     if container_path is not None:
       container_path.mkdir(exist_ok=True)
@@ -42,7 +41,6 @@ class InputContainer(ImageTreeInterface):
 
     # InputContainer tags:
     self.container_path = container_path
-    self.header_tags: List[int] = header_tags
 
     #
     self.logger: logging.Logger = logging.getLogger("dicomnode")
@@ -60,15 +58,10 @@ class InputContainer(ImageTreeInterface):
     self.logger.debug(f"Validation returns: {valid}")
     return valid
 
-  def get_header(self) -> Optional[Dataset]:
-    if not hasattr(self, 'header'):
-      return None
-    return self.header
-
   def _get_data(self) -> 'InputContainer':
     new_instance = {}
     for arg_name, input in self.data.items():
-      new_instance[arg_name] : input.get_data()
+      new_instance[arg_name] = input.get_data()
     self.instance = new_instance
 
     return self
@@ -77,13 +70,14 @@ class InputContainer(ImageTreeInterface):
     if not hasattr(self, 'header'):
       self.logger.debug("Adding Header")
       self.header = Dataset()
-      for header_tag in self.header_tags:
-        if header_tag in dicom:
-          self.header[header_tag] = dicom[header_tag]
-        else:
-          self.logger("Could not add the add the header, rejecting image.")
-          del self.header
-          raise InvalidDataset()
+
+      #for header_tag in self.header_tags:
+      #  if header_tag in dicom:
+      #    self.header[header_tag] = dicom[header_tag]
+      #  else:
+      #    self.logger("Could not add the add the header, rejecting image.")
+      #    del self.header
+      #    raise InvalidDataset()
 
     added = False
     for input in self.data.values():
@@ -107,17 +101,20 @@ class PipelineTree(ImageTreeInterface):
   def __init__(self,
                patient_identifier : int,
                pipelineArgs: Dict[str, Type], # Type of AbstractInputDataClass
-               header_tags: List[int] =[],
-               header_values: Dict[str, Any] = {},
                root_data_directory : Optional[Path] = None,
     ) -> None:
     """_summary_
 
     Args:
-        root_data_directory (Path): _description_
         patient_identifier (int): _description_
-        args (Dict[str, AbstractInputDataClass]): _description_
-        dcm (Optional[Union[List[Dataset], Dataset]], optional): _description_. Defaults to None.
+        pipelineArgs (Dict[str, Type]): _description_
+        header_values (Dict[str, Any], optional): _description_. Defaults to {}.
+        root_data_directory (Optional[Path], optional): _description_. Defaults to None.
+
+    Raises:
+        InvalidRootDataDirectory: _description_
+        InvalidRootDataDirectory: _description_
+        InvalidRootDataDirectory: _description_
     """
     # ImageTreeInterface required attributes
     self.data: Dict[str, InputContainer] = {}
@@ -127,8 +124,6 @@ class PipelineTree(ImageTreeInterface):
     self.patient_identifier_tag: int = patient_identifier
     self.PipelineArgs: Dict[str, Type] = pipelineArgs
     self.root_data_directory: Optional[str | Path] = root_data_directory
-    self.header_tags = header_tags
-    self.header_values = header_values
 
     #Logger Setup
     self.logger: logging.Logger = logging.getLogger("dicomnode")
@@ -136,6 +131,9 @@ class PipelineTree(ImageTreeInterface):
     #Load File state
     if self.root_data_directory is None: # There are no files to load if it's in memory
       return
+
+    if not self.root_data_directory.exists():
+      self.root_data_directory.mkdir()
 
     for patient_directory in self.root_data_directory.iterdir():
       if patient_directory.is_file():
@@ -157,7 +155,7 @@ class PipelineTree(ImageTreeInterface):
 
   def add_image(self, dicom : Dataset) -> None:
     if self.patient_identifier_tag not in dicom:
-      self.logger.debug(f"{hex(self.patient_identifier_tag)} not in {dicom}") 
+      self.logger.debug(f"{hex(self.patient_identifier_tag)} not in dataset")
       self.logger.debug("Patient Identifier tag not in dicom")
       raise InvalidDataset()
 
@@ -176,7 +174,7 @@ class PipelineTree(ImageTreeInterface):
       else:
         patient_directory = None
 
-      patient_data = InputContainer(self.PipelineArgs, patient_directory, header_tags=self.header_tags)
+      patient_data = InputContainer(self.PipelineArgs, patient_directory)
       self.data[key] = patient_data
     else:
       patient_data = self.data[key]
