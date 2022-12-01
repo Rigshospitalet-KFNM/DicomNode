@@ -17,6 +17,7 @@ from pydicom import Dataset
 
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
+from dicomnode.lib.dicomFactory import HeaderBlueprint, DicomFactory
 from dicomnode.server.pipelineTree import PipelineTree
 
 import logging
@@ -45,6 +46,9 @@ class AbstractPipeline(ABC):
   input: Dict[str, Type] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
   root_data_directory: Optional[str | Path] = None
+  header_blueprint: HeaderBlueprint = HeaderBlueprint()
+  dicom_factory = DicomFactory(header_blueprint)
+
 
   # Output Configuration
   endpoints: List[Address] = []

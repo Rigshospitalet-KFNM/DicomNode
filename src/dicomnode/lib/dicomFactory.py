@@ -145,6 +145,9 @@ class HeaderBlueprint():
     for ve in virtual_elements:
       self.add_virtual_element(ve)
 
+  def __len__(self) -> int:
+    return len(self._dict)
+
   def __contains__(self, tag: int) -> bool:
     return tag in self._dict
 

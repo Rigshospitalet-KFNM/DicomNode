@@ -3,6 +3,7 @@ from dicomnode.lib.dimse import Address
 from dicomnode.lib.grinders import dicom_tree_grinder
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping
 
+from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 
@@ -48,7 +49,7 @@ class AnonymizationPipeline(AbstractPipeline):
   # Endpoint configuration
   endpoints: List[Address] = [Address('localhost', 4321, 'STORESCP')]
 
-  def process(self, input_data: Dict[str, DicomTree]) -> Iterable[Dataset]:
+  def process(self, input_data: InputContainer) -> Iterable[Dataset]:
     DT: DicomTree = input_data[INPUT_ARG]
     IM = IdentityMapping(prefix_size=self.prefix_size)
     IM.fill_from_DicomTree(DT)
