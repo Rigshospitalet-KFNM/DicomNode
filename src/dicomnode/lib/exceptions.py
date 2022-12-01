@@ -18,3 +18,6 @@ class InvalidQueryDataset(InvalidDataset):
 
 class MissingModule(ImportError):
   """Missing an module"""
+
+class InvalidEncoding(Exception):
+  """When a data structure have an unexpected encoding"""

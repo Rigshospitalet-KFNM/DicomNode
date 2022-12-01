@@ -17,7 +17,7 @@ from pynetdicom.ae import ApplicationEntity
 from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove
 
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
-
+from dicomnode.lib.dicom import make_meta
 
 logger = logging.getLogger("dicomnode")
 
@@ -40,7 +40,7 @@ class ResponseAddress(Address):
   def __init__(self):
     pass
 
-def send_image(SCU_AE: str, address: Address, dicom_image: Dataset ) -> Dataset:
+def send_image(SCU_AE: str, address: Address, dicom_image: Dataset) -> Dataset:
   ae = ApplicationEntity(ae_title=SCU_AE)
   ae.add_requested_context(dicom_image.SOPClassUID)
   assoc = ae.associate(
@@ -49,6 +49,10 @@ def send_image(SCU_AE: str, address: Address, dicom_image: Dataset ) -> Dataset:
     ae_title=address.ae_title
   )
   if assoc.is_established:
+    if hasattr(dicom_image, 'file_meta'):
+      make_meta(dicom_image)
+    if 0x00020010 not in dicom_image.file_meta:
+      make_meta(dicom_image)
     response = assoc.send_c_store(dicom_image)
     assoc.release()
     return response
@@ -62,9 +66,18 @@ def send_image(SCU_AE: str, address: Address, dicom_image: Dataset ) -> Dataset:
     logger.error(error_message)
     raise CouldNotCompleteDIMSEMessage("Could not connect")
 
-def send_images(SCU_AE: str, address: Address, dicom_images: Iterable[Dataset], error_callback_func: Optional[Callable[[], None]] = None):
+def send_images(SCU_AE: str,
+                address: Address,
+                dicom_images: Iterable[Dataset],
+                error_callback_func: Optional[Callable[[Address, Dataset, Dataset], None]] = None
+  ):
   ae = ApplicationEntity(ae_title=SCU_AE)
-  ae.add_requested_context(dicom_images[0].SOPClassUID)
+  contexts = set()
+  for image in dicom_images:
+    if image.SOPClassUID.name not in contexts:
+      ae.add_requested_context(image.SOPClassUID)
+      contexts.add(image.SOPClassUID.name)
+
   assoc = ae.associate(
     address.ip,
     address.port,
@@ -72,10 +85,19 @@ def send_images(SCU_AE: str, address: Address, dicom_images: Iterable[Dataset], 
   )
   if assoc.is_established:
     for dataset in dicom_images:
+      if not hasattr(dataset, 'file_meta'):
+        make_meta(dataset)
+      if 0x00020010 not in dataset.file_meta:
+        make_meta(dataset)
       response = assoc.send_c_store(dataset)
-      if(response.status != 0x0000) and error_callback_func is not None:
-        assoc.release()
-        raise CouldNotCompleteDIMSEMessage
+      if(response.Status != 0x0000):
+        if error_callback_func is None:
+          assoc.release()
+          error_message = f"Could not send {dataset}\n Received Response: {response}"
+          logger.error(error_message)
+          raise CouldNotCompleteDIMSEMessage(f"Could not send {dataset}")
+        else:
+          error_callback_func(Address, response, dataset)
     assoc.release()
   else:
     error_message = f"""Could not connect to the SCP with the following inputs:

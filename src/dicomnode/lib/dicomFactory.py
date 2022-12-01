@@ -57,16 +57,17 @@ class CallElement(VirtualElement):
   """Abstract Virtual tag. This class represents a tag, that will be
   instantiated from with an image slice.
   """
-  @abstractmethod
   def __init__(self, tag, VR, func) -> None:
-    raise NotImplementedError # pragma: no cover
+    self.tag: BaseTag = tag
+    self.VR: str = VR
+    self.func = func
 
   def corporealialize(self, _DF: 'DicomFactory', _DS: Dataset) -> 'CallElement':
     return self
 
   @abstractmethod
-  def __call__(self, *args: Any, **kwds: Any) -> Any:
-    raise NotImplementedError # pragma: no cover
+  def __call__(self) -> Any:
+    return DataElement(self.tag, self.vr, self.func())
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
@@ -169,8 +170,8 @@ class HeaderBlueprint():
 class Header():
   """A dicom dataset blueprint for a factory to produce a series of dicom
   datasets"""
-  def __getitem__(self, key):
-    return self._blueprint[key]
+  def __getitem__(self, key) -> DataElement:
+    return self._blueprint[Tag(key)]
 
   def __setitem__(self, key, value: Union[DataElement, CallElement]):
     if key != value.tag:
@@ -183,7 +184,7 @@ class Header():
   def __init__(self,
                blueprint: List[Union[DataElement, CallElement]] = [],
                ) -> None:
-    self._blueprint: Dict[int,Union[DataElement, CallElement]] = {}
+    self._blueprint: Dict[BaseTag,Union[DataElement, CallElement]] = {}
     for tag in blueprint:
       self.add_tag(tag)
 
@@ -211,7 +212,7 @@ class DicomFactory(ABC):
 
   def make_header(self,
                   dataset: Dataset,
-                  elements: Optional[List[StaticElement]]= None,
+                  elements: Optional[HeaderBlueprint]= None,
                   filling_strategy: Optional[FillingStrategy] = None
     ) -> Header:
     """This function produces a header dataset based on an input dataset.

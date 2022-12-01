@@ -15,6 +15,7 @@ if __name__ == '__main__':
       'pydicom>=2.3.1',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
+      'typing_extensions>=4.4.0',
     ],
     extras_require = {
      "test" : ["coverage"],

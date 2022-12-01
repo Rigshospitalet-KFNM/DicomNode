@@ -198,8 +198,6 @@ class AbstractPipeline(ABC):
         else:
           if self.dispatch(result):
             PatientData._cleanup()
-
-
       else:
         self.logger.debug(f"Dataset was not valid for {patient_ID}")
     del self.__updated_patients[event.assoc.name]
@@ -207,6 +205,7 @@ class AbstractPipeline(ABC):
   def dispatch(self, images: Iterable[Dataset]) -> bool:
     for address in self.endpoints:
       try:
+        self.logger.debug(f"Sending datasets to {Address}")
         send_images(self.ae_title, address, images)
       except CouldNotCompleteDIMSEMessage:
         self.logger.error(f"Could not send response to {address}")

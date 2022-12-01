@@ -6,7 +6,7 @@ from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMEN
 from dicomnode.lib.exceptions import InvalidDataset
 
 from pydicom import Dataset
-from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian
+from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian, ExplicitVRLittleEndian
 
 def gen_uid() -> UID:
   return generate_uid(prefix=DICOMNODE_IMPLEMENTATION_UID + '.')
@@ -38,9 +38,11 @@ def make_meta(dicom: Dataset) -> None:
 
   if dicom.is_little_endian and dicom.is_implicit_VR:
     dicom.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
+  elif dicom.is_little_endian and not dicom.is_implicit_VR:
+    dicom.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
   elif not dicom.is_little_endian and not dicom.is_implicit_VR:
     dicom.file_meta.TransferSyntaxUID = ExplicitVRBigEndian
-  elif not dicom.is_little_endian and dicom.is_implicit_VR:
+  else:
     raise InvalidDataset("Implicit VR Big Endian is not a "
                          "supported Transfer Syntax.")
 

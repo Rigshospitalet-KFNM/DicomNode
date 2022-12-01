@@ -23,7 +23,7 @@ def str2bool(v:str) -> bool:
   else:
     raise ArgumentTypeError("Boolean value expected")
 
-def prefixInt(number: int, minLength : int= 4):
+def prefixInt(number: int, minLength: int= 4):
   numberStr = str(number)
   zeroes = (minLength - len(numberStr)) * "0"
   return f"{zeroes}{numberStr}"
@@ -36,7 +36,14 @@ def getTag(Tag : int) -> Callable[[Dataset], Any]:
       return None
   return retfunc
 
-def staticfy(func):
+def staticfy(func : Callable):
+  """Decorator function that removes the first argument.
+
+  The main use case is transform instance and class methods into static methods
+
+  Args:
+      func (Callable): method the
+  """
   def wrapper(self,*args, **kwargs):
     return func(*args, **kwargs)
   return wrapper

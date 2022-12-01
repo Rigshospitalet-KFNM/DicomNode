@@ -47,3 +47,22 @@ def many_meta_grinder(*grinders: Callable[[Iterator[Dataset]], Any]) -> Callable
       grinded.append(grinder(image_generator))
     return grinded
   return retFunc
+
+try:
+  import numpy
+  def numpy_grinder(datasets: Iterator[Dataset]) -> numpy.ndarray:
+    datasets: List[Dataset] = list(datasets)
+    pivot = datasets[0]
+    x_dim = pivot.Columns
+    y_dim = pivot.Rows
+    z_dim = len(datasets)
+
+    image_array: numpy.ndarray = numpy.empty((x_dim, y_dim, z_dim))
+
+    for i, dataset in enumerate(datasets):
+      image_array[i,:,:] = dataset.pixel_array
+
+    return image_array
+
+except ImportError:
+  pass

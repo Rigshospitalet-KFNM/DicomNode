@@ -132,9 +132,10 @@ class HeaderTestCase(TestCase):
     self.de_1 = DataElement(0x00100010, 'PN', 'Face^Mace^to')
     self.tag_list = [self.de_1]
 
-  def test_header_with_args(self):
+  def test_header_with_args_iter(self):
     header = Header(self.tag_list)
 
+    self.assertEqual(id(self.de_1), id(header[0x00100010]))
     for i, tag in enumerate(header):
       if i == 0:
         self.assertEqual(id(self.de_1), id(tag))

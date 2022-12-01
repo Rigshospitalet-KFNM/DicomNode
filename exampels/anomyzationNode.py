@@ -8,7 +8,7 @@ from dicomnode.server.nodes import AbstractPipeline
 
 from pydicom import Dataset
 from pathlib import Path
-from types import List, Any, Iterator, Callable, Iterable, Dict, Optional
+from typing import List, Any, Iterator, Callable, Iterable, Dict, Optional
 
 INPUT_ARG = "dataset"
 
@@ -36,7 +36,7 @@ class AnonymizationPipeline(AbstractPipeline):
   BASE_NAME: str = "Anon"
 
   # Pipeline configuration
-  port: int =9999
+  port: int = 9999
   ae_title: str = "ANONYMIZATION"
   log_path: Optional[str | Path] = Path("Anon.log")
 
