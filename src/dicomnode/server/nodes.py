@@ -17,16 +17,20 @@ from pydicom import Dataset
 
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
-from dicomnode.lib.dicomFactory import HeaderBlueprint, DicomFactory
+from dicomnode.lib.dicomFactory import HeaderBlueprint, NoFactory, DicomFactory
 from dicomnode.server.pipelineTree import PipelineTree
 
 import logging
 
 from abc import ABC, abstractmethod
+
+from gc import collect as garbage_collect
+
+from copy import copy, deepcopy
 from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from sys import stdout
+from sys import stdout, getrefcount
 from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn
 
 
@@ -39,15 +43,13 @@ class AbstractPipeline(ABC):
     * ae_title : str
     * config_path : Union[str, PathLike]
     * process : Callable
-
   """
 
   # Input configuration
   input: Dict[str, Type] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
   root_data_directory: Optional[str | Path] = None
-  header_blueprint: HeaderBlueprint = HeaderBlueprint()
-  dicom_factory = DicomFactory(header_blueprint)
+  dicom_factory: DicomFactory = NoFactory()
 
 
   # Output Configuration
@@ -167,11 +169,10 @@ class AbstractPipeline(ABC):
         return 0xB006 # Element discarded
     except Exception as E:
       self.logger.critical("User Filter function crashed")
-
       return 0xA801
 
     if self.patient_identifier_tag in dataset:
-      patientID = dataset[self.patient_identifier_tag].value
+      patientID = deepcopy(dataset[self.patient_identifier_tag].value)
       try:
         self.__data_state.add_image(dataset)
         self.__updated_patients[event.assoc.name].add(patientID)
@@ -191,6 +192,7 @@ class AbstractPipeline(ABC):
         self.__updated_patients[event.assoc.name] = set()
 
   def __association_released(self, event: evt.Event):
+    garbage_collect() # Clean up after any storage
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.__updated_patients[event.assoc.name]:
       if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:

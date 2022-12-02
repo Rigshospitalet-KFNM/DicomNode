@@ -264,8 +264,12 @@ class DicomFactory(ABC):
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
-###### Header function ######
 
+class NoFactory(DicomFactory):
+  def make_series(self, header: Header, image: Any) -> List[Dataset]:
+    raise NotImplementedError
+
+###### Header function ######
 def _get_today() -> date:
   return date.today()
 
