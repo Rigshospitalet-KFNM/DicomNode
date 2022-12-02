@@ -25,7 +25,7 @@ class InputContainer(ImageTreeInterface):
 
   def __init__(self,
                args: Dict[str, Type],
-               container_path : Optional[str | Path]
+               container_path : Optional[Union[str, Path]]
     ) -> None:
     if container_path is not None:
       container_path.mkdir(exist_ok=True)
@@ -123,7 +123,7 @@ class PipelineTree(ImageTreeInterface):
     # Args setup
     self.patient_identifier_tag: int = patient_identifier
     self.PipelineArgs: Dict[str, Type] = pipelineArgs
-    self.root_data_directory: Optional[str | Path] = root_data_directory
+    self.root_data_directory: Optional[Union[str, Path]] = root_data_directory
 
     #Logger Setup
     self.logger: logging.Logger = logging.getLogger("dicomnode")

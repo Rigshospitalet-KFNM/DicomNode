@@ -31,7 +31,7 @@ from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from sys import stdout, getrefcount
-from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn
+from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn, Union
 
 
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -48,7 +48,7 @@ class AbstractPipeline(ABC):
   # Input configuration
   input: Dict[str, Type] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
-  root_data_directory: Optional[str | Path] = None
+  root_data_directory: Optional[Union[str, Path]] = None
   dicom_factory: DicomFactory = NoFactory()
 
 
@@ -66,7 +66,7 @@ class AbstractPipeline(ABC):
 
   #Logging Configuration
   backup_weeks: int = 8
-  log_path: Optional[str | Path] = None
+  log_path: Optional[Union[str, Path]] = None
   log_level: int = logging.INFO
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
   disable_pynetdicom_logger: bool = True

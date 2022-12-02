@@ -138,7 +138,7 @@ To make the pipeline save a copy to disk you need to overwrite an attribute:
 ```python
 class MyPipeline(AbstractPipeline):
   ...
-  root_data_directory: str | Path = Path('path/to/data/directory')
+  root_data_directory: Union[str, Path] = Path('path/to/data/directory')
   ...
 ```
 
@@ -169,7 +169,7 @@ If you have tried and run your pipeline in a terminal, you'll without a doubt no
 ```python
 class MyPipeline(AbstractPipeline):
   ...
-  root_data_directory: str | Path = Path('path/to/log')
+  root_data_directory: Union[str, Path] = Path('path/to/log')
   ...
 ```
 
