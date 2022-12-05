@@ -38,7 +38,7 @@ class TestInput(AbstractInput):
     return True
 
 
-class NodeTestImplementation(AbstractPipeline):
+class TestNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
@@ -50,9 +50,9 @@ class NodeTestImplementation(AbstractPipeline):
     return []
 
 
-class ServerNodesTestCase(TestCase):
+class TestNodeTestCase(TestCase):
   def setUp(self):
-    self.node = NodeTestImplementation(start=False)
+    self.node = TestNode(start=False)
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
@@ -60,18 +60,40 @@ class ServerNodesTestCase(TestCase):
   def tearDown(self) -> None:
     self.node.close()
 
-
   def test_send_C_store_success(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     response = send_image(SENDER_AE, address, DEFAULT_DATASET)
     self.assertEqual(response.Status, 0x0000)
     # Okay This is mostly to ensure lazyness
-    # See the 
+    # See the advanced docs guide for details
     self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPINSTANCEUID]), 2)
-
-
 
   def test_reject_connection(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     self.assertRaises(CouldNotCompleteDIMSEMessage,send_image,"NOT_SENDER_AE", address, DEFAULT_DATASET)
 
+
+class FaultyNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def process(self, InputData: Dict[str, Any]) -> Iterator[Dataset]:
+    raise Exception
+
+class FaultyNodeTestCase(TestCase):
+  def setUp(self):
+    self.node = FaultyNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_faulty_process(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    self.assertEqual(response.Status, 0x0000)

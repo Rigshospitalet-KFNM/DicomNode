@@ -93,6 +93,10 @@ def save_dicom(
     dicomPath: Path,
     dicom: Dataset
   ):
+  dicomPath = dicomPath.absolute()
+  if not dicomPath.parent.exists():
+    dicomPath.parent.mkdir()
+
   dicom.save_as(dicomPath, write_like_original=False)
 
 

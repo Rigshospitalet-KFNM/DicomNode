@@ -18,9 +18,10 @@ from pydicom import Dataset
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
 from dicomnode.lib.dicomFactory import HeaderBlueprint, NoFactory, DicomFactory
-from dicomnode.server.pipelineTree import PipelineTree
+from dicomnode.server.pipelineTree import PipelineTree,InputContainer
 
 import logging
+import traceback
 
 from abc import ABC, abstractmethod
 
@@ -158,17 +159,21 @@ class AbstractPipeline(ABC):
 
     self.post_init(start=start)
     if start:
-      self.open()
+      self.open() #pragma: no cover
+
+  def __log_user_error(self, Exp: Exception, user_function: str):
+    self.logger.critical(f"Encountered error in user function {user_function}")
+    self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
+    self.logger.critical(f"Traceback: {traceback.format_exc()}")
 
   def __handle_store(self, event: evt.Event):
     dataset = event.dataset
-
     try:
       if not self.filter(dataset):
         self.logger.warning("Dataset discarded")
         return 0xB006 # Element discarded
     except Exception as E:
-      self.logger.critical("User Filter function crashed")
+      self.__log_user_error(E, "Filter")
       return 0xA801
 
     if self.patient_identifier_tag in dataset:
@@ -192,21 +197,20 @@ class AbstractPipeline(ABC):
         self.__updated_patients[event.assoc.name] = set()
 
   def __association_released(self, event: evt.Event):
-    garbage_collect() # Clean up after any storage
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.__updated_patients[event.assoc.name]:
       if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:
         self.logger.debug(f"Calling Processing for user: {patient_ID}")
         try:
           result = self.process(PatientData)
-        except Exception:
-          self.logger.critical("User Error in processing Data")
+        except Exception as E:
+          self.__log_user_error(E, "Process")
         else:
           if self.dispatch(result):
             PatientData._cleanup()
+            del self.__updated_patients[event.assoc.name]
       else:
         self.logger.debug(f"Dataset was not valid for {patient_ID}")
-    del self.__updated_patients[event.assoc.name]
 
   def dispatch(self, images: Iterable[Dataset]) -> bool:
     for address in self.endpoints:
@@ -232,7 +236,7 @@ class AbstractPipeline(ABC):
     return True
 
   @abstractmethod
-  def process(self, input_data: Dict[str, Any]) -> Iterable[Dataset]:
+  def process(self, input_data: InputContainer) -> Iterable[Dataset]:
     raise NotImplemented #pragma: no cover
 
   def post_init(self, start : bool) -> None:

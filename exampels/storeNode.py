@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pydicom import Dataset
+import logging
 
 from os import environ
 
@@ -37,6 +38,8 @@ class storeNode(AbstractPipeline):
   ae_title: str = "STORENODE"
   port: int = 1337
   ip: str = '0.0.0.0'
+  disable_pynetdicom_logger=False
+  log_level: int = logging.DEBUG
 
   input: Dict[str, type] = {
     INPUT_ARG : DicomObjectInput
@@ -54,7 +57,7 @@ class storeNode(AbstractPipeline):
       self.storeDataset(dataset)
     return []
 
-  def post_init(self, _: bool) -> None:
+  def post_init(self, start: bool) -> None:
     self.archive_path.mkdir(exist_ok=True)
 
 
