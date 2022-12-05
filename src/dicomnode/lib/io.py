@@ -30,8 +30,8 @@ def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str
   """
   # Update DicomDictionary to include our private tags
   DicomDictionary.update(new_dict_items)
-  new_names_dirc = dict([(val[4], tag) for tag, val in new_dict_items.items()])
-  keyword_dict.update(new_names_dirc)
+  new_names_dict = dict([(val[4], tag) for tag, val in new_dict_items.items()])
+  keyword_dict.update(new_names_dict)
 
 
 def apply_private_tags(
@@ -95,7 +95,7 @@ def save_dicom(
   ):
   dicomPath = dicomPath.absolute()
   if not dicomPath.parent.exists():
-    dicomPath.parent.mkdir()
+    dicomPath.parent.mkdir(parents=True)
 
   dicom.save_as(dicomPath, write_like_original=False)
 
