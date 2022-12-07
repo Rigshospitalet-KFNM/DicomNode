@@ -32,14 +32,13 @@ class DicomObjectInput(AbstractInput):
     return True
 
 
-
 class storeNode(AbstractPipeline):
   log_path: str = "log.log"
   ae_title: str = "STORENODE"
   port: int = 1337
   ip: str = '0.0.0.0'
-  disable_pynetdicom_logger=False
-  log_level: int = logging.DEBUG
+  disable_pynetdicom_logger=True
+  log_level: int = logging.INFO
 
   input: Dict[str, type] = {
     INPUT_ARG : DicomObjectInput
