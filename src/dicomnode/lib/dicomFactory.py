@@ -10,7 +10,7 @@ from inspect import getfullargspec
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag, BaseTag
 from random import randint
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Iterator,  Optional, Tuple, Union
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
@@ -21,7 +21,7 @@ class FillingStrategy(Enum):
 
 class VirtualElement(ABC):
   """"""
-  _tag: BaseTag
+  __tag: BaseTag
 
   @property
   def tag(self) -> BaseTag:
@@ -30,11 +30,11 @@ class VirtualElement(ABC):
     Returns:
         int: int between 0 and 2 ** 32 - 1
     """
-    return self._tag
+    return self.__tag
 
   @tag.setter
   def tag(self, tag: Union[BaseTag, str, int, Tuple[int,int]]):
-    self._tag = Tag(tag)
+    self.__tag = Tag(tag)
 
   @abstractmethod
   def corporealialize(self, factory: 'DicomFactory', dataset: Dataset) -> Optional[Union[DataElement, 'CallElement']]:
@@ -66,15 +66,15 @@ class CallElement(VirtualElement):
     return self
 
   @abstractmethod
-  def __call__(self) -> Any:
-    return DataElement(self.tag, self.vr, self.func())
+  def __call__(self) -> DataElement:
+    return DataElement(self.tag, self.VR, self.func())
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
   original dataset, Throws an error is element is missing"""
 
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], Optional: bool = False) -> None:
-    self.tag: int = tag
+    self.tag: BaseTag = Tag(tag)
     self.Optional = Optional
 
   def corporealialize(self, _: 'DicomFactory', dataset: Dataset) -> Optional[DataElement]:
@@ -102,14 +102,17 @@ class SeriesElement(VirtualElement):
                func: Union[Callable[[Dataset], Any], Callable[[],Any]]) -> None:
     self.tag = tag
     self.VR  = VR
-    self.func = func
-    self.require_dataset = len(getfullargspec(func).args) == 1
+    self.func:  Union[Callable[[Dataset], Any], Callable[[],Any]] = func
+    self.require_dataset: bool = len(getfullargspec(func).args) == 1
 
   def corporealialize(self, _: 'DicomFactory', dataset: Dataset) -> DataElement:
     if self.require_dataset:
-      value = self.func(dataset)
+      # The '# type: ignores' here is because the type checker assumes func
+      # is an instance based function, when it is dynamic assigned function
+      # and therefore behaves like a static function  
+      value = self.func(dataset) # type: ignore 
     else:
-      value = self.func()
+      value = self.func() # type: ignore
     return DataElement(self.tag, self.VR, value)
 
 class StaticElement(VirtualElement):
@@ -162,7 +165,7 @@ class HeaderBlueprint():
 
     return new_header_blueprint
 
-  def __iter__(self) -> VirtualElement:
+  def __iter__(self) -> Iterator[VirtualElement]:
     for ve in self._dict.values():
       yield ve
 
@@ -173,7 +176,7 @@ class HeaderBlueprint():
 class Header():
   """A dicom dataset blueprint for a factory to produce a series of dicom
   datasets"""
-  def __getitem__(self, key) -> DataElement:
+  def __getitem__(self, key) -> Union[DataElement, CallElement]:
     return self._blueprint[Tag(key)]
 
   def __setitem__(self, key, value: Union[DataElement, CallElement]):
@@ -252,7 +255,9 @@ class DicomFactory(ABC):
       for data_element in dataset:
         if data_element.tag in elements:
           virtual_element = elements[data_element.tag]
-          header.add_tag(virtual_element.corporealialize(self, dataset))
+          corporeal_tag = virtual_element.corporealialize(self, dataset)
+          if corporeal_tag is not None:
+            header.add_tag(corporeal_tag)
         else:
           header.add_tag(data_element)
     return header

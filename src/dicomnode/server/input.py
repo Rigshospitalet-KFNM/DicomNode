@@ -20,9 +20,10 @@ from dicomnode.lib.utils import staticfy
 
 class AbstractInput(ImageTreeInterface, ABC):
   required_tags: List[int] = [0x00080018, 0x7FE00010] # InstanceUID, Pixel Data
-  private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
+  __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
   required_values: Dict[int, Any] = {}
   image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
+  data: Dict[str, Dataset]
 
   def __init__(self, instance_directory: Optional[Path] = None):
     self.__instance_directory: Optional[Path] = instance_directory
@@ -38,7 +39,7 @@ class AbstractInput(ImageTreeInterface, ABC):
       if not self.__instance_directory.exists():
         self.__instance_directory.mkdir(exist_ok=True)
       for image_path in self.__instance_directory.iterdir():
-        dcm = load_dicom(image_path, self.private_tags)
+        dcm = load_dicom(image_path, self.__private_tags)
         self.add_image(dcm)
 
   @abstractmethod
@@ -65,9 +66,6 @@ class AbstractInput(ImageTreeInterface, ABC):
         Any: Data ready for the pipelines process function.
     """
     return staticfy(self.image_grinder)(self.data.values())
-
-  def map(self, func: Callable[[Dataset], Any], UIDMapping) -> List[Any]:
-    pass
 
   def __getPath(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
@@ -122,7 +120,7 @@ class AbstractInput(ImageTreeInterface, ABC):
         raise InvalidDataset()
 
     # Save the dataset
-    self.data[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
+    self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
     self.images += 1
     if self.__instance_directory is not None:
       dicom_path:Path = self.__getPath(dicom)

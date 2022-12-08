@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from pprint import pprint, pformat
-from typing import Any, List, Optional, Union, Dict, Callable
+from typing import Any, List, Optional, Union, Dict, Callable, Iterable, Iterator
 
 
 
@@ -15,6 +15,7 @@ from psutil import virtual_memory
 from abc import ABC, abstractclassmethod, abstractmethod
 
 from dicomnode.lib.dicom import gen_uid
+from dicomnode.lib.exceptions import InvalidTreeNode
 from dicomnode.lib.io import save_dicom, load_dicom
 from dicomnode.lib.utils import prefixInt
 
@@ -37,7 +38,14 @@ class IdentityMapping():
     self.PatientMapping : Dict[str, str] = {}
     self.prefix_size = prefix_size
 
-  def _add_to_mapping(self, uid : str , mapping : Dict) -> UID:
+  def __contains__(self, key: str) -> bool:
+    return key in self.StudyUIDMapping \
+            or key in self.SeriesUIDMapping \
+            or key in self.SOPUIDMapping \
+            or key in self.PatientMapping
+    
+
+  def __add_to_mapping(self, uid : str , mapping : Dict) -> UID:
     if uid in mapping:
       return mapping[uid]
     else:
@@ -45,13 +53,13 @@ class IdentityMapping():
       return mapping[uid]
 
   def add_StudyUID(self, StudyInstanceUID : UID) -> UID:
-    return self._add_to_mapping(StudyInstanceUID.name, self.StudyUIDMapping)
+    return self.__add_to_mapping(StudyInstanceUID.name, self.StudyUIDMapping)
 
   def add_SeriesUID(self, SeriesInstanceUID : UID) -> UID :
-    return self._add_to_mapping(SeriesInstanceUID.name, self.SeriesUIDMapping)
+    return self.__add_to_mapping(SeriesInstanceUID.name, self.SeriesUIDMapping)
 
   def add_SOPUID(self, SOPInstanceUID : UID) -> UID:
-    return self._add_to_mapping(SOPInstanceUID.name, self.SOPUIDMapping)
+    return self.__add_to_mapping(SOPInstanceUID.name, self.SOPUIDMapping)
 
   def add_Patient(self, PatientID : str, patient_prefix : str = _PPrefix  ) -> str:
     if PatientID in self.PatientMapping:
@@ -64,44 +72,52 @@ class IdentityMapping():
 
   def fill_from_SeriesTree(self, seriesTree: 'SeriesTree'):
     for SOPInstanceUID, _dataSet in seriesTree.data.items():
-      self._add_to_mapping(SOPInstanceUID, self.SOPUIDMapping)
+      self.__add_to_mapping(SOPInstanceUID, self.SOPUIDMapping)
 
   def fill_from_StudyTree(self, studyTree : 'StudyTree'):
     for seriesInstanceUID, seriesTree in studyTree.data.items():
-      self._add_to_mapping(seriesInstanceUID, self.SeriesUIDMapping)
+      self.__add_to_mapping(seriesInstanceUID, self.SeriesUIDMapping)
       self.fill_from_SeriesTree(seriesTree)
 
   def fill_from_PatientTree(self, patientTree : 'PatientTree'):
     for studyInstanceUID, studyTree in patientTree.data.items():
-      self._add_to_mapping(studyInstanceUID, self.StudyUIDMapping)
+      self.__add_to_mapping(studyInstanceUID, self.StudyUIDMapping)
       self.fill_from_StudyTree(studyTree)
 
   def fill_from_DicomTree(self, dicomTree : 'DicomTree', patient_prefix : str = _PPrefix, change_UIDs : bool = True):
     self.prefix_size = max(ceil(log10(len(dicomTree.data))),1)
     for patientID, studyTree in dicomTree.data.items():
       self.add_Patient(patientID, patient_prefix)
+
       if change_UIDs:
         self.fill_from_PatientTree(studyTree)
 
+  def __getitem__(self, key: Union[UID, str]):
+    if isinstance(key, UID):
+      key = key.name
+    
+    if key in self.PatientMapping:
+      return self.PatientMapping[key]
+    if key in self.StudyUIDMapping:
+      return self.StudyUIDMapping[key]
+    if key in self.SeriesUIDMapping:
+      return self.SeriesUIDMapping[key]
+    if key in self.SOPUIDMapping:
+      return self.SOPUIDMapping[key]
+    raise KeyError()
 
   def get_mapping(self, uid : Union[UID, str]) -> Optional[Union[UID, str]]:
     if isinstance(uid, UID):
       uid = uid.name
-      if uid in self.StudyUIDMapping:
-        return self.StudyUIDMapping[uid]
-      if uid in self.SeriesUIDMapping:
-        return self.SeriesUIDMapping[uid]
-      if uid in self.SOPUIDMapping:
-        return self.SOPUIDMapping[uid]
-    else:
-      if uid in self.PatientMapping:
-        return self.PatientMapping[uid]
-      if uid in self.StudyUIDMapping:
-        return self.StudyUIDMapping[uid]
-      if uid in self.SeriesUIDMapping:
-        return self.SeriesUIDMapping[uid]
-      if uid in self.SOPUIDMapping:
-        return self.SOPUIDMapping[uid]
+    
+    if uid in self.PatientMapping:
+      return self.PatientMapping[uid]
+    if uid in self.StudyUIDMapping:
+      return self.StudyUIDMapping[uid]
+    if uid in self.SeriesUIDMapping:
+      return self.SeriesUIDMapping[uid]
+    if uid in self.SOPUIDMapping:
+      return self.SOPUIDMapping[uid]
     return None
 
   def __str__(self) -> str:
@@ -122,31 +138,38 @@ class IdentityMapping():
     return base_string
 
 class ImageTreeInterface(ABC):
+  """Base class for a tree of Dicom Images.
+  
+  """
   @abstractmethod
   def add_image(self, _dicom : Dataset) -> None:
+    """Abstract Method for adding datasets to the Tree"""
     raise NotImplemented #pragma: no cover
 
-  def add_images(self, listOfDicom : List[Dataset]) -> None:
+  def add_images(self, listOfDicom : Iterable[Dataset]) -> None:
     for dicom in listOfDicom:
       self.add_image(dicom)
 
-  def _map(self,
+  def map(self,
            func : Callable[[Dataset], Any],
-           index_map : Optional[Dict],
-           UIDMapping : Optional[IdentityMapping] = None
+           UIDMapping : IdentityMapping = IdentityMapping()
     ) -> Dict[str, Any]:
-    new_data = {}
+    new_data: Dict[str, Union[Dataset, ImageTreeInterface]] = {}
     ret_dir = {}
-    for ID, tree in self.data.items():
-      ret_dir.update(tree.map(func, UIDMapping))
-      if index_map:
-        if ID in index_map:
-          new_data[index_map[ID]] = tree
-        else:
-          new_data[ID] = tree
+    for ID, entry in self.data.items():
+      if ID in UIDMapping:
+        ID = UIDMapping[ID]
+      if isinstance(entry, ImageTreeInterface):
+        ret_dir.update(entry.map(func, UIDMapping))
+        new_data[ID] = entry
+      elif isinstance(entry, Dataset): # is a Dataset
+        return_value = func(entry)
+        if return_value is not None:
+          ret_dir[ID] = return_value
+        new_data[ID] = entry
       else:
-        new_data[ID] = tree
-    self.data = new_data
+        raise InvalidTreeNode("A None ImageTree or Data is added")
+    self.__Data = new_data
     return ret_dir
 
   def discover(self, path: Path):
@@ -169,23 +192,6 @@ class ImageTreeInterface(ABC):
     elif path.is_dir():
       for p in path.iterdir():
         self.discover(p)
-
-  @abstractmethod
-  def map(self, func: Callable[[Dataset], Any],
-                    UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    """Applies a callable function to all dataset in the Tree.
-    If the function changes the keys, namely:
-      SOPInstanceUID
-      SeriesInstanceUID
-      StudyInstanceUID
-      PatientID
-    Then that should be included as the UIDMapping
-
-    Args:
-        func (Callable[[Dataset], ]): Function to be applied to each dataset
-        UIDMapping (Optional[IdentityMapping], optional): Mapping of UID to applied to the TreeInterface. Defaults to None.
-    """
-    raise NotImplemented #pragma: no cover
 
   def save_tree(self, target: Path) -> None:
     if(len(self.data) == 1):
@@ -219,10 +225,10 @@ class ImageTreeInterface(ABC):
         new_data[ID] = tree
       trimmed_total += trimmed
       self.images -= trimmed
-    self.data = new_data
+    self.__data = new_data
     return trimmed_total
 
-  def __iter__(self) -> Dataset:
+  def __iter__(self) -> Iterator[Dataset]:
     for subtree in self.data.values():
       if isinstance(subtree, ImageTreeInterface):
         for subtreeVal in subtree:
@@ -233,19 +239,51 @@ class ImageTreeInterface(ABC):
   def __len__(self):
     return self.images
 
-  def __init__(self, dcm: Optional[Union[List[Dataset], Dataset]] = None) -> None:
-    self.data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
+  @property
+  def data(self) -> Dict[str, Union[Dataset, 'ImageTreeInterface']]:
+    """Data stored in the Image tree
+  
+    Leafs are datasets and Nodes are
+    
+    """
+    return self.__data
+
+  @data.setter
+  def __setData(self, value: Dict[str, Union[Dataset, 'ImageTreeInterface']]):
+    self.__data = value
+
+  def __setitem__(self, key: Union[str, UID], entry: Union[Dataset, 'ImageTreeInterface']) -> None:
+    """Low Leveler function that actually stores the data. 
+    
+      Use Add image for a high level version of this.
+    """
+    if isinstance(key, UID):
+      key = key.name
+    if not isinstance(key, str):
+      raise TypeError("The Key should be an string")
+    if not (isinstance(entry, (Dataset, ImageTreeInterface))):
+      raise TypeError("The Entry should be a Dataset or An ImageTree")
+    self.__data[key] = entry
+
+  def __delitem__(self, key: str) -> None:
+      del self.__data[key]
+
+
+  def __init__(self, dcm: Union[Iterable[Dataset], Dataset] = []) -> None:
+    self.__data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
     self.images: int = 0 # The total number of images of this tree and it's subtrees
 
     if dcm:
       if isinstance(dcm, Dataset):
         self.add_image(dcm)
-      else:
+      elif isinstance(dcm, Iterable):
         self.add_images(dcm)
 
 class SeriesTree(ImageTreeInterface):
   """Final Layer of the DicomTree that contains the data.
   """
+  data: Dict[str, Dataset]
+
   SeriesDescription = "Tree of Undefined Series"
 
   def add_image(self, dicom : Dataset) -> None:
@@ -262,27 +300,8 @@ class SeriesTree(ImageTreeInterface):
         self.SeriesDescription = f"Tree of {dicom.SeriesDescription}"
     if dicom.SOPInstanceUID.name in self.data:
       raise ValueError("Dublicate Image added!")
-    self.data[dicom.SOPInstanceUID.name] = dicom
+    self[dicom.SOPInstanceUID.name] = dicom
     self.images += 1
-
-  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    new_data = {}
-    ret_dict = {}
-    for SOPInstanceUID, dataset in self.data.items():
-      ret_val = func(dataset)
-      if UIDMapping:
-        if SOPInstanceUID in UIDMapping.SOPUIDMapping:
-          newSOPInstanceUID = UIDMapping.SOPUIDMapping[SOPInstanceUID]
-          new_data[newSOPInstanceUID] = dataset
-          ret_dict[newSOPInstanceUID] = ret_val
-        else:
-          new_data[SOPInstanceUID] = dataset
-          ret_dict[SOPInstanceUID] = ret_val
-      else:
-        new_data[SOPInstanceUID] = dataset
-        ret_dict[SOPInstanceUID] = ret_val
-    self.data = new_data
-    return ret_dict
 
   def trim_tree(self, filterfunc: Callable[[Dataset], bool]) -> int:
     trimmed = 0
@@ -312,7 +331,8 @@ class SeriesTree(ImageTreeInterface):
 class StudyTree(ImageTreeInterface):
   """A Study tree is a data object that contains all studies with the same study ID
   """
-  StudyDescription = f"Undefined Study Description"
+  data: Dict[str, SeriesTree]
+  StudyDescription: str = f"Undefined Study Description"
 
   def add_image(self, dicom : Dataset) -> None:
     if not hasattr(dicom, 'StudyInstanceUID'):
@@ -333,12 +353,6 @@ class StudyTree(ImageTreeInterface):
       self.data[dicom.SeriesInstanceUID.name] = SeriesTree(dicom)
     self.images += 1
 
-  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    if UIDMapping:
-      return self._map(func, UIDMapping.SeriesUIDMapping, UIDMapping)
-    else:
-      return self._map(func, None, None)
-
   def __str__(self) -> str:
     seriesStr = f""
     for series in self.data.values():
@@ -349,6 +363,7 @@ class StudyTree(ImageTreeInterface):
 class PatientTree(ImageTreeInterface):
   """A Tree of Dicom images under one patient, based around Patient ID
   """
+  data: Dict[str, StudyTree]
   TreeName : str = "Unknown Tree"
 
   def add_image(self, dicom : Dataset) -> None:
@@ -368,13 +383,6 @@ class PatientTree(ImageTreeInterface):
     else:
       self.data[dicom.StudyInstanceUID.name] = StudyTree(dicom)
     self.images += 1
-
-  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    if UIDMapping:
-      return self._map(func, UIDMapping.StudyUIDMapping, UIDMapping)
-    else:
-      return self._map(func, None, None)
-
 
   def __str__(self) -> str:
     studyStr = ""
@@ -396,6 +404,8 @@ class DicomTree(ImageTreeInterface):
     /   ...   \ 
   DataSet...
   """
+  data: Dict[str, PatientTree]
+
 
   def add_image(self, dicom : Dataset) -> None:
     if not hasattr(dicom, 'PatientID'):
@@ -407,12 +417,6 @@ class DicomTree(ImageTreeInterface):
       tree.add_image(dicom)
       self.data[dicom.PatientID] = tree
     self.images += 1
-
-  def map(self, func: Callable[[Dataset], Any], UIDMapping: Optional[IdentityMapping] = None) -> Dict[str, Any]:
-    if UIDMapping:
-      return self._map(func, UIDMapping.PatientMapping, UIDMapping)
-    else:
-      return self._map(func, None, None)
 
   def __str__(self) -> str:
     patientStr = f""

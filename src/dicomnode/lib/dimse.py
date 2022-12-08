@@ -97,7 +97,7 @@ def send_images(SCU_AE: str,
           logger.error(error_message)
           raise CouldNotCompleteDIMSEMessage(f"Could not send {dataset}")
         else:
-          error_callback_func(Address, response, dataset)
+          error_callback_func(address, response, dataset)
     assoc.release()
   else:
     error_message = f"""Could not connect to the SCP with the following inputs:
@@ -150,7 +150,7 @@ def send_move(SCU_AE: str,
   assoc = ae.associate(
     address.ip,
     address.port,
-    address.ae_title
+    ae_title=address.ae_title
   )
 
   successful_send = True

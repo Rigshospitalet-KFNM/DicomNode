@@ -10,9 +10,10 @@ called and not just referenced.
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-from typing import Iterator, List, Callable, Any
+from typing import Dict, Iterator, List, Callable, Any
 from pydicom import Dataset
 
+from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.imageTree import DicomTree
 
 def identity_grinder(image_generator: Iterator[Dataset] ) -> Iterator[Dataset]:
@@ -50,19 +51,51 @@ def many_meta_grinder(*grinders: Callable[[Iterator[Dataset]], Any]) -> Callable
 
 try:
   import numpy
-  def numpy_grinder(datasets: Iterator[Dataset]) -> numpy.ndarray:
-    datasets: List[Dataset] = list(datasets)
+  unsigned_array_encoding: Dict[int, type] = {
+    8 : numpy.uint8,
+    16 : numpy.uint16,
+    32 : numpy.uint32,
+    64 : numpy.uint64,
+  }
+
+  signed_array_encoding: Dict[int, type] = {
+    8 : numpy.int8,
+    16 : numpy.int16,
+    32 : numpy.int32,
+    64 : numpy.int64,
+  }
+
+  def numpy_grinder(datasets_iterator: Iterator[Dataset]) -> numpy.ndarray:
+    """
+      Requires Tags:
+        0x7FE00008 or 0x7FE0009 or 0x7FE00010
+    """
+    datasets: List[Dataset] = list(datasets_iterator)
     pivot = datasets[0]
     x_dim = pivot.Columns
     y_dim = pivot.Rows
     z_dim = len(datasets)
 
-    image_array: numpy.ndarray = numpy.empty((x_dim, y_dim, z_dim))
+    if 0x7FE00008 in pivot:
+      dataType = numpy.float32
+    elif 0x7FE00009 in pivot:
+      dataType = numpy.float64
+    elif 0x002801052 in pivot and 0x00281053 in pivot:
+      dataType = numpy.float64
+    elif pivot.PixelRepresentation == 0:
+      dataType = unsigned_array_encoding.get(pivot.BitsAllocated, None)
+    else:
+      dataType = signed_array_encoding.get(pivot.BitsAllocated, None)
+    
+    if dataType is None:
+      raise InvalidDataset
+    
+    image_array: numpy.ndarray = numpy.empty((x_dim, y_dim, z_dim), dtype=dataType)
 
     for i, dataset in enumerate(datasets):
       image_array[i,:,:] = dataset.pixel_array
 
     return image_array
-
+  
 except ImportError:
   pass

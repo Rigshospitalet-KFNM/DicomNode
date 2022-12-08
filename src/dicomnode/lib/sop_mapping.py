@@ -292,7 +292,7 @@ DICOM_RT_Image_required_tags = Patient_required_tags \
   + General_Equipment_required_tags \
   + General_Image_required_tags \
   + Image_Pixel_required_tags \
-  + RT_Image \
+  + RT_image \
   + SOP_Common_required_tags
 
 

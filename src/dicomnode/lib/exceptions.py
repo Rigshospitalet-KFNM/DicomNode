@@ -21,3 +21,6 @@ class MissingModule(ImportError):
 
 class InvalidEncoding(Exception):
   """When a data structure have an unexpected encoding"""
+
+class InvalidTreeNode(Exception):
+  """If there's an incorrect datatype in an ImageTree"""
