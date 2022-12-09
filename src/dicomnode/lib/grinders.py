@@ -10,30 +10,32 @@ called and not just referenced.
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-from typing import Dict, Iterator, List, Callable, Any
+from typing import Any, Callable, Dict, Iterable, Iterator, List
+
 from pydicom import Dataset
 
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.imageTree import DicomTree
 
-def identity_grinder(image_generator: Iterator[Dataset] ) -> Iterator[Dataset]:
+
+def identity_grinder(image_generator: Iterable[Dataset] ) -> Iterable[Dataset]:
   """This is an identity function. The iterator is not called.
 
   Args:
-      image_generator (Iterator[Dataset]): An iterator of dataset
+      image_generator (Iterable[Dataset]): An iterator of dataset
 
   Returns:
-      Iterator[Dataset]: The same iterator
+      Iterable[Dataset]: The same iterator
   """
   return image_generator
 
-def list_grinder(image_generator: Iterator[Dataset]) -> List[Dataset]:
+def list_grinder(image_generator: Iterable[Dataset]) -> List[Dataset]:
   return list(image_generator)
 
-def dicom_tree_grinder(image_generator: Iterator[Dataset]) -> DicomTree:
+def dicom_tree_grinder(image_generator: Iterable[Dataset]) -> DicomTree:
   return DicomTree(image_generator)
 
-def many_meta_grinder(*grinders: Callable[[Iterator[Dataset]], Any]) -> Callable[[Iterator[Dataset]], List[Any]]:
+def many_meta_grinder(*grinders: Callable[[Iterable[Dataset]], Any]) -> Callable[[Iterable[Dataset]], List[Any]]:
   """This meta grinder combines any number of grinders
 
   Args:
@@ -42,7 +44,7 @@ def many_meta_grinder(*grinders: Callable[[Iterator[Dataset]], Any]) -> Callable
   Returns:
       Callable[[Iterator[Dataset]], List[Any]]: _description_
   """
-  def retFunc(image_generator: Iterator[Dataset]) -> List[Any]:
+  def retFunc(image_generator: Iterable[Dataset]) -> List[Any]:
     grinded: List[Any] = []
     for grinder in grinders:
       grinded.append(grinder(image_generator))
@@ -65,7 +67,7 @@ try:
     64 : numpy.int64,
   }
 
-  def numpy_grinder(datasets_iterator: Iterator[Dataset]) -> numpy.ndarray:
+  def numpy_grinder(datasets_iterator: Iterable[Dataset]) -> numpy.ndarray:
     """
       Requires Tags:
         0x7FE00008 or 0x7FE0009 or 0x7FE00010
@@ -75,27 +77,32 @@ try:
     x_dim = pivot.Columns
     y_dim = pivot.Rows
     z_dim = len(datasets)
+    rescale = (0x002801052 in pivot and 0x00281053 in pivot)
+
 
     if 0x7FE00008 in pivot:
       dataType = numpy.float32
     elif 0x7FE00009 in pivot:
       dataType = numpy.float64
-    elif 0x002801052 in pivot and 0x00281053 in pivot:
+    elif rescale:
       dataType = numpy.float64
     elif pivot.PixelRepresentation == 0:
       dataType = unsigned_array_encoding.get(pivot.BitsAllocated, None)
     else:
       dataType = signed_array_encoding.get(pivot.BitsAllocated, None)
-    
+
     if dataType is None:
       raise InvalidDataset
-    
+
     image_array: numpy.ndarray = numpy.empty((x_dim, y_dim, z_dim), dtype=dataType)
 
     for i, dataset in enumerate(datasets):
-      image_array[i,:,:] = dataset.pixel_array
+      if rescale:
+        image = (numpy.asarray(dataset.pixel_array, dtype=numpy.float64) - dataset.RescaleIntercept) * dataset.RescaleSlope
+      else:
+        image = dataset.pixel_array
+      image_array[i,:,:] = image
 
     return image_array
-  
 except ImportError:
   pass

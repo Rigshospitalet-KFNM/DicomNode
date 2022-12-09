@@ -14,7 +14,7 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
-from typing import List, Dict, Any, Iterator
+from typing import List, Dict, Any, Iterable
 
 TEST_AE_TITLE = "TEST_AE"
 SENDER_AE = "SENDER_AE"
@@ -45,7 +45,7 @@ class TestNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: Dict[str, Any]) -> Iterator[Dataset]:
+  def process(self, InputData: Dict[str, Any]) -> Iterable[Dataset]:
     self.logger.info("process is called")
     return []
 
@@ -66,7 +66,7 @@ class TestNodeTestCase(TestCase):
     self.assertEqual(response.Status, 0x0000)
     # Okay This is mostly to ensure lazyness
     # See the advanced docs guide for details
-    self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPINSTANCEUID]), 2)
+    self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPINSTANCEUID]), 2) # type: ignore
 
   def test_reject_connection(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -80,7 +80,7 @@ class FaultyNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: Dict[str, Any]) -> Iterator[Dataset]:
+  def process(self, InputData: Dict[str, Any]) -> Iterable[Dataset]:
     raise Exception
 
 class FaultyNodeTestCase(TestCase):

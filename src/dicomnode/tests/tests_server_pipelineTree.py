@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Iterator, Callable
 from unittest import TestCase
 
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer
 
@@ -79,8 +79,11 @@ class PipelineTestCase(TestCase):
     make_meta(dataset)
     self.pipeline_tree.add_image(dataset)
     data = self.pipeline_tree.validate_patient_ID(CPR)
-    self.assertEqual(data['arg_1'].images, 1)
-    self.assertEqual(data['arg_2'], 'GrinderString')
+    if data is not None:
+      self.assertEqual(data['arg_1'].images, 1)
+      self.assertEqual(data['arg_2'], 'GrinderString')
+    else:
+      raise AssertionError
 
 
 class InputContainerTestCase(TestCase):
@@ -110,6 +113,20 @@ class InputContainerTestCase(TestCase):
     self.assertEqual(data['arg_1'].images, 1)
     self.assertEqual(data['arg_2'], 'GrinderString')
 
-  def test_get_data_before_instantiated(self):
-    self.assertRaises(KeyError, self.input_container.__getitem__, "key")
+  def test_get_AI_before_instantiated(self):
+    self.assertIsInstance(self.input_container['arg_1'], TestInput1)
+    self.assertIsInstance(self.input_container['arg_2'], TestInput2)
+
+  def test_raises_error_on_file_existance(self):
+    path = self.path / "test"
+    with path.open(mode="w") as f:
+      f.write("asdf")
+    self.assertRaises(InvalidRootDataDirectory, InputContainer,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, path)
+
+  def test_IC_cleanup(self):
+    path = self.path / "test"
+    path.mkdir()
+    IC = InputContainer({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, path)
+    IC._cleanup()
+    self.assertFalse(path.exists())
 

@@ -4,7 +4,7 @@ import shutil
 
 from pydicom import Dataset
 from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
-from unittest import TestCase
+from unittest import TestCase, skip
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.io import load_dicom
@@ -96,6 +96,14 @@ class lib_imageTree(TestCase):
     self.dataset_6.fix_meta_info()
 
     self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
+    self.SOPInstanceUIDs = [
+      self.dataset_1_SOPInstanceUID,
+      self.dataset_2_SOPInstanceUID,
+      self.dataset_3_SOPInstanceUID,
+      self.dataset_4_SOPInstanceUID,
+      self.dataset_5_SOPInstanceUID,
+      self.dataset_6_SOPInstanceUID]
+
 
     self.empty_dataset = Dataset()
 
@@ -254,6 +262,16 @@ class lib_imageTree(TestCase):
     for ds in self.datasets:
       self.assertEqual(ds.Modality, "OT")
 
+  def test_maps_with_returnVals(self):
+    DT = DicomTree(self.datasets)
+    def getSOPUID(dataset: Dataset)-> UID:
+      return dataset.SOPInstanceUID
+    SOPs = DT.map(getSOPUID)
+
+    for SOP in SOPs:
+      self.assertIn(SOP, self.SOPInstanceUIDs)
+
+
   def test_DicomTree_apply_mapping_with_empty_IM(self):
     def writeModality(ds : Dataset):
       ds.Modality = 'OT'
@@ -279,6 +297,28 @@ class lib_imageTree(TestCase):
       pass
 
     self.assertRaises(TypeError, Tree)
+
+  ### Attribute Tests ###
+
+  def test_setitem(self):
+    ST = SeriesTree([self.dataset_1])
+    self.assertRaises(TypeError, ST.__setitem__, 1, self.dataset_2)
+    self.assertRaises(TypeError, ST.__setitem__, "asd", 1)
+    ST[self.dataset_2_SOPInstanceUID] = self.dataset_2
+
+  def test_get_item(self):
+    ST = SeriesTree([self.dataset_1])
+    self.assertEqual(ST[self.dataset_1_SOPInstanceUID], self.dataset_1)
+
+  def test_delitem(self):
+    ST = SeriesTree([self.dataset_1])
+    del ST[self.dataset_1_SOPInstanceUID]
+    self.assertEqual(ST.images, 0)
+    self.assertNotIn(self.dataset_1_SOPInstanceUID, ST)
+    StudyT = StudyTree([self.dataset_1, self.dataset_2])
+    del StudyT[self.dataset_1.SeriesInstanceUID]
+    self.assertEqual(StudyT.images, 0)
+
 
 ###### IdentityMapping #########
   def test_create_IdentityMapping(self):
@@ -341,7 +381,8 @@ class lib_imageTree(TestCase):
 
     patientID = im.get_mapping(self.patientID_1)
 
-    self.assertEqual(patientID[:len(prefix)], prefix)
+    self.assertIsNotNone(patientID)
+    self.assertEqual(patientID[:len(prefix)], prefix) # type: ignore
 
     self.assertEqual(sop_uid_ret_1, sop_str_ret_1)
     self.assertEqual(study_uid_ret_1, study_str_ret_1)
@@ -390,3 +431,5 @@ class lib_imageTree(TestCase):
     DT = DicomTree(self.datasets)
     for image in DT:
       self.assertIn(image, self.datasets)
+
+  

@@ -23,22 +23,25 @@ class AbstractInput(ImageTreeInterface, ABC):
   __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
   required_values: Dict[int, Any] = {}
   image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
-  data: Dict[str, Dataset]
+
+  @property
+  def data(self) -> Dict[str, Dataset]:
+    return super().data # type: ignore
 
   def __init__(self, instance_directory: Optional[Path] = None):
-    self.__instance_directory: Optional[Path] = instance_directory
-    self.data: Dict[str, Dataset] = {}
-    self.images = 0
+    super().__init__()
+
+    self.path: Optional[Path] = instance_directory
 
     self.logger= logging.getLogger("dicomnode")
 
     if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
       self.required_tags.append(0x00080018)
 
-    if self.__instance_directory is not None:
-      if not self.__instance_directory.exists():
-        self.__instance_directory.mkdir(exist_ok=True)
-      for image_path in self.__instance_directory.iterdir():
+    if self.path is not None:
+      if not self.path.exists():
+        self.path.mkdir(exist_ok=True)
+      for image_path in self.path.iterdir():
         dcm = load_dicom(image_path, self.__private_tags)
         self.add_image(dcm)
 
@@ -53,8 +56,8 @@ class AbstractInput(ImageTreeInterface, ABC):
 
   def _clean_up(self) -> None:
     """Removes any files, stored by the Input"""
-    if self.__instance_directory is not None:
-      for dicom in self.data.values():
+    if self.path is not None:
+      for dicom in self:
         p = self.__getPath(dicom)
         p.unlink()
 
@@ -79,7 +82,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     Raises:
       IncorrectlyConfigured : Calls to this function require a dictory
     """
-    if self.__instance_directory is None:
+    if self.path is None:
       raise IncorrectlyConfigured
 
     image_name: str = ""
@@ -94,9 +97,9 @@ class AbstractInput(ImageTreeInterface, ABC):
 
     image_name += ".dcm"
 
-    return self.__instance_directory / image_name
+    return self.path / image_name
 
-  def add_image(self, dicom: Dataset) -> None:
+  def add_image(self, dicom: Dataset) -> int:
     """Attempts to add an image to the input.
 
     Args:
@@ -122,7 +125,8 @@ class AbstractInput(ImageTreeInterface, ABC):
     # Save the dataset
     self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
     self.images += 1
-    if self.__instance_directory is not None:
+    if self.path is not None:
       dicom_path:Path = self.__getPath(dicom)
       if not dicom_path.exists():
         save_dicom(dicom_path, dicom)
+    return 1

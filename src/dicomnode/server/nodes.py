@@ -12,7 +12,9 @@
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-from pynetdicom import AE, evt, AllStoragePresentationContexts
+from pynetdicom import evt
+from pynetdicom.ae import ApplicationEntity as AE
+from pynetdicom.presentation import AllStoragePresentationContexts
 from pydicom import Dataset
 
 from dicomnode.lib.dimse import Address, send_images
@@ -79,7 +81,7 @@ class AbstractPipeline(ABC):
     """
     self.ae.shutdown()
 
-  def open(self, blocking=True) -> NoReturn:
+  def open(self, blocking=True) -> NoReturn: #type: ignore
     """Opens all connections active connections.
       If your application includes additional connections, you should overwrite this method,
       And open any connections and call the super function.
@@ -95,7 +97,7 @@ class AbstractPipeline(ABC):
       block=blocking,
       evt_handlers=self.__evt_handlers)
 
-  def __init__(self, start=True) -> NoReturn:
+  def __init__(self, start=True) -> NoReturn: #type: ignore
     # logging
     if self.log_path:
       logging.basicConfig(
@@ -150,7 +152,7 @@ class AbstractPipeline(ABC):
     self.__data_state = PipelineTree(
       self.patient_identifier_tag,
       self.input,
-      root_data_directory=self.root_data_directory
+      root_data_directory= self.root_data_directory
     )
 
     # Validates that Pipeline is configured correctly.

@@ -3,9 +3,12 @@ See SOP classes in DicomForDummies.md
 """
 
 
+from typing import Dict, List
+
 from pydicom import Dataset
-from pydicom.uid import UID, CTImageStorage, NuclearMedicineImageStorage, PositronEmissionTomographyImageStorage, MRImageStorage, EncapsulatedPDFStorage
-from typing import List, Dict
+from pydicom.uid import (UID, CTImageStorage, EncapsulatedPDFStorage,
+                         MRImageStorage, NuclearMedicineImageStorage,
+                         PositronEmissionTomographyImageStorage)
 
 CT_Image_required_tags: List[int] = [
   0x00080008, # ImageType
@@ -128,7 +131,7 @@ NM_Image_required_tags: List[int] = [
 
 NM_Isotope_required_tags: List[int] = [
   0x00540012, # EnergyWindowInformationSequence
-  0x00540016, # RadiopharmaceuticalInformationSequence 
+  0x00540016, # RadiopharmaceuticalInformationSequence
 ]
 
 NM_PET_Patient_Orientation_required_tags: List[int] = [

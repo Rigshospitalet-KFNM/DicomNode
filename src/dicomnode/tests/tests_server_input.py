@@ -22,7 +22,7 @@ correct_date_format = "%Y/%m/%d %H:%M:%S"
 
 
 logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.CRITICAL + 1 ,
         format=log_format,
         datefmt=correct_date_format,
         handlers=[StreamHandler(
@@ -65,17 +65,17 @@ class InputTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     self.test_input.add_image(dataset)
-    self.assertTrue(self.test_input._AbstractInput__getPath(dataset).exists())
+    self.assertTrue(self.test_input._AbstractInput__getPath(dataset).exists()) # type: ignore
 
   def test_get_path(self):
     dataset = Dataset()
     SOPInstanceUID = gen_uid()
     dataset.SOPInstanceUID = SOPInstanceUID
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'image_{SOPInstanceUID.name}.dcm')
+    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.Modality = 'CT'
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm')
+    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.InstanceNumber = 431
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_431.dcm')
+    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_431.dcm') # type: ignore
 
   def test_cleanup(self):
     dataset = Dataset()
@@ -85,7 +85,7 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.test_input.add_image(dataset)
     self.test_input._clean_up()
-    self.assertFalse(self.test_input._AbstractInput__getPath(dataset).exists())
+    self.assertFalse(self.test_input._AbstractInput__getPath(dataset).exists()) # type: ignore
 
   def test_get_data(self):
     dataset = Dataset()
