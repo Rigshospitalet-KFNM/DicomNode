@@ -6,12 +6,14 @@ import logging
 
 from sys import getrefcount
 
+from gc import get_referrers
+
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dimse import Address, send_image
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.nodes import AbstractPipeline
+from dicomnode.server.nodes import AbstractPipeline, InputContainer
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
 from typing import List, Dict, Any, Iterable
@@ -26,7 +28,6 @@ DATASET_SOPINSTANCEUID = DEFAULT_DATASET.SOPInstanceUID.name
 
 
 TEST_CPR = "1502799995"
-
 INPUT_KW = "test_input"
 
 DEFAULT_DATASET.PatientID = TEST_CPR
@@ -45,7 +46,7 @@ class TestNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: Dict[str, Any]) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
     self.logger.info("process is called")
     return []
 
@@ -73,6 +74,7 @@ class TestNodeTestCase(TestCase):
     self.assertRaises(CouldNotCompleteDIMSEMessage,send_image,"NOT_SENDER_AE", address, DEFAULT_DATASET)
 
 
+
 class FaultyNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
@@ -80,7 +82,7 @@ class FaultyNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: Dict[str, Any]) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
     raise Exception
 
 class FaultyNodeTestCase(TestCase):

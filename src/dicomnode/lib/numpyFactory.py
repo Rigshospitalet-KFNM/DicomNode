@@ -2,18 +2,14 @@
 
   Requires numpy
 """
-from enum import Enum
-from functools import lru_cache, wraps
-from inspect import getfullargspec
-
 from pydicom import DataElement, Dataset
 from pydicom.tag import BaseTag, Tag
 from typing import Dict, List, Union, Tuple, Any, Optional, Callable, Iterator
 
-from typing_extensions import TypedDict, NotRequired
+from dataclasses import dataclass
 
 from dicomnode.lib.dicom import make_meta, gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CallElement, CopyElement, DicomFactory, Header, SeriesElement, FillingStrategy, StaticElement, HeaderBlueprint
+from dicomnode.lib.dicomFactory import AttrElement, CallerArgs, CallElement, CopyElement, DicomFactory, SeriesHeader, SeriesElement, FillingStrategy, StaticElement, Blueprint
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, InvalidEncoding
 
 import numpy
@@ -26,14 +22,13 @@ unsigned_array_encoding: Dict[int, type] = {
   64 : numpy.uint64,
 }
 
-class NumpyCallerArgs(TypedDict):
-  scaled_image: NotRequired[ndarray]
-  slope : NotRequired[float]
-  intercept : NotRequired[float]
-  i : int
+@dataclass
+class NumpyCallerArgs(CallerArgs):
   image : ndarray # Unmodified image
   factory : 'NumpyFactory'
-  VirtualElement : NotRequired['NumpyCaller'] # This is required However when this is created, it's missing
+  intercept : Optional[float] = None
+  slope : Optional[float] = None
+  scaled_image: Optional[ndarray] = None
 
 class NumpyCaller(CallElement):
   """Virtual Data Element, indicating that the value will produced from
@@ -41,15 +36,24 @@ class NumpyCaller(CallElement):
   def __init__(self,
                tag: Union[int, str, Tuple[int, int]],
                VR: str,
-               func: Callable[[],Any]
+               func: Callable[[NumpyCallerArgs],Any]
     ) -> None:
     self.tag: Union[int, str, Tuple[int, int]] = tag
     self.VR: str = VR
-    self.func: Callable[[],Any] = func
+    self.func: Callable[[NumpyCallerArgs],Any] = func
 
-  def __call__(self, **kwargs) -> DataElement:
-    kwargs['VirtualElement'] = self
-    value = self.func(**kwargs)
+  def __call__(self, caller_args : NumpyCallerArgs) -> Optional[DataElement]:
+    """Now There's a Liskov's Substitution principle violation here,
+    because NumpyCaller is more inherits from Caller Args. 
+
+    Args:
+        caller_args (NumpyCallerArgs): _description_
+
+    Returns:
+        Optional[DataElement]: _description_
+    """
+    caller_args.virtual_element = self
+    value = self.func(caller_args)
     if value is not None:
       return DataElement(self.tag, self.VR, value)
     else:
@@ -63,7 +67,7 @@ class NumpyFactory(DicomFactory):
   _pixel_representation: int = 0
 
   def __init__(self,
-               header_blueprint: Optional[HeaderBlueprint] = None,
+               header_blueprint: Optional[Blueprint] = None,
                filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
     super().__init__(header_blueprint, filling_strategy)
 
@@ -152,83 +156,82 @@ class NumpyFactory(DicomFactory):
     return new_image, slope, intercept
 
 
-  def make_series(self, header : Header, image: ndarray):
+  def make_series(self, header : SeriesHeader, image: ndarray):
     target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
-      raise IncorrectlyConfigured("There's no target Datatype")
+      raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
 
     encode = image.dtype == target_datatype
 
     list_dicom = []
     if len(image.shape) == 3:
       for i, slice in enumerate(image):
-        caller_args: NumpyCallerArgs = {
-          'factory' : self,
-          'i' : i,
-          'image' : slice
-        }
+        caller_args = NumpyCallerArgs(
+          i=i,
+          factory=self,
+          image=slice
+        )
 
         # Encoding is done per slice basis
         if encode:
           scaled_slice, slope, intercept = self.scale_image(slice)
-          caller_args['scaled_image'] = scaled_slice
-          caller_args['slope'] = slope
-          caller_args['intercept'] = intercept
+          caller_args.scaled_image = scaled_slice
+          caller_args.slope = slope
+          caller_args.intercept = intercept
 
         dataset = Dataset()
         for element in header:
           if isinstance(element, DataElement):
             dataset.add(element)
           if isinstance(element, CallElement):
-            if data_element := element(**caller_args):
+            data_element = element(caller_args)
+            if data_element is not None:
               dataset.add(data_element)
         list_dicom.append(dataset)
     return list_dicom
 
-def _get_image(**kwargs: NumpyCallerArgs) -> ndarray:
-  if 'scaled_image' in kwargs:
-    image = kwargs['scaled_image']
+def _get_image(numpy_caller_args: NumpyCallerArgs) -> ndarray:
+  if numpy_caller_args.scaled_image is not None:
+    image = numpy_caller_args.scaled_image
   else:
-    image = kwargs['image']
+    image = numpy_caller_args.image
   return image
 
-def _add_InstanceNumber(**kwargs: NumpyCallerArgs):
-  return kwargs['i']
 
-def _add_Rows(**kwargs: NumpyCallerArgs) -> int:
-  image = _get_image(**kwargs)
+def _add_Rows(numpy_caller_args: NumpyCallerArgs) -> int:
+  image = _get_image(numpy_caller_args)
   return image.shape[0]
 
-def _add_Columns(**kwargs: NumpyCallerArgs) -> int:
-  image = _get_image(**kwargs)
+def _add_Columns(numpy_caller_args: NumpyCallerArgs) -> int:
+  image = _get_image(numpy_caller_args)
   return image.shape[1]
 
-def _add_smallest_pixel(**kwargs: NumpyCallerArgs) -> int:
-  image = _get_image(**kwargs)
+def _add_smallest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
+  image = _get_image(numpy_caller_args)
   return image.min()
 
-def _add_largest_pixel(**kwargs: NumpyCallerArgs) -> int:
-  image = _get_image(**kwargs)
+def _add_largest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
+  image = _get_image(numpy_caller_args)
   return image.max()
 
-def _add_aspect_ratio(**kwargs: NumpyCallerArgs) -> List[int]:
-  image = _get_image(**kwargs)
+def _add_aspect_ratio(numpy_caller_args: NumpyCallerArgs) -> List[int]:
+  image = _get_image(numpy_caller_args)
   return [image.shape[0], image.shape[1]]
 
-def _add_slope(**kwargs: NumpyCallerArgs) -> Optional[int]:
-  return kwargs.get('slope')
+def _add_slope(numpy_caller_args: NumpyCallerArgs) -> Optional[float]:
+  return numpy_caller_args.slope
 
-def _add_intercept(**kwargs: NumpyCallerArgs) -> Optional[int]:
-  return kwargs.get('intercept')
+def _add_intercept(numpy_caller_args: NumpyCallerArgs) -> Optional[float]:
+  return numpy_caller_args.intercept
 
-def _add_PixelData(**kwargs) -> bytes:
-  image = _get_image(**kwargs)
+def _add_PixelData(numpy_caller_args: NumpyCallerArgs) -> bytes:
+  image = _get_image(numpy_caller_args)
   return image.tobytes()
 
 ####### Header Tag groups #######
 general_image_header_tags = []
 
-image_pixel_header_tags: HeaderBlueprint = HeaderBlueprint([
+image_pixel_header_tags: Blueprint = Blueprint([
   StaticElement(0x00280002, 'US', 1),                    # SamplesPerPixel
   StaticElement(0x00280004, 'CS', 'MONOCHROME2'),        # PhotometricInterpretation
   NumpyCaller(0x00280010, 'US', _add_Rows),              # Rows

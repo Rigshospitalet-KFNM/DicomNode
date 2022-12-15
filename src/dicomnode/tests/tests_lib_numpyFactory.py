@@ -1,24 +1,16 @@
 from pydicom import Dataset
 from unittest import TestCase, skipIf
 from typing import List
-
-
-try:
-  import numpy
-  from dicomnode.lib.numpyFactory import image_pixel_header_tags, NumpyCaller, NumpyFactory
-  NUMPY_IMPORTED = True
-except:
-  NUMPY_IMPORTED = False
+from dicomnode.lib.numpyFactory import image_pixel_header_tags, NumpyCaller, NumpyFactory
+import numpy
 
 class NumpyFactoryTestCase(TestCase):
   def setUp(self) -> None:
-    if NUMPY_IMPORTED:
-      self.blueprint = image_pixel_header_tags
-      self.factory = NumpyFactory(self.blueprint)
-      self.header_dataset = Dataset()
-      self.header = self.factory.make_header(self.header_dataset)
+    self.blueprint = image_pixel_header_tags
+    self.factory = NumpyFactory(self.blueprint)
+    self.header_dataset = Dataset()
+    self.header = self.factory.make_series_header(self.header_dataset)
 
-  @skipIf(not NUMPY_IMPORTED, "Numpy Required for test")
   def test_make_series_no_encoding(self):
     images  = 100
     rows    = 40
@@ -32,7 +24,6 @@ class NumpyFactoryTestCase(TestCase):
       self.assertEqual(dataset.Columns, columns)
       self.assertEqual(dataset.Rows, rows)
 
-  @skipIf(not NUMPY_IMPORTED, "Numpy Required for test")
   def test_make_series_float_encoding(self):
     images  = 100
     rows    = 40
@@ -49,7 +40,6 @@ class NumpyFactoryTestCase(TestCase):
       self.assertEqual(dataset.Columns, columns)
       self.assertEqual(dataset.Rows, rows)
 
-  @skipIf(not NUMPY_IMPORTED, "Numpy Required for test")
   def test_scale_image(self):
     image = numpy.array([[1.,2.], [3.,4.]], dtype=numpy.float64)
     scaled_image, slope, intercept = self.factory.scale_image(image)
@@ -61,7 +51,6 @@ class NumpyFactoryTestCase(TestCase):
     for image_val, recreated_val in zip(image.flatten(), recreated_image.flatten()):
       self.assertAlmostEqual(image_val, recreated_val, places=8)
 
-  @skipIf(not NUMPY_IMPORTED, "Numpy Required for test")
   def test_numpy_factory_properties(self):
     factory = NumpyFactory()
 
@@ -81,7 +70,7 @@ class NumpyFactoryTestCase(TestCase):
     self.assertEqual(factory.pixel_representation, 1)
 
     try:
-      factory.bits_allocated_setter = "asdf"
+      factory.bits_allocated_setter = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
@@ -102,7 +91,7 @@ class NumpyFactoryTestCase(TestCase):
     self.assertEqual(factory.bits_allocated_setter, 24)
 
     try:
-      factory.bits_stored_setter = "asdf"
+      factory.bits_stored_setter = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
@@ -127,7 +116,7 @@ class NumpyFactoryTestCase(TestCase):
     self.assertEqual(factory.bits_stored, 24)
 
     try:
-      factory.high_bit_setter = "asdf"
+      factory.high_bit_setter = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
@@ -145,3 +134,4 @@ class NumpyFactoryTestCase(TestCase):
       pass
 
     factory.high_bit_setter = 23
+

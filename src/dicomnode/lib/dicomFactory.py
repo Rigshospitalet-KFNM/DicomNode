@@ -4,6 +4,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 from inspect import getfullargspec
@@ -11,6 +12,7 @@ from pydicom import DataElement, Dataset
 from pydicom.tag import Tag, BaseTag
 from random import randint
 from typing import Any, Callable, Dict, List, Iterator,  Optional, Tuple, Union
+
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
@@ -21,7 +23,7 @@ class FillingStrategy(Enum):
 
 class VirtualElement(ABC):
   """"""
-  __tag: BaseTag
+
 
   @property
   def tag(self) -> BaseTag:
@@ -35,6 +37,18 @@ class VirtualElement(ABC):
   @tag.setter
   def tag(self, tag: Union[BaseTag, str, int, Tuple[int,int]]):
     self.__tag = Tag(tag)
+
+  @property
+  def VR(self) -> str:
+    return self.__VR
+
+  @VR.setter
+  def VR(self, val: str) -> None:
+    self.__VR = val
+
+  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str) -> None:
+    self.tag = tag
+    self.VR = VR
 
   @abstractmethod
   def corporealialize(self, factory: 'DicomFactory', dataset: Dataset) -> Optional[Union[DataElement, 'CallElement']]:
@@ -53,12 +67,18 @@ class AttrElement(VirtualElement):
     value = getattr(factory, self.attribute)
     return DataElement(self.tag, self.VR, value)
 
+@dataclass
+class CallerArgs:
+  i : int
+  virtual_element: Optional[VirtualElement] = field(default=None, init=False) # This is required, However when object is created, it's missing
+
+
 class CallElement(VirtualElement):
-  """Abstract Virtual tag. This class represents a tag, that will be
+  """Abstract tag. This class represents a tag, that will be
   instantiated from with an image slice.
   """
-  def __init__(self, tag, VR, func) -> None:
-    self.tag: BaseTag = tag
+  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, func: Callable[[CallerArgs],Any]) -> None:
+    self.tag: BaseTag = Tag(tag)
     self.VR: str = VR
     self.func = func
 
@@ -66,8 +86,8 @@ class CallElement(VirtualElement):
     return self
 
   @abstractmethod
-  def __call__(self) -> DataElement:
-    return DataElement(self.tag, self.VR, self.func())
+  def __call__(self, callerArgs: CallerArgs) -> DataElement:
+    return DataElement(self.tag, self.VR, self.func(callerArgs))
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
@@ -109,8 +129,8 @@ class SeriesElement(VirtualElement):
     if self.require_dataset:
       # The '# type: ignores' here is because the type checker assumes func
       # is an instance based function, when it is dynamic assigned function
-      # and therefore behaves like a static function  
-      value = self.func(dataset) # type: ignore 
+      # and therefore behaves like a static function
+      value = self.func(dataset) # type: ignore
     else:
       value = self.func() # type: ignore
     return DataElement(self.tag, self.VR, value)
@@ -124,7 +144,7 @@ class StaticElement(VirtualElement):
   def corporealialize(self, factory: 'DicomFactory', dataset: Dataset) -> Optional[Union[DataElement, 'CallElement']]:
     return DataElement(self.tag, self.VR, self.value)
 
-class HeaderBlueprint():
+class Blueprint():
   def __getitem__(self, __tag: int):
     return self._dict[__tag]
 
@@ -154,7 +174,7 @@ class HeaderBlueprint():
   def __contains__(self, tag: int) -> bool:
     return tag in self._dict
 
-  def __add__(self, blueprint: 'HeaderBlueprint') -> 'HeaderBlueprint':
+  def __add__(self, blueprint: 'Blueprint') -> 'Blueprint':
     new_header_blueprint = type(self)()
 
     for ve in self:
@@ -173,7 +193,7 @@ class HeaderBlueprint():
     self._dict[virtual_element.tag] = virtual_element
 
 
-class Header():
+class SeriesHeader():
   """A dicom dataset blueprint for a factory to produce a series of dicom
   datasets"""
   def __getitem__(self, key) -> Union[DataElement, CallElement]:
@@ -210,17 +230,17 @@ class DicomFactory(ABC):
   """
 
   def __init__(self,
-               header_blueprint: Optional[HeaderBlueprint] = None,
+               header_blueprint: Optional[Blueprint] = None,
                filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
-    self.header_blueprint: Optional[HeaderBlueprint] = header_blueprint
+    self.header_blueprint: Optional[Blueprint] = header_blueprint
     self.filling_strategy: Optional[FillingStrategy] = filling_strategy
     self.series_description: str = "Unnamed Pipeline post processing "
 
-  def make_header(self,
+  def make_series_header(self,
                   dataset: Dataset,
-                  elements: Optional[HeaderBlueprint]= None,
+                  elements: Optional[Blueprint]= None,
                   filling_strategy: Optional[FillingStrategy] = None
-    ) -> Header:
+    ) -> SeriesHeader:
     """This function produces a header dataset based on an input dataset.
 
     Note that it's callers responsibility to ensure, that the produced header
@@ -245,7 +265,7 @@ class DicomFactory(ABC):
     if filling_strategy is None:
       raise IncorrectlyConfigured("A strategy is need for unmarked tags")
 
-    header = Header()
+    header = SeriesHeader()
     if filling_strategy == FillingStrategy.DISCARD:
       for virtual_element in elements:
         de = virtual_element.corporealialize(self, dataset)
@@ -264,35 +284,34 @@ class DicomFactory(ABC):
 
   @abstractmethod
   def make_series(self,
-                  header : Header,
+                  header : SeriesHeader,
                   image : Any
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
-
-class NoFactory(DicomFactory):
-  def make_series(self, header: Header, image: Any) -> List[Dataset]:
-    raise NotImplementedError
-
 ###### Header function ######
-def _get_today() -> date:
+
+def _add_InstanceNumber(caller_args: CallerArgs):
+  return caller_args.i
+
+def _get_today(_) -> date:
   return date.today()
 
-def _get_time() -> time:
+def _get_time(_) -> time:
   return datetime.now().time()
 
-def _get_random_number() -> int:
+def _get_random_number(_) -> int:
   return randint(1, 2147483646)
 ###### Header Tag Lists ######
 
-patient_header_tags = HeaderBlueprint([
+patient_header_tags = Blueprint([
   CopyElement(0x00100010), # PatientName
   CopyElement(0x00100020), # PatientID
   CopyElement(0x00100030), # PatientsBirthDate
   CopyElement(0x00100040), # PatientSex
 ])
 
-general_study_header_tags = HeaderBlueprint([
+general_study_header_tags = Blueprint([
   CopyElement(0x00080020), # StudyDate
   CopyElement(0x00080030), # StudyTime
   CopyElement(0x00080050), # AccessionNumber
@@ -301,14 +320,14 @@ general_study_header_tags = HeaderBlueprint([
   CopyElement(0x0020000D), # StudyInstanceUID
 ])
 
-patient_study_header_tags = HeaderBlueprint([
+patient_study_header_tags = Blueprint([
   CopyElement(0x00101010, Optional=True), # PatientAge
   CopyElement(0x00101020, Optional=True), # PatientSize
   CopyElement(0x00101030, Optional=True), # PatientWeight
 ])
 
 
-general_series_study_header = HeaderBlueprint([
+general_series_study_header = Blueprint([
   CopyElement(0x00080060), # Modality
   SeriesElement(0x00080021, 'DA', _get_today), # SeriesDate
   SeriesElement(0x00080031, 'TM', _get_time), # SeriesTime

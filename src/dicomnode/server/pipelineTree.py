@@ -4,15 +4,18 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 import logging
+from logging import Logger
 import shutil
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pydicom import Dataset
-from pathlib import Path
-from typing import Dict, Union, List, Optional, Type, Callable, Any
 
-
-from dicomnode.lib.exceptions import InvalidRootDataDirectory, InvalidDataset, InvalidTreeNode
-from dicomnode.lib.imageTree import ImageTreeInterface, IdentityMapping
+from dicomnode.lib.dicomFactory import DicomFactory
+from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
+                                      InvalidTreeNode)
+from dicomnode.lib.imageTree import IdentityMapping, ImageTreeInterface
 from dicomnode.server.input import AbstractInput
 
 
@@ -21,6 +24,12 @@ class InputContainer(ImageTreeInterface):
 
   """
 
+  @dataclass
+  class Options:
+    logger: Optional[Logger] = None
+    container_path: Optional[Path] = None
+    factory: Optional[DicomFactory] = None
+
   def __getitem__(self, key: str):
     if hasattr(self, 'instance'):
       return self.instance[key]
@@ -28,37 +37,48 @@ class InputContainer(ImageTreeInterface):
       return self.data[key]
 
   def __init__(self,
-               args: Dict[str, Type],
-               container_path : Optional[Path]
+               args: Dict[str, Type[AbstractInput]],
+               pivot: Optional[Dataset] = None, # See lazyness
+               options: Options = Options(),
     ) -> None:
     super().__init__()
+    self.options = options
 
-    if container_path is not None:
-      if container_path.is_file():
+    if self.options.container_path is not None:
+      if self.options.container_path.is_file():
         raise InvalidRootDataDirectory
-      container_path.mkdir(exist_ok=True)
+      self.options.container_path.mkdir(exist_ok=True)
+
+    if self.options.factory is not None and pivot is not None:
+      self.header = self.options.factory.make_series_header(pivot)
+
 
     for arg_name, input in args.items():
-      if container_path is not None:
-        input_path = container_path / arg_name
-      else:
-        input_path = None
-      self.data[arg_name] = input(input_path)
+      input_path: Optional[Path] = None
+      if self.options.container_path is not None:
+        input_path = self.options.container_path / arg_name
 
-    # InputContainer tags:
-    self.container_path: Optional[Path] = container_path
+      inputOptions = input.Options(
+        data_directory = input_path,
+        factory = self.options.factory
+      )
+
+      self.data[arg_name] = input(pivot, options=inputOptions)
 
     # logger
-    self.logger: logging.Logger = logging.getLogger("dicomnode")
+    if self.options.logger is not None:
+      self.logger = self.options.logger
+    else:
+      self.logger = logging.getLogger("dicomnode")
 
   def _cleanup(self):
-    if self.container_path:
+    if self.options.container_path is not None:
       for input in self.data.values():
         if isinstance(input, AbstractInput):
           input._clean_up()
         else:
           raise InvalidTreeNode # pragma: no cover
-      shutil.rmtree(self.container_path)
+      shutil.rmtree(self.options.container_path)
 
   def _validateAll(self):
     valid = True
@@ -82,38 +102,50 @@ class InputContainer(ImageTreeInterface):
     return self
 
   def add_image(self, dicom: Dataset) -> int:
-    if not hasattr(self, 'header'):
+    if not hasattr(self, 'header') and self.options.factory is not None:
       self.logger.debug("Adding Header")
-      self.header = Dataset()
+      self.header = self.options.factory.make_series_header(dicom)
 
     added = 0
     for input in self.data.values():
-      try:
-        input.add_image(dicom)
-        added += 1
-      except InvalidDataset:
-        pass
+      if isinstance(input, AbstractInput):
+        try:
+          added += input.add_image(dicom)
+        except InvalidDataset:
+          pass
+      else:
+        raise InvalidTreeNode
     if added == 0:
       raise InvalidDataset()
     self.images += added
     return added
+
+  def __str__(self) -> str:
+    return str(self.data)
 
 
 class PipelineTree(ImageTreeInterface):
   """A more specialized ImageTree, which is used by a dicom node to keep track
   of studies.
   """
+
+  @dataclass
+  class Options:
+    input_container: type[InputContainer] = InputContainer
+    data_directory: Optional[Path] = None
+    factory: Optional[DicomFactory] = None
+
   def __init__(self,
                patient_identifier: int,
-               pipelineArgs: Dict[str, Type], # Type of AbstractInputDataClass
-               root_data_directory : Optional[Path] = None,
+               pipelineArgs: Dict[str, Type[AbstractInput]], # Type of AbstractInputDataClass
+               options = Options()
     ) -> None:
     """_summary_
 
     Args:
         patient_identifier (int): _description_
         pipelineArgs (Dict[str, Type]): _description_
-        root_data_directory (Optional[Path], optional): _description_. Defaults to None.
+        Options: PipelineTree.Options
 
     Raises:
         InvalidRootDataDirectory: _description_
@@ -123,8 +155,9 @@ class PipelineTree(ImageTreeInterface):
 
     # Args setup
     self.patient_identifier_tag: int = patient_identifier
-    self.PipelineArgs: Dict[str, Type] = pipelineArgs
-    self.root_data_directory: Optional[Path] = root_data_directory
+    self.PipelineArgs: Dict[str, Type[AbstractInput]] = pipelineArgs
+    self.root_data_directory: Optional[Path] = options.data_directory
+    self.options = options
 
     #Logger Setup
     self.logger: logging.Logger = logging.getLogger("dicomnode")
@@ -141,7 +174,13 @@ class PipelineTree(ImageTreeInterface):
         self.logger.error(f"{patient_directory.name} in root_data_directory is a file not a directory")
         raise InvalidRootDataDirectory()
 
-      self[patient_directory.name] = InputContainer(self.PipelineArgs, patient_directory)
+      options = InputContainer.Options(
+        container_path=patient_directory,
+        factory=self.options.factory,
+        logger= self.logger
+      )
+
+      self[patient_directory.name] = InputContainer(self.PipelineArgs, None, options)
 
   def add_image(self, dicom : Dataset) -> int:
     if self.patient_identifier_tag not in dicom:
@@ -155,7 +194,13 @@ class PipelineTree(ImageTreeInterface):
       IDC_path: Optional[Path] = None
       if self.root_data_directory is not None:
         IDC_path = self.root_data_directory / key
-      self[key] = InputContainer(self.PipelineArgs, IDC_path)
+
+      options = InputContainer.Options(
+        container_path=IDC_path,
+
+        factory=self.options.factory
+      )
+      self[key] = InputContainer(self.PipelineArgs, dicom, options)
 
     IDC = self[key]
     if isinstance(IDC, InputContainer):
@@ -185,3 +230,6 @@ class PipelineTree(ImageTreeInterface):
         del self[patient_id]
       else:
         raise InvalidTreeNode # pragma: no cover
+
+  def __str__(self) -> str:
+    return str(self.data)

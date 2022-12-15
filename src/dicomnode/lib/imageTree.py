@@ -147,13 +147,15 @@ class ImageTreeInterface(ABC):
 
   """
   @abstractmethod
-  def add_image(self, _dicom : Dataset) -> None:
+  def add_image(self, _dicom : Dataset) -> int:
     """Abstract Method for adding datasets to the Tree"""
     raise NotImplemented #pragma: no cover
 
-  def add_images(self, listOfDicom : Iterable[Dataset]) -> None:
+  def add_images(self, listOfDicom : Iterable[Dataset]) -> int:
+    added = 0
     for dicom in listOfDicom:
-      self.add_image(dicom)
+      added += self.add_image(dicom)
+    return added
 
   def map(self,
            func : Callable[[Dataset], Any],
@@ -308,7 +310,7 @@ class ImageTreeInterface(ABC):
     self.__data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
     self.images: int = 0 # The total number of images of this tree and it's subtrees
 
-    if dcm:
+    if dcm is not None:
       if isinstance(dcm, Dataset):
         self.add_image(dcm)
       elif isinstance(dcm, Iterable):
@@ -320,7 +322,7 @@ class SeriesTree(ImageTreeInterface):
 
   SeriesDescription = "Tree of Undefined Series"
 
-  def add_image(self, dicom : Dataset) -> None:
+  def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'SeriesInstanceUID'):
       raise ValueError("Dicom image doesn't have a SeriesInstanceUID")
     if not hasattr(dicom, 'SOPInstanceUID'):
@@ -336,6 +338,7 @@ class SeriesTree(ImageTreeInterface):
       raise ValueError("Dublicate Image added!")
     self[dicom.SOPInstanceUID.name] = dicom
     self.images += 1
+    return 1
 
   def save_tree(self, target: Path) -> None:
     if len(self) == 1:
@@ -356,7 +359,7 @@ class StudyTree(ImageTreeInterface):
 
   StudyDescription: str = f"Undefined Study Description"
 
-  def add_image(self, dicom : Dataset) -> None:
+  def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'StudyInstanceUID'):
       raise ValueError("Dicom image doesn't have a StudyInstanceUID")
     if not hasattr(dicom, 'SeriesInstanceUID'):
@@ -374,6 +377,7 @@ class StudyTree(ImageTreeInterface):
     else:
       self[dicom.SeriesInstanceUID.name] = SeriesTree(dicom)
     self.images += 1
+    return 1
 
   def __str__(self) -> str:
     seriesStr = f""
@@ -388,7 +392,7 @@ class PatientTree(ImageTreeInterface):
 
   TreeName : str = "Unknown Tree"
 
-  def add_image(self, dicom : Dataset) -> None:
+  def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'StudyInstanceUID'):
       raise ValueError("Dicom image doesn't have StudyInstanceUID")
     if not hasattr(dicom, 'PatientID'):
@@ -405,6 +409,7 @@ class PatientTree(ImageTreeInterface):
     else:
       self[dicom.StudyInstanceUID.name] = StudyTree(dicom)
     self.images += 1
+    return 1
 
   def __str__(self) -> str:
     studyStr = ""
@@ -427,7 +432,7 @@ class DicomTree(ImageTreeInterface):
   DataSet ... Dataset
   """
 
-  def add_image(self, dicom : Dataset) -> None:
+  def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'PatientID'):
       raise ValueError("Dicom Image doesn't have PatientID")
 
@@ -438,6 +443,7 @@ class DicomTree(ImageTreeInterface):
       tree.add_image(dicom)
       self[dicom.PatientID] = tree
     self.images += 1
+    return 1
 
   def __str__(self) -> str:
     patientStr = f""

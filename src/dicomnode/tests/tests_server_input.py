@@ -45,7 +45,10 @@ class TestInput(AbstractInput):
 class InputTestCase(TestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
-    self.test_input = TestInput(instance_directory=self.path)
+    self.options = TestInput.Options(
+      data_directory=self.path
+    )
+    self.test_input = TestInput(None, self.options)
     self.logger = logger
 
   def tearDown(self) -> None:

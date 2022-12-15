@@ -19,8 +19,10 @@ from pydicom import Dataset
 
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
-from dicomnode.lib.dicomFactory import HeaderBlueprint, NoFactory, DicomFactory
-from dicomnode.server.pipelineTree import PipelineTree,InputContainer
+from dicomnode.lib.dicomFactory import Blueprint, DicomFactory
+from dicomnode.server.pipelineTree import PipelineTree, InputContainer
+from dicomnode.server.input import AbstractInput
+
 
 import logging
 import traceback
@@ -49,11 +51,13 @@ class AbstractPipeline(ABC):
   """
 
   # Input configuration
-  input: Dict[str, Type] = {}
+  input: Dict[str, Type[AbstractInput]] = {}
+  input_config: Dict[str, Dict[str, Any]] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
-  root_data_directory: Optional[Union[str, Path]] = None
-  dicom_factory: DicomFactory = NoFactory()
-
+  root_data_directory: Optional[Path] = None
+  dicom_factory: Optional[DicomFactory] = None
+  pipelineTreeType: Type[PipelineTree] = PipelineTree
+  inputContainerType: Type[InputContainer] = InputContainer
 
   # Output Configuration
   endpoints: List[Address] = []
@@ -135,12 +139,9 @@ class AbstractPipeline(ABC):
     }
 
     # Load state
-    self.in_memory = self.root_data_directory is None
-    if not self.in_memory:
-      if not self.root_data_directory:
-        raise IncorrectlyConfigured("set data storage without specifying where")
-
+    if self.root_data_directory is not None:
       if not isinstance(self.root_data_directory, Path):
+        self.logger.warn("root_data_directory is not of type Path, attempting to convert!")
         self.root_data_directory = Path(self.root_data_directory)
 
       if self.root_data_directory.is_file():
@@ -149,10 +150,17 @@ class AbstractPipeline(ABC):
       if not self.root_data_directory.exists():
         self.root_data_directory.mkdir()
 
-    self.__data_state = PipelineTree(
+
+    options = self.pipelineTreeType.Options(
+      input_container=self.inputContainerType,
+      data_directory=self.root_data_directory,
+      factory=self.dicom_factory
+    )
+
+    self.__data_state: PipelineTree = self.pipelineTreeType(
       self.patient_identifier_tag,
       self.input,
-      root_data_directory= self.root_data_directory
+      options
     )
 
     # Validates that Pipeline is configured correctly.
@@ -166,7 +174,6 @@ class AbstractPipeline(ABC):
   def __log_user_error(self, Exp: Exception, user_function: str):
     self.logger.critical(f"Encountered error in user function {user_function}")
     self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
-    self.logger.critical(f"Traceback: {traceback.format_exc()}")
 
   def __handle_store(self, event: evt.Event):
     dataset = event.dataset
@@ -195,35 +202,39 @@ class AbstractPipeline(ABC):
   def __association_accepted(self, event: evt.Event):
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
     for requested_context in event.assoc.requestor.requested_contexts:
-      if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
+      if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"): #type: ignore There is an error here most likely.
+
         self.__updated_patients[event.assoc.name] = set()
 
   def __association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.__updated_patients[event.assoc.name]:
       if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:
-        self.logger.debug(f"Calling Processing for user: {patient_ID}")
+        self.logger.debug(f"Sufficient data - Calling Processing")
         try:
           result = self.process(PatientData)
         except Exception as E:
           self.__log_user_error(E, "Process")
         else:
           if self.dispatch(result):
+            self.logger.debug("Removing Patient")
             PatientData._cleanup()
             del self.__updated_patients[event.assoc.name]
+          else:
+            self.logger.error("Unable to send to addresses")
       else:
         self.logger.debug(f"Dataset was not valid for {patient_ID}")
 
   def dispatch(self, images: Iterable[Dataset]) -> bool:
+    success: bool = True
     for address in self.endpoints:
       try:
         self.logger.debug(f"Sending datasets to {Address}")
         send_images(self.ae_title, address, images)
       except CouldNotCompleteDIMSEMessage:
         self.logger.error(f"Could not send response to {address}")
-        return False
-      else:
-        return True
+        success = False
+    return success
 
 
   def filter(self, dataset : Dataset) -> bool:

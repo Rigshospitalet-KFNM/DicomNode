@@ -10,12 +10,16 @@ called and not just referenced.
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-from typing import Any, Callable, Dict, Iterable, Iterator, List
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Type
 
 from pydicom import Dataset
-
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.imageTree import DicomTree
+
+import numpy
+import logging
+
+logger = logging.getLogger("dicomnode")
 
 
 def identity_grinder(image_generator: Iterable[Dataset] ) -> Iterable[Dataset]:
@@ -30,9 +34,36 @@ def identity_grinder(image_generator: Iterable[Dataset] ) -> Iterable[Dataset]:
   return image_generator
 
 def list_grinder(image_generator: Iterable[Dataset]) -> List[Dataset]:
+  """Wraps all datasets in a build-in list
+
+  Args:
+      image_generator (Iterable[Dataset]): generator object, list will be build for
+
+  Returns:
+      List[Dataset]: A list of datasets
+  """
   return list(image_generator)
 
 def dicom_tree_grinder(image_generator: Iterable[Dataset]) -> DicomTree:
+  """Constructs a DicomTree from the input
+
+  Requires That each Dataset have the tags:
+    PatientID
+    SOPInstanceUID
+    StudyInstanceUID
+    SeriesInstanceUID
+
+  Additional functionality is available if the tags are present:
+    StudyDescription - Names the Study trees
+    SeriesDescription - Names the Series trees
+    PatientName - Names the Patient Trees
+
+  Args:
+      image_generator (Iterable[Dataset]): generator object, the tree will be build from
+
+  Returns:
+      DicomTree: A datastructure
+  """
   return DicomTree(image_generator)
 
 def many_meta_grinder(*grinders: Callable[[Iterable[Dataset]], Any]) -> Callable[[Iterable[Dataset]], List[Any]]:
@@ -51,58 +82,93 @@ def many_meta_grinder(*grinders: Callable[[Iterable[Dataset]], Any]) -> Callable
     return grinded
   return retFunc
 
-try:
-  import numpy
-  unsigned_array_encoding: Dict[int, type] = {
-    8 : numpy.uint8,
-    16 : numpy.uint16,
-    32 : numpy.uint32,
-    64 : numpy.uint64,
-  }
+unsigned_array_encoding: Dict[int, Type[numpy.unsignedinteger]] = {
+  8 : numpy.uint8,
+  16 : numpy.uint16,
+  32 : numpy.uint32,
+  64 : numpy.uint64,
+}
 
-  signed_array_encoding: Dict[int, type] = {
-    8 : numpy.int8,
-    16 : numpy.int16,
-    32 : numpy.int32,
-    64 : numpy.int64,
-  }
-
-  def numpy_grinder(datasets_iterator: Iterable[Dataset]) -> numpy.ndarray:
-    """
-      Requires Tags:
-        0x7FE00008 or 0x7FE0009 or 0x7FE00010
-    """
-    datasets: List[Dataset] = list(datasets_iterator)
-    pivot = datasets[0]
-    x_dim = pivot.Columns
-    y_dim = pivot.Rows
-    z_dim = len(datasets)
-    rescale = (0x002801052 in pivot and 0x00281053 in pivot)
+signed_array_encoding: Dict[int, Type[numpy.signedinteger]] = {
+  8 : numpy.int8,
+  16 : numpy.int16,
+  32 : numpy.int32,
+  64 : numpy.int64,
+}
 
 
-    if 0x7FE00008 in pivot:
-      dataType = numpy.float32
-    elif 0x7FE00009 in pivot:
-      dataType = numpy.float64
-    elif rescale:
-      dataType = numpy.float64
-    elif pivot.PixelRepresentation == 0:
-      dataType = unsigned_array_encoding.get(pivot.BitsAllocated, None)
+def _numpy_monochrome_grinder(datasets: List[Dataset]) -> numpy.ndarray:
+  pivot = datasets[0]
+  x_dim = pivot.Columns
+  y_dim = pivot.Rows
+  z_dim = len(datasets)
+  rescale = (0x00281052 in pivot and 0x00281053 in pivot)
+
+  if 0x7FE00008 in pivot:
+    dataType = numpy.float32
+  elif 0x7FE00009 in pivot:
+    dataType = numpy.float64
+  elif rescale:
+    dataType = numpy.float64
+  elif pivot.PixelRepresentation == 0:
+    dataType = unsigned_array_encoding.get(pivot.BitsAllocated, None)
+  else:
+    dataType = signed_array_encoding.get(pivot.BitsAllocated, None)
+
+  if dataType is None:
+    raise InvalidDataset
+
+  image_array: numpy.ndarray = numpy.empty((z_dim, y_dim, x_dim), dtype=dataType)
+
+  for i, dataset in enumerate(datasets):
+    if rescale:
+      image = (numpy.asarray(dataset.pixel_array, dtype=numpy.float64) - dataset.RescaleIntercept) * dataset.RescaleSlope
     else:
-      dataType = signed_array_encoding.get(pivot.BitsAllocated, None)
+      image = dataset.pixel_array
+    image_array[i,:,:] = image
 
-    if dataType is None:
-      raise InvalidDataset
+  return image_array
 
-    image_array: numpy.ndarray = numpy.empty((x_dim, y_dim, z_dim), dtype=dataType)
 
-    for i, dataset in enumerate(datasets):
-      if rescale:
-        image = (numpy.asarray(dataset.pixel_array, dtype=numpy.float64) - dataset.RescaleIntercept) * dataset.RescaleSlope
-      else:
-        image = dataset.pixel_array
-      image_array[i,:,:] = image
+def numpy_grinder(datasets_iterator: Iterable[Dataset]) -> numpy.ndarray:
+  """Constructs a 3d volume from a collections of pydicom.Dataset
 
-    return image_array
-except ImportError:
-  pass
+    Args:
+      datasets_iterator: Iterable[Dataset]
+
+    Each dataset Requires Tags:
+      0x00280002 - SamplesPerPixel, with value 1 or 3
+      0x00280004 - PhotometricInterpretation
+      0x00280010 - Rows
+      0x00280011 - Columns
+      0x00280100 - BitsAllocated
+      0x00280103 - PixelRepresentation
+      0x7FE00008 or 0x7FE0009 or 0x7FE00010 - Image data
+
+    Each dataset requires values:
+
+    Additional Functionality available if tags are present
+      0x00281052 and 0x00281053, RescaleIntercept and RescaleSlope
+        rescales the the picture to original values, allows slice based scaling
+      0x00200013 InstanceNumber - Sorts the dataset ensuring correct order
+
+  """
+  datasets: List[Dataset] = list(datasets_iterator)
+  pivot = datasets[0]
+
+  if 'InstanceNumber' in pivot:
+    datasets.sort(key=lambda ds: ds.InstanceNumber)
+  else:
+    logger.warn("Instance Number not present in dataset, arbitrary ordering of datasets")
+
+  if pivot.SamplesPerPixel == 1:
+    return _numpy_monochrome_grinder(datasets)
+  if pivot.SamplesPerPixel == 3:
+    raise NotImplementedError
+
+  if pivot.SamplesPerPixel == 4:
+    logger.error("Dataset contains a retired value for Samples Per Pixel, which is not supported")
+  else:
+    logger.error("Dataset contains a invalid value for Samples Per Pixel")
+
+  raise InvalidDataset()

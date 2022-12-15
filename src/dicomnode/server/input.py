@@ -5,12 +5,14 @@ number of classes which you should use to define your input for your process fun
 """
 
 from abc import abstractmethod, ABC
+from dataclasses import dataclass, asdict
+from logging import Logger
 from pathlib import Path
 from pydicom import Dataset
-from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, TypeVar
-
+from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type
 import logging
 
+from dicomnode.lib.dicomFactory import DicomFactory
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.grinders import identity_grinder
@@ -24,16 +26,24 @@ class AbstractInput(ImageTreeInterface, ABC):
   required_values: Dict[int, Any] = {}
   image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
 
-  @property
-  def data(self) -> Dict[str, Dataset]:
-    return super().data # type: ignore
+  @dataclass
+  class Options:
+    logger: Optional[Logger] = None
+    data_directory: Optional[Path]  = None
+    factory: Optional[DicomFactory] = None
 
-  def __init__(self, instance_directory: Optional[Path] = None):
+  def __init__(self,
+      pivot: Optional[Dataset] = None,
+      options: Options = Options(),
+    ):
     super().__init__()
+    self.options = options
 
-    self.path: Optional[Path] = instance_directory
-
-    self.logger= logging.getLogger("dicomnode")
+    self.path: Optional[Path] = options.data_directory
+    if self.options.logger is not None:
+      self.logger = self.options.logger
+    else:
+      self.logger = logging.getLogger("dicomnode")
 
     if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
       self.required_tags.append(0x00080018)
@@ -68,7 +78,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     Returns:
         Any: Data ready for the pipelines process function.
     """
-    return staticfy(self.image_grinder)(self.data.values())
+    return staticfy(self.image_grinder)(self)
 
   def __getPath(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
@@ -105,8 +115,11 @@ class AbstractInput(ImageTreeInterface, ABC):
     Args:
         dicom (Dataset): The dataset to be added
 
+    Returns:
+      int - The number of images added, in this case 1.
+
     Raises:
-        InvalidDataset: If the dataset is not valid, this is raised.
+        InvalidDataset: If the dataset is not valid.
     """
     # Dataset Validation
     for required_tag in self.required_tags:
@@ -130,3 +143,7 @@ class AbstractInput(ImageTreeInterface, ABC):
       if not dicom_path.exists():
         save_dicom(dicom_path, dicom)
     return 1
+
+  def __str__(self) -> str:
+    return str(self.data)
+

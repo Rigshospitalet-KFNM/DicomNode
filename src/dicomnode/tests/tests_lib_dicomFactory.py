@@ -9,7 +9,7 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, general_series_study_header, Header, HeaderBlueprint, SeriesElement, StaticElement
+from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, general_series_study_header, SeriesHeader, Blueprint, SeriesElement, StaticElement
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -21,12 +21,12 @@ class HeaderBlueprintTestCase(TestCase):
     self.virtual_patient_id_conflict = StaticElement(0x00100020, 'LO', '0404942445')
     self.virtual_patient_sex = StaticElement(0x00100040, 'CS', 'M')
 
-    self.blueprint_1 = HeaderBlueprint([
+    self.blueprint_1 = Blueprint([
       self.virtual_patient_name,
       self.virtual_patient_id,
     ])
 
-    self.blueprint_2 = HeaderBlueprint([
+    self.blueprint_2 = Blueprint([
       self.virtual_patient_id_conflict,
       self.virtual_patient_sex,
     ])
@@ -75,12 +75,12 @@ class HeaderBlueprintTestCase(TestCase):
         self.assertTrue(False)
 
   def test_iadd(self):
-    blueprint = HeaderBlueprint([
+    blueprint = Blueprint([
       self.virtual_patient_name,
       self.virtual_patient_id,
     ])
 
-    blueprint += HeaderBlueprint([
+    blueprint += Blueprint([
       self.virtual_patient_id_conflict,
       self.virtual_patient_sex,
     ])
@@ -104,7 +104,7 @@ class HeaderBlueprintTestCase(TestCase):
     self.assertEqual(id(self.virtual_patient_id), id(self.blueprint_1[0x00100020]))
 
   def test_delitem(self):
-    blueprint = HeaderBlueprint([
+    blueprint = Blueprint([
       self.virtual_patient_name,
       self.virtual_patient_id,
     ])
@@ -113,7 +113,7 @@ class HeaderBlueprintTestCase(TestCase):
 
 
   def test_setting_tags(self):
-    blueprint = HeaderBlueprint([
+    blueprint = Blueprint([
       self.virtual_patient_name,
       self.virtual_patient_id,
     ])
@@ -128,12 +128,12 @@ class HeaderBlueprintTestCase(TestCase):
 
 class HeaderTestCase(TestCase):
   def setUp(self) -> None:
-    self.header = Header()
+    self.header = SeriesHeader()
     self.de_1 = DataElement(0x00100010, 'PN', 'Face^Mace^to')
     self.tag_list = [self.de_1]
 
   def test_header_with_args_iter(self):
-    header = Header(self.tag_list)
+    header = SeriesHeader(self.tag_list)
 
     self.assertEqual(id(self.de_1), id(header[0x00100010]))
     for i, tag in enumerate(header):
@@ -147,7 +147,7 @@ class HeaderTestCase(TestCase):
 
 
 class testFactory(DicomFactory):
-  def make_series(self, header: Header, image: Any) -> List[Dataset]:
+  def make_series(self, header: SeriesHeader, image: Any) -> List[Dataset]:
     return super().make_series(header, image)
 
 class DicomFactoryTestClass(TestCase):
@@ -160,7 +160,7 @@ class DicomFactoryTestClass(TestCase):
     pass
 
   def test_make_series_dont_call_super(self):
-    self.assertRaises(NotImplementedError, self.factory.make_series, Header(), None)
+    self.assertRaises(NotImplementedError, self.factory.make_series, SeriesHeader(), None)
 
   def test_AttributeElementCorporealialize(self):
     attribute_element = AttrElement(0x0008103E, 'LO','series_description')
@@ -239,16 +239,16 @@ class DicomFactoryTestClass(TestCase):
 
   def test_create_header(self):
     dataset = Dataset()
-    self.assertRaises(IncorrectlyConfigured, self.factory.make_header, dataset)
+    self.assertRaises(IncorrectlyConfigured, self.factory.make_series_header, dataset)
 
     headerBP = general_series_study_header
-    self.assertRaises(IncorrectlyConfigured, self.factory.make_header, dataset, **{'elements' :  headerBP})
+    self.assertRaises(IncorrectlyConfigured, self.factory.make_series_header, dataset, **{'elements' :  headerBP})
 
     dataset.Modality = 'OT'
     dataset.PatientSize = 50
 
-    header = self.factory.make_header(dataset, headerBP, FillingStrategy.DISCARD)
-    headerCopy = self.factory.make_header(dataset, headerBP, FillingStrategy.COPY)
+    header = self.factory.make_series_header(dataset, headerBP, FillingStrategy.DISCARD)
+    headerCopy = self.factory.make_series_header(dataset, headerBP, FillingStrategy.COPY)
 
     self.assertNotIn(0x00101020, header)
     self.assertIn(0x00101020, headerCopy)

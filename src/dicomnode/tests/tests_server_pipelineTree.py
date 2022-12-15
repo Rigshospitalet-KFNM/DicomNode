@@ -57,11 +57,14 @@ class TestInput2(AbstractInput):
 class PipelineTestCase(TestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
+    self.options = PipelineTree.Options(
+      data_directory=self.path
+    )
     self.pipeline_tree = PipelineTree(
       0x00100020, {
         'arg_1' : TestInput1,
         'arg_2' : TestInput2
-      }, root_data_directory=self.path)
+      },self.options)
 
 
   def tearDown(self) -> None:
@@ -89,10 +92,13 @@ class PipelineTestCase(TestCase):
 class InputContainerTestCase(TestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
+    self.options = InputContainer.Options(
+      container_path=self.path
+    )
     self.input_container = InputContainer({
       'arg_1' : TestInput1,
       'arg_2' : TestInput2
-    }, self.path)
+    }, None, self.options)
 
   def tearDown(self) -> None:
     shutil.rmtree(self.path)
@@ -100,13 +106,16 @@ class InputContainerTestCase(TestCase):
   def test_add_image(self):
     CPR = "1502799995"
     dataset = Dataset()
+    # Test 1
     self.assertRaises(InvalidDataset, self.input_container.add_image, dataset)
     dataset.PatientID = CPR
+    # Test 2
     self.assertRaises(InvalidDataset, self.input_container.add_image, dataset)
     dataset.SOPInstanceUID = gen_uid()
     dataset.SeriesDescription = SERIES_DESCRIPTION
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
+    # Test 3
     self.input_container.add_image(dataset)
     data = self.input_container._get_data()
     self.assertEqual(id(data), id(self.input_container))
@@ -121,12 +130,16 @@ class InputContainerTestCase(TestCase):
     path = self.path / "test"
     with path.open(mode="w") as f:
       f.write("asdf")
-    self.assertRaises(InvalidRootDataDirectory, InputContainer,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, path)
+    options = InputContainer.Options(container_path=path)
+    self.assertRaises(InvalidRootDataDirectory, InputContainer,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
 
   def test_IC_cleanup(self):
     path = self.path / "test"
     path.mkdir()
-    IC = InputContainer({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, path)
+    options = InputContainer.Options(
+      container_path=path
+    )
+    IC = InputContainer({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
     IC._cleanup()
     self.assertFalse(path.exists())
 

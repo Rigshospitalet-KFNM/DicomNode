@@ -16,11 +16,11 @@ if __name__ == '__main__':
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
       'typing_extensions>=4.4.0',
+      'pylatex[matrices, matplotlib]'
     ],
     extras_require = {
      "test" : ["coverage"],
-     "numpy" : ["numpy"],
-     "all" : ["numpy", "coverage"],
+
     },
     python_requires='>=3.9.1',
     entry_points={

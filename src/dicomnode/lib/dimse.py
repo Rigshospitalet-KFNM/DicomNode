@@ -14,8 +14,7 @@ from threading import Thread
 from pydicom import Dataset
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
-from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove
-
+from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove # type: ignore
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.lib.dicom import make_meta
 

@@ -24,3 +24,9 @@ class InvalidEncoding(Exception):
 
 class InvalidTreeNode(Exception):
   """If there's an incorrect datatype in an ImageTree"""
+
+class InvalidLatexCompiler(Exception):
+  """If a compiler that should be available is unavailable"""
+
+class InvalidFont(Exception):
+  """When a font doens't lead to a OTF or a TTF font"""

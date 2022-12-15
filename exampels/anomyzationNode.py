@@ -1,5 +1,6 @@
 from dicomnode.lib.anonymization import anonymize_dicom_tree
 from dicomnode.lib.dimse import Address
+from dicomnode.lib.exceptions import InvalidTreeNode
 from dicomnode.lib.grinders import dicom_tree_grinder
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping
 
@@ -22,7 +23,7 @@ class DicomObjectInput(AbstractInput):
     0x0020000E, # SeriesInstanceUID
   ]
 
-  image_grinder: Callable[[Iterator[Dataset]], Any] = dicom_tree_grinder
+  image_grinder: Callable[[Iterator[Dataset]], DicomTree] = dicom_tree_grinder
 
   def validate(self):
     return True
@@ -50,11 +51,14 @@ class AnonymizationPipeline(AbstractPipeline):
   endpoints: List[Address] = [Address('localhost', 4321, 'STORESCP')]
 
   def process(self, input_data: InputContainer) -> Iterable[Dataset]:
-    DT: DicomTree = input_data[INPUT_ARG]
+    DT_untyped = input_data[INPUT_ARG]
+    if not isinstance(DT_untyped, DicomTree): # This is for satisfying the type checker
+      self.logger.critical("Somehow the dicom tree grinder, didn't return a dicomtree")
+      raise InvalidTreeNode
+    DT: DicomTree = DT_untyped
     IM = IdentityMapping(prefix_size=self.prefix_size)
     IM.fill_from_DicomTree(DT)
     DT.map(anonymize_dicom_tree(IM, self.BASE_NAME))
-
     return DT
 
   # AnonymizationPipeline definition done
