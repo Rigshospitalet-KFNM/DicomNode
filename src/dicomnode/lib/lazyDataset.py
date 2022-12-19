@@ -11,7 +11,7 @@ import operator
 from typing import Callable
 from dicomnode.lib.io import load_dicom
 
-class LazyDataset:
+class LazyDataset(Dataset): # It's not need to set this as a dataset, since we overwrite it later, however typechecker can't figure out my magic
   _wrapped = None
   _is_init = False
 
@@ -23,7 +23,7 @@ class LazyDataset:
     self._wrapped = load_dicom(self._path)
     self._is_init = True
 
-  def new_method_proxy(func):
+  def new_method_proxy(func): # type: ignore # Dont call this method...
     """
       Util function to help us route functions
       to the nested object.
@@ -51,21 +51,21 @@ class LazyDataset:
       self._setup()
     delattr(self._wrapped, name)
 
-  __getattr__ = new_method_proxy(getattr)
-  __bytes__ = new_method_proxy(bytes)
-  __str__ = new_method_proxy(str)
-  __bool__ = new_method_proxy(bool)
-  __dir__ = new_method_proxy(dir)
-  __hash__ = new_method_proxy(hash)
-  __class__ = property(new_method_proxy(operator.attrgetter("__class__")))
-  __eq__ = new_method_proxy(operator.eq)
-  __lt__ = new_method_proxy(operator.lt)
-  __gt__ = new_method_proxy(operator.gt)
-  __ne__ = new_method_proxy(operator.ne)
-  __hash__ = new_method_proxy(hash)
-  __getitem__ = new_method_proxy(operator.getitem)
-  __setitem__ = new_method_proxy(operator.setitem)
-  __delitem__ = new_method_proxy(operator.delitem)
-  __iter__ = new_method_proxy(iter)
-  __len__ = new_method_proxy(len)
-  __contains__ = new_method_proxy(operator.contains)
+  __getattr__ = new_method_proxy(getattr) # type: ignore
+  __bytes__ = new_method_proxy(bytes) # type: ignore
+  __str__ = new_method_proxy(str) # type: ignore
+  __bool__ = new_method_proxy(bool) # type: ignore
+  __dir__ = new_method_proxy(dir) # type: ignore
+  __hash__ = new_method_proxy(hash) # type: ignore
+  __class__ = property(new_method_proxy(operator.attrgetter("__class__"))) # type: ignore
+  __eq__ = new_method_proxy(operator.eq) # type: ignore
+  __lt__ = new_method_proxy(operator.lt) # type: ignore
+  __gt__ = new_method_proxy(operator.gt) # type: ignore
+  __ne__ = new_method_proxy(operator.ne) # type: ignore
+  __hash__ = new_method_proxy(hash) # type: ignore
+  __getitem__ = new_method_proxy(operator.getitem) # type: ignore
+  __setitem__ = new_method_proxy(operator.setitem) # type: ignore
+  __delitem__ = new_method_proxy(operator.delitem) # type: ignore
+  __iter__ = new_method_proxy(iter) # type: ignore
+  __len__ = new_method_proxy(len) # type: ignore
+  __contains__ = new_method_proxy(operator.contains) # type: ignore

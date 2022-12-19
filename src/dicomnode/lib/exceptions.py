@@ -29,4 +29,4 @@ class InvalidLatexCompiler(Exception):
   """If a compiler that should be available is unavailable"""
 
 class InvalidFont(Exception):
-  """When a font doens't lead to a OTF or a TTF font"""
+  """When a font isn't a OTF or a TTF font"""

@@ -10,22 +10,24 @@ from dicomnode.lib.imageTree import IdentityMapping
 BASE_ANONYMIZED_PATIENT_NAME = "Anonymized_PatientName"
 
 
-def anonymize_dataset(ds: Dataset):
-      if hasattr(ds, 'file_meta'):
-        anonymize_dataset(ds.file_meta)
+def anonymize_dataset(ds: Dataset, PatientName="Anon", PatientNumber="0000"):
+  if hasattr(ds, 'file_meta'):
+    anonymize_dataset(ds.file_meta)
 
-      for dataElement in ds.iterall():
-        vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
-        if type(dataElement.VR) == VR: # The VR might be very wierd
-          vr = str(vr)
-          _, vr = vr.split('.')
-        if dataElement.tag == BaseTag(0x00100010): # PatientName tag value
-          dataElement.value  = f"{PatientName}_{PatientNumber}"
-        elif vr == "PN":
-          dataElement.value = "Anon_" + dataElement.name
-        elif vr == "SQ":
-          for seq in dataElement:
-            anonymize_dataset(seq)
+  for dataElement in ds:
+    vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
+    if type(dataElement.VR) == VR: # The VR might be very wierd
+      vr = str(vr)
+      _, vr = vr.split('.')
+    if dataElement.tag == BaseTag(0x00100010): # PatientName tag value
+      dataElement.value  = f"{PatientName}_{PatientNumber}"
+    if dataElement.tag == BaseTag(0x00100020): # PatientID tag value
+      dataElement.value  = f"{PatientNumber}"
+    elif vr == "PN":
+      dataElement.value = "Anon_" + dataElement.name
+    elif vr == "SQ":
+      for seq in dataElement:
+        anonymize_dataset(seq)
 
 
 def anonymize_dicom_tree(
@@ -54,7 +56,7 @@ def anonymize_dicom_tree(
       if hasattr(ds, 'file_meta'):
         anon_ds(ds.file_meta)
 
-      for dataElement in ds.iterall():
+      for dataElement in ds:
         vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
         if type(dataElement.VR) == VR: # The VR might be very wierd
           vr = str(vr)

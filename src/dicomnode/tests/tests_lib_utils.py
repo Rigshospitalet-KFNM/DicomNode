@@ -3,7 +3,7 @@ from pydicom import Dataset
 from unittest import TestCase
 
 
-from dicomnode.lib.utils import getTag, str2bool
+from dicomnode.lib.utils import str2bool
 
 
 class Lib_util_TestCase(TestCase):
@@ -31,12 +31,3 @@ class Lib_util_TestCase(TestCase):
     self.assertRaises(ArgumentTypeError, str2bool, "truth")
     self.assertRaises(ArgumentTypeError, str2bool, "Alternative Facts!")
     self.assertRaises(ArgumentTypeError, str2bool, "YES!")
-
-  def test_getTag_success(self):
-    ds = Dataset()
-    pid = "TestID"
-    ds.PatientID = pid # PatientID Tag
-    getTag_PatientID = getTag(0x00100020)
-    getTag_PatientName = getTag(0x00100010)
-    self.assertEqual(getTag_PatientID(ds).value, pid)
-    self.assertIsNone(getTag_PatientName(ds))

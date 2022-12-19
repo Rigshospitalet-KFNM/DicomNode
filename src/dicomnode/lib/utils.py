@@ -1,8 +1,12 @@
 from argparse import ArgumentTypeError
 from typing import Any, Callable, Union
 from pydicom import Dataset
+from typing import Iterable, Mapping, Optional, Union
 
-def str2bool(v:str) -> bool:
+
+from threading import Thread
+
+def str2bool(v:Union[str, bool]) -> bool:
   """This function convert commons strings to their respective boolean values
 
   Args:
@@ -28,14 +32,6 @@ def prefixInt(number: int, minLength: int= 4):
   zeroes = (minLength - len(numberStr)) * "0"
   return f"{zeroes}{numberStr}"
 
-def getTag(Tag : int) -> Callable[[Dataset], Any]:
-  def retfunc(Dataset):
-    if Tag in Dataset:
-      return Dataset[Tag]
-    else:
-      return None
-  return retfunc
-
 def staticfy(func : Callable):
   """Decorator function that removes the first argument.
 
@@ -47,3 +43,18 @@ def staticfy(func : Callable):
   def wrapper(self,*args, **kwargs):
     return func(*args, **kwargs)
   return wrapper
+
+class ThreadWithReturnValue(Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, daemon=True):
+        Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
+        self._return: Any = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args, **self._kwargs)
+
+
+    def join(self, *args):
+        Thread.join(self, *args)
+        return self._return

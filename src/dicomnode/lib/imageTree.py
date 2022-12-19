@@ -76,7 +76,7 @@ class IdentityMapping():
       if isinstance(seriesTree, SeriesTree):
         self.fill_from_SeriesTree(seriesTree)
       else:
-        raise InvalidTreeNode
+        raise InvalidTreeNode # pragma: no cover
 
   def fill_from_PatientTree(self, patientTree : 'PatientTree'):
     for studyInstanceUID, studyTree in patientTree.data.items():
@@ -84,7 +84,7 @@ class IdentityMapping():
       if isinstance(studyTree, StudyTree):
         self.fill_from_StudyTree(studyTree)
       else:
-        raise InvalidTreeNode
+        raise InvalidTreeNode # pragma: no cover
 
   def fill_from_DicomTree(self, dicomTree : 'DicomTree', patient_prefix : str = _PPrefix, change_UIDs : bool = True):
     self.prefix_size = max(ceil(log10(len(dicomTree.data))),1)
@@ -95,7 +95,7 @@ class IdentityMapping():
         if isinstance(patientTree, PatientTree):
           self.fill_from_PatientTree(patientTree)
         else:
-          raise InvalidTreeNode
+          raise InvalidTreeNode # pragma: no cover
 
   def __getitem__(self, key: Union[UID, str]):
     if isinstance(key, UID):

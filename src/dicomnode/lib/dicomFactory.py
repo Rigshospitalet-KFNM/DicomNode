@@ -59,8 +59,7 @@ class AttrElement(VirtualElement):
   """Reads an attribute from the factory and creates a data element
   from it"""
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, attribute: str) -> None:
-    self.tag = tag
-    self.VR = VR
+    super().__init__(tag, VR)
     self.attribute = attribute
 
   def corporealialize(self, factory: 'DicomFactory', _: Dataset) -> DataElement:
@@ -78,14 +77,12 @@ class CallElement(VirtualElement):
   instantiated from with an image slice.
   """
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, func: Callable[[CallerArgs],Any]) -> None:
-    self.tag: BaseTag = Tag(tag)
-    self.VR: str = VR
+    super().__init__(tag, VR)
     self.func = func
 
   def corporealialize(self, _DF: 'DicomFactory', _DS: Dataset) -> 'CallElement':
     return self
 
-  @abstractmethod
   def __call__(self, callerArgs: CallerArgs) -> DataElement:
     return DataElement(self.tag, self.VR, self.func(callerArgs))
 
@@ -160,7 +157,7 @@ class Blueprint():
   def __delitem__(self, tag):
     del self._dict[tag]
 
-  def __init__(self, virtual_elements: List[VirtualElement] = []) -> None:
+  def __init__(self, virtual_elements: Union[List[VirtualElement],'Blueprint'] = []) -> None:
     # Init
     self._dict: Dict[int, VirtualElement] = {}
 
@@ -231,8 +228,10 @@ class DicomFactory(ABC):
 
   def __init__(self,
                header_blueprint: Optional[Blueprint] = None,
+               message_blueprint: Optional[Blueprint] = None,
                filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
     self.header_blueprint: Optional[Blueprint] = header_blueprint
+    self.message_blueprint: Optional[Blueprint] = message_blueprint
     self.filling_strategy: Optional[FillingStrategy] = filling_strategy
     self.series_description: str = "Unnamed Pipeline post processing "
 
@@ -289,10 +288,16 @@ class DicomFactory(ABC):
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
+  def make_c_move_message(self, pivot: Dataset) -> Dataset:
+    return Dataset()
+
 ###### Header function ######
 
 def _add_InstanceNumber(caller_args: CallerArgs):
-  return caller_args.i
+  return caller_args.i + 1 # iterator is Zero indexed while, instance number is 1 indexed
+
+def _add_SOPInstanceUID(caller_args: CallerArgs):
+  return gen_uid()
 
 def _get_today(_) -> date:
   return date.today()
@@ -334,4 +339,10 @@ general_series_study_header = Blueprint([
   SeriesElement(0x0020000E, 'UI', gen_uid),   # SeriesInstanceUID
   AttrElement(0x0008103E, 'LO', 'series_description'),
   SeriesElement(0x00200011, 'IS', _get_random_number) # SeriesNumber
+])
+
+SOP_common_header: Blueprint = Blueprint([
+  CopyElement(0x00080016),                            # SOPClassUID, you might need to change this
+  CallElement(0x00080018, 'UI', _add_SOPInstanceUID), # SOPInstanceUID
+  CallElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
 ])

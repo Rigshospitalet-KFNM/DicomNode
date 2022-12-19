@@ -4,12 +4,14 @@ from datetime import datetime, date, time
 
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag
+from pydicom.uid import SecondaryCaptureImageStorage
 from typing import Any, List
 from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, general_series_study_header, SeriesHeader, Blueprint, SeriesElement, StaticElement
+from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
+  general_series_study_header, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_header
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -125,6 +127,15 @@ class HeaderBlueprintTestCase(TestCase):
     self.assertRaises(ValueError, self.blueprint_1.__setitem__, 0x00100020, self.virtual_patient_name)
     self.assertRaises(TypeError, self.blueprint_1.__setitem__, 0x00100010, DataElement(0x00100010, 'PN', 'Face^Mace^to'))
 
+  def test_blueprint_length(self):
+    blueprint = Blueprint([
+      self.virtual_patient_name,
+      self.virtual_patient_id,
+      self.virtual_patient_sex,
+    ])
+
+    self.assertEqual(len(blueprint), 3)
+
 
 class HeaderTestCase(TestCase):
   def setUp(self) -> None:
@@ -133,7 +144,7 @@ class HeaderTestCase(TestCase):
     self.tag_list = [self.de_1]
 
   def test_header_with_args_iter(self):
-    header = SeriesHeader(self.tag_list)
+    header = SeriesHeader(self.tag_list) # type: ignore The type checker is high here
 
     self.assertEqual(id(self.de_1), id(header[0x00100010]))
     for i, tag in enumerate(header):
@@ -145,6 +156,11 @@ class HeaderTestCase(TestCase):
   def test_header_InvalidTagType(self):
     self.assertRaises(InvalidTagType, self.header.add_tag,StaticElement(0x00100010, 'PN', 'Face^Mace^To'))
 
+  def test_header_wrong_element(self):
+    self.assertRaises(ValueError, self.header.__setitem__, 0x00100020, self.de_1)
+
+  def test_header_set_element(self):
+    self.header[0x00100010] = self.de_1
 
 class testFactory(DicomFactory):
   def make_series(self, header: SeriesHeader, image: Any) -> List[Dataset]:
@@ -185,14 +201,17 @@ class DicomFactoryTestClass(TestCase):
     data_element = copy_element.corporealialize( self.factory, dataset)
     data_element_optional = optional_copy_element.corporealialize(self.factory, dataset)
 
-    self.assertIsInstance(data_element, DataElement)
-    self.assertIsInstance(data_element_optional, DataElement)
+    if data_element is not None and data_element_optional is not None:
+      self.assertIsInstance(data_element, DataElement)
+      self.assertIsInstance(data_element_optional, DataElement)
 
-    self.assertEqual(data_element.tag, 0x00100020)
-    self.assertEqual(data_element_optional.tag, 0x00100020)
+      self.assertEqual(data_element.tag, 0x00100020)
+      self.assertEqual(data_element_optional.tag, 0x00100020)
 
-    self.assertEqual(data_element.value, cpr)
-    self.assertEqual(data_element_optional.value, cpr)
+      self.assertEqual(data_element.value, cpr)
+      self.assertEqual(data_element_optional.value, cpr)
+    else:
+      self.assertEqual(1,2)
 
   def test_discard_element(self):
     discard_element = DiscardElement(0x00100020)
@@ -232,10 +251,13 @@ class DicomFactoryTestClass(TestCase):
     patient_name = 'Face^Booty^Mac'
     static_element = StaticElement(0x00100010, 'PN', patient_name)
     de = static_element.corporealialize(self.factory, Dataset())
+    if isinstance(de, DataElement):
+      self.assertEqual(de.tag, 0x00100010)
+      self.assertEqual(de.VR, 'PN')
+      self.assertEqual(de.value, patient_name)
+    else:
+      self.assertTrue(False)
 
-    self.assertEqual(de.tag, 0x00100010)
-    self.assertEqual(de.VR, 'PN')
-    self.assertEqual(de.value, patient_name)
 
   def test_create_header(self):
     dataset = Dataset()
@@ -252,3 +274,4 @@ class DicomFactoryTestClass(TestCase):
 
     self.assertNotIn(0x00101020, header)
     self.assertIn(0x00101020, headerCopy)
+

@@ -1,6 +1,8 @@
 from pydicom import Dataset
+from pydicom.uid import SecondaryCaptureImageStorage
 from unittest import TestCase, skipIf
 from typing import List
+from dicomnode.lib.dicomFactory import SOP_common_header, FillingStrategy
 from dicomnode.lib.numpyFactory import image_pixel_header_tags, NumpyCaller, NumpyFactory
 import numpy
 
@@ -55,83 +57,103 @@ class NumpyFactoryTestCase(TestCase):
     factory = NumpyFactory()
 
     try:
-      factory.pixel_representation_setter = 3
+      factory.pixel_representation = 3
       self.assertFalse(True)
     except ValueError:
       pass
 
     try:
-      factory.pixel_representation_setter = "asdf"
+      factory.pixel_representation = "asdf"
       self.assertFalse(True)
     except TypeError:
       pass
 
-    factory.pixel_representation_setter = 1
+    factory.pixel_representation = 1
     self.assertEqual(factory.pixel_representation, 1)
 
     try:
-      factory.bits_allocated_setter = "asdf" #type: ignore the point of this test
+      factory.bits_allocated = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
 
     try:
-      factory.bits_allocated_setter = 17
+      factory.bits_allocated = 17
       self.assertFalse(True)
     except ValueError:
       pass
 
     try:
-      factory.bits_allocated_setter = -16
+      factory.bits_allocated = -16
       self.assertFalse(True)
     except ValueError:
       pass
 
-    factory.bits_allocated_setter = 24
-    self.assertEqual(factory.bits_allocated_setter, 24)
+    factory.bits_allocated = 24
+    self.assertEqual(factory.bits_allocated, 24)
 
     try:
-      factory.bits_stored_setter = "asdf" #type: ignore the point of this test
+      factory.bits_stored = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
 
     try:
-      factory.bits_stored_setter = -16
+      factory.bits_stored = -16
       self.assertFalse(True)
     except ValueError:
       pass
 
     try:
-      factory.bits_stored_setter = 0
+      factory.bits_stored = 0
       self.assertFalse(True)
     except ValueError:
       pass
 
-    factory.bits_stored_setter = 1
+    factory.bits_stored = 1
     self.assertEqual(factory.bits_stored, 1)
-    factory.bits_stored_setter = 20
+    factory.bits_stored = 20
     self.assertEqual(factory.bits_stored, 20)
-    factory.bits_stored_setter = 24
+    factory.bits_stored = 24
     self.assertEqual(factory.bits_stored, 24)
 
     try:
-      factory.high_bit_setter = "asdf" #type: ignore the point of this test
+      factory.high_bit = "asdf" #type: ignore the point of this test
       self.assertFalse(True)
     except TypeError:
       pass
 
     try:
-      factory.high_bit_setter = -16
+      factory.high_bit = -16
       self.assertFalse(True)
     except ValueError:
       pass
 
     try:
-      factory.high_bit_setter = 0
+      factory.high_bit = 0
       self.assertFalse(True)
     except ValueError:
       pass
 
-    factory.high_bit_setter = 23
+    factory.high_bit = 23
+
+  def test_SOP_common_header(self):
+    dataset = Dataset()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    blueprint = self.blueprint + SOP_common_header
+
+    factory = NumpyFactory(blueprint)
+    header = factory.make_series_header(dataset,  blueprint, FillingStrategy.DISCARD)
+
+    images  = 2
+    rows    = 40
+    columns = 50
+    image = numpy.random.randint(0, 65536, size=(images,rows,columns), dtype=numpy.uint16)
+
+    datasets = factory.make_series(header, image)
+
+    for i, ds in enumerate(datasets):
+      self.assertEqual(ds.SOPClassUID, SecondaryCaptureImageStorage)
+      self.assertIn(0x00080018, ds)
+      self.assertEqual(ds.InstanceNumber, i + 1)
 

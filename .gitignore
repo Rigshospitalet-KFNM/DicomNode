@@ -8,3 +8,4 @@ playground/
 src/dicomnode/tests/test_data/*
 *.oft
 settings.json
+lcov.info

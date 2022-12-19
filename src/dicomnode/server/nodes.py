@@ -85,7 +85,7 @@ class AbstractPipeline(ABC):
     """
     self.ae.shutdown()
 
-  def open(self, blocking=True) -> NoReturn: #type: ignore
+  def open(self, blocking=True) -> Union[NoReturn, None]: #type: ignore
     """Opens all connections active connections.
       If your application includes additional connections, you should overwrite this method,
       And open any connections and call the super function.
@@ -99,7 +99,7 @@ class AbstractPipeline(ABC):
     self.ae.start_server(
       (self.ip,self.port),
       block=blocking,
-      evt_handlers=self.__evt_handlers)
+      evt_handlers=self._evt_handlers)
 
   def __init__(self, start=True) -> NoReturn: #type: ignore
     # logging
@@ -129,12 +129,12 @@ class AbstractPipeline(ABC):
 
     # Handler setup
     # class needs to be instantiated before handlers can be defined
-    self.__evt_handlers = [
-      (evt.EVT_C_STORE, self.__handle_store),
-      (evt.EVT_ACCEPTED, self.__association_accepted),
-      (evt.EVT_RELEASED, self.__association_released)
+    self._evt_handlers = [
+      (evt.EVT_C_STORE, self._handle_store),
+      (evt.EVT_ACCEPTED, self._association_accepted),
+      (evt.EVT_RELEASED, self._association_released)
     ]
-    self.__updated_patients: Dict[str, MutableSet] = {
+    self.__updated_patients: Dict[Optional[int], MutableSet] = {
 
     }
 
@@ -148,7 +148,7 @@ class AbstractPipeline(ABC):
         raise IncorrectlyConfigured("The root data directory exists as a file.")
 
       if not self.root_data_directory.exists():
-        self.root_data_directory.mkdir()
+        self.root_data_directory.mkdir(parents=True)
 
 
     options = self.pipelineTreeType.Options(
@@ -171,25 +171,25 @@ class AbstractPipeline(ABC):
     if start:
       self.open() #pragma: no cover
 
-  def __log_user_error(self, Exp: Exception, user_function: str):
+  def _log_user_error(self, Exp: Exception, user_function: str):
     self.logger.critical(f"Encountered error in user function {user_function}")
     self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
 
-  def __handle_store(self, event: evt.Event):
+  def _handle_store(self, event: evt.Event) -> int:
     dataset = event.dataset
     try:
       if not self.filter(dataset):
         self.logger.warning("Dataset discarded")
         return 0xB006 # Element discarded
     except Exception as E:
-      self.__log_user_error(E, "Filter")
+      self._log_user_error(E, "Filter")
       return 0xA801
 
     if self.patient_identifier_tag in dataset:
       patientID = deepcopy(dataset[self.patient_identifier_tag].value)
       try:
         self.__data_state.add_image(dataset)
-        self.__updated_patients[event.assoc.name].add(patientID)
+        self.__updated_patients[event.assoc.native_id].add(patientID)
       except InvalidDataset:
         self.logger.debug(f"Received dataset is not accepted by any inputs")
         return 0xB006
@@ -199,27 +199,27 @@ class AbstractPipeline(ABC):
 
     return 0x0000
 
-  def __association_accepted(self, event: evt.Event):
+  def _association_accepted(self, event: evt.Event):
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"): #type: ignore There is an error here most likely.
 
-        self.__updated_patients[event.assoc.name] = set()
+        self.__updated_patients[event.assoc.native_id] = set()
 
-  def __association_released(self, event: evt.Event):
+  def _association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    for patient_ID in self.__updated_patients[event.assoc.name]:
+    for patient_ID in self.__updated_patients[event.assoc.native_id]:
       if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:
         self.logger.debug(f"Sufficient data - Calling Processing")
         try:
           result = self.process(PatientData)
         except Exception as E:
-          self.__log_user_error(E, "Process")
+          self._log_user_error(E, "Process")
         else:
           if self.dispatch(result):
             self.logger.debug("Removing Patient")
             PatientData._cleanup()
-            del self.__updated_patients[event.assoc.name]
+            del self.__updated_patients[event.assoc.native_id]
           else:
             self.logger.error("Unable to send to addresses")
       else:

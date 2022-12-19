@@ -1,10 +1,11 @@
+from time import perf_counter
+from typing import Any, Callable, Dict, Iterable,Iterator,List, Optional, Tuple, Type, Union
+
+import numpy
 from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage, UID
 
-from typing import Iterator, Dict, Type
 from dicomnode.lib.dicom import make_meta, gen_uid
-
-import numpy
 
 unsigned_array_encoding: Dict[int, Type[numpy.unsignedinteger]] = {
   8 : numpy.uint8,
@@ -20,11 +21,12 @@ def generate_numpy_dataset(
     Rows: int,
     bits: int,
     rescale: bool,
-    PixelRepresentation: int
+    PixelRepresentation: int,
+    PatientID: str
   ) -> Dataset:
   ds = Dataset()
   ds.SOPClassUID = SecondaryCaptureImageStorage
-
+  ds.PatientID = PatientID
   ds.SOPInstanceUID = gen_uid()
   ds.StudyInstanceUID = StudyUID
   ds.SeriesInstanceUID = SeriesUID
@@ -69,7 +71,8 @@ def generate_numpy_datasets(
     Rows = 400,
     Bits = 16,
     rescale = True,
-    PixelRepresentation = 0
+    PixelRepresentation = 0,
+    PatientID: str = "None"
   ) -> Iterator[Dataset]:
   yielded = 0
   while yielded < datasets:
@@ -81,8 +84,30 @@ def generate_numpy_datasets(
       Rows,
       Bits,
       rescale,
-      PixelRepresentation
+      PixelRepresentation,
+      PatientID
     )
     ds.InstanceNumber = yielded + 1
     yield ds
 
+def personify(
+    tags: List[Tuple[int, str, Any]] = []
+  ) -> Callable[[Dataset],None]:
+  def retfunc(ds: Dataset) -> None:
+    for tag,vr, val in tags:
+      ds.add_new(tag, vr, val)
+
+    return None
+
+  return retfunc
+
+def bench(func: Callable) -> Callable:
+  """Decorator that benchmarks a function to stdout
+  """
+  def inner(*args, **kwargs) -> Any:
+    start = perf_counter()
+    ret = func(*args, **kwargs)
+    stop = perf_counter()
+    print(f"{func.__name__} runtime : {stop - start} s")
+    return ret
+  return inner

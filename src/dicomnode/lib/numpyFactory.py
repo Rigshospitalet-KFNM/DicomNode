@@ -44,7 +44,7 @@ class NumpyCaller(CallElement):
 
   def __call__(self, caller_args : NumpyCallerArgs) -> Optional[DataElement]:
     """Now There's a Liskov's Substitution principle violation here,
-    because NumpyCaller is more inherits from Caller Args. 
+    because NumpyCaller is more inherits from Caller Args.
 
     Args:
         caller_args (NumpyCallerArgs): _description_
@@ -68,8 +68,12 @@ class NumpyFactory(DicomFactory):
 
   def __init__(self,
                header_blueprint: Optional[Blueprint] = None,
+               message_blueprint: Optional[Blueprint] = None,
                filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
-    super().__init__(header_blueprint, filling_strategy)
+    super().__init__(
+      header_blueprint=header_blueprint,
+      message_blueprint=message_blueprint,
+      filling_strategy=filling_strategy)
 
   @property
   def pixel_representation(self) -> int:
@@ -80,7 +84,7 @@ class NumpyFactory(DicomFactory):
     return self._pixel_representation
 
   @pixel_representation.setter
-  def pixel_representation_setter(self, val):
+  def pixel_representation(self, val):
     if not isinstance(val, int):
       raise TypeError("pixel representation must be an int")
     if val == 0 or val == 1:
@@ -98,7 +102,7 @@ class NumpyFactory(DicomFactory):
     return self._bits_allocated
 
   @bits_allocated.setter
-  def bits_allocated_setter(self, val: int) -> None:
+  def bits_allocated(self, val: int) -> None:
     if not isinstance(val, int):
       raise TypeError("Bits allocated must be a positive integer of multiple 8")
     if val > 0 and (val == 1 or (val % 8 == 0)):
@@ -115,14 +119,13 @@ class NumpyFactory(DicomFactory):
     return self._bits_stored
 
   @bits_stored.setter
-  def bits_stored_setter(self, val: int):
+  def bits_stored(self, val: int):
     if not isinstance(val, int):
-      raise TypeError("bits stored must be an int")
-    if 0 < val <= self.bits_allocated:
+      raise TypeError("bits stored must be an int") # type: ignore
+    if 1 <= val <= self.bits_allocated:
       self._bits_stored = val
     else:
-      error_message = f"bits stored must be in range [1 - {self.bits_allocated}]"
-      raise ValueError(error_message)
+      raise ValueError(f"bit stored must be in range [1, {self.bits_allocated}]")
 
   @property
   def high_bit(self) -> int:
@@ -133,7 +136,7 @@ class NumpyFactory(DicomFactory):
     return self._high_bit
 
   @high_bit.setter
-  def high_bit_setter(self, val: int):
+  def high_bit(self, val: int):
     if not isinstance(val, int):
       raise TypeError("High bit must be an int")
     if val + 1 == self.bits_stored:
@@ -183,7 +186,7 @@ class NumpyFactory(DicomFactory):
         for element in header:
           if isinstance(element, DataElement):
             dataset.add(element)
-          if isinstance(element, CallElement):
+          elif isinstance(element, CallElement):
             data_element = element(caller_args)
             if data_element is not None:
               dataset.add(data_element)

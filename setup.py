@@ -19,7 +19,7 @@ if __name__ == '__main__':
       'pylatex[matrices, matplotlib]'
     ],
     extras_require = {
-     "test" : ["coverage"],
+     "test" : ["coverage", "coverage-lcov"],
 
     },
     python_requires='>=3.9.1',

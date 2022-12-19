@@ -1,12 +1,13 @@
 """Library methods for manipulation of pydicom.dataset objects
 """
-
-from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
-
-from dicomnode.lib.exceptions import InvalidDataset
+from typing import Any, Callable
 
 from pydicom import Dataset
 from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian, ExplicitVRLittleEndian
+
+from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
+from dicomnode.lib.exceptions import InvalidDataset
+
 
 def gen_uid() -> UID:
   return generate_uid(prefix=DICOMNODE_IMPLEMENTATION_UID + '.')
@@ -46,6 +47,14 @@ def make_meta(dicom: Dataset) -> None:
     raise InvalidDataset("Implicit VR Big Endian is not a "
                          "supported Transfer Syntax.")
 
+
+def getTag(Tag: int) -> Callable[[Dataset], Any]:
+  def retFunc(Dataset):
+    if Tag in Dataset:
+      return Dataset[Tag]
+    else:
+      return None
+  return retFunc
 
 
 

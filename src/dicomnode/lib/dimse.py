@@ -9,14 +9,15 @@ from enum import Enum
 import logging
 from typing import Iterable, Callable, Optional
 
-from threading import Thread
 
 from pydicom import Dataset
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove # type: ignore
+
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.lib.dicom import make_meta
+from dicomnode.lib.utils import ThreadWithReturnValue
 
 logger = logging.getLogger("dicomnode")
 
@@ -107,6 +108,17 @@ def send_images(SCU_AE: str,
     """
     logger.error(error_message)
     raise CouldNotCompleteDIMSEMessage("Could not connect")
+  return 0x0000
+
+def send_images_thread(
+    SCU_AE: str,
+    address : Address,
+    dicom_images: Iterable[Dataset],
+    error_callback_func: Optional[Callable[[Address, Dataset, Dataset], None]] = None,
+    daemon: bool = True) -> ThreadWithReturnValue:
+  thread = ThreadWithReturnValue(group= None, target=send_images, args=[SCU_AE, address, dicom_images, error_callback_func], daemon=daemon)
+  thread.start()
+  return thread
 
 def send_move(SCU_AE: str,
               address : Address,
@@ -179,11 +191,12 @@ def send_move(SCU_AE: str,
   if not successful_send:
     raise CouldNotCompleteDIMSEMessage
 
-def send_move_daemon(SCU_AE: str,
+def send_move_thread(SCU_AE: str,
                      address : Address,
                      dataset : Dataset,
-                     query_level: QueryLevels= QueryLevels.PATIENT
-  ) -> Thread:
+                     query_level: QueryLevels= QueryLevels.PATIENT,
+                     daemon: bool = True
+  ) -> ThreadWithReturnValue:
   """Creates a thread, that sends a C-Move to the target.
 
   The main reason you want to use this function over the standard send C-Move
@@ -198,6 +211,6 @@ def send_move_daemon(SCU_AE: str,
   Returns:
       Thread: _description_
   """
-  daemon = Thread(target=send_move, daemon=True, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
-  daemon.run()
-  return daemon
+  thread = ThreadWithReturnValue(target=send_move, daemon=daemon, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
+  thread.start()
+  return thread

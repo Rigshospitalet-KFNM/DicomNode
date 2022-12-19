@@ -1,9 +1,11 @@
 from unittest import TestCase
 
+from copy import deepcopy
+
 from pydicom import Dataset, DataElement, Sequence
 from pydicom.valuerep import VR
 from pydicom.uid import MediaStorageDirectoryStorage
-from dicomnode.lib.anonymization import anonymize_dicom_tree
+from dicomnode.lib.anonymization import anonymize_dicom_tree, anonymize_dataset
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping
@@ -97,20 +99,52 @@ class Lib_anonymization(TestCase):
     self.dataset_6.PatientID = self.patientID_3
     self.dataset_6.PatientName = self.patientName_3
 
-    self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5]
-    self.dt = DicomTree(self.datasets)
-    self.im = IdentityMapping()
-    self.im.fill_from_DicomTree(self.dt)
+    self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
+    self.SOPInstanceUIDs = [
+      self.dataset_1_SOPInstanceUID,
+      self.dataset_2_SOPInstanceUID,
+      self.dataset_3_SOPInstanceUID,
+      self.dataset_4_SOPInstanceUID,
+      self.dataset_5_SOPInstanceUID,
+      self.dataset_6_SOPInstanceUID,
+    ]
+    self.SeriesUIDs = [
+      self.seriesUID_1,
+      self.seriesUID_2,
+      self.seriesUID_3
+    ]
+
+    self.studyUIDs = [
+      self.studyUID_1,
+      self.studyUID_2,
+      self.studyUID_3,
+    ]
+
 
   def test_anonymization(self):
-    anonymization_function = anonymize_dicom_tree(self.im)
-    self.dt.map(anonymization_function, self.im)
+    dt = DicomTree(deepcopy(self.datasets))
+    im = IdentityMapping()
+    im.fill_from_DicomTree(dt)
+    anonymization_function = anonymize_dicom_tree(im)
+    dt.map(anonymization_function, im)
 
-    for ds in self.datasets:
+
+    for ds in dt:
       self.assertNotIn(ds.PatientName,self.patientNames)
       self.assertNotIn(ds.PatientID, self.patientIDs)
+      self.assertNotIn(ds.SOPInstanceUID, self.SOPInstanceUIDs)
+      self.assertNotIn(ds.StudyInstanceUID, self.studyUIDs)
+      self.assertNotIn(ds.SeriesInstanceUID, self.SeriesUIDs)
 
-    self.assertEqual(self.dataset_3_seq_ds_1.ReviewerName, "Anon_Reviewer Name")
-    self.assertEqual(self.dataset_3_seq_ds_2.ReviewerName, "Anon_Reviewer Name")
-    self.assertEqual(self.dataset_4.OtherPatientNames, "Anon_Other Patient Names")
-    self.assertEqual(self.dataset_5.ResponsiblePerson, "Anon_Responsible Person")
+  def test_anonymize_dataset(self):
+    dss = deepcopy(self.datasets)
+
+    for ds in dss:
+      anonymize_dataset(ds)
+
+    for ds in dss:
+      self.assertNotIn(ds.PatientName,self.patientNames)
+      self.assertNotIn(ds.PatientID, self.patientIDs)
+      self.assertIn(ds.SOPInstanceUID, self.SOPInstanceUIDs) # No UID mapping
+      self.assertIn(ds.StudyInstanceUID, self.studyUIDs) # No UID mapping
+      self.assertIn(ds.SeriesInstanceUID, self.SeriesUIDs) # No UID mapping

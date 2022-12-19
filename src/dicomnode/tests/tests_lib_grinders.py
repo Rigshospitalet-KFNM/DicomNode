@@ -254,3 +254,30 @@ class GrinderTests(TestCase):
 
     self.assertRaises(InvalidDataset, numpy_grinder, ds)
 
+  def test_numpy_SamplesPerPixel_3(self):
+    ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
+
+    ds[0].SamplesPerPixel = 3
+    ds[1].SamplesPerPixel = 3
+    ds[2].SamplesPerPixel = 3
+
+    self.assertRaises(NotImplementedError, numpy_grinder, ds)
+
+  def test_numpy_SamplesPerPixel_retired(self):
+    ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
+
+    ds[0].SamplesPerPixel = 4
+    ds[1].SamplesPerPixel = 4
+    ds[2].SamplesPerPixel = 4
+
+    self.assertRaises(InvalidDataset, numpy_grinder, ds)
+
+  def test_numpy_SamplesPerPixel_Nonsense(self):
+    ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
+
+    ds[0].SamplesPerPixel = 12
+    ds[1].SamplesPerPixel = 12
+    ds[2].SamplesPerPixel = 12
+
+    self.assertRaises(InvalidDataset, numpy_grinder, ds)
+

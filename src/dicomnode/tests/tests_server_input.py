@@ -13,7 +13,8 @@ import logging
 
 
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.input import AbstractInput
 
 
@@ -68,17 +69,17 @@ class InputTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     self.test_input.add_image(dataset)
-    self.assertTrue(self.test_input._AbstractInput__getPath(dataset).exists()) # type: ignore
+    self.assertTrue(self.test_input.getPath(dataset).exists()) # type: ignore
 
   def test_get_path(self):
     dataset = Dataset()
     SOPInstanceUID = gen_uid()
     dataset.SOPInstanceUID = SOPInstanceUID
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.getPath(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.Modality = 'CT'
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.getPath(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.InstanceNumber = 431
-    self.assertEqual(self.test_input._AbstractInput__getPath(dataset).name, f'CT_image_431.dcm') # type: ignore
+    self.assertEqual(self.test_input.getPath(dataset).name, f'CT_image_431.dcm') # type: ignore
 
   def test_cleanup(self):
     dataset = Dataset()
@@ -88,7 +89,7 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.test_input.add_image(dataset)
     self.test_input._clean_up()
-    self.assertFalse(self.test_input._AbstractInput__getPath(dataset).exists()) # type: ignore
+    self.assertFalse(self.test_input.getPath(dataset).exists())
 
   def test_get_data(self):
     dataset = Dataset()
@@ -98,3 +99,54 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.test_input.add_image(dataset)
     self.assertEqual(list(self.test_input.get_data()), [dataset])
+
+  def test_load_on_creation(self):
+    dataset_1 = Dataset()
+    dataset_1.SOPInstanceUID = gen_uid()
+    dataset_1.SeriesDescription = SERIES_DESCRIPTION
+    dataset_1.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset_1)
+    ds_1_path = self.path / "ds_1.dcm"
+    save_dicom(ds_1_path, dataset_1)
+
+    dataset_2 = Dataset()
+    dataset_2.SOPInstanceUID = gen_uid()
+    dataset_2.SeriesDescription = SERIES_DESCRIPTION
+    dataset_2.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset_2)
+    ds_2_path = self.path / "ds_2.dcm"
+    save_dicom(ds_2_path, dataset_2)
+
+    test_input = TestInput(None, options=TestInput.Options(data_directory=self.path))
+
+    self.assertEqual(len(test_input),2)
+    self.assertIn(dataset_1.SOPInstanceUID, test_input)
+    self.assertIn(dataset_2.SOPInstanceUID, test_input)
+
+  def test_get_path_with_in_memory_input(self):
+    input = TestInput()
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SeriesDescription = SERIES_DESCRIPTION
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset)
+
+    self.assertRaises(IncorrectlyConfigured,  input.getPath, dataset)
+
+  def test_customer_logger(self):
+    input = TestInput(options=TestInput.Options(logger=logger))
+
+    self.assertIs(input.logger, logger)
+
+  def test_lazy_testInput(self):
+    input = TestInput(None, options=TestInput.Options(data_directory=self.path, lazy=True))
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SeriesDescription = SERIES_DESCRIPTION
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset)
+    input.add_image(dataset)
+
+    self.assertTrue(input.getPath(dataset).exists())

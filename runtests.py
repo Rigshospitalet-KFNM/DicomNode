@@ -8,7 +8,8 @@ from unittest import TextTestRunner, TestSuite, TestLoader
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
-  parser.add_argument("--verbose", type=int, default=1, )
+  parser.add_argument("--verbose", type=int, default=1)
+  parser.add_argument("-p", "--performance", action='store_true')
 
   args = parser.parse_args()
 
@@ -16,6 +17,11 @@ if __name__ == "__main__":
   runner = TextTestRunner()
   loader = TestLoader()
   suite = loader.discover("src")
+  if args.performance:
+    loader.testMethodPrefix = "performance"
+    performance_tests = loader.discover("src")
+    suite.addTests(performance_tests)
+
   cwd = os.getcwd()
   tmpDir = "/tmp/pipeline_tests"
   tmpDirPath = Path(tmpDir)

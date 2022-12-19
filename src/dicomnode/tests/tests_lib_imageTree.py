@@ -358,6 +358,16 @@ class lib_imageTree(TestCase):
     uid2 = im.SOPUIDMapping[self.dataset_1_SOPInstanceUID.name]
     self.assertEqual(uid, uid2)
 
+  def test_IdentityMapping_get_UID(self):
+    im = IdentityMapping()
+    uid = im.add_SOPUID(self.dataset_1_SOPInstanceUID)
+    self.assertEqual(im[self.dataset_1_SOPInstanceUID], uid)
+
+  def test_IdentityMapping_get_non_existence(self):
+    im = IdentityMapping()
+    self.assertRaises(KeyError, im.__getitem__, self.dataset_1_SOPInstanceUID)
+
+
   def test_Getting_PatientID(self):
     im = IdentityMapping()
     ret_1 = im.add_Patient("Patient")

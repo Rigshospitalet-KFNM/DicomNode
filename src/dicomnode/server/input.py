@@ -12,9 +12,11 @@ from pydicom import Dataset
 from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type
 import logging
 
+from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicomFactory import DicomFactory
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.lazyDataset import LazyDataset
 from dicomnode.lib.grinders import identity_grinder
 from dicomnode.lib.imageTree import ImageTreeInterface
 from dicomnode.lib.utils import staticfy
@@ -27,10 +29,14 @@ class AbstractInput(ImageTreeInterface, ABC):
   image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
 
   @dataclass
-  class Options:
+  class Options: # These are options that are injected into all input.
+    # Note the reason, why there some options, that are not used by this class
+    # is because of Liskov's Substitution principle, and subclasses might need
+    # these options.
     logger: Optional[Logger] = None
     data_directory: Optional[Path]  = None
     factory: Optional[DicomFactory] = None
+    lazy: bool = False
 
   def __init__(self,
       pivot: Optional[Dataset] = None,
@@ -68,7 +74,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     """Removes any files, stored by the Input"""
     if self.path is not None:
       for dicom in self:
-        p = self.__getPath(dicom)
+        p = self.getPath(dicom)
         p.unlink()
 
   def get_data(self) -> Any:
@@ -80,7 +86,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     return staticfy(self.image_grinder)(self)
 
-  def __getPath(self, dicom: Dataset) -> Path:
+  def getPath(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
 
     Args:
@@ -136,14 +142,40 @@ class AbstractInput(ImageTreeInterface, ABC):
         raise InvalidDataset()
 
     # Save the dataset
-    self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
-    self.images += 1
-    if self.path is not None:
-      dicom_path:Path = self.__getPath(dicom)
+    if self.options.lazy:
+      if self.path is None:
+        raise IncorrectlyConfigured("Lazy object require file storage")
+      dicom_path:Path = self.getPath(dicom)
       if not dicom_path.exists():
         save_dicom(dicom_path, dicom)
+      self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
+    else:
+      self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
+      if self.path is not None:
+        dicom_path:Path = self.getPath(dicom)
+        if not dicom_path.exists():
+          save_dicom(dicom_path, dicom)
+    self.images += 1
     return 1
 
-  def __str__(self) -> str:
-    return str(self.data)
+
+class HistoricAbstractInput(AbstractInput):
+  address: Optional[Address] = None
+
+  def __init__(self, pivot: Optional[Dataset] = None, options: AbstractInput.Options = AbstractInput.Options()):
+    super().__init__(pivot, options)
+
+    if pivot is None:
+      self.logger.error("You forgot to parse the pivot to The Input")
+      raise IncorrectlyConfigured
+
+    if self.address is None:
+      self.logger.error("A target address is needed to send a C-Move to")
+      raise IncorrectlyConfigured
+
+    if self.options.factory is None:
+      self.logger.error("A Factory is needed to generate a C move message")
+      raise IncorrectlyConfigured
+
+    message = self.options.factory.make_c_move_message(pivot)
 
