@@ -1,3 +1,4 @@
+from copy import deepcopy
 import logging
 from random import randint
 from pathlib import Path
@@ -24,8 +25,9 @@ SENDER_AE = "SENDER_AE"
 
 DEFAULT_DATASET = Dataset()
 DEFAULT_DATASET.SOPClassUID = RawDataStorage
+DEFAULT_DATASET.PatientSex = 'M'
 make_meta(DEFAULT_DATASET)
-DATASET_SOPINSTANCEUID = DEFAULT_DATASET.SOPInstanceUID.name
+DATASET_SOPInstanceUID = DEFAULT_DATASET.SOPInstanceUID.name
 
 
 TEST_CPR = "1502799995"
@@ -34,7 +36,7 @@ INPUT_KW = "test_input"
 DEFAULT_DATASET.PatientID = TEST_CPR
 
 class TestInput(AbstractInput):
-  required_tags: List[int] = [0x00080018]
+  required_tags: List[int] = [0x00080018, 0x00100040]
 
   def validate(self):
     return True
@@ -68,11 +70,25 @@ class PipelineTestCase(TestCase):
     self.assertEqual(response.Status, 0x0000)
     # Okay This is mostly to ensure lazyness
     # See the advanced docs guide for details
-    self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPINSTANCEUID]), 2) # type: ignore
+    self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPInstanceUID]), 2) # type: ignore
 
   def test_reject_connection(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     self.assertRaises(CouldNotCompleteDIMSEMessage,send_image,"NOT_SENDER_AE", address, DEFAULT_DATASET)
+
+  def test_missing_sex(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    ds = deepcopy(DEFAULT_DATASET)
+    del ds.PatientSex
+    response = send_image(SENDER_AE, address, ds)
+    self.assertEqual(response.Status, 0xB006)
+
+  def test_missing_PatientID(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    ds = deepcopy(DEFAULT_DATASET)
+    del ds.PatientID
+    response = send_image(SENDER_AE, address, ds)
+    self.assertEqual(response.Status, 0xB007)
 
   @bench
   def performance_send_concurrently(self):
@@ -198,3 +214,64 @@ class FileStorageTestNodeTestCase(TestCase):
     self.assertEqual(ret_2, 0)
 
     self.assertEqual(self.node._AbstractPipeline__data_state.images,2 * num_images) # type: ignore
+
+
+class MaxFilterNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def filter(self, dataset: Dataset) -> bool:
+    return False
+
+  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+    raise Exception
+
+
+class MaxFilterTestCase(TestCase):
+  def setUp(self):
+    self.node = MaxFilterNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_send_C_store_rejected(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    self.assertEqual(response.Status, 0xB006)
+
+
+
+class FaultyFilterNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def filter(self, dataset: Dataset) -> bool:
+    raise Exception
+
+  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+    raise Exception
+
+
+class FaultyFilterTestCase(TestCase):
+  def setUp(self):
+    self.node = FaultyFilterNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_send_C_store_rejected(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    self.assertEqual(response.Status, 0xA801)

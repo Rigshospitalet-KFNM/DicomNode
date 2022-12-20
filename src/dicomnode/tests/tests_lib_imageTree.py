@@ -6,6 +6,8 @@ from pydicom import Dataset
 from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
 from unittest import TestCase, skip
 
+from dicomnode.tests.helpers import generate_numpy_datasets, bench
+
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.io import load_dicom
 from dicomnode.lib.imageTree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
@@ -264,9 +266,9 @@ class lib_imageTree(TestCase):
 
   def test_maps_with_returnVals(self):
     DT = DicomTree(self.datasets)
-    def getSOPUID(dataset: Dataset)-> UID:
+    def getSOP_UID(dataset: Dataset)-> UID:
       return dataset.SOPInstanceUID
-    SOPs = DT.map(getSOPUID)
+    SOPs = DT.map(getSOP_UID)
 
     for SOP in SOPs:
       self.assertIn(SOP, self.SOPInstanceUIDs)
@@ -326,12 +328,12 @@ class lib_imageTree(TestCase):
 
     self.assertTrue(isinstance(im.StudyUIDMapping, dict))
     self.assertTrue(isinstance(im.SeriesUIDMapping, dict))
-    self.assertTrue(isinstance(im.SOPUIDMapping, dict))
+    self.assertTrue(isinstance(im.SOP_UIDMapping, dict))
     self.assertTrue(isinstance(im.PatientMapping, dict))
 
     self.assertEqual(len(im.StudyUIDMapping), 0)
     self.assertEqual(len(im.SeriesUIDMapping), 0)
-    self.assertEqual(len(im.SOPUIDMapping), 0)
+    self.assertEqual(len(im.SOP_UIDMapping), 0)
     self.assertEqual(len(im.PatientMapping), 0)
     self.assertEqual(im.prefix_size, 4)
 
@@ -352,15 +354,15 @@ class lib_imageTree(TestCase):
     uid2 = im.SeriesUIDMapping[self.seriesUID_1.name]
     self.assertEqual(uid, uid2)
 
-  def test_IdentityMapping_add_SOPUID(self):
+  def test_IdentityMapping_add_SOP_UID(self):
     im = IdentityMapping()
-    uid =  im.add_SOPUID(self.dataset_1_SOPInstanceUID)
-    uid2 = im.SOPUIDMapping[self.dataset_1_SOPInstanceUID.name]
+    uid =  im.add_SOP_UID(self.dataset_1_SOPInstanceUID)
+    uid2 = im.SOP_UIDMapping[self.dataset_1_SOPInstanceUID.name]
     self.assertEqual(uid, uid2)
 
   def test_IdentityMapping_get_UID(self):
     im = IdentityMapping()
-    uid = im.add_SOPUID(self.dataset_1_SOPInstanceUID)
+    uid = im.add_SOP_UID(self.dataset_1_SOPInstanceUID)
     self.assertEqual(im[self.dataset_1_SOPInstanceUID], uid)
 
   def test_IdentityMapping_get_non_existence(self):
@@ -442,4 +444,19 @@ class lib_imageTree(TestCase):
     for image in DT:
       self.assertIn(image, self.datasets)
 
-  
+  @bench
+  def test_max_recursion(self):
+    DT = DicomTree()
+
+    datasets = set()
+
+    studies = 2000
+
+    for i in range(studies):
+      for ds in generate_numpy_datasets(1, Cols=2,Rows=2, PatientID=f"patient_{i}"):
+        datasets.add(ds.SOPInstanceUID.name)
+        DT.add_image(ds)
+
+    self.assertEqual(DT.images,studies)
+    for ds in DT:
+      self.assertIn(ds.SOPInstanceUID.name, datasets)

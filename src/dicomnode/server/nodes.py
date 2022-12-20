@@ -35,7 +35,7 @@ from copy import copy, deepcopy
 from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from sys import stdout, getrefcount
+from sys import stdout
 from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn, Union
 
 

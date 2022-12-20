@@ -31,14 +31,14 @@ class IdentityMapping():
   def __init__(self, prefix_size = 4) -> None:
     self.StudyUIDMapping : Dict[str, UID] = {}
     self.SeriesUIDMapping : Dict[str, UID] = {}
-    self.SOPUIDMapping : Dict[str, UID] = {}
+    self.SOP_UIDMapping : Dict[str, UID] = {}
     self.PatientMapping : Dict[str, str] = {}
     self.prefix_size = prefix_size
 
   def __contains__(self, key: str) -> bool:
     return key in self.StudyUIDMapping \
             or key in self.SeriesUIDMapping \
-            or key in self.SOPUIDMapping \
+            or key in self.SOP_UIDMapping \
             or key in self.PatientMapping
 
   def __add_to_mapping(self, uid : str , mapping : Dict) -> UID:
@@ -54,8 +54,8 @@ class IdentityMapping():
   def add_SeriesUID(self, SeriesInstanceUID : UID) -> UID :
     return self.__add_to_mapping(SeriesInstanceUID.name, self.SeriesUIDMapping)
 
-  def add_SOPUID(self, SOPInstanceUID : UID) -> UID:
-    return self.__add_to_mapping(SOPInstanceUID.name, self.SOPUIDMapping)
+  def add_SOP_UID(self, SOPInstanceUID : UID) -> UID:
+    return self.__add_to_mapping(SOPInstanceUID.name, self.SOP_UIDMapping)
 
   def add_Patient(self, PatientID : str, patient_prefix : str = _PPrefix  ) -> str:
     if PatientID in self.PatientMapping:
@@ -68,7 +68,7 @@ class IdentityMapping():
 
   def fill_from_SeriesTree(self, seriesTree: 'SeriesTree'):
     for SOPInstanceUID, _dataSet in seriesTree.data.items():
-      self.__add_to_mapping(SOPInstanceUID, self.SOPUIDMapping)
+      self.__add_to_mapping(SOPInstanceUID, self.SOP_UIDMapping)
 
   def fill_from_StudyTree(self, studyTree : 'StudyTree'):
     for seriesInstanceUID, seriesTree in studyTree.data.items():
@@ -107,8 +107,8 @@ class IdentityMapping():
       return self.StudyUIDMapping[key]
     if key in self.SeriesUIDMapping:
       return self.SeriesUIDMapping[key]
-    if key in self.SOPUIDMapping:
-      return self.SOPUIDMapping[key]
+    if key in self.SOP_UIDMapping:
+      return self.SOP_UIDMapping[key]
     raise KeyError()
 
   def get_mapping(self, uid : Union[UID, str]) -> Optional[Union[UID, str]]:
@@ -121,8 +121,8 @@ class IdentityMapping():
       return self.StudyUIDMapping[uid]
     if uid in self.SeriesUIDMapping:
       return self.SeriesUIDMapping[uid]
-    if uid in self.SOPUIDMapping:
-      return self.SOPUIDMapping[uid]
+    if uid in self.SOP_UIDMapping:
+      return self.SOP_UIDMapping[uid]
     return None
 
   def __str__(self) -> str:
@@ -137,8 +137,8 @@ class IdentityMapping():
     if len(self.SeriesUIDMapping) > 0:
       base_string += f"\n  Series Mapping with {len(self.SeriesUIDMapping)}"
     # SOP instances
-    if len(self.SOPUIDMapping) > 0:
-      base_string += f"\n  SOP Mapping with {len(self.SOPUIDMapping)} Mappings"
+    if len(self.SOP_UIDMapping) > 0:
+      base_string += f"\n  SOP Mapping with {len(self.SOP_UIDMapping)} Mappings"
 
     return base_string
 
@@ -215,7 +215,7 @@ class ImageTreeInterface(ABC):
     Destroys any subtrees that zeroes images.
 
     Args:
-        filterfunc (Callable[[Dataset], bool]): _description_
+        filter_function (Callable[[Dataset], bool]): _description_
 
     Returns:
         int: Number of Pictures trimmed
@@ -335,7 +335,7 @@ class SeriesTree(ImageTreeInterface):
       if hasattr(dicom, 'SeriesDescription'):
         self.SeriesDescription = f"Tree of {dicom.SeriesDescription}"
     if dicom.SOPInstanceUID.name in self.data:
-      raise ValueError("Dublicate Image added!")
+      raise ValueError("Duplicate Image added!")
     self[dicom.SOPInstanceUID.name] = dicom
     self.images += 1
     return 1
@@ -366,7 +366,7 @@ class StudyTree(ImageTreeInterface):
       raise ValueError("Dicom image doesn't have a SeriesInstanceUID")
     if hasattr(self, 'StudyInstanceUID'):
       if self.StudyInstanceUID != dicom.StudyInstanceUID.name:
-        raise KeyError("Attempting to add an image to a study where it doesn't belog")
+        raise KeyError("Attempting to add an image to a study where it doesn't belong")
     else:
       self.StudyInstanceUID = dicom.StudyInstanceUID.name
       if hasattr(dicom, 'StudyDescription'):

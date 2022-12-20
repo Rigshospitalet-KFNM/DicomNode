@@ -15,7 +15,7 @@ from pydicom import Dataset
 from dicomnode.lib.dicomFactory import DicomFactory
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode)
-from dicomnode.lib.imageTree import IdentityMapping, ImageTreeInterface
+from dicomnode.lib.imageTree import ImageTreeInterface
 from dicomnode.server.input import AbstractInput
 
 
@@ -29,6 +29,7 @@ class InputContainer(ImageTreeInterface):
     logger: Optional[Logger] = None
     container_path: Optional[Path] = None
     factory: Optional[DicomFactory] = None
+    lazy: bool = False
 
   def __getitem__(self, key: str):
     if hasattr(self, 'instance'):
@@ -58,10 +59,7 @@ class InputContainer(ImageTreeInterface):
       if self.options.container_path is not None:
         input_path = self.options.container_path / arg_name
 
-      inputOptions = input.Options(
-        data_directory = input_path,
-        factory = self.options.factory
-      )
+      inputOptions = self.__get_Input_Options(input=input, input_path=input_path)
 
       self.data[arg_name] = input(pivot, options=inputOptions)
 
@@ -114,11 +112,19 @@ class InputContainer(ImageTreeInterface):
         except InvalidDataset:
           pass
       else:
-        raise InvalidTreeNode
+        raise InvalidTreeNode # pragma: no cover
     if added == 0:
       raise InvalidDataset()
     self.images += added
     return added
+
+  def __get_Input_Options(self, input: Type[AbstractInput], input_path: Optional[Path]):
+    return input.Options(
+        data_directory = input_path,
+        logger=self.options.logger,
+        factory = self.options.factory,
+        lazy=self.options.lazy
+      )
 
   def __str__(self) -> str:
     return str(self.data)
@@ -134,6 +140,7 @@ class PipelineTree(ImageTreeInterface):
     input_container: type[InputContainer] = InputContainer
     data_directory: Optional[Path] = None
     factory: Optional[DicomFactory] = None
+    lazy: bool = False
 
   def __init__(self,
                patient_identifier: int,
@@ -174,11 +181,7 @@ class PipelineTree(ImageTreeInterface):
         self.logger.error(f"{patient_directory.name} in root_data_directory is a file not a directory")
         raise InvalidRootDataDirectory()
 
-      options = InputContainer.Options(
-        container_path=patient_directory,
-        factory=self.options.factory,
-        logger= self.logger
-      )
+      options = self.__get_InputContainer_Options(patient_directory)
 
       self[patient_directory.name] = InputContainer(self.PipelineArgs, None, options)
 
@@ -195,11 +198,7 @@ class PipelineTree(ImageTreeInterface):
       if self.root_data_directory is not None:
         IDC_path = self.root_data_directory / key
 
-      options = InputContainer.Options(
-        container_path=IDC_path,
-
-        factory=self.options.factory
-      )
+      options = self.__get_InputContainer_Options(IDC_path)
       self[key] = InputContainer(self.PipelineArgs, dicom, options)
 
     IDC = self[key]
@@ -233,3 +232,20 @@ class PipelineTree(ImageTreeInterface):
 
   def __str__(self) -> str:
     return str(self.data)
+
+  def __get_InputContainer_Options(self, container_path: Optional[Path]) -> InputContainer.Options:
+    """Creates the options for the underlying Input Container
+
+    Args:
+        container_path (Optional[Path]): _description_
+
+    Returns:
+        InputContainer.Options: _description_
+    """
+
+    return InputContainer.Options(
+        container_path=container_path,
+        factory=self.options.factory,
+        logger=self.logger,
+        lazy=self.options.lazy
+      )
