@@ -248,20 +248,16 @@ class DicomFactory(ABC):
     """
 
     header = SeriesHeader()
-    if filling_strategy == FillingStrategy.DISCARD:
-      for virtual_element in elements:
+    if filling_strategy == FillingStrategy.COPY:
+      for data_element in dataset:
+        if data_element.tag in elements:
+          pass
+        else:
+          header.add_tag(data_element)
+    for virtual_element in elements:
         de = virtual_element.corporealialize(self, dataset)
         if de is not None:
           header.add_tag(de)
-    elif filling_strategy == FillingStrategy.COPY:
-      for data_element in dataset:
-        if data_element.tag in elements:
-          virtual_element = elements[data_element.tag]
-          corporeal_tag = virtual_element.corporealialize(self, dataset)
-          if corporeal_tag is not None:
-            header.add_tag(corporeal_tag)
-        else:
-          header.add_tag(data_element)
     return header
 
   @abstractmethod
@@ -271,8 +267,33 @@ class DicomFactory(ABC):
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
-  def build(self, pivot: Dataset, blueprint: Blueprint) -> Dataset:
-    return Dataset()
+  def build(self, pivot: Dataset, blueprint: Blueprint, filling_strategy: FillingStrategy = FillingStrategy.DISCARD) -> Dataset:
+    """Builds a singular dataset
+
+    Args:
+        pivot (Dataset): _description_
+        blueprint (Blueprint): _description_
+        filling_strategy (FillingStrategy, optional): _description_. Defaults to FillingStrategy.DISCARD.
+
+    Returns:
+        Dataset: _description_
+    """
+    dataset = Dataset()
+    if filling_strategy == FillingStrategy.COPY:
+      for data_element in pivot:
+        if data_element.tag in blueprint:
+          pass
+        else:
+          dataset.add(data_element)
+    for virtual_element in blueprint:
+      de = virtual_element.corporealialize(self, pivot)
+      if isinstance(de, CallElement):
+        args = CallerArgs(1)
+        args.virtual_element = de
+        de = de(args)
+      if de is not None:
+        dataset.add(de)
+    return dataset
 
 ###### Header function ######
 
