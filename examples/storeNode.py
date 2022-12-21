@@ -7,6 +7,7 @@ from os import environ
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
+from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.lib.io import save_dicom
 
@@ -51,10 +52,10 @@ class storeNode(AbstractPipeline):
     save_dicom(dataset_path,  dataset)
     return None
 
-  def process(self, input_data: InputContainer) -> Iterable[Dataset]:
+  def process(self, input_data: InputContainer) -> PipelineOutput:
     for dataset in input_data[INPUT_ARG]:
       self.storeDataset(dataset)
-    return []
+    return NoOutput()
 
   def post_init(self, start: bool) -> None:
     self.archive_path.mkdir(exist_ok=True)

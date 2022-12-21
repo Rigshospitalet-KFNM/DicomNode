@@ -103,7 +103,7 @@ Add the process method to the class, this is the image processing function that 
 ```python
 class MyPipeline(AbstractPipeline):
   ...
-  def process(self, input_container: InputContainer) -> Iterable[Dataset]:
+  def process(self, input_container: InputContainer) -> PipelineOutput:
     ...
 ```
 

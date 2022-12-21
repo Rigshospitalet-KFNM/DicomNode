@@ -9,7 +9,10 @@ from typing import Dict, List, Union, Tuple, Any, Optional, Callable, Iterator
 from dataclasses import dataclass
 
 from dicomnode.lib.dicom import make_meta, gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CallerArgs, CallElement, CopyElement, DicomFactory, SeriesHeader, SeriesElement, FillingStrategy, StaticElement, Blueprint
+from dicomnode.lib.dicomFactory import AttrElement, CallerArgs, CallElement, DicomFactory, SeriesHeader,\
+  StaticElement, Blueprint, patient_blueprint, general_series_blueprint,\
+  general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint,\
+  general_equipment_blueprint, general_image_blueprint, ct_image_blueprint
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, InvalidEncoding
 
 import numpy
@@ -223,9 +226,7 @@ def _add_PixelData(numpy_caller_args: NumpyCallerArgs) -> bytes:
   return image.tobytes()
 
 ####### Header Tag groups #######
-general_image_header_tags = []
-
-image_pixel_header_tags: Blueprint = Blueprint([
+image_pixel_NumpyBlueprint: Blueprint = Blueprint([
   StaticElement(0x00280002, 'US', 1),                    # SamplesPerPixel
   StaticElement(0x00280004, 'CS', 'MONOCHROME2'),        # PhotometricInterpretation
   NumpyCaller(0x00280010, 'US', _add_Rows),              # Rows
@@ -242,4 +243,13 @@ image_pixel_header_tags: Blueprint = Blueprint([
   NumpyCaller(0x7FE00010, 'OB', _add_PixelData)          # PixelData
 ])
 
+CTImageStorage_NumpyBlueprint: Blueprint = patient_blueprint\
+                                           + general_study_blueprint \
+                                           + general_series_blueprint \
+                                           + frame_of_reference_blueprint \
+                                           + general_equipment_blueprint \
+                                           + general_image_blueprint \
+                                           + image_pixel_NumpyBlueprint\
+                                           + ct_image_blueprint \
+                                           + SOP_common_blueprint
 

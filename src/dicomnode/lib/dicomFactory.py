@@ -292,14 +292,19 @@ def _get_random_number(_) -> int:
   return randint(1, 2147483646)
 ###### Header Tag Lists ######
 
-patient_header_tags = Blueprint([
+patient_blueprint = Blueprint([
   CopyElement(0x00100010), # PatientName
   CopyElement(0x00100020), # PatientID
   CopyElement(0x00100030), # PatientsBirthDate
   CopyElement(0x00100040), # PatientSex
 ])
 
-general_study_header_tags = Blueprint([
+frame_of_reference_blueprint = Blueprint([
+  CopyElement(0x00200052),
+  CopyElement(0x00201040)
+])
+
+general_study_blueprint = Blueprint([
   CopyElement(0x00080020), # StudyDate
   CopyElement(0x00080030), # StudyTime
   CopyElement(0x00080050), # AccessionNumber
@@ -308,14 +313,23 @@ general_study_header_tags = Blueprint([
   CopyElement(0x0020000D), # StudyInstanceUID
 ])
 
-patient_study_header_tags = Blueprint([
+general_equipment_blueprint = Blueprint([])
+
+general_image_blueprint = Blueprint([])
+
+general_plane_blueprint = Blueprint([])
+
+ct_image_blueprint = Blueprint([])
+
+
+patient_study_blueprint = Blueprint([
   CopyElement(0x00101010, Optional=True), # PatientAge
   CopyElement(0x00101020, Optional=True), # PatientSize
   CopyElement(0x00101030, Optional=True), # PatientWeight
 ])
 
 
-general_series_study_header = Blueprint([
+general_series_blueprint = Blueprint([
   CopyElement(0x00080060), # Modality
   SeriesElement(0x00080021, 'DA', _get_today), # SeriesDate
   SeriesElement(0x00080031, 'TM', _get_time), # SeriesTime
@@ -324,7 +338,7 @@ general_series_study_header = Blueprint([
   SeriesElement(0x00200011, 'IS', _get_random_number) # SeriesNumber
 ])
 
-SOP_common_header: Blueprint = Blueprint([
+SOP_common_blueprint: Blueprint = Blueprint([
   CopyElement(0x00080016),                            # SOPClassUID, you might need to change this
   CallElement(0x00080018, 'UI', _add_SOPInstanceUID), # SOPInstanceUID
   CallElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber

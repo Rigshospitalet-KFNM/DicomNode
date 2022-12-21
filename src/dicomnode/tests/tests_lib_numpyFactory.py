@@ -2,13 +2,13 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 from unittest import TestCase, skipIf
 from typing import List
-from dicomnode.lib.dicomFactory import SOP_common_header, FillingStrategy
-from dicomnode.lib.numpyFactory import image_pixel_header_tags, NumpyCaller, NumpyFactory
+from dicomnode.lib.dicomFactory import SOP_common_blueprint, FillingStrategy
+from dicomnode.lib.numpyFactory import image_pixel_NumpyBlueprint, NumpyCaller, NumpyFactory
 import numpy
 
 class NumpyFactoryTestCase(TestCase):
   def setUp(self) -> None:
-    self.blueprint = image_pixel_header_tags
+    self.blueprint = image_pixel_NumpyBlueprint
     self.factory = NumpyFactory()
     self.header_dataset = Dataset()
     self.header = self.factory.make_series_header(self.header_dataset, self.blueprint)
@@ -141,7 +141,7 @@ class NumpyFactoryTestCase(TestCase):
   def test_SOP_common_header(self):
     dataset = Dataset()
     dataset.SOPClassUID = SecondaryCaptureImageStorage
-    blueprint = self.blueprint + SOP_common_header
+    blueprint = self.blueprint + SOP_common_blueprint
 
     factory = NumpyFactory()
     header = factory.make_series_header(dataset, blueprint, FillingStrategy.DISCARD)

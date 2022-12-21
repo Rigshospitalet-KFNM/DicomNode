@@ -11,7 +11,7 @@ from unittest import TestCase
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
-  general_series_study_header, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_header
+  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -261,7 +261,7 @@ class DicomFactoryTestClass(TestCase):
 
   def test_create_header(self):
     dataset = Dataset()
-    headerBP = general_series_study_header
+    headerBP = general_series_blueprint
 
     dataset.Modality = 'OT'
     dataset.PatientSize = 50

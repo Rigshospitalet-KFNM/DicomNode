@@ -444,7 +444,6 @@ class lib_imageTree(TestCase):
     for image in DT:
       self.assertIn(image, self.datasets)
 
-  @bench
   def test_max_recursion(self):
     DT = DicomTree()
 

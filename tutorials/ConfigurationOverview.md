@@ -59,5 +59,5 @@ A greater documentation detail can be found in the files or the sphinx documenta
 ### Methods - Pipeline
 
 * `Filter(self, dataset: Dataset) -> bool` - initial Function for filtering datasets received by c stores
-* `process(self, input_container: InputContainer): -> Iterable[Dataset]` - Post processing function
+* `process(self, input_container: InputContainer): -> PipelineOutput` - Post processing function
 * `post_init(self, start)` - Function called after most init, but before the node opens, used to setup other inputs.

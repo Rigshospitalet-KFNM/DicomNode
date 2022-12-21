@@ -11,6 +11,11 @@ from dicomnode.lib.dimse import Address, send_images
 logger = logging.getLogger("dicomnode")
 
 class PipelineOutput:
+  """Base Class for pipeline outputs.
+  This class carries the responsibility for sending processed data to the endpoint
+
+  """
+
   output: List[Tuple[Address, Iterable[Dataset]]]
 
   def __init__(self, output: List[Tuple[Address, Iterable[Dataset]]], AE: str) -> None:

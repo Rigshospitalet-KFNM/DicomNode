@@ -13,7 +13,7 @@ from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type
 import logging
 
 from dicomnode.lib.dimse import Address
-from dicomnode.lib.dicomFactory import DicomFactory
+from dicomnode.lib.dicomFactory import DicomFactory, Blueprint
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.lazyDataset import LazyDataset
@@ -161,21 +161,26 @@ class AbstractInput(ImageTreeInterface, ABC):
 
 class HistoricAbstractInput(AbstractInput):
   address: Optional[Address] = None
+  c_move_blueprint: Optional[Blueprint] = None
 
   def __init__(self, pivot: Optional[Dataset] = None, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(pivot, options)
 
     if pivot is None:
-      self.logger.error("You forgot to parse the pivot to The Input")
+      self.logger.critical("You forgot to parse the pivot to The Input")
+      raise IncorrectlyConfigured
+
+    if self.c_move_blueprint is None:
+      self.logger.critical("A C move blueprint is missing")
       raise IncorrectlyConfigured
 
     if self.address is None:
-      self.logger.error("A target address is needed to send a C-Move to")
+      self.logger.critical("A target address is needed to send a C-Move to")
       raise IncorrectlyConfigured
 
     if self.options.factory is None:
-      self.logger.error("A Factory is needed to generate a C move message")
+      self.logger.critical("A Factory is needed to generate a C move message")
       raise IncorrectlyConfigured
 
-    message = self.options.factory.make_c_move_message(pivot)
+    message = self.options.factory.build(pivot,self.c_move_blueprint)
 

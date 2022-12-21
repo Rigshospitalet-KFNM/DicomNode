@@ -250,6 +250,8 @@ class AbstractPipeline(ABC):
 
   @abstractmethod
   def process(self, input_data: InputContainer) -> PipelineOutput:
+    """Function responsible for doing post processing."""
+
     return NoOutput
 
   def post_init(self, start : bool) -> None:

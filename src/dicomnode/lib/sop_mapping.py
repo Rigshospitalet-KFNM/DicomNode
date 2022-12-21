@@ -230,7 +230,7 @@ PET_Image_required_tags: List[int] = [
   0x00541330  # ImageIndex
 ]
 
-Dicom_CT_SOP_Class_required_tags: List[int] = Patient_required_tags \
+CTImageStorage_required_tags: List[int] = Patient_required_tags \
   + General_Study_required_tags \
   + General_Series_required_tags \
   + Frame_of_Reference_required_tags \
@@ -241,7 +241,7 @@ Dicom_CT_SOP_Class_required_tags: List[int] = Patient_required_tags \
   + CT_Image_required_tags \
   + SOP_Common_required_tags
 
-Dicom_Encapsulated_PDF_SOP_Class_required_tags: List[int] = Patient_required_tags \
+EncapsulatedPDFStorage_required_tags: List[int] = Patient_required_tags \
   + General_Series_required_tags \
   + Encapsulated_Document_Series_required_tags \
   + General_Equipment_required_tags \
@@ -249,7 +249,7 @@ Dicom_Encapsulated_PDF_SOP_Class_required_tags: List[int] = Patient_required_tag
   + Encapsulated_Document_required_tags \
   + SOP_Common_required_tags
 
-Dicom_MR_SOP_Class_required_tags: List[int] = Patient_required_tags \
+MRImageStorage_required_tags: List[int] = Patient_required_tags \
   + General_Study_required_tags \
   + General_Series_required_tags \
   + Frame_of_Reference_required_tags \
@@ -260,7 +260,7 @@ Dicom_MR_SOP_Class_required_tags: List[int] = Patient_required_tags \
   + MR_Image_required_tags \
   + SOP_Common_required_tags
 
-Dicom_NM_SOP_Class_required_tags: List[int] = Patient_required_tags \
+NuclearMedicineImageStorage_required_tags: List[int] = Patient_required_tags \
   + General_Study_required_tags \
   + General_Series_required_tags \
   + NM_PET_Patient_Orientation_required_tags \
@@ -275,7 +275,7 @@ Dicom_NM_SOP_Class_required_tags: List[int] = Patient_required_tags \
   + NM_Detector_required_tags \
   + SOP_Common_required_tags
 
-Dicom_PET_SOP_Class_required_tags: List[int] = Patient_required_tags \
+PositronEmissionTomographyImageStorage_required_tags: List[int] = Patient_required_tags \
   + General_Study_required_tags \
   + General_Series_required_tags \
   + PET_Series_required_tags \
@@ -300,9 +300,9 @@ DICOM_RT_Image_required_tags = Patient_required_tags \
 
 
 required_tags: Dict[UID, List[int]] = {
-  CTImageStorage : Dicom_CT_SOP_Class_required_tags,
-  EncapsulatedPDFStorage : Dicom_Encapsulated_PDF_SOP_Class_required_tags,
-  MRImageStorage : Dicom_MR_SOP_Class_required_tags,
-  NuclearMedicineImageStorage : Dicom_NM_SOP_Class_required_tags,
-  PositronEmissionTomographyImageStorage : Dicom_PET_SOP_Class_required_tags,
+  CTImageStorage : CTImageStorage_required_tags,
+  EncapsulatedPDFStorage : EncapsulatedPDFStorage_required_tags,
+  MRImageStorage : MRImageStorage_required_tags,
+  NuclearMedicineImageStorage : NuclearMedicineImageStorage_required_tags,
+  PositronEmissionTomographyImageStorage : PositronEmissionTomographyImageStorage_required_tags,
 }

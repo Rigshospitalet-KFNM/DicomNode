@@ -1,0 +1,63 @@
+from pathlib import Path
+
+from pydicom import Dataset
+from pydicom.uid import CTImageStorage
+
+from numpy import ndarray
+
+import logging
+
+
+from os import environ
+
+from dicomnode.lib.dimse import Address
+from dicomnode.lib.numpyFactory import NumpyFactory, CTImageStorage_NumpyBlueprint
+from dicomnode.lib.grinders import numpy_grinder
+from dicomnode.lib.sop_mapping import CTImageStorage_required_tags
+
+from dicomnode.server.input import AbstractInput
+from dicomnode.server.nodes import AbstractPipeline
+from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.pipelineTree import InputContainer
+
+
+INPUT_KW = "CT_IMAGE"
+
+class CTInput(AbstractInput):
+  required_tags = CTImageStorage_required_tags
+
+  image_grinder = numpy_grinder
+
+  def validate(self):
+    return self.images > 150
+
+class PlusOnePipeline(AbstractPipeline):
+  log_path: str = "log.log"
+  ae_title: str = "PLUSONE"
+  port: int = 1337
+  ip: str = '0.0.0.0'
+  disable_pynetdicom_logger=True
+  log_level: int = logging.INFO
+  header_blueprint = CTImageStorage_NumpyBlueprint
+
+  endpoint = Address('1.2.3.4', 104, "ENDPOINT_AE")
+
+  dicom_factory: NumpyFactory = NumpyFactory()
+
+  input = {
+    INPUT_KW : CTInput
+  }
+
+  def process(self, input_data: InputContainer) -> PipelineOutput:
+    data: ndarray = input_data[INPUT_KW] # type: ignore
+    # Data processing
+    data += 1
+
+    # Conversion back to dicom
+    series = self.dicom_factory.make_series(input_data.header, data)
+
+    # Producing Pipeline Output
+    out = PipelineOutput([(self.endpoint, series)], self.ae_title)
+
+    return out
+
