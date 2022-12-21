@@ -1,8 +1,9 @@
 import logging
-from typing import Dict, List, Iterable, Tuple
+from typing import Any, Dict, List, Iterable, Tuple
+
+from abc import ABC, abstractmethod
 
 from pydicom import Dataset
-
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.dimse import Address, send_images
 
@@ -10,14 +11,27 @@ from dicomnode.lib.dimse import Address, send_images
 
 logger = logging.getLogger("dicomnode")
 
-class PipelineOutput:
+class PipelineOutput(ABC):
   """Base Class for pipeline outputs.
   This class carries the responsibility for sending processed data to the endpoint
 
   """
 
-  output: List[Tuple[Address, Iterable[Dataset]]]
+  output: List[Tuple[Address, Any]]
 
+  def __init__(self, output: List[Tuple[Address, Any]]) -> None:
+    self.output = output
+
+  @abstractmethod
+  def send(self) -> bool:
+    """Method that should send all the data in output
+
+    Returns:
+        bool: _description_
+    """
+    raise NotImplementedError
+
+class DicomOutput(PipelineOutput):
   def __init__(self, output: List[Tuple[Address, Iterable[Dataset]]], AE: str) -> None:
     self.output = output
     self.ae = AE
@@ -33,9 +47,11 @@ class PipelineOutput:
     return success
 
 
+
 class NoOutput(PipelineOutput):
-  def __init__(self, output: List[Tuple[Address, Iterable[Dataset]]] = [], AE: str = "") -> None:
-    super().__init__(output, AE)
+  output = []
+  def __init__(self) -> None:
+    pass
 
   def send(self) -> bool:
     return True

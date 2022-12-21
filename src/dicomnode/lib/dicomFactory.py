@@ -300,7 +300,7 @@ class DicomFactory(ABC):
 def _add_InstanceNumber(caller_args: CallerArgs):
   return caller_args.i + 1 # iterator is Zero indexed while, instance number is 1 indexed
 
-def _add_SOPInstanceUID(caller_args: CallerArgs):
+def _add_SOPInstanceUID(_):
   return gen_uid()
 
 def _get_today(_) -> date:

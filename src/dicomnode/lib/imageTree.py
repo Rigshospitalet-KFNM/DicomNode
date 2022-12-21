@@ -239,7 +239,7 @@ class ImageTreeInterface(ABC):
         else:
           trimmed_total += 1
           self.images -= 1
-    self.__data = new_data
+    self.data = new_data
     return trimmed_total
 
   def __iter__(self) -> Iterator[Dataset]:
@@ -268,7 +268,6 @@ class ImageTreeInterface(ABC):
   def data(self, value: Dict[str, Union[Dataset, 'ImageTreeInterface']]):
     """This function is not callable from subclasses"""
     self.__data = value
-    self.images = len(value)
 
   def __getitem__(self, key) -> Union[Dataset, 'ImageTreeInterface']:
     if isinstance(key, UID):
@@ -309,6 +308,7 @@ class ImageTreeInterface(ABC):
   def __init__(self, dcm: Union[Iterable[Dataset], Dataset] = []) -> None:
     self.__data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
     self.images: int = 0 # The total number of images of this tree and it's subtrees
+
 
     if dcm is not None:
       if isinstance(dcm, Dataset):

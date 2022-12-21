@@ -111,16 +111,19 @@ The `input_container` is a glorified `Dict[str, Any]` where the keys are matchin
 
 ### Exporting Data
 
-The final step of a pipeline is to send data to an endpoint. To define an endpoint you need to overwrite another attribute called endpoint.
-This should be a list of addresses, which is a data class found in `lib.dimse` module:
+The final step of a pipeline is to send data to an endpoint. Because sending data is a none trivial task you need to create a Pipeline output object.
+This as pairing of endpoints and series and a method to export this data.
 
 ```python
 
 from dicomnode.lib.dimse import Address
 
+from dicomnode.server.output import DicomOutput
+
 class MyPipeline(AbstractPipeline):
   ...
-  endpoints = [Address(ip='', port=104, ae_title="")]
+  def process(self, input_container: InputContainer) -> PipelineOutput
+  return DicomOutput([Address(ip='', port=104, ae_title=""), datasets])
 ```
 
 If you have performed the steps above you now have a functional pipeline.
@@ -215,11 +218,18 @@ class MyPipeline(AbstractPipeline):
   dicom_factory = NumpyFactory()
 
 
-  def process(self, input_container: InputContainer) -> Iterator[Dataset]:
+  def process(self, input_container: InputContainer) -> PipelineOutput:
     ...
 
     data_series = self.dicom_factory.make_series(input_container.header, numpy_array)
-    return data_series
+
+    output = PipelineOutput([(address, data_series)])
+
+    return output
 ```
 
 The addition between two blue print are not a commutative operator, ie: `blueprint_1 + blueprint_2 != blueprint_2 + blueprint_1` because of how tag collision is handled. The Tags of the second blueprint is dominant. Each addition does produce a new object.
+
+#### Customizing outputs
+
+Sometimes you want to create a report supplementing an image series or you want to send data over some other form communication protocol. In that case you need to start custimizing the output

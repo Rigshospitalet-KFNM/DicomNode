@@ -21,7 +21,7 @@ from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
 from dicomnode.lib.dicomFactory import Blueprint, DicomFactory
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.pipelineTree import PipelineTree, InputContainer
+from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
 
 
@@ -55,7 +55,7 @@ class AbstractPipeline(ABC):
   patient_identifier_tag: int = 0x00100020 # Patient ID
   root_data_directory: Optional[Path] = None
   pipelineTreeType: Type[PipelineTree] = PipelineTree
-  inputContainerType: Type[InputContainer] = InputContainer
+  inputContainerType: Type[PatientNode] = PatientNode
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
@@ -205,9 +205,11 @@ class AbstractPipeline(ABC):
   def _association_accepted(self, event: evt.Event):
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
     for requested_context in event.assoc.requestor.requested_contexts:
-      if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"): #type: ignore There is an error here most likely.
-
-        self.__updated_patients[event.assoc.native_id] = set()
+      if requested_context.abstract_syntax is not None:
+        if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
+          self.__updated_patients[event.assoc.native_id] = set()
+      else:
+        self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
 
   def _association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
@@ -221,7 +223,7 @@ class AbstractPipeline(ABC):
         else:
           if self.dispatch(result):
             self.logger.debug("Removing Patient")
-            PatientData._cleanup()
+            self.__data_state.remove_patient(patient_ID)
             del self.__updated_patients[event.assoc.native_id]
           else:
             self.logger.error("Unable to send output")

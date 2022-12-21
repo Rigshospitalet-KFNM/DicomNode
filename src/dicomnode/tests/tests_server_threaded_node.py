@@ -13,6 +13,7 @@ from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench
 
 from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.server.input import AbstractInput
+from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.threaded_node import AbstractThreadedPipeline
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
@@ -35,9 +36,9 @@ class TestNode(AbstractThreadedPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
-    return []
+    return NoOutput()
 
 
 class TestNodeTestCase(TestCase):
@@ -128,9 +129,9 @@ class FileStorageTestNode(AbstractThreadedPipeline):
   disable_pynetdicom_logger: bool = True
   root_data_directory = fs_path
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
-    return []
+    return NoOutput()
 
 class FileStorageTestNodeTestCase(TestCase):
   def setUp(self):
@@ -149,7 +150,7 @@ class FileStorageTestNodeTestCase(TestCase):
 
     images_1.map(personify(
       tags=[
-        (0x00100010, "PN", "Odd Haugen Test"),
+        (0x00100010, "PN", "Odd Name Test"),
         (0x00100040, "CS", "M")
       ]
     ))

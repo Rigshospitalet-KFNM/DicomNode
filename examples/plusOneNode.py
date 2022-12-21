@@ -17,7 +17,7 @@ from dicomnode.lib.sop_mapping import CTImageStorage_required_tags
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.output import NoOutput, PipelineOutput, DicomOutput
 from dicomnode.server.pipelineTree import InputContainer
 
 
@@ -50,6 +50,9 @@ class PlusOnePipeline(AbstractPipeline):
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     data: ndarray = input_data[INPUT_KW] # type: ignore
+    if input_data.header is None:
+      self.logger.critical("Header is missing!")
+      raise Exception
     # Data processing
     data += 1
 
@@ -57,7 +60,7 @@ class PlusOnePipeline(AbstractPipeline):
     series = self.dicom_factory.make_series(input_data.header, data)
 
     # Producing Pipeline Output
-    out = PipelineOutput([(self.endpoint, series)], self.ae_title)
+    out = DicomOutput([(self.endpoint, series)], self.ae_title)
 
     return out
 
