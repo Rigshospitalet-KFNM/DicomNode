@@ -2,7 +2,6 @@
 title: Create a pipeline
 author: Christoffer Vilstrup Jensen
 ---
-# Creating a pipeline
 
 ## Introduction & Definitions
 
@@ -104,11 +103,11 @@ Add the process method to the class, this is the image processing function that 
 ```python
 class MyPipeline(AbstractPipeline):
   ...
-  def process(self, input_data: Dict[str, Any]) -> Iterable[Dataset]:
+  def process(self, input_container: InputContainer) -> Iterable[Dataset]:
     ...
 ```
 
-The `input_data` dictionary contains keys matching the keys of the `input` and values what the inputs `get_data` method returned, which unless you overwrote it is the just the return value of the grinder. Your function should return a iterable (list) of datasets of identical modality.
+The `input_container` is a glorified `Dict[str, Any]` where the keys are matching the keys of the `input` attribute of the pipeline and values is what the `AbstractInputs.get_data` methods returned.
 
 ### Exporting Data
 
@@ -213,7 +212,7 @@ blueprint = get_blueprint(Produced_SOP_class_UID) + my_blueprint
 
 class MyPipeline(AbstractPipeline):
   header_blueprint = blueprint
-  dicom_factory = NumpyFactory(blueprint)
+  factory = NumpyFactory
 
 
   def process(self, input_container: InputContainer) -> Iterator[Dataset]:
@@ -223,4 +222,4 @@ class MyPipeline(AbstractPipeline):
     return data_series
 ```
 
-The addition between two blue print are not a commutative operator, because of how tag collision is handled. The Tags of the second blueprint is dominant. Each addition does produce a new object.
+The addition between two blue print are not a commutative operator, ie: `blueprint_1 + blueprint_2 != blueprint_2 + blueprint_1` because of how tag collision is handled. The Tags of the second blueprint is dominant. Each addition does produce a new object.

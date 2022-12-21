@@ -14,22 +14,21 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 from pynetdicom import evt
 from pynetdicom.ae import ApplicationEntity as AE
-from pynetdicom.presentation import AllStoragePresentationContexts
+from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext
 from pydicom import Dataset
 
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
 from dicomnode.lib.dicomFactory import Blueprint, DicomFactory
-from dicomnode.server.pipelineTree import PipelineTree, InputContainer
 from dicomnode.server.input import AbstractInput
+from dicomnode.server.pipelineTree import PipelineTree, InputContainer
+from dicomnode.server.output import PipelineOutput, NoOutput
 
 
 import logging
 import traceback
 
 from abc import ABC, abstractmethod
-
-from gc import collect as garbage_collect
 
 from copy import copy, deepcopy
 from logging import StreamHandler, getLogger
@@ -55,18 +54,22 @@ class AbstractPipeline(ABC):
   input_config: Dict[str, Dict[str, Any]] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
   root_data_directory: Optional[Path] = None
-  dicom_factory: Optional[DicomFactory] = None
   pipelineTreeType: Type[PipelineTree] = PipelineTree
   inputContainerType: Type[InputContainer] = InputContainer
 
+  #DicomGeneration
+  dicom_factory: Optional[DicomFactory] = None
+  header_blueprint: Optional[Blueprint] = None
+  c_move_blueprint: Optional[Blueprint] = None
+
   # Output Configuration
-  endpoints: List[Address] = []
+  output: Type[PipelineOutput] = PipelineOutput
 
   # AE configuration tags
   ae_title: str = "Your_AE_TITLE"
   ip: str = 'localhost'
   port: int = 104
-  supported_contexts = AllStoragePresentationContexts
+  supported_contexts: List[PresentationContext] = AllStoragePresentationContexts
   require_called_aet: bool = True
   require_calling_aet: List[str] = []
 
@@ -221,19 +224,16 @@ class AbstractPipeline(ABC):
             PatientData._cleanup()
             del self.__updated_patients[event.assoc.native_id]
           else:
-            self.logger.error("Unable to send to addresses")
+            self.logger.error("Unable to send output")
       else:
         self.logger.debug(f"Dataset was not valid for {patient_ID}")
 
-  def dispatch(self, images: Iterable[Dataset]) -> bool:
-    success: bool = True
-    for address in self.endpoints:
-      try:
-        self.logger.debug(f"Sending datasets to {Address}")
-        send_images(self.ae_title, address, images)
-      except CouldNotCompleteDIMSEMessage:
-        self.logger.error(f"Could not send response to {address}")
-        success = False
+  def dispatch(self, Output: PipelineOutput) -> bool:
+    try:
+      success = Output.send()
+    except Exception as E:
+      self._log_user_error(E, "Output sending")
+      success = False
     return success
 
 
@@ -249,8 +249,8 @@ class AbstractPipeline(ABC):
     return True
 
   @abstractmethod
-  def process(self, input_data: InputContainer) -> Iterable[Dataset]:
-    raise NotImplemented #pragma: no cover
+  def process(self, input_data: InputContainer) -> PipelineOutput:
+    return NoOutput
 
   def post_init(self, start : bool) -> None:
     """This function is called just before the server is started.
@@ -258,7 +258,7 @@ class AbstractPipeline(ABC):
       This would often be
 
     Args:
-        start (bool): Indicatation if the server should start
+        start (bool): Indication if the server should start
 
     """
     pass

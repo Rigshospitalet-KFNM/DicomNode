@@ -66,15 +66,6 @@ class NumpyFactory(DicomFactory):
   _high_bit: int = 15
   _pixel_representation: int = 0
 
-  def __init__(self,
-               header_blueprint: Optional[Blueprint] = None,
-               message_blueprint: Optional[Blueprint] = None,
-               filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
-    super().__init__(
-      header_blueprint=header_blueprint,
-      message_blueprint=message_blueprint,
-      filling_strategy=filling_strategy)
-
   @property
   def pixel_representation(self) -> int:
     """Indicates encoding of pixel:
@@ -159,7 +150,7 @@ class NumpyFactory(DicomFactory):
     return new_image, slope, intercept
 
 
-  def make_series(self, header : SeriesHeader, image: ndarray):
+  def make_series(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
     target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid

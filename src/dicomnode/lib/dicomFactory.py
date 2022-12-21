@@ -226,19 +226,14 @@ class DicomFactory(ABC):
   """A DicomFactory is a class, that produces various collections of datasets
   """
 
-  def __init__(self,
-               header_blueprint: Optional[Blueprint] = None,
-               message_blueprint: Optional[Blueprint] = None,
-               filling_strategy: Optional[FillingStrategy] = FillingStrategy.DISCARD) -> None:
-    self.header_blueprint: Optional[Blueprint] = header_blueprint
-    self.message_blueprint: Optional[Blueprint] = message_blueprint
-    self.filling_strategy: Optional[FillingStrategy] = filling_strategy
+  def __init__(self) -> None:
+    #
     self.series_description: str = "Unnamed Pipeline post processing "
 
   def make_series_header(self,
                   dataset: Dataset,
-                  elements: Optional[Blueprint]= None,
-                  filling_strategy: Optional[FillingStrategy] = None
+                  elements: Blueprint,
+                  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     ) -> SeriesHeader:
     """This function produces a header dataset based on an input dataset.
 
@@ -250,19 +245,7 @@ class DicomFactory(ABC):
 
     Returns:
         Dataset: The produced dataset
-
-    Raises:
-        IncorrectlyConfigured: If it's impossible to produce a DataElement from a tag
     """
-    if elements is None:
-      elements = self.header_blueprint
-    if elements is None:
-      raise IncorrectlyConfigured("A header needs some tags")
-
-    if filling_strategy is None:
-      filling_strategy = self.filling_strategy
-    if filling_strategy is None:
-      raise IncorrectlyConfigured("A strategy is need for unmarked tags")
 
     header = SeriesHeader()
     if filling_strategy == FillingStrategy.DISCARD:
@@ -288,7 +271,7 @@ class DicomFactory(ABC):
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
-  def make_c_move_message(self, pivot: Dataset) -> Dataset:
+  def build(self, pivot: Dataset, blueprint: Blueprint) -> Dataset:
     return Dataset()
 
 ###### Header function ######

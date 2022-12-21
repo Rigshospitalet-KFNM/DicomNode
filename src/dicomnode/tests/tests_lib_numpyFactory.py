@@ -9,9 +9,9 @@ import numpy
 class NumpyFactoryTestCase(TestCase):
   def setUp(self) -> None:
     self.blueprint = image_pixel_header_tags
-    self.factory = NumpyFactory(self.blueprint)
+    self.factory = NumpyFactory()
     self.header_dataset = Dataset()
-    self.header = self.factory.make_series_header(self.header_dataset)
+    self.header = self.factory.make_series_header(self.header_dataset, self.blueprint)
 
   def test_make_series_no_encoding(self):
     images  = 100
@@ -23,6 +23,7 @@ class NumpyFactoryTestCase(TestCase):
 
     self.assertEqual(len(datasets), images)
     for dataset in datasets:
+      self.assertEqual(dataset.SamplesPerPixel, 1)
       self.assertEqual(dataset.Columns, columns)
       self.assertEqual(dataset.Rows, rows)
 
@@ -142,8 +143,8 @@ class NumpyFactoryTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     blueprint = self.blueprint + SOP_common_header
 
-    factory = NumpyFactory(blueprint)
-    header = factory.make_series_header(dataset,  blueprint, FillingStrategy.DISCARD)
+    factory = NumpyFactory()
+    header = factory.make_series_header(dataset, blueprint, FillingStrategy.DISCARD)
 
     images  = 2
     rows    = 40

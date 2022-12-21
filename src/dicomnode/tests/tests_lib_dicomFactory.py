@@ -169,7 +169,7 @@ class testFactory(DicomFactory):
 class DicomFactoryTestClass(TestCase):
   def setUp(self) -> None:
     self.my_desc = "My description"
-    self.factory = testFactory(filling_strategy=None)
+    self.factory = testFactory()
     self.factory.series_description = self.my_desc
 
   def tearDown(self) -> None:
@@ -261,10 +261,7 @@ class DicomFactoryTestClass(TestCase):
 
   def test_create_header(self):
     dataset = Dataset()
-    self.assertRaises(IncorrectlyConfigured, self.factory.make_series_header, dataset)
-
     headerBP = general_series_study_header
-    self.assertRaises(IncorrectlyConfigured, self.factory.make_series_header, dataset, **{'elements' :  headerBP})
 
     dataset.Modality = 'OT'
     dataset.PatientSize = 50

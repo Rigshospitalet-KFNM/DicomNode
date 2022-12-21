@@ -18,6 +18,7 @@ from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline, InputContainer
+from dicomnode.server.output import NoOutput, PipelineOutput
 
 
 TEST_AE_TITLE = "TEST_AE"
@@ -49,9 +50,9 @@ class TestNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
-    return []
+    return NoOutput()
 
 
 class PipelineTestCase(TestCase):
@@ -124,7 +125,7 @@ class FaultyNode(AbstractPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
 
 class FaultyNodeTestCase(TestCase):
@@ -226,7 +227,7 @@ class MaxFilterNode(AbstractPipeline):
   def filter(self, dataset: Dataset) -> bool:
     return False
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
 
 
@@ -246,7 +247,6 @@ class MaxFilterTestCase(TestCase):
     self.assertEqual(response.Status, 0xB006)
 
 
-
 class FaultyFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
@@ -257,7 +257,7 @@ class FaultyFilterNode(AbstractPipeline):
   def filter(self, dataset: Dataset) -> bool:
     raise Exception
 
-  def process(self, InputData: InputContainer) -> Iterable[Dataset]:
+  def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
 
 
