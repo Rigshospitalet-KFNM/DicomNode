@@ -212,7 +212,7 @@ blueprint = get_blueprint(Produced_SOP_class_UID) + my_blueprint
 
 class MyPipeline(AbstractPipeline):
   header_blueprint = blueprint
-  factory = NumpyFactory
+  dicom_factory = NumpyFactory()
 
 
   def process(self, input_container: InputContainer) -> Iterator[Dataset]:
