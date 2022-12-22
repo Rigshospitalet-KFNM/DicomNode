@@ -27,6 +27,8 @@ from dicomnode.server.output import PipelineOutput, NoOutput
 
 import logging
 import traceback
+from threading import Thread
+from queue import Queue
 
 from abc import ABC, abstractmethod
 
@@ -35,7 +37,7 @@ from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from sys import stdout
-from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn, Union
+from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn, Union, Tuple
 
 
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -56,6 +58,7 @@ class AbstractPipeline(ABC):
   root_data_directory: Optional[Path] = None
   pipelineTreeType: Type[PipelineTree] = PipelineTree
   inputContainerType: Type[PatientNode] = PatientNode
+  lazy_storage: bool = False
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
@@ -137,7 +140,7 @@ class AbstractPipeline(ABC):
       (evt.EVT_ACCEPTED, self._association_accepted),
       (evt.EVT_RELEASED, self._association_released)
     ]
-    self.__updated_patients: Dict[Optional[int], MutableSet] = {
+    self.updated_patients: Dict[Optional[int], MutableSet] = {
 
     }
 
@@ -160,7 +163,7 @@ class AbstractPipeline(ABC):
       factory=self.dicom_factory
     )
 
-    self.__data_state: PipelineTree = self.pipelineTreeType(
+    self.data_state: PipelineTree = self.pipelineTreeType(
       self.patient_identifier_tag,
       self.input,
       options
@@ -191,8 +194,8 @@ class AbstractPipeline(ABC):
     if self.patient_identifier_tag in dataset:
       patientID = deepcopy(dataset[self.patient_identifier_tag].value)
       try:
-        self.__data_state.add_image(dataset)
-        self.__updated_patients[event.assoc.native_id].add(patientID)
+        self.data_state.add_image(dataset)
+        self.updated_patients[event.assoc.native_id].add(patientID)
       except InvalidDataset:
         self.logger.debug(f"Received dataset is not accepted by any inputs")
         return 0xB006
@@ -207,14 +210,14 @@ class AbstractPipeline(ABC):
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None:
         if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
-          self.__updated_patients[event.assoc.native_id] = set()
+          self.updated_patients[event.assoc.native_id] = set()
       else:
         self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
 
   def _association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    for patient_ID in self.__updated_patients[event.assoc.native_id]:
-      if (PatientData := self.__data_state.validate_patient_ID(patient_ID)) is not None:
+    for patient_ID in self.updated_patients[event.assoc.native_id]:
+      if (PatientData := self.data_state.validate_patient_ID(patient_ID)) is not None:
         self.logger.debug(f"Sufficient data - Calling Processing")
         try:
           result = self.process(PatientData)
@@ -223,16 +226,24 @@ class AbstractPipeline(ABC):
         else:
           if self.dispatch(result):
             self.logger.debug("Removing Patient")
-            self.__data_state.remove_patient(patient_ID)
-            del self.__updated_patients[event.assoc.native_id]
+            self.data_state.remove_patient(patient_ID)
           else:
             self.logger.error("Unable to send output")
       else:
         self.logger.debug(f"Dataset was not valid for {patient_ID}")
+      del self.updated_patients[event.assoc.native_id]
 
-  def dispatch(self, Output: PipelineOutput) -> bool:
+  def dispatch(self, output: PipelineOutput) -> bool:
+    """This function is responsible for triggering exporting of data and handling errors. 
+      You should consider if it's possible to create your own output rather than overwriting this function
+
+      Args:
+        output: PipelineOutput
+      Returns:
+        bool - If the output was successful in exporting the data.
+    """
     try:
-      success = Output.send()
+      success = output.send()
     except Exception as E:
       self._log_user_error(E, "Output sending")
       success = False
@@ -266,3 +277,52 @@ class AbstractPipeline(ABC):
 
     """
     pass
+
+
+class AbstractQueuedPipeline(AbstractPipeline):
+  process_queue: Queue[Tuple[str, InputContainer]]
+  dispatch_queue: Queue[Tuple[str,PipelineOutput]]
+
+  def process_worker(self):
+    while True:
+      PatientID, input_container = self.process_queue.get()
+      try:
+        output = self.process(input_container)
+      except Exception as E:
+        self._log_user_error(E, "process")
+      else:
+        self.dispatch_queue.put((PatientID, output))
+      finally:
+        self.process_queue.task_done()
+
+  def dispatch_worker(self):
+    while True:
+      PatientID, output = self.dispatch_queue.get()
+      success = self.dispatch(output)
+      if success: 
+        self.data_state.remove_patient(PatientID)
+      else:
+        self.logger.error(f"Could not send data to")
+
+      self.dispatch_queue.task_done()
+
+  def _association_released(self, event: evt.Event):
+    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
+    for patient_ID in self.updated_patients[event.assoc.native_id]:
+      if (input_container := self.data_state.validate_patient_ID(patient_ID)) is not None:
+        self.logger.debug(f"Sufficient data - Calling Processing")
+        self.process_queue.put((patient_ID, input_container))
+      else:
+        self.logger.debug(f"{patient_ID} is still missing data")
+      del self.updated_patients[event.assoc.native_id]
+
+  def __init__(self, start=True) -> NoReturn:
+    self.process_thread = Thread(target=self.process_worker, daemon=True)
+    self.dispatch_thread = Thread(target=self.dispatch_worker, daemon=True)
+
+    self.process_thread.start()
+    self.dispatch_thread.start()
+
+    super().__init__(start)
+
+  
