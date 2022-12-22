@@ -26,18 +26,14 @@ A greater documentation detail can be found in the files or the sphinx documenta
 * `patient_identifier_tag: int = 0x00100020 # Patient ID` - Dicom tag to separate data
 * `root_data_directory: Optional[Path] = None` - Path to where the pipeline tree may store dicom objects "permanently"
 * `pipelineTreeType: Type[PipelineTree] = PipelineTree` - PipelineTree for creating input containers
-* `inputContainerType: Type[InputContainer] = InputContainer` - Class that will be instantiated in Pipeline tree and passed to process
+* `inputContainerType: Type[PatientContainer] = PatientContainer` - Class that will be instantiated in Pipeline tree and passed to process
 * `lazy: bool = False` - Determined the abstract inputs should use Lazy datasets.
 
 #### DicomGeneration
 
 * `factory: Optional[DicomFactory] = None` - Class for producing various Dicom objects and series
 * `header_blueprint: Optional[Blueprint] = None` - Blueprint for creating a series header
-* `message_blueprint: Optional[Blueprint] = None` - Blueprint for create a C Move object
-
-#### Output Configuration
-
-* `endpoints: List[Address] = []` - Destination of post processed pipelines
+* `c_move_blueprint: Optional[Blueprint] = None` - Blueprint for create a C Move object
 
 #### AE configuration tags
 

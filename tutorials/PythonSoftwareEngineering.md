@@ -16,9 +16,9 @@ I would recommend the following style guides:
 * snake_case for general code - this_is_snake_case
 * SCREAMING_SNAKE_CASE for constants - THIS_IS_SCREAMING_SNAKE_CASE
 
-### Adding a doc string
+### Adding Documentation
 
-A documentation string is a string which describe the functionality of a function or class. It should be placed after each function. Like so:
+The most basic form of documentation is a documentation string, which is a string which describe the functionality of a function or class. It should be placed after each function. Like so:
 
 ```python
 def function(arg_1, arg_2):
@@ -38,24 +38,94 @@ def function(arg_1, arg_2):
   """
 ```
 
-Now if you have a good editor with intelliSense (**<https://code.visualstudio.com/>** if you need one) they will display this docstring when you hover over the function. You can also document modules, by filling the first like of code in a file. Docstring are different as they actually gets stored in an object under the keyword `__doc__`. Mean you can accesoo....
+Now if you have a good editor with intelliSense (**<https://code.visualstudio.com/>** if you need one) they will display this docstring when you hover over the function. You can also document modules, by filling the first like of code in a file. Docstring are different as they actually gets stored in an object under the keyword `__doc__`. Mean you can access the documentation at run time if you really need to. 
+
+If you're unsure of what to put in a documentation, try and think about the responsibility of the function and write that. You should not assume that a docstring covers for magical coding tricks. You should add a comment explaining what is going on. If you're using python this should manly happen when you hit a sharp corner of python. There're some examples of this in the advanced section. 
+
+Adding documentation is work, which is much like an investment. It requires resources to get rolling, namely time. Not all documentation is going to be worth that time, but it's impossible to determine which documentation is useful and which isn't. A good rule of thumb is too add documentation to all public methods and functions. However you can often receive better results writing a tutorial or creating dataflow diagrams.
+
+### Type hints
+
+While python is dynamically typed. It allows a great freedom for the programmer, and that isn't always a good thing. These freedoms allow a programmer to speed though development, but this speed allows bugs to creep in, namely type error. A Type error occurs when you assume an attribute have a method or property, which is does not. 
+
+Now to help with this, you can add type hints to your functions. A type hint is a super duper pinky promise, that a variable is of a certain type. In other words you can break a type hint, and your python program will still run no problem (assuming no type error happens). Your IDE might yell at you thou.
+
+To declare type hint:
+
 ```python
 def function(arg_1: ArgType, kw_arg_1: KwArgType = kw_val) -> ReturnType:
   variable: VarType = ...
 ```
 
-Now, some times you would like to use the flexibility of type system, and then you need the `typing` Library. It contains some helpful Classes:
+Some types are composite. IE they contain other objects of a certain type. For instance a list of number. To specify this you need the `typing` Library. You can see this down below.
 
 * Any - This an explicit way of saying, I don't know the type of this object.
-* Dict - For the build in `dict` class, this is a composite type, and is specified: `Dict[KeyType, ValueType]`
-* List - For the build in `list` class, this is a composite type, and is specified: `List[ListType1, ListType2, ...]`
-* Optional - Allows the variable to be either the type or `None`. it's specified as: `Optional[Type]`
+* Dict - For the build in `dict` class, this is a composite type, and is specified: `Dict[KeyType, ValueType]` - *achoo Reader Monad*
+* List - For the build in `list` class, this is a composite type, and is specified: `List[ListType1, ListType2, ...]` - *achoo List monad*
+* Optional - Allows the variable to be either the type or `None`. it's specified as: `Optional[Type]` - *achoo Maybe Monad*
 * Type - In python3 types and classes
 * Union - allows a variable to store multiple types, this is composite type and is specified: `Union[Type1, Type2, ...]` Now if you're a fancy and are using python3.10 or later you can specify this as `Type1 | Type2 | ...`
 
+While this seams easy and fine, you can often run into problems when dealing with polymorphic functions. Consider this function.
+
+```python
+def add(x, y):
+  return x + y
+```
+
+And add some type hints:
+
+```python
+def add(x: int, y: int) -> int:
+  return x + y
+```
+
+Now somebody on your team wants to use this function with floating points. And you get the union type.
+
+```python
+def add(x: Union[int, float], y: Union[int, float]) -> Union[int, float]:
+  return x + y
+```
+
+But now you have to deal with the possibility of float returned in your code. A possible solution is by overloading the method, but that's not supported by the standard library. If a method starts to become too difficult to deal with type wise, consider separating it into multiple functions. 
+
+Even if you franticly type hint EVERYTHING, the libraries that you use might not be type hinted, leading you what is generally known as a bad time, so don't sweet to hard about it. 
+
 ### Inheritance
 
-This library heavily use inheritance, the idea is to 
+Python is an object oriented language, which means inheritance is a big part of the language. Inheritance allows you to inherit functionality from super classes ie:
+
+```python
+class SuperClass: 
+  def super_method(self):
+    print("super method")
+
+class SubClass(SuperClass):
+  pass
+
+>>> s = SubClass()
+>>> s.super_method()
+super method
+```
+
+Now say you some different functionality you can overwrite the function with your own implementation:
+
+```python
+class SuperClass: 
+  def super_method(self):
+    print("super method")
+
+class SubClass(SuperClass):
+  def super_method(self):
+    print("sub method")
+
+>>> s = SubClass()
+>>> s.super_method()
+sub method
+```
+
+So this how this library works, it is essentially a ready made pipeline with the exception of a function for processing the image, which you are intended to overwrite with your own implementation.
+This also deals with problem of users with very specific requirements, by allowing them to overwrite the part they want changed. So if you want to change something you can probably overwrite it and pass it in as an option. 
 
 ## Advanced Documentations
 
