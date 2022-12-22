@@ -30,8 +30,6 @@ import traceback
 from threading import Thread
 from queue import Queue
 
-from abc import ABC, abstractmethod
-
 from copy import copy, deepcopy
 from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
@@ -42,13 +40,15 @@ from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoRetu
 
 correct_date_format = "%Y/%m/%d %H:%M:%S"
 
-class AbstractPipeline(ABC):
-  """Abstract Class for a Pipeline, which acts a SCP
+class AbstractPipeline():
+  """Base Class for an image processing Pipeline
 
-  Requires the following attributes before it can be instantiated.
-    * ae_title : str
-    * config_path : Union[str, PathLike]
-    * process : Callable
+  Creates a SCP server on object instantiation unless passed start=False
+
+  Should be subclassed with your implementation of the process function at least.
+
+  Check tutorials/ConfigurationOverview.md for an overview
+
   """
 
   # Input configuration
@@ -91,7 +91,7 @@ class AbstractPipeline(ABC):
     """
     self.ae.shutdown()
 
-  def open(self, blocking=True) -> Union[NoReturn, None]: #type: ignore
+  def open(self, blocking=True) -> Optional[NoReturn]: #type: ignore
     """Opens all connections active connections.
       If your application includes additional connections, you should overwrite this method,
       And open any connections and call the super function.
@@ -107,7 +107,7 @@ class AbstractPipeline(ABC):
       block=blocking,
       evt_handlers=self._evt_handlers)
 
-  def __init__(self, start=True) -> NoReturn: #type: ignore
+  def __init__(self, start=True) -> Optional[NoReturn]: #type: ignore
     # logging
     if self.log_path:
       logging.basicConfig(
@@ -136,7 +136,7 @@ class AbstractPipeline(ABC):
     # Handler setup
     # class needs to be instantiated before handlers can be defined
     self._evt_handlers = [
-      (evt.EVT_C_STORE, self._handle_store),
+      (evt.EVT_C_STORE,  self._handle_store),
       (evt.EVT_ACCEPTED, self._association_accepted),
       (evt.EVT_RELEASED, self._association_released)
     ]
@@ -261,11 +261,18 @@ class AbstractPipeline(ABC):
     """
     return True
 
-  @abstractmethod
   def process(self, input_data: InputContainer) -> PipelineOutput:
-    """Function responsible for doing post processing."""
+    """Function responsible for doing post processing.
+    
+    Args:
+      input_data: InputContainer - Acts much like a dict similar to the input attribute
+        containing the return data of the various input grinder functions
+    Returns:
+      PipelineOutput - The processed images of the pipeline
 
-    return NoOutput
+    """
+
+    return NoOutput()
 
   def post_init(self, start : bool) -> None:
     """This function is called just before the server is started.
@@ -316,7 +323,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
         self.logger.debug(f"{patient_ID} is still missing data")
       del self.updated_patients[event.assoc.native_id]
 
-  def __init__(self, start=True) -> NoReturn:
+  def __init__(self, start=True) -> Optional[NoReturn]:
     self.process_thread = Thread(target=self.process_worker, daemon=True)
     self.dispatch_thread = Thread(target=self.dispatch_worker, daemon=True)
 
@@ -325,4 +332,38 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     super().__init__(start)
 
-  
+  def close(self) -> None:
+    self.process_queue.join()
+    self.dispatch_queue.join()
+
+    return super().close()
+
+class AbstractThreadedPipeline(AbstractPipeline):
+  threads: Dict[Optional[int],List[Thread]] = {}
+
+  def _handle_store(self, event: evt.Event) -> int:
+    thread: Thread = Thread(target=super()._handle_store, args=[event], daemon=True)
+    thread.start()
+    if event.assoc.native_id in self.threads:
+      self.threads[event.assoc.native_id].append(thread)
+    else:
+      self.threads[event.assoc.native_id] = [thread]
+    return 0x0000
+
+  def _join_threads(self, assoc_name:Optional[int] = None) -> None:
+    if assoc_name is None:
+      for thread_list in self.threads.values():
+        for thread in thread_list: # pragma: no cover
+          thread.join() # pragma: no cover
+      self.threads = {}
+    else:
+      thread_list = self.threads[assoc_name]
+      for thread in thread_list:
+        thread.join()
+      del self.threads[assoc_name]
+
+  def _association_released(self, event: evt.Event):
+    self._join_threads(event.assoc.native_id)
+    return super()._association_released(event)
+
+

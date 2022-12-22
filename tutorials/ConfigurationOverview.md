@@ -1,7 +1,7 @@
 # Configuration Guide
 
 This Document provides an overview of the different attributes, method and properties, that you can overwrite.
-A greater documentation detail can be found in the files or the sphinx documentation.
+Function docstring can be found in the files or sphinx documentation. 
 
 ## AbstractInput
 
