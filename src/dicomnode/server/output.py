@@ -1,7 +1,7 @@
 import logging
 
 from pathlib import Path
-from typing import Any, Dict, List, Iterable, Tuple
+from typing import Any, Dict, List, Iterable, Tuple, Type
 from abc import ABC, abstractmethod
 
 from pydicom import Dataset
@@ -63,12 +63,15 @@ class NoOutput(PipelineOutput):
     return True
 
 class FileOutput(PipelineOutput):
-  def __init__(self, output: List[Tuple[Path, Iterable[Dataset]]]) -> None:
+  image_tree_interface_type: Type[ImageTreeInterface]
+
+  def __init__(self, output: List[Tuple[Path, Iterable[Dataset]]], image_tree_interface_type: Type[ImageTreeInterface]=DicomTree) -> None:
     self.output = output
+    self.image_tree_interface_type = image_tree_interface_type
 
   def send(self) -> bool:
     for Path, Datasets in self.output:
       if not isinstance(Datasets, ImageTreeInterface):
-        Datasets = DicomTree(Datasets)
+        Datasets = self.image_tree_interface_type(Datasets)
       Datasets.save_tree(Path)
     return True
