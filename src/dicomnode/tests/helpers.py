@@ -95,6 +95,23 @@ def generate_numpy_datasets(
     ds.InstanceNumber = yielded + 1
     yield ds
 
+def generate_id_dataset(
+    datasets: int,
+    StudyUID = gen_uid(),
+    SeriesUID = gen_uid(),
+    PatientID = "1233435567"
+  ):
+
+  yielded = 0
+  while yielded < datasets:
+    yielded += 1
+    dataset = Dataset()
+    dataset.add_new(0x0020000D,'UI',StudyUID)
+    dataset.add_new(0x0020000E,'UI',SeriesUID)
+    dataset.add_new(0x00080016,'UI',gen_uid())
+    dataset.add_new(0x00100020, 'LO', PatientID)
+    yield dataset
+
 def personify(
     tags: List[Tuple[int, str, Any]] = []
   ) -> Callable[[Dataset],None]:

@@ -188,7 +188,7 @@ class PipelineTestCase(TestCase):
     self.assertEqual(response.Status, 0xB007)
 
   @bench
-  def performance_send_concurrently(self):
+  def performance_send(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
 
@@ -227,7 +227,7 @@ class FileStorageTestCase(TestCase):
     self.node.open(blocking=False)
 
   @bench
-  def performance_send_concurrently_fs(self):
+  def performance_send_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
 
@@ -243,11 +243,12 @@ class FileStorageTestCase(TestCase):
     self.assertEqual(ret_1, 0)
     self.assertEqual(self.node.data_state.images,50) # type: ignore
 
-  def test_threaded_send_concurrently_fs(self):
+  def test_send_concurrently_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     num_images = 2
 
     images_1 = DicomTree(generate_numpy_datasets(num_images, PatientID = "1502799995"))
+    images_2 = DicomTree(generate_numpy_datasets(num_images, PatientID = "0201919996"))
 
     images_1.map(personify(
       tags=[
@@ -256,13 +257,21 @@ class FileStorageTestCase(TestCase):
       ]
     ))
 
+    images_2.map(personify(
+      tags=[
+        (0x00100010,"PN", "Ellen Louise Test"),
+        (0x00100040,"CS", "M")
+      ]
+    ))
+
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
       thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
       ret_1 = thread_1.join()
 
     self.assertIn('DEBUG:dicomnode:insufficient data for patient 1502799995', cm.output)
+    self.assertIn('DEBUG:dicomnode:insufficient data for patient 0201919996', cm.output)
     self.assertEqual(ret_1, 0)
-    self.assertEqual(self.node.data_state.images, num_images)
+    self.assertEqual(self.node.data_state.images, 2* num_images)
 
 
 class MaxFilterTestCase(TestCase):
@@ -314,10 +323,9 @@ class TestNodeTestCase(TestCase):
     self.node.close()
 
   @bench
-  def performance_threaded_send_concurrently(self):
+  def performance_threaded_send(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
-    images_2 = DicomTree(generate_numpy_datasets(50, PatientID = "0201919996"))
 
     images_1.map(personify(
       tags=[
@@ -326,23 +334,14 @@ class TestNodeTestCase(TestCase):
       ]
     ))
 
-    images_2.map(personify(
-      tags=[
-        (0x00100010,"PN", "Ellen Louise Test"),
-        (0x00100040,"CS", "M")
-      ]
-    ))
 
     thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-    thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
 
     ret_1 = thread_1.join()
-    ret_2 = thread_2.join()
 
     self.assertEqual(ret_1, 0)
-    self.assertEqual(ret_2, 0)
 
-    self.assertEqual(self.node.data_state.images,100) # type: ignore
+    self.assertEqual(self.node.data_state.images, 50) # type: ignore
 
   def test_threaded_send_concurrently(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
