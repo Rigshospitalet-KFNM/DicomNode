@@ -54,7 +54,6 @@ class TestNeverValidatingInput(AbstractInput):
     return False
 
 ##### Test Node Implementations
-
 class TestNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
@@ -90,8 +89,6 @@ class FileStorageNode(AbstractPipeline):
     self.logger.info("process is called")
     return NoOutput()
 
-
-
 class FaultyFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
@@ -104,7 +101,6 @@ class FaultyFilterNode(AbstractPipeline):
 
   def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
-
 
 class MaxFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
@@ -144,6 +140,15 @@ class FileStorageThreadedNode(AbstractThreadedPipeline):
     self.logger.info("process is called")
     return NoOutput()
 
+class QueueNode(AbstractQueuedPipeline):
+  input = { INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  ae_title = TEST_AE_TITLE
+  disable_pynetdicom_logger = True
+
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    self.logger.info("process is called")
+    return NoOutput()
 
 ##### Test Cases #####
 class PipelineTestCase(TestCase):
@@ -154,6 +159,8 @@ class PipelineTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
     self.node.close()
 
   def test_send_C_store_success(self):
@@ -226,6 +233,11 @@ class FileStorageTestCase(TestCase):
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
+  def tearDown(self) -> None:
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
+    self.node.close()
+
   @bench
   def performance_send_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -266,11 +278,14 @@ class FileStorageTestCase(TestCase):
 
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
       thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+      thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
       ret_1 = thread_1.join()
+      ret_2 = thread_2.join()
 
     self.assertIn('DEBUG:dicomnode:insufficient data for patient 1502799995', cm.output)
     self.assertIn('DEBUG:dicomnode:insufficient data for patient 0201919996', cm.output)
     self.assertEqual(ret_1, 0)
+    self.assertEqual(ret_2, 0)
     self.assertEqual(self.node.data_state.images, 2* num_images)
 
 
@@ -282,6 +297,8 @@ class MaxFilterTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
     self.node.close()
 
   def test_send_C_store_rejected(self):
@@ -390,6 +407,11 @@ class FileStorageThreadedNodeTestCase(TestCase):
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
+  def tearDown(self) -> None:
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
+    self.node.close()
+
   @bench
   def performance_threaded_send_concurrently_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -453,3 +475,28 @@ class FileStorageThreadedNodeTestCase(TestCase):
     self.assertEqual(ret_2, 0)
 
     self.assertEqual(self.node.data_state.images,2 * num_images)
+
+class QueuedNodeTestCase(TestCase):
+  def setUp(self):
+    self.node = QueueNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
+    self.node.close()
+
+  def test_send_C_store_success(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+
+    self.assertIn("INFO:dicomnode:process is called", cm.output)
+
+    self.assertEqual(response.Status, 0x0000)
+    self.assertEqual(self.node.data_state.images,0)
+
+
+

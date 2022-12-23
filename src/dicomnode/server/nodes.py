@@ -316,16 +316,19 @@ class AbstractQueuedPipeline(AbstractPipeline):
       if (input_container := self.data_state.validate_patient_ID(patient_ID)) is not None:
         self.logger.debug(f"Sufficient data - Calling Processing")
         self.process_queue.put((patient_ID, input_container))
-      else:
-        self.logger.debug(f"{patient_ID} is still missing data")
-      del self.updated_patients[event.assoc.native_id]
+    del self.updated_patients[event.assoc.native_id]
 
   def __init__(self, start=True) -> Optional[NoReturn]:
+    self.process_queue = Queue()
+    self.dispatch_queue = Queue()
+
     self.process_thread = Thread(target=self.process_worker, daemon=True)
     self.dispatch_thread = Thread(target=self.dispatch_worker, daemon=True)
 
     self.process_thread.start()
     self.dispatch_thread.start()
+
+
 
     super().__init__(start)
 
