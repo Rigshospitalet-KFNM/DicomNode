@@ -218,23 +218,21 @@ class AbstractPipeline():
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.updated_patients[event.assoc.native_id]:
       if (PatientData := self.data_state.validate_patient_ID(patient_ID)) is not None:
-        self.logger.debug(f"Sufficient data - Calling Processing")
         try:
           result = self.process(PatientData)
         except Exception as E:
           self._log_user_error(E, "Process")
         else:
           if self.dispatch(result):
-            self.logger.debug("Removing Patient")
+            self.logger.debug(f"Removing Patient {patient_ID}")
             self.data_state.remove_patient(patient_ID)
           else:
             self.logger.error("Unable to send output")
-      else:
-        self.logger.debug(f"Dataset was not valid for {patient_ID}")
-      del self.updated_patients[event.assoc.native_id]
+      # Failure Logging is done by validate_patient_ID
+    del self.updated_patients[event.assoc.native_id] # Removing updated Patients
 
   def dispatch(self, output: PipelineOutput) -> bool:
-    """This function is responsible for triggering exporting of data and handling errors. 
+    """This function is responsible for triggering exporting of data and handling errors.
       You should consider if it's possible to create your own output rather than overwriting this function
 
       Args:
@@ -263,7 +261,7 @@ class AbstractPipeline():
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     """Function responsible for doing post processing.
-    
+
     Args:
       input_data: InputContainer - Acts much like a dict similar to the input attribute
         containing the return data of the various input grinder functions
@@ -272,7 +270,7 @@ class AbstractPipeline():
 
     """
 
-    return NoOutput()
+    return NoOutput() # pragma: no cover
 
   def post_init(self, start : bool) -> None:
     """This function is called just before the server is started.
@@ -281,7 +279,6 @@ class AbstractPipeline():
 
     Args:
         start (bool): Indication if the server should start
-
     """
     pass
 
@@ -306,7 +303,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
     while True:
       PatientID, output = self.dispatch_queue.get()
       success = self.dispatch(output)
-      if success: 
+      if success:
         self.data_state.remove_patient(PatientID)
       else:
         self.logger.error(f"Could not send data to")
@@ -365,5 +362,3 @@ class AbstractThreadedPipeline(AbstractPipeline):
   def _association_released(self, event: evt.Event):
     self._join_threads(event.assoc.native_id)
     return super()._association_released(event)
-
-

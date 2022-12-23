@@ -10,3 +10,4 @@ src/dicomnode/tests/test_data/*
 .vscode/
 lcov.info
 *.austin
+performance/

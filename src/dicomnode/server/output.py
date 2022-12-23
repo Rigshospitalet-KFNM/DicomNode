@@ -33,7 +33,7 @@ class PipelineOutput(ABC):
     Returns:
         bool: _description_
     """
-    raise NotImplementedError
+    raise NotImplementedError # pragma: no cover
 
   def __iter__(self):
     for destination, payload in self.output:

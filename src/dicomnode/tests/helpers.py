@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from time import perf_counter
 from typing import Any, Callable, Dict, Iterable,Iterator,List, Optional, Tuple, Type, Union
+
+import cProfile
+import pstats
 
 import numpy
 from pydicom import Dataset
@@ -93,21 +98,25 @@ def generate_numpy_datasets(
 def personify(
     tags: List[Tuple[int, str, Any]] = []
   ) -> Callable[[Dataset],None]:
-  def retfunc(ds: Dataset) -> None:
+  def retFunc(ds: Dataset) -> None:
     for tag,vr, val in tags:
       ds.add_new(tag, vr, val)
-
     return None
-
-  return retfunc
+  return retFunc
 
 def bench(func: Callable) -> Callable:
   """Decorator that benchmarks a function to stdout
   """
   def inner(*args, **kwargs) -> Any:
-    start = perf_counter()
-    ret = func(*args, **kwargs)
-    stop = perf_counter()
-    print(f"{func.__name__} runtime : {stop - start} s")
+    with cProfile.Profile() as profile:
+      ret = func(*args, **kwargs)
+
+    stats = pstats.Stats(profile)
+    stats.sort_stats(pstats.SortKey.TIME)
+
+    PerformanceDir = Path("performance").mkdir(exist_ok=True)
+    stats.dump_stats(f"performance/{func.__name__}.prof")
+
+
     return ret
   return inner

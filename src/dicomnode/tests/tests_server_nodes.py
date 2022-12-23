@@ -3,6 +3,7 @@ import logging
 from random import randint
 from pathlib import Path
 from sys import getrefcount
+from time import sleep
 from typing import List, Dict, Any, Iterable
 from unittest import TestCase
 
@@ -17,8 +18,9 @@ from dicomnode.lib.imageTree import DicomTree
 from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench
 
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.nodes import AbstractPipeline, InputContainer
+from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.pipelineTree import InputContainer
 
 
 TEST_AE_TITLE = "TEST_AE"
@@ -31,10 +33,13 @@ make_meta(DEFAULT_DATASET)
 DATASET_SOPInstanceUID = DEFAULT_DATASET.SOPInstanceUID.name
 
 
+
 TEST_CPR = "1502799995"
 INPUT_KW = "test_input"
 
 DEFAULT_DATASET.PatientID = TEST_CPR
+
+##### Test Input Implementations
 
 class TestInput(AbstractInput):
   required_tags: List[int] = [0x00080018, 0x00100040]
@@ -42,6 +47,13 @@ class TestInput(AbstractInput):
   def validate(self):
     return True
 
+class TestNeverValidatingInput(AbstractInput):
+  required_tags: List[int] = [0x00080018]
+
+  def validate(self):
+    return False
+
+##### Test Node Implementations
 
 class TestNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
@@ -54,7 +66,86 @@ class TestNode(AbstractPipeline):
     self.logger.info("process is called")
     return NoOutput()
 
+class FaultyNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
 
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    raise Exception
+
+fs_path = Path("/tmp/pipeline_tests/fs")
+
+class FileStorageNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestNeverValidatingInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+  root_data_directory = fs_path
+
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    self.logger.info("process is called")
+    return NoOutput()
+
+
+
+class FaultyFilterNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def filter(self, dataset: Dataset) -> bool:
+    raise Exception
+
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    raise Exception
+
+
+class MaxFilterNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def filter(self, dataset: Dataset) -> bool:
+    return False
+
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    raise Exception
+
+class TestThreadedNode(AbstractThreadedPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestNeverValidatingInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    self.logger.info("process is called")
+    return NoOutput()
+
+fs_threaded_path = Path("/tmp/pipeline_tests/fs_threaded")
+
+class FileStorageThreadedNode(AbstractThreadedPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestNeverValidatingInput }
+  require_calling_aet = [SENDER_AE]
+  log_level: int = logging.CRITICAL
+  disable_pynetdicom_logger: bool = True
+  root_data_directory = fs_threaded_path
+
+  def process(self, InputData: InputContainer) -> PipelineOutput:
+    self.logger.info("process is called")
+    return NoOutput()
+
+
+##### Test Cases #####
 class PipelineTestCase(TestCase):
   def setUp(self):
     self.node = TestNode(start=False)
@@ -67,11 +158,16 @@ class PipelineTestCase(TestCase):
 
   def test_send_C_store_success(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+
+    self.assertIn("INFO:dicomnode:process is called", cm.output)
+
     self.assertEqual(response.Status, 0x0000)
     # Okay This is mostly to ensure lazyness
     # See the advanced docs guide for details
-    self.assertEqual(getrefcount(self.node._AbstractPipeline__data_state.data[TEST_CPR].data[INPUT_KW].data[DATASET_SOPInstanceUID]), 2) # type: ignore
+    self.assertEqual(self.node.data_state.images,0)
+
 
   def test_reject_connection(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -95,7 +191,6 @@ class PipelineTestCase(TestCase):
   def performance_send_concurrently(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
-    images_2 = DicomTree(generate_numpy_datasets(50, PatientID = "0201919996"))
 
     images_1.map(personify(
       tags=[
@@ -103,30 +198,8 @@ class PipelineTestCase(TestCase):
         (0x00100040, "CS", "M")
       ]
     ))
-
-    images_2.map(personify(
-      tags=[
-        (0x00100010,"PN", "Ellen Louise Test"),
-        (0x00100040,"CS", "M")
-      ]
-    ))
-
-
     thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-    thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
-
     ret_1 = thread_1.join()
-    ret_2 = thread_2.join()
-
-class FaultyNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
-  log_level: int = logging.CRITICAL
-  disable_pynetdicom_logger: bool = True
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    raise Exception
 
 class FaultyNodeTestCase(TestCase):
   def setUp(self):
@@ -139,22 +212,109 @@ class FaultyNodeTestCase(TestCase):
     self.node.close()
 
   def test_faulty_process(self):
-    address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
-    self.assertEqual(response.Status, 0x0000)
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      address = Address('localhost', self.test_port, TEST_AE_TITLE)
+      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      self.assertEqual(response.Status, 0x0000)
+    self.assertIn("CRITICAL:dicomnode:Encountered error in user function Process", cm.output)
 
-fs_path = Path('/tmp/pipeline_tests/fs')
-
-class FileStorageTestNodeTestCase(TestCase):
+class FileStorageTestCase(TestCase):
   def setUp(self):
     fs_path.mkdir(parents=True, exist_ok=True)
-    self.node = TestNode(start=False)
+    self.node = FileStorageNode(start=False)
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
   @bench
-  def performance_threaded_send_concurrently_fs(self):
+  def performance_send_concurrently_fs(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
+
+    images_1.map(personify(
+      tags=[
+        (0x00100010, "PN", "Odd Haugen Test"),
+        (0x00100040, "CS", "M")
+      ]
+    ))
+
+    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+    ret_1 = thread_1.join()
+    self.assertEqual(ret_1, 0)
+    self.assertEqual(self.node.data_state.images,50) # type: ignore
+
+  def test_threaded_send_concurrently_fs(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    num_images = 2
+
+    images_1 = DicomTree(generate_numpy_datasets(num_images, PatientID = "1502799995"))
+
+    images_1.map(personify(
+      tags=[
+        (0x00100010, "PN", "Odd Haugen Test"),
+        (0x00100040, "CS", "M")
+      ]
+    ))
+
+    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+      thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+      ret_1 = thread_1.join()
+
+    self.assertIn('DEBUG:dicomnode:insufficient data for patient 1502799995', cm.output)
+    self.assertEqual(ret_1, 0)
+    self.assertEqual(self.node.data_state.images, num_images)
+
+
+class MaxFilterTestCase(TestCase):
+  def setUp(self):
+    self.node = MaxFilterNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_send_C_store_rejected(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    self.assertEqual(response.Status, 0xB006)
+
+
+
+
+class FaultyFilterTestCase(TestCase):
+  def setUp(self):
+    self.node = FaultyFilterNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_send_C_store_rejected(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    self.assertEqual(response.Status, 0xA801)
+
+
+class TestNodeTestCase(TestCase):
+  def setUp(self):
+    self.node = TestThreadedNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node._join_threads()
+    while self.node.ae.active_associations != []:
+      sleep(0.005)
+
+    self.node.close()
+
+  @bench
+  def performance_threaded_send_concurrently(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
     images_2 = DicomTree(generate_numpy_datasets(50, PatientID = "0201919996"))
@@ -182,7 +342,86 @@ class FileStorageTestNodeTestCase(TestCase):
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
 
-    self.assertEqual(self.node._AbstractPipeline__data_state.images,100) # type: ignore
+    self.assertEqual(self.node.data_state.images,100) # type: ignore
+
+  def test_threaded_send_concurrently(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    num_images = 2
+
+    images_1 = DicomTree(generate_numpy_datasets(num_images, PatientID = "1502799995"))
+    images_2 = DicomTree(generate_numpy_datasets(num_images, PatientID = "0201919996"))
+
+    images_1.map(personify(
+      tags=[
+        (0x00100010, "PN", "Odd Haugen Test"),
+        (0x00100040, "CS", "M")
+      ]
+    ))
+
+    images_2.map(personify(
+      tags=[
+        (0x00100010,"PN", "Ellen Louise Test"),
+        (0x00100040,"CS", "M")
+      ]
+    ))
+
+    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+      thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+      thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+
+      ret_1 = thread_1.join()
+      ret_2 = thread_2.join()
+
+    self.assertIn("DEBUG:dicomnode:insufficient data for patient 1502799995", cm.output)
+    self.assertIn("DEBUG:dicomnode:insufficient data for patient 0201919996", cm.output)
+
+    self.assertEqual(ret_1, 0)
+    self.assertEqual(ret_2, 0)
+
+    self.assertEqual(self.node.data_state.images, 2* num_images)
+
+
+
+
+class FileStorageThreadedNodeTestCase(TestCase):
+  def setUp(self):
+    fs_path.mkdir(parents=True, exist_ok=True)
+    self.node = FileStorageThreadedNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  @bench
+  def performance_threaded_send_concurrently_fs(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
+    images_2 = DicomTree(generate_numpy_datasets(50, PatientID = "0201919996"))
+
+
+    images_1.map(personify(
+      tags=[
+        (0x00100010, "PN", "Odd Name Test"),
+        (0x00100040, "CS", "M")
+      ]
+    ))
+
+    images_2.map(personify(
+      tags=[
+        (0x00100010,"PN", "Ellen Louise Test"),
+        (0x00100040,"CS", "M")
+      ]
+    ))
+
+    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+    thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+
+    ret_1 = thread_1.join()
+    ret_2 = thread_2.join()
+
+    self.assertEqual(ret_1, 0)
+    self.assertEqual(ret_2, 0)
+
+    self.assertEqual(self.node.data_state.images,100) # type: ignore
 
   def test_threaded_send_concurrently_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -214,64 +453,4 @@ class FileStorageTestNodeTestCase(TestCase):
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
 
-    self.assertEqual(self.node._AbstractPipeline__data_state.images,2 * num_images) # type: ignore
-
-
-class MaxFilterNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
-  log_level: int = logging.CRITICAL
-  disable_pynetdicom_logger: bool = True
-
-  def filter(self, dataset: Dataset) -> bool:
-    return False
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    raise Exception
-
-
-class MaxFilterTestCase(TestCase):
-  def setUp(self):
-    self.node = MaxFilterNode(start=False)
-    self.test_port = randint(1025,65535)
-    self.node.port = self.test_port
-    self.node.open(blocking=False)
-
-  def tearDown(self) -> None:
-    self.node.close()
-
-  def test_send_C_store_rejected(self):
-    address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
-    self.assertEqual(response.Status, 0xB006)
-
-
-class FaultyFilterNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
-  log_level: int = logging.CRITICAL
-  disable_pynetdicom_logger: bool = True
-
-  def filter(self, dataset: Dataset) -> bool:
-    raise Exception
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    raise Exception
-
-
-class FaultyFilterTestCase(TestCase):
-  def setUp(self):
-    self.node = FaultyFilterNode(start=False)
-    self.test_port = randint(1025,65535)
-    self.node.port = self.test_port
-    self.node.open(blocking=False)
-
-  def tearDown(self) -> None:
-    self.node.close()
-
-  def test_send_C_store_rejected(self):
-    address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
-    self.assertEqual(response.Status, 0xA801)
+    self.assertEqual(self.node.data_state.images,2 * num_images)

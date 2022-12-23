@@ -29,9 +29,7 @@ class InputContainer:
 
 
 class PatientNode(ImageTreeInterface):
-  """This is the container containing all the series, of a study.
-
-  """
+  """This is the container containing all the Inputs of your pipeline."""
 
   @dataclass
   class Options:
@@ -92,7 +90,6 @@ class PatientNode(ImageTreeInterface):
         valid &= input.validate()
       else:
         raise InvalidTreeNode # pragma: no cover
-    self.logger.debug(f"Validation returns: {valid}")
     return valid
 
   def _get_data(self) -> InputContainer:
@@ -212,7 +209,7 @@ class PipelineTree(ImageTreeInterface):
       self[key] = PatientNode(self.PipelineArgs, dicom, options)
 
     IDC = self[key]
-    if isinstance(IDC, InputContainer):
+    if isinstance(IDC, PatientNode):
       added = IDC.add_image(dicom)
       self.images += added
       return added
@@ -226,7 +223,9 @@ class PipelineTree(ImageTreeInterface):
       return None
     elif isinstance(input_container, PatientNode):
       if input_container._validateAll():
+        self.logger.debug(f"sufficient data for patient {pid}")
         return input_container._get_data()
+      self.logger.debug(f"insufficient data for patient {pid}")
       return None
     else:
       raise InvalidTreeNode # pragma: no cover

@@ -11,7 +11,7 @@ from unittest import TestCase
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.pipelineTree import PipelineTree, InputContainer
+from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 
 
 SERIES_DESCRIPTION = "Fancy Description"
@@ -89,13 +89,13 @@ class PipelineTestCase(TestCase):
       raise AssertionError
 
 
-class InputContainerTestCase(TestCase):
+class PatientNodeTestCase(TestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
-    self.options = InputContainer.Options(
+    self.options = PatientNode.Options(
       container_path=self.path
     )
-    self.input_container = InputContainer({
+    self.PatientNode = PatientNode({
       'arg_1' : TestInput1,
       'arg_2' : TestInput2
     }, None, self.options)
@@ -107,39 +107,39 @@ class InputContainerTestCase(TestCase):
     CPR = "1502799995"
     dataset = Dataset()
     # Test 1
-    self.assertRaises(InvalidDataset, self.input_container.add_image, dataset)
+    self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
     dataset.PatientID = CPR
     # Test 2
-    self.assertRaises(InvalidDataset, self.input_container.add_image, dataset)
+    self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
     dataset.SOPInstanceUID = gen_uid()
     dataset.SeriesDescription = SERIES_DESCRIPTION
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     # Test 3
-    self.input_container.add_image(dataset)
-    data = self.input_container._get_data()
-    self.assertEqual(id(data), id(self.input_container))
+    self.PatientNode.add_image(dataset)
+    data = self.PatientNode._get_data()
+    self.assertIsInstance(data, InputContainer)
     self.assertEqual(data['arg_1'].images, 1)
     self.assertEqual(data['arg_2'], 'GrinderString')
 
   def test_get_AI_before_instantiated(self):
-    self.assertIsInstance(self.input_container['arg_1'], TestInput1)
-    self.assertIsInstance(self.input_container['arg_2'], TestInput2)
+    self.assertIsInstance(self.PatientNode['arg_1'], TestInput1)
+    self.assertIsInstance(self.PatientNode['arg_2'], TestInput2)
 
   def test_raises_error_on_file_existance(self):
     path = self.path / "test"
     with path.open(mode="w") as f:
       f.write("asdf")
-    options = InputContainer.Options(container_path=path)
-    self.assertRaises(InvalidRootDataDirectory, InputContainer,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
+    options = PatientNode.Options(container_path=path)
+    self.assertRaises(InvalidRootDataDirectory, PatientNode,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
+    path.unlink(missing_ok=True)
 
   def test_IC_cleanup(self):
     path = self.path / "test"
     path.mkdir()
-    options = InputContainer.Options(
+    options = PatientNode.Options(
       container_path=path
     )
-    IC = InputContainer({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
+    IC = PatientNode({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
     IC._cleanup()
     self.assertFalse(path.exists())
-
