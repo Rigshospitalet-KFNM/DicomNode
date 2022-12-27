@@ -4,7 +4,7 @@ This library contains numerous python class for you to use and a few extension t
 
 ## Library
 
-This module contains most useful functions for manipulation of dicom objects. 
+This module contains most useful functions for manipulation of dicom objects.
 
 ### Dicom Factory
 
@@ -12,12 +12,12 @@ This module contains most useful functions for manipulation of dicom objects.
 * Blueprint - Class representing a blueprint for a dataset and is made op of VirtualElements. A blueprint can instantiated to a dataset or a SeriesHeader from another Dicom dataset, through a Dicom factory.
 * SeriesHeader - Class representing a partially instantiated dicom dataset. Can be instantiated through the factory to a Series of Dicom images, when given some image data, not on the dicom format.
 
-#### VirtualElements 
+#### VirtualElements
 
 VirtualElement is base abstract class representing a tag in a blueprint. A Virtual element can produce a Data Element or a method to produce a Data Element by "corporealializing".
 There's the following VirtualElements:
 
-* StaticElement - Represent an data element with static value. 
+* StaticElement - Represent an data element with static value.
 * CopyElement - Represent a data element, that will be copied from the handed dataset.
 * AttrElement - Reads an attribute from the Factory and copies it. Often useful when restriction are applied to the tag.
 * DiscardElement - Element will be discarded from dataset.
@@ -40,9 +40,9 @@ There's the following VirtualElements:
 * StudyTree - Contains images from the same study. Creates SeriesTrees to store images.
 * PatientTree - Contains images Belonging to the same patient. Creates StudyTrees to store images.
 * DicomTree - Contains PatientTree, Create PatientTree when a new patient is encountered.
-* IdentityMapping - A mapping of UIDs, useful for anonymizing. 
+* IdentityMapping - A mapping of UIDs, useful for anonymizing.
 
-## Server 
+## Server
 
 This module contains classes for building an medical image processing pipeline.
 
@@ -68,5 +68,4 @@ This module contains classes for building an medical image processing pipeline.
 
 * InputContainer - A glorified dict with additional data
 * PatientContainer - An ImageTreeInterface that manages all Abstract input.
-* PipelineTree - An ImageTreeInterface that manages all PatientContainers. 
-
+* PipelineTree - An ImageTreeInterface that manages all PatientContainers.
