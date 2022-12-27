@@ -17,7 +17,6 @@ from pynetdicom.ae import ApplicationEntity as AE
 from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext
 from pydicom import Dataset
 
-from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
 from dicomnode.lib.dicomFactory import Blueprint, DicomFactory
 from dicomnode.server.input import AbstractInput
@@ -30,35 +29,34 @@ import traceback
 from threading import Thread
 from queue import Queue
 
-from copy import copy, deepcopy
+from copy import deepcopy
 from logging import StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from sys import stdout
-from typing import Dict, Type, List, Optional, MutableSet, Any, Iterable, NoReturn, Union, Tuple
+from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple
 
 
 correct_date_format = "%Y/%m/%d %H:%M:%S"
 
 class AbstractPipeline():
   """Base Class for an image processing Pipeline
-
   Creates a SCP server on object instantiation unless passed start=False
 
   Should be subclassed with your implementation of the process function at least.
 
-  Check tutorials/ConfigurationOverview.md for an overview
-
+  Check tutorials/ConfigurationOverview.md for an overview of attributes
   """
 
   # Input configuration
   input: Dict[str, Type[AbstractInput]] = {}
   input_config: Dict[str, Dict[str, Any]] = {}
   patient_identifier_tag: int = 0x00100020 # Patient ID
-  root_data_directory: Optional[Path] = None
-  pipelineTreeType: Type[PipelineTree] = PipelineTree
-  inputContainerType: Type[PatientNode] = PatientNode
+  data_directory: Optional[Path] = None
   lazy_storage: bool = False
+  pipelineTreeType: Type[PipelineTree] = PipelineTree
+  PatientContainerType: Type[PatientNode] = PatientNode
+  InputContainerType: Type[InputContainer] = InputContainer
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
@@ -91,7 +89,7 @@ class AbstractPipeline():
     """
     self.ae.shutdown()
 
-  def open(self, blocking=True) -> Optional[NoReturn]: #type: ignore
+  def open(self, blocking=True) -> Optional[NoReturn]:
     """Opens all connections active connections.
       If your application includes additional connections, you should overwrite this method,
       And open any connections and call the super function.
@@ -140,27 +138,30 @@ class AbstractPipeline():
       (evt.EVT_ACCEPTED, self._association_accepted),
       (evt.EVT_RELEASED, self._association_released)
     ]
-    self.updated_patients: Dict[Optional[int], MutableSet] = {
+    self.updated_patients: Dict[Optional[int], Set] = {
 
     }
 
     # Load state
-    if self.root_data_directory is not None:
-      if not isinstance(self.root_data_directory, Path):
+    if self.data_directory is not None:
+      if not isinstance(self.data_directory, Path):
         self.logger.warn("root_data_directory is not of type Path, attempting to convert!")
-        self.root_data_directory = Path(self.root_data_directory)
+        self.data_directory = Path(self.data_directory)
 
-      if self.root_data_directory.is_file():
+      if self.data_directory.is_file():
         raise IncorrectlyConfigured("The root data directory exists as a file.")
 
-      if not self.root_data_directory.exists():
-        self.root_data_directory.mkdir(parents=True)
+      if not self.data_directory.exists():
+        self.data_directory.mkdir(parents=True)
 
 
     options = self.pipelineTreeType.Options(
-      input_container=self.inputContainerType,
-      data_directory=self.root_data_directory,
-      factory=self.dicom_factory
+      data_directory=self.data_directory,
+      factory=self.dicom_factory,
+      HeaderBlueprint=self.header_blueprint,
+      lazy=self.lazy_storage,
+      InputContainerType=self.InputContainerType,
+      patient_container=self.PatientContainerType,
     )
 
     self.data_state: PipelineTree = self.pipelineTreeType(
@@ -267,7 +268,6 @@ class AbstractPipeline():
         containing the return data of the various input grinder functions
     Returns:
       PipelineOutput - The processed images of the pipeline
-
     """
 
     return NoOutput() # pragma: no cover
@@ -284,10 +284,13 @@ class AbstractPipeline():
 
 
 class AbstractQueuedPipeline(AbstractPipeline):
+  """A pipeline that processes each object one at a time
+  """
   process_queue: Queue[Tuple[str, InputContainer]]
   dispatch_queue: Queue[Tuple[str,PipelineOutput]]
 
   def process_worker(self):
+    """Worker function for the process_queue"""
     while True:
       PatientID, input_container = self.process_queue.get()
       try:
@@ -306,7 +309,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       if success:
         self.data_state.remove_patient(PatientID)
       else:
-        self.logger.error(f"Could not send data to")
+        self.logger.error(f"Could not export data")
 
       self.dispatch_queue.task_done()
 
@@ -339,6 +342,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
     return super().close()
 
 class AbstractThreadedPipeline(AbstractPipeline):
+  """Pipeline that creates threads to handle storing, to minimize IO load
+  """
   threads: Dict[Optional[int],List[Thread]] = {}
 
   def _handle_store(self, event: evt.Event) -> int:

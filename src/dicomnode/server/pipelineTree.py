@@ -19,6 +19,8 @@ from dicomnode.lib.imageTree import ImageTreeInterface
 from dicomnode.server.input import AbstractInput
 
 class InputContainer:
+  """Simple container class for grinded input.
+  """
   def __init__(self, data: Dict[str, Any], header: Optional[SeriesHeader] = None, paths: Optional[Dict[str, Path]] = None) -> None:
     self.__data = data
     self.header = header
@@ -33,11 +35,12 @@ class PatientNode(ImageTreeInterface):
 
   @dataclass
   class Options:
-    logger: Optional[Logger] = None
     container_path: Optional[Path] = None
     factory: Optional[DicomFactory] = None
-    header_blueprint: Optional[Blueprint] = None
     lazy: bool = False
+    logger: Optional[Logger] = None
+    header_blueprint: Optional[Blueprint] = None
+    InputContainerType: Type[InputContainer] = InputContainer
 
 
   def __init__(self,
@@ -106,7 +109,7 @@ class PatientNode(ImageTreeInterface):
           paths[arg_name] = input.path
       else:
         raise InvalidTreeNode # pragma: no cover
-    input_container = InputContainer(new_instance, self.header, paths)
+    input_container = self.options.InputContainerType(new_instance, self.header, paths)
 
     return input_container
 
@@ -144,9 +147,11 @@ class PipelineTree(ImageTreeInterface):
 
   @dataclass
   class Options:
-    input_container: type[PatientNode] = PatientNode
+    patient_container: Type[PatientNode] = PatientNode
+    InputContainerType: Type[InputContainer] = InputContainer
     data_directory: Optional[Path] = None
     factory: Optional[DicomFactory] = None
+    HeaderBlueprint: Optional[Blueprint] = None
     lazy: bool = False
 
   def __init__(self,
@@ -188,7 +193,7 @@ class PipelineTree(ImageTreeInterface):
         self.logger.error(f"{patient_directory.name} in root_data_directory is a file not a directory")
         raise InvalidRootDataDirectory()
 
-      options = self.__get_InputContainer_Options(patient_directory)
+      options = self.__get_PatientContainer_Options(patient_directory)
 
       self[patient_directory.name] = PatientNode(self.PipelineArgs, None, options)
 
@@ -205,7 +210,7 @@ class PipelineTree(ImageTreeInterface):
       if self.root_data_directory is not None:
         IDC_path = self.root_data_directory / key
 
-      options = self.__get_InputContainer_Options(IDC_path)
+      options = self.__get_PatientContainer_Options(IDC_path)
       self[key] = PatientNode(self.PipelineArgs, dicom, options)
 
     IDC = self[key]
@@ -218,6 +223,18 @@ class PipelineTree(ImageTreeInterface):
 
 
   def validate_patient_ID(self, pid: str) -> Optional[InputContainer]:
+    """Determines if a patient have all needed data and extract it if it does
+
+    Args:
+        pid (str): patient to be validated
+
+    Raises:
+        InvalidTreeNode: If value at patient id is not a PatientNode
+
+    Returns:
+        Optional[InputContainer]: If there's insufficient data returns None,
+          Otherwise a InputContainer with the grinded values
+    """
     input_container = self[pid]
     if input_container is None:
       return None
@@ -231,6 +248,14 @@ class PipelineTree(ImageTreeInterface):
       raise InvalidTreeNode # pragma: no cover
 
   def remove_patient(self,patient_id: str) -> None:
+    """Removes a patient from the tree
+
+    Args:
+        patient_id (str): identifier of the patient to be deleted
+
+    Raises:
+        InvalidTreeNode: If value at patient id is not a PatientNode
+    """
     if patient_id in self:
       IC = self[patient_id]
       if isinstance(IC, PatientNode):
@@ -239,22 +264,22 @@ class PipelineTree(ImageTreeInterface):
       else:
         raise InvalidTreeNode # pragma: no cover
 
-  def __str__(self) -> str:
-    return str(self.data)
 
-  def __get_InputContainer_Options(self, container_path: Optional[Path]) -> PatientNode.Options:
-    """Creates the options for the underlying Input Container
+  def __get_PatientContainer_Options(self, container_path: Optional[Path]) -> PatientNode.Options:
+    """Creates the options for the underlying Patient Container
 
     Args:
-        container_path (Optional[Path]): _description_
+        container_path (Optional[Path]): patient container path. Needed as input since path is per container
 
     Returns:
-        InputContainer.Options: _description_
+        PatientContainer.Options: Options ready to be injected.
     """
 
-    return PatientNode.Options(
+    return self.options.patient_container.Options(
         container_path=container_path,
         factory=self.options.factory,
         logger=self.logger,
-        lazy=self.options.lazy
+        lazy=self.options.lazy,
+        InputContainerType=self.options.InputContainerType,
+        header_blueprint=self.options.HeaderBlueprint,
       )

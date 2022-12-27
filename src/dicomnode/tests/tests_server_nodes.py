@@ -150,6 +150,15 @@ class QueueNode(AbstractQueuedPipeline):
     self.logger.info("process is called")
     return NoOutput()
 
+class FaultyQueueNode(AbstractQueuedPipeline):
+  input = { INPUT_KW : TestInput }
+  require_calling_aet = [SENDER_AE]
+  ae_title = TEST_AE_TITLE
+  disable_pynetdicom_logger = True
+
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    raise Exception
+
 ##### Test Cases #####
 class PipelineTestCase(TestCase):
   def setUp(self):
@@ -498,5 +507,23 @@ class QueuedNodeTestCase(TestCase):
     self.assertEqual(response.Status, 0x0000)
     self.assertEqual(self.node.data_state.images,0)
 
+class FaultyQueueTestCase(TestCase):
+  def setUp(self):
+    self.node = FaultyQueueNode(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
 
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_send_C_store_Faulty(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+
+    self.node.process_queue.join()
+
+    self.assertIn("CRITICAL:dicomnode:Encountered error in user function process", cm.output)
+    self.assertEqual(response.Status, 0x0000)
 

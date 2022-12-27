@@ -40,9 +40,10 @@ class PipelineOutput(ABC):
       yield destination, payload
 
 class DicomOutput(PipelineOutput):
+  output: List[Tuple[Address, Iterable[Dataset]]]
   def __init__(self, output: List[Tuple[Address, Iterable[Dataset]]], AE: str) -> None:
-    self.output = output
     self.ae = AE
+    super().__init__(output)
 
   def send(self) -> bool:
     success = True
@@ -64,9 +65,11 @@ class NoOutput(PipelineOutput):
 
 class FileOutput(PipelineOutput):
   image_tree_interface_type: Type[ImageTreeInterface]
+  output: List[Tuple[Path, Iterable[Dataset]]]
+
 
   def __init__(self, output: List[Tuple[Path, Iterable[Dataset]]], image_tree_interface_type: Type[ImageTreeInterface]=DicomTree) -> None:
-    self.output = output
+    super().__init__(output)
     self.image_tree_interface_type = image_tree_interface_type
 
   def send(self) -> bool:

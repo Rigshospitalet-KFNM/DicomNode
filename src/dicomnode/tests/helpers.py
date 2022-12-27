@@ -1,16 +1,18 @@
-from pathlib import Path
-
-from time import perf_counter
-from typing import Any, Callable, Dict, Iterable,Iterator,List, Optional, Tuple, Type, Union
-
 import cProfile
 import pstats
+from logging import Logger
+from pathlib import Path
+from time import perf_counter
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional,\
+                    Tuple, Type, Union
 
 import numpy
 from pydicom import Dataset
-from pydicom.uid import SecondaryCaptureImageStorage, UID
+from pydicom.uid import UID, SecondaryCaptureImageStorage
+from pynetdicom import events
+from pynetdicom.ae import ApplicationEntity
 
-from dicomnode.lib.dicom import make_meta, gen_uid
+from dicomnode.lib.dicom import gen_uid, make_meta
 
 unsigned_array_encoding: Dict[int, Type[numpy.unsignedinteger]] = {
   8 : numpy.uint8,
@@ -130,10 +132,69 @@ def bench(func: Callable) -> Callable:
 
     stats = pstats.Stats(profile)
     stats.sort_stats(pstats.SortKey.TIME)
-
-    PerformanceDir = Path("performance").mkdir(exist_ok=True)
+    Path("performance").mkdir(exist_ok=True)
     stats.dump_stats(f"performance/{func.__name__}.prof")
-
-
     return ret
   return inner
+
+
+def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Optional[Dataset] = None):
+  if dataset is None:
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SeriesInstanceUID = gen_uid()
+
+  def _handle_C_store(evt: events.Event):
+    logger.info("Received C Store")
+    return 0x0000
+
+  def _handle_C_move(evt: events.Event):
+    logger.info("Received C Move")
+    identifier = evt.identifier # Dataset send by c move
+
+    # yield destination ip address and port
+    yield 'localhost', destination_port
+    # yield number of C-stores
+    yield 1
+
+    # For dataset in container:
+    #    if Cancelled
+    #       yield 0xFE00, None
+    #    yield (0xFF00,dataset)
+    if evt.is_cancelled:
+      yield 0xFE00, None
+
+    yield 0xFF00, Dataset
+
+  def _handle_C_find(evt: events.Event):
+    if 'QueryRetrieveLevel' not in evt.identifier:
+      return 0xC000, None
+
+    if evt.is_cancelled:
+      yield 0xFE00, None
+
+    yield 0xFF00, dataset
+
+
+  def _handle_C_get(evt: events.Event):
+    if 'QueryRetrieveLevel' not in evt.identifier:
+      return 0xC000, None
+
+    if evt.is_cancelled:
+      yield 0xFE00, None
+
+    yield 0xFF00, dataset
+
+  ae = ApplicationEntity(ae_title="Dummy")
+
+  ae.start_server(('localhost', port),
+    evt_handlers=[
+      (events.EVT_C_MOVE, _handle_C_move),
+      (events.EVT_C_STORE, _handle_C_store),
+      (events.EVT_C_FIND, _handle_C_find),
+      (events.EVT_C_GET, _handle_C_get)
+    ],
+    block=False
+  )
+
+  return ae
