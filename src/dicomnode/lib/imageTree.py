@@ -7,7 +7,7 @@ from typing import (Any, Callable, Dict, Iterable, Iterator, List, Optional,
                     Union)
 
 from psutil import virtual_memory
-from pydicom import Dataset, FileDataset, write_file
+from pydicom import Dataset, FileDataset, write_file, DataElement
 from pydicom.errors import InvalidDicomError
 from pydicom.uid import UID
 
@@ -300,9 +300,13 @@ class ImageTreeInterface(ABC):
     del val # not needed but whatever
     del self.__data[key]
 
-  def __contains__(self, key: Union[str, UID]) -> bool:
+  def __contains__(self, key: Union[str, UID, DataElement]) -> bool:
+    if isinstance(key, DataElement):
+      key = key.value
     if isinstance(key, UID):
       key = key.name
+    if not isinstance(key, str):
+      key = str(key)
     return key in self.data
 
   def __init__(self, dcm: Union[Iterable[Dataset], Dataset] = []) -> None:

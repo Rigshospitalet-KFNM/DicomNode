@@ -9,15 +9,16 @@ from dataclasses import dataclass, asdict
 from logging import Logger
 from pathlib import Path
 from pydicom import Dataset
-from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type
+from pydicom.uid import UID
+from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type, Iterable, Union
 import logging
 
 from dicomnode.lib.dimse import Address, send_move_thread
 from dicomnode.lib.dicomFactory import DicomFactory, Blueprint
-from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.lazyDataset import LazyDataset
-from dicomnode.lib.grinders import identity_grinder
+from dicomnode.lib.grinders import identity_grinder, dicom_tree_grinder
 from dicomnode.lib.imageTree import ImageTreeInterface
 from dicomnode.lib.utils import staticfy
 
@@ -75,7 +76,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     """Removes any files, stored by the Input"""
     if self.path is not None:
       for dicom in self:
-        p = self.getPath(dicom)
+        p = self.get_path(dicom)
         p.unlink()
 
   def get_data(self) -> Any:
@@ -87,7 +88,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     return staticfy(self.image_grinder)(self)
 
-  def getPath(self, dicom: Dataset) -> Path:
+  def get_path(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
 
     Args:
@@ -160,18 +161,96 @@ class AbstractInput(ImageTreeInterface, ABC):
     if self.options.lazy:
       if self.path is None:
         raise IncorrectlyConfigured("Lazy object require file storage")
-      dicom_path:Path = self.getPath(dicom)
+      dicom_path = self.get_path(dicom)
       if not dicom_path.exists():
         save_dicom(dicom_path, dicom)
       self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
     else:
       self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
       if self.path is not None:
-        dicom_path:Path = self.getPath(dicom)
+        dicom_path = self.get_path(dicom)
         if not dicom_path.exists():
           save_dicom(dicom_path, dicom)
     self.images += 1
     return 1
+
+class DynamicLeaf(ImageTreeInterface):
+  """Subclass to DynamicInput, each instance is a separate series"""
+  def __init__(self, dcm: Union[Iterable[Dataset], Dataset] = [], lazy = False, path: Optional[Path] = None) -> None:
+    super().__init__(dcm)
+    self.lazy = lazy
+    self.path = path
+
+  def get_path(self, dicom: Dataset) -> Path:
+    if self.path is None:
+      raise IncorrectlyConfigured("getting the path needs a base path")
+    return self.path / (dicom.SOPInstanceUID.name + ".dcm")
+
+  def add_image(self, dicom: Dataset) -> int:
+    if self.lazy:
+      if self.path is None:
+        raise IncorrectlyConfigured("Lazy datasets require a path")
+      dicom_path = self.get_path(dicom)
+      self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
+    else:
+      self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
+      if self.path is not None:
+        dicom_path = self.get_path(dicom)
+        if not dicom_path.exists():
+          save_dicom(dicom_path, dicom)
+    self.images += 1
+    return 1
+
+class DynamicInput(AbstractInput):
+  """This input signifies when you are dealing with a variable number of input series.
+
+  Applies image grinder to each Input
+  """
+  leaf_class: Type[DynamicLeaf] = DynamicLeaf
+  separator_tag: int = 0x0020000E # SeriesInstanceUID
+
+  def get_data(self) -> Dict[str, Any]:
+    returnDict = {}
+    for key, leaf in self.data.items():
+      if not isinstance(leaf, DynamicLeaf):
+        raise InvalidTreeNode # pragma: no cover
+
+      returnDict[key] = staticfy(self.image_grinder)(leaf)
+
+    return returnDict
+
+  def add_image(self, dataset: Dataset) -> int:
+    if not self.validate_image(dataset):
+      raise InvalidDataset
+
+    if self.separator_tag not in dataset:
+      raise InvalidDataset
+
+    key = dataset[self.separator_tag].value
+    if isinstance(key, UID):
+      key = key.name
+      # This is to ensure the assumption that underlying data dict is Dict[str, Union[Dataset, ImageTreeInterface]]
+    if not isinstance(key, str):
+      key = str(key) # Otherwise the imageTree throws a type error
+
+    if key in self:
+      image_tree = self[key]
+      if isinstance(image_tree, ImageTreeInterface):
+        ret_value = image_tree.add_image(dataset)
+      else:
+        raise InvalidTreeNode #pragma: no cover
+    else:
+      # Don't use the add image functionality of the constructor due to fact that, it's return value is needed
+      if self.path is not None:
+        leaf_path = self.path / key
+        leaf_path.mkdir(parents=True, exist_ok=True)
+      else:
+        leaf_path = None
+      leaf = self.leaf_class([], self.options.lazy, leaf_path)
+      self[key] = leaf
+      ret_value = leaf.add_image(dataset)
+    self.images += ret_value
+    return ret_value
 
 
 class HistoricAbstractInput(AbstractInput):

@@ -1,6 +1,6 @@
 from unittest import TestCase
-
 from logging import StreamHandler
+import numpy
 from pathlib import Path
 from pydicom.uid import UID, SecondaryCaptureImageStorage
 from pydicom import Dataset
@@ -15,10 +15,11 @@ from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dicomFactory import Blueprint
 from dicomnode.lib.numpyFactory import NumpyFactory
+from dicomnode.lib.grinders import numpy_grinder
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
-from dicomnode.server.input import AbstractInput, HistoricAbstractInput
-
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput
+from dicomnode.tests.helpers import generate_numpy_datasets
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -44,6 +45,14 @@ class TestInput(AbstractInput):
 
   def validate(self) -> bool:
     return True
+
+class TestDynamicInput(DynamicInput):
+  required_tags = [0x0020000E, 0x0020000D, 0x00100020, 0x00080018]
+
+  image_grinder = numpy_grinder
+
+  def validate(self) -> bool:
+    return len(self.data) >= 2
 
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
@@ -105,17 +114,17 @@ class InputTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     self.test_input.add_image(dataset)
-    self.assertTrue(self.test_input.getPath(dataset).exists()) # type: ignore
+    self.assertTrue(self.test_input.get_path(dataset).exists()) # type: ignore
 
   def test_get_path(self):
     dataset = Dataset()
     SOPInstanceUID = gen_uid()
     dataset.SOPInstanceUID = SOPInstanceUID
-    self.assertEqual(self.test_input.getPath(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.Modality = 'CT'
-    self.assertEqual(self.test_input.getPath(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
     dataset.InstanceNumber = 431
-    self.assertEqual(self.test_input.getPath(dataset).name, f'CT_image_431.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name, f'CT_image_431.dcm') # type: ignore
 
   def test_cleanup(self):
     dataset = Dataset()
@@ -125,7 +134,7 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.test_input.add_image(dataset)
     self.test_input._clean_up()
-    self.assertFalse(self.test_input.getPath(dataset).exists())
+    self.assertFalse(self.test_input.get_path(dataset).exists())
 
   def test_get_data(self):
     dataset = Dataset()
@@ -168,7 +177,7 @@ class InputTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
 
-    self.assertRaises(IncorrectlyConfigured,  input.getPath, dataset)
+    self.assertRaises(IncorrectlyConfigured,  input.get_path, dataset)
 
   def test_customer_logger(self):
     input = TestInput(options=TestInput.Options(logger=logger))
@@ -185,7 +194,7 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     input.add_image(dataset)
 
-    self.assertTrue(input.getPath(dataset).exists())
+    self.assertTrue(input.get_path(dataset).exists())
 
   def test_lazy_testInput_NoPath(self):
     input = TestInput(None, options=TestInput.Options(data_directory=None, lazy=True))
@@ -222,3 +231,88 @@ class InputTestCase(TestCase):
       self.assertRaises(IncorrectlyConfigured, HistoricInput, Dataset(), HistoricInput.Options(factory=NumpyFactory()))
     self.assertIn("CRITICAL:dicomnode:Historic Inputs needs a AE Title of the SCU", cm.output)
 
+  def test_dynamic_output(self):
+    patient_ID = "2002112161"
+    studyUID = gen_uid()
+    seriesUID_1 = gen_uid()
+    seriesUID_2 = gen_uid()
+    seriesUID_3 = gen_uid()
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+
+    TDI = TestDynamicInput()
+
+    for dataset_1, dataset_2, dataset_3 in zip(datasets_1,datasets_2,datasets_3):
+      TDI.add_image(dataset_1)
+      TDI.add_image(dataset_2)
+      TDI.add_image(dataset_3)
+
+    self.assertEqual(len(TDI.data),3)
+
+
+  def test_dynamic_output_with_path(self):
+    patient_ID = "2002112161"
+    studyUID = gen_uid()
+    seriesUID_1 = gen_uid()
+    seriesUID_2 = gen_uid()
+    seriesUID_3 = gen_uid()
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+
+    options = TestDynamicInput.Options(data_directory=self.path)
+
+    TDI = TestDynamicInput(options=options)
+
+    for dataset_1, dataset_2, dataset_3 in zip(datasets_1,datasets_2,datasets_3):
+      TDI.add_image(dataset_1)
+      TDI.add_image(dataset_2)
+      TDI.add_image(dataset_3)
+
+    self.assertEqual(len(TDI.data),3)
+
+
+  def test_dynamic_output_with_lazy(self):
+    patient_ID = "2002112161"
+    studyUID = gen_uid()
+    seriesUID_1 = gen_uid()
+    seriesUID_2 = gen_uid()
+    seriesUID_3 = gen_uid()
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+
+    options = TestDynamicInput.Options(data_directory=self.path, lazy=True)
+
+    TDI = TestDynamicInput(options=options)
+
+    for dataset_1, dataset_2, dataset_3 in zip(datasets_1,datasets_2,datasets_3):
+      TDI.add_image(dataset_1)
+      TDI.add_image(dataset_2)
+      TDI.add_image(dataset_3)
+
+    self.assertEqual(len(TDI.data),3)
+
+  def test_dynamic_get_data(self):
+    patient_ID = "2002112161"
+    studyUID = gen_uid()
+    seriesUID_1 = gen_uid()
+    seriesUID_2 = gen_uid()
+    seriesUID_3 = gen_uid()
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+
+    TDI = TestDynamicInput()
+
+    for dataset_1, dataset_2, dataset_3 in zip(datasets_1,datasets_2,datasets_3):
+      TDI.add_image(dataset_1)
+      TDI.add_image(dataset_2)
+      TDI.add_image(dataset_3)
+
+    numpyDict = TDI.get_data()
+
+    self.assertIsInstance(numpyDict[seriesUID_1.name], numpy.ndarray)
+    self.assertIsInstance(numpyDict[seriesUID_2.name], numpy.ndarray)
+    self.assertIsInstance(numpyDict[seriesUID_3.name], numpy.ndarray)
