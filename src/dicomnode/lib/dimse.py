@@ -137,11 +137,12 @@ def send_move(SCU_AE: str,
 
   Raises:
     InvalidQueryDataset:
-    Could
-
   """
   if "QueryRetrieveLevel" not in dataset:
     dataset.QueryRetrieveLevel = query_level
+
+  if 0x00080052 not in dataset:
+    dataset.add_new(0x00080052,'CS', query_level.value)
 
   if query_level == QueryLevels.PATIENT and 'PatientID' not in dataset:
     logger.error("Attempted to send a move at Patient level without a PatientID tag")
@@ -166,7 +167,12 @@ def send_move(SCU_AE: str,
 
   successful_send = True
   if assoc.is_established:
-    response = assoc.send_c_move(dataset, SCU_AE, query_request_context)
+    try:
+      response = assoc.send_c_move(dataset, SCU_AE, query_request_context)
+    except Exception as E: #pragma: no cover
+      logger.critical("Exception Rose in sending image")
+      assoc.release()
+      raise E
     for (status, identifier) in response:
       if status:
         logger.debug(f"status: {status}")
@@ -176,7 +182,6 @@ def send_move(SCU_AE: str,
         logger.error(f"status: {status}")
         logger.error(f"identifier: {identifier}")
         successful_send = False
-
     assoc.release()
   else:
     error_message = f"""Could not connect to the SCP with the following inputs:
@@ -186,10 +191,10 @@ def send_move(SCU_AE: str,
       SCU AE:{SCU_AE}
     """
     logger.error(error_message)
-    successful_send = False
 
   if not successful_send:
     raise CouldNotCompleteDIMSEMessage
+  return None
 
 def send_move_thread(SCU_AE: str,
                      address : Address,

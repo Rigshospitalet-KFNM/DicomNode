@@ -343,11 +343,14 @@ class SeriesTree(ImageTreeInterface):
   def save_tree(self, target: Path) -> None:
     if len(self) == 1:
       for dicom in self: # Only Iterated once
+        if target.is_dir():
+          target = target / (dicom.SOPInstanceUID.name + ".dcm")
+
         save_dicom(target, dicom)
     else:
       target.mkdir()
       for dicom in self: # Only Iterated once
-        file_target = target / dicom.SOPInstanceUID.name
+        file_target = target / (dicom.SOPInstanceUID.name + ".dcm")
         save_dicom(file_target, dicom)
 
   def __str__(self) -> str:

@@ -12,12 +12,14 @@ from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dimse import Address, send_image, send_images_thread
+from dicomnode.lib.dicomFactory import Blueprint, CopyElement, StaticElement
+from dicomnode.lib.numpyFactory import NumpyFactory
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.imageTree import DicomTree
 
-from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench
+from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae
 
-from dicomnode.server.input import AbstractInput
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.pipelineTree import InputContainer
@@ -32,10 +34,11 @@ DEFAULT_DATASET.PatientSex = 'M'
 make_meta(DEFAULT_DATASET)
 DATASET_SOPInstanceUID = DEFAULT_DATASET.SOPInstanceUID.name
 
-
+ENDPOINT_PORT = 50000
 
 TEST_CPR = "1502799995"
 INPUT_KW = "test_input"
+HISTORIC_KW = "historic_input"
 
 DEFAULT_DATASET.PatientID = TEST_CPR
 
@@ -52,6 +55,14 @@ class TestNeverValidatingInput(AbstractInput):
 
   def validate(self):
     return False
+
+class TestHistoricInput(HistoricAbstractInput):
+  address = Address('localhost', ENDPOINT_PORT, "DUMMY")
+  required_tags: List[int] = [0x00080018]
+  c_move_blueprint = Blueprint([CopyElement(0x00100020), StaticElement(0x00080052, 'CS', 'PATIENT')])
+
+  def validate(self) -> bool:
+    return True
 
 ##### Test Node Implementations
 class TestNode(AbstractPipeline):
@@ -139,6 +150,21 @@ class FileStorageThreadedNode(AbstractThreadedPipeline):
   def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
     return NoOutput()
+
+class HistoricPipeline(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {
+    INPUT_KW : TestNeverValidatingInput,
+    HISTORIC_KW : TestHistoricInput
+   }
+  require_calling_aet = [SENDER_AE, "DUMMY"]
+  log_level: int = logging.DEBUG
+  disable_pynetdicom_logger: bool = False
+  dicom_factory = NumpyFactory()
+
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    return NoOutput()
+
 
 class QueueNode(AbstractQueuedPipeline):
   input = { INPUT_KW : TestInput }
@@ -527,3 +553,21 @@ class FaultyQueueTestCase(TestCase):
     self.assertIn("CRITICAL:dicomnode:Encountered error in user function process", cm.output)
     self.assertEqual(response.Status, 0x0000)
 
+class HistoricTestCase(TestCase):
+  def setUp(self) -> None:
+    self.node = HistoricPipeline(start=False)
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+  def test_create_and_send(self):
+    address = Address("localhost", self.test_port, TEST_AE_TITLE)
+    endpoint = get_test_ae(ENDPOINT_PORT, self.test_port, logging.getLogger("dicomnode"))
+
+    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      sleep(0.25) # wait for all the threads to be done
+    endpoint.shutdown()

@@ -11,11 +11,13 @@ from sys import stdout
 import shutil
 import logging
 
-
+from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
+from dicomnode.lib.dicomFactory import Blueprint
+from dicomnode.lib.numpyFactory import NumpyFactory
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
-from dicomnode.server.input import AbstractInput
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
@@ -39,6 +41,40 @@ class TestInput(AbstractInput):
   required_values: Dict[int, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
+
+  def validate(self) -> bool:
+    return True
+
+
+# Note the functional tests of historic inputs can be found in tests_server_nodes.py
+class FaultyHistoricInput(HistoricAbstractInput):
+  required_tags: List[int] = []
+  required_values: Dict[int, Any] = {
+    0x0008103E : SERIES_DESCRIPTION
+  }
+
+  def validate(self) -> bool:
+    return True
+
+class FaultyBlueprintHistoricInput(HistoricAbstractInput):
+  required_tags: List[int] = []
+  required_values: Dict[int, Any] = {
+    0x0008103E : SERIES_DESCRIPTION
+  }
+
+  c_move_blueprint = Blueprint([])
+
+  def validate(self) -> bool:
+    return True
+
+class HistoricInput(HistoricAbstractInput):
+  required_tags: List[int] = []
+  required_values: Dict[int, Any] = {
+    0x0008103E : SERIES_DESCRIPTION
+  }
+
+  address = Address('localhost', 50001, "DUMMY")
+  c_move_blueprint = Blueprint([])
 
   def validate(self) -> bool:
     return True
@@ -150,3 +186,39 @@ class InputTestCase(TestCase):
     input.add_image(dataset)
 
     self.assertTrue(input.getPath(dataset).exists())
+
+  def test_lazy_testInput_NoPath(self):
+    input = TestInput(None, options=TestInput.Options(data_directory=None, lazy=True))
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SeriesDescription = SERIES_DESCRIPTION
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset)
+    self.assertRaises(IncorrectlyConfigured, input.add_image, dataset)
+
+  def test_historic_input_missing_pivot(self):
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, FaultyHistoricInput)
+    self.assertIn("CRITICAL:dicomnode:You forgot to parse the pivot to The Input", cm.output)
+
+  def test_historic_input_missing_blueprint(self):
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, FaultyHistoricInput, Dataset())
+    self.assertIn("CRITICAL:dicomnode:A C move blueprint is missing", cm.output)
+
+  def test_historic_input_missing_address(self):
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, FaultyBlueprintHistoricInput, Dataset())
+    self.assertIn("CRITICAL:dicomnode:A target address is needed to send a C-Move to", cm.output)
+
+  def test_historic_input_missing_factory(self):
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, Dataset())
+    self.assertIn("CRITICAL:dicomnode:A Factory is needed to generate a C move message", cm.output)
+
+  def test_historic_input_missing_ae_title(self):
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, Dataset(), HistoricInput.Options(factory=NumpyFactory()))
+    self.assertIn("CRITICAL:dicomnode:Historic Inputs needs a AE Title of the SCU", cm.output)
+

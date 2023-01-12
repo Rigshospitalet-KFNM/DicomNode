@@ -261,7 +261,7 @@ class DicomFactory(ABC):
     return header
 
   @abstractmethod
-  def make_series(self,
+  def build_from_header(self,
                   header : SeriesHeader,
                   image : Any
     ) -> List[Dataset]:

@@ -12,7 +12,7 @@ from pydicom import Dataset
 from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type
 import logging
 
-from dicomnode.lib.dimse import Address
+from dicomnode.lib.dimse import Address, send_move_thread
 from dicomnode.lib.dicomFactory import DicomFactory, Blueprint
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import load_dicom, save_dicom
@@ -33,6 +33,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     # Note the reason, why there some options, that are not used by this class
     # is because of Liskov's Substitution principle, and subclasses might need
     # these options.
+    ae_title: Optional[str] = None
     logger: Optional[Logger] = None
     data_directory: Optional[Path]  = None
     factory: Optional[DicomFactory] = None
@@ -115,6 +116,31 @@ class AbstractInput(ImageTreeInterface, ABC):
 
     return self.path / image_name
 
+  def validate_image(self, dicom: Dataset) -> bool:
+    """Checks if an image belongs in the input
+
+    Args:
+        dicom (Dataset): Dataset in question
+
+    Returns:
+        bool: True if the image can be added, False if not
+    """
+    # Dataset Validation
+    for required_tag in self.required_tags:
+      if required_tag not in dicom:
+        self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
+        return False
+
+    for required_tag, required_value in self.required_values.items():
+      if required_tag not in dicom:
+        self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
+        return False
+      if dicom[required_tag].value != required_value:
+        self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
+        return False
+
+    return True
+
   def add_image(self, dicom: Dataset) -> int:
     """Attempts to add an image to the input.
 
@@ -127,19 +153,8 @@ class AbstractInput(ImageTreeInterface, ABC):
     Raises:
         InvalidDataset: If the dataset is not valid.
     """
-    # Dataset Validation
-    for required_tag in self.required_tags:
-      if required_tag not in dicom:
-        self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
-        raise InvalidDataset()
-
-    for required_tag, required_value in self.required_values.items():
-      if required_tag not in dicom:
-        self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
-        raise InvalidDataset()
-      if dicom[required_tag].value != required_value:
-        self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
-        raise InvalidDataset()
+    if not self.validate_image(dicom):
+      raise InvalidDataset
 
     # Save the dataset
     if self.options.lazy:
@@ -182,5 +197,11 @@ class HistoricAbstractInput(AbstractInput):
       self.logger.critical("A Factory is needed to generate a C move message")
       raise IncorrectlyConfigured
 
+    if self.options.ae_title is None:
+      self.logger.critical("Historic Inputs needs a AE Title of the SCU")
+      raise IncorrectlyConfigured
+
     message = self.options.factory.build(pivot,self.c_move_blueprint)
+
+    send_move_thread(self.options.ae_title, self.address, message)
 

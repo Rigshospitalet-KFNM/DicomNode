@@ -18,7 +18,7 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
-from dicomnode.lib.dicomFactory import Blueprint, DicomFactory
+from dicomnode.lib.dicomFactory import Blueprint, DicomFactory, FillingStrategy
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
@@ -60,6 +60,7 @@ class AbstractPipeline():
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
+  filling_strategy: Optional[FillingStrategy] = None
   header_blueprint: Optional[Blueprint] = None
   c_move_blueprint: Optional[Blueprint] = None
 
@@ -97,9 +98,6 @@ class AbstractPipeline():
       Keyword Args:
         blocking (bool) : if true, this functions doesn't return.
     """
-    self.ae.require_called_aet = self.require_called_aet
-    self.ae.require_calling_aet = self.require_calling_aet
-
     self.ae.start_server(
       (self.ip,self.port),
       block=blocking,
@@ -156,11 +154,13 @@ class AbstractPipeline():
 
 
     options = self.pipelineTreeType.Options(
+      ae_title=self.ae_title,
       data_directory=self.data_directory,
       factory=self.dicom_factory,
-      HeaderBlueprint=self.header_blueprint,
+      filling_strategy=self.filling_strategy,
+      header_blueprint=self.header_blueprint,
       lazy=self.lazy_storage,
-      InputContainerType=self.InputContainerType,
+      input_container_type=self.InputContainerType,
       patient_container=self.PatientContainerType,
     )
 
@@ -173,6 +173,9 @@ class AbstractPipeline():
     # Validates that Pipeline is configured correctly.
     self.ae = AE(ae_title = self.ae_title)
     self.ae.supported_contexts = self.supported_contexts
+
+    self.ae.require_called_aet = self.require_called_aet
+    self.ae.require_calling_aet = self.require_calling_aet
 
     self.post_init(start=start)
     if start:

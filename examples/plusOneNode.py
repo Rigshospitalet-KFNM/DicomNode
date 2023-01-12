@@ -57,7 +57,7 @@ class PlusOnePipeline(AbstractPipeline):
     data += 1
 
     # Conversion back to dicom
-    series = self.dicom_factory.make_series(input_data.header, data)
+    series = self.dicom_factory.build_from_header(input_data.header, data)
 
     # Producing Pipeline Output
     out = DicomOutput([(self.endpoint, series)], self.ae_title)

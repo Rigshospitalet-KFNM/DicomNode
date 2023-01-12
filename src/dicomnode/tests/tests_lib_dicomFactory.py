@@ -163,8 +163,8 @@ class HeaderTestCase(TestCase):
     self.header[0x00100010] = self.de_1
 
 class testFactory(DicomFactory):
-  def make_series(self, header: SeriesHeader, image: Any) -> List[Dataset]:
-    return super().make_series(header, image)
+  def build_from_header(self, header: SeriesHeader, image: Any) -> List[Dataset]:
+    return super().build_from_header(header, image)
 
 class DicomFactoryTestClass(TestCase):
   def setUp(self) -> None:
@@ -176,7 +176,7 @@ class DicomFactoryTestClass(TestCase):
     pass
 
   def test_make_series_dont_call_super(self):
-    self.assertRaises(NotImplementedError, self.factory.make_series, SeriesHeader(), None)
+    self.assertRaises(NotImplementedError, self.factory.build_from_header, SeriesHeader(), None)
 
   def test_AttributeElementCorporealialize(self):
     attribute_element = AttrElement(0x0008103E, 'LO','series_description')

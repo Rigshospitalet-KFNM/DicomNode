@@ -11,6 +11,8 @@ from pydicom import Dataset
 from pydicom.uid import UID, SecondaryCaptureImageStorage
 from pynetdicom import events
 from pynetdicom.ae import ApplicationEntity
+from pynetdicom.presentation import AllStoragePresentationContexts
+from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind,PatientRootQueryRetrieveInformationModelMove #type: ignore
 
 from dicomnode.lib.dicom import gen_uid, make_meta
 
@@ -143,6 +145,10 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
     dataset = Dataset()
     dataset.SOPInstanceUID = gen_uid()
     dataset.SeriesInstanceUID = gen_uid()
+    dataset.StudyInstanceUID = gen_uid()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    dataset.PatientID = "1506932263"
+    make_meta(dataset)
 
   def _handle_C_store(evt: events.Event):
     logger.info("Received C Store")
@@ -185,9 +191,11 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 
     yield 0xFF00, dataset
 
-  ae = ApplicationEntity(ae_title="Dummy")
-
-  ae.start_server(('localhost', port),
+  ae = ApplicationEntity(ae_title="DUMMY")
+  ae.supported_contexts = AllStoragePresentationContexts
+  ae.add_supported_context(StudyRootQueryRetrieveInformationModelFind)
+  ae.add_supported_context(PatientRootQueryRetrieveInformationModelMove)
+  ae.start_server(('127.0.0.1', port),
     evt_handlers=[
       (events.EVT_C_MOVE, _handle_C_move),
       (events.EVT_C_STORE, _handle_C_store),

@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pydicom import Dataset
 
-from dicomnode.lib.dicomFactory import DicomFactory, SeriesHeader, Blueprint
+from dicomnode.lib.dicomFactory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode)
 from dicomnode.lib.imageTree import ImageTreeInterface
@@ -35,11 +35,13 @@ class PatientNode(ImageTreeInterface):
 
   @dataclass
   class Options:
+    ae_title: Optional[str] = None
     container_path: Optional[Path] = None
     factory: Optional[DicomFactory] = None
     lazy: bool = False
     logger: Optional[Logger] = None
     header_blueprint: Optional[Blueprint] = None
+    filling_strategy: Optional[FillingStrategy] = None
     InputContainerType: Type[InputContainer] = InputContainer
 
 
@@ -115,8 +117,11 @@ class PatientNode(ImageTreeInterface):
 
   def add_image(self, dicom: Dataset) -> int:
     if not hasattr(self, 'header') and self.options.factory is not None and self.options.header_blueprint is not None:
-      self.logger.debug("Adding Header")
-      self.header = self.options.factory.make_series_header(dicom, self.options.header_blueprint)
+      self.logger.debug("Adding Series Header")
+      filling_strategy = self.options.filling_strategy
+      if filling_strategy is None:
+        filling_strategy = FillingStrategy.DISCARD
+      self.header = self.options.factory.make_series_header(dicom, self.options.header_blueprint, filling_strategy)
 
     added = 0
     for input in self.data.values():
@@ -134,6 +139,7 @@ class PatientNode(ImageTreeInterface):
 
   def __get_Input_Options(self, input: Type[AbstractInput], input_path: Optional[Path]):
     return input.Options(
+        ae_title=self.options.ae_title,
         data_directory = input_path,
         logger=self.options.logger,
         factory = self.options.factory,
@@ -147,12 +153,14 @@ class PipelineTree(ImageTreeInterface):
 
   @dataclass
   class Options:
-    patient_container: Type[PatientNode] = PatientNode
-    InputContainerType: Type[InputContainer] = InputContainer
+    ae_title: Optional[str] = None
     data_directory: Optional[Path] = None
     factory: Optional[DicomFactory] = None
-    HeaderBlueprint: Optional[Blueprint] = None
     lazy: bool = False
+    filling_strategy: Optional[FillingStrategy] = None
+    input_container_type: Type[InputContainer] = InputContainer
+    patient_container: Type[PatientNode] = PatientNode
+    header_blueprint: Optional[Blueprint] = None
 
   def __init__(self,
                patient_identifier: int,
@@ -276,10 +284,12 @@ class PipelineTree(ImageTreeInterface):
     """
 
     return self.options.patient_container.Options(
+        ae_title=self.options.ae_title,
         container_path=container_path,
         factory=self.options.factory,
         logger=self.logger,
         lazy=self.options.lazy,
-        InputContainerType=self.options.InputContainerType,
-        header_blueprint=self.options.HeaderBlueprint,
+        InputContainerType=self.options.input_container_type,
+        header_blueprint=self.options.header_blueprint,
+        filling_strategy=self.options.filling_strategy
       )

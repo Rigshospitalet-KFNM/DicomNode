@@ -19,7 +19,7 @@ class NumpyFactoryTestCase(TestCase):
     columns = 50
     image = numpy.random.randint(0, 65536, size=(images,rows,columns), dtype=numpy.uint16)
 
-    datasets = self.factory.make_series(self.header, image)
+    datasets = self.factory.build_from_header(self.header, image)
 
     self.assertEqual(len(datasets), images)
     for dataset in datasets:
@@ -36,7 +36,7 @@ class NumpyFactoryTestCase(TestCase):
         10e9,
         size=(images,rows,columns))
 
-    datasets = self.factory.make_series(self.header, image)
+    datasets = self.factory.build_from_header(self.header, image)
 
     self.assertEqual(len(datasets), images)
     for dataset in datasets:
@@ -151,7 +151,7 @@ class NumpyFactoryTestCase(TestCase):
     columns = 50
     image = numpy.random.randint(0, 65536, size=(images,rows,columns), dtype=numpy.uint16)
 
-    datasets = factory.make_series(header, image)
+    datasets = factory.build_from_header(header, image)
 
     for i, ds in enumerate(datasets):
       self.assertEqual(ds.SOPClassUID, SecondaryCaptureImageStorage)

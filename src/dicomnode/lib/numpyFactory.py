@@ -153,7 +153,7 @@ class NumpyFactory(DicomFactory):
     return new_image, slope, intercept
 
 
-  def make_series(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
+  def build_from_header(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
     target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
