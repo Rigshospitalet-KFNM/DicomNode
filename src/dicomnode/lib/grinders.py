@@ -10,7 +10,7 @@ called and not just referenced.
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Type
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Type, Tuple
 
 from pydicom import Dataset
 from dicomnode.lib.exceptions import InvalidDataset
@@ -65,6 +65,44 @@ def dicom_tree_grinder(image_generator: Iterable[Dataset]) -> DicomTree:
       DicomTree: A datastructure
   """
   return DicomTree(image_generator)
+
+def tag_meta_grinder(tag_list: List[int], optional=False) -> Callable[[Iterable[Dataset]], List[Tuple[int, Any]]]:
+  """Generates a function that extracts values at a tag
+      The tags are taken from an arbitrary dataset from the collection of datasets
+      In other words ensure that the tag is equal among all datasets of the collection
+
+  Args:
+      tag_list (List[int]): The list of tags to be extracted
+      optional (bool, optional): if False causes an exception if a tag is missing in the dataset. Defaults to False.
+
+  Returns:
+      Callable[[Iterable[Dataset]], List[Tuple[int, Any]]]: function which does the extraction.
+
+  Example:
+    >>>grinder = tag_meta_grinder([0x00100010])
+    >>>dataset = pydicom.Dataset()
+    >>>dataset.PatientName = "patient_name"
+    >>>grinder([dataset])
+    [(0x00100010, "patient_name")]
+  """
+  def ret_func(image_generator: Iterable[Dataset]) -> List[Tuple[int, Any]]:
+    value_list: List[Tuple[int, Any]] = []
+    pivot: Optional[Dataset] = None
+    for dataset in image_generator:
+      pivot = dataset # assume the tags are shared
+      break
+    if pivot is None:
+      raise ValueError
+
+    for tag in tag_list:
+      if tag in pivot:
+        value_list.append((tag, pivot[tag].value))
+      elif not optional:
+        raise InvalidDataset
+
+    return value_list
+  return ret_func
+
 
 def many_meta_grinder(*grinders: Callable[[Iterable[Dataset]], Any]) -> Callable[[Iterable[Dataset]], List[Any]]:
   """This meta grinder combines any number of grinders
