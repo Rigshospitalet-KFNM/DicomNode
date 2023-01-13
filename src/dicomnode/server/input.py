@@ -215,7 +215,7 @@ class DynamicInput(AbstractInput):
       if not isinstance(leaf, DynamicLeaf):
         raise InvalidTreeNode # pragma: no cover
 
-      returnDict[key] = staticfy(self.image_grinder)(leaf)
+      returnDict[key] = staticfy(self.image_grinder)(list(leaf.data.values()))
 
     return returnDict
 
