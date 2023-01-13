@@ -92,7 +92,7 @@ def tag_meta_grinder(tag_list: List[int], optional=False) -> Callable[[Iterable[
       pivot = dataset # assume the tags are shared
       break
     if pivot is None:
-      raise ValueError
+      raise ValueError # Your input probably shouldn't validate with 0 images!
 
     for tag in tag_list:
       if tag in pivot:

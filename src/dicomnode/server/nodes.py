@@ -187,6 +187,7 @@ class AbstractPipeline():
 
   def _handle_store(self, event: evt.Event) -> int:
     dataset = event.dataset
+    dataset.file_meta = event.file_meta
     try:
       if not self.filter(dataset):
         self.logger.warning("Dataset discarded")
