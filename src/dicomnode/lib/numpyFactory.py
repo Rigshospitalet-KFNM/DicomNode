@@ -32,6 +32,7 @@ class NumpyCallerArgs(CallerArgs):
   intercept : Optional[float] = None
   slope : Optional[float] = None
   scaled_image: Optional[ndarray] = None
+  total_images: Optional[int] = None
 
 class NumpyCaller(CallElement):
   """Virtual Data Element, indicating that the value will produced from
@@ -169,6 +170,8 @@ class NumpyFactory(DicomFactory):
           image=slice
         )
 
+        caller_args.total_images = image.shape[2]
+
         # Encoding is done per slice basis
         if encode:
           scaled_slice, slope, intercept = self.scale_image(slice)
@@ -215,6 +218,9 @@ def _add_aspect_ratio(numpy_caller_args: NumpyCallerArgs) -> List[int]:
   image = _get_image(numpy_caller_args)
   return [image.shape[0], image.shape[1]]
 
+def _add_images_in_acquisition(numpy_caller_args: NumpyCallerArgs) -> Optional[int]:
+  return numpy_caller_args.total_images
+
 def _add_slope(numpy_caller_args: NumpyCallerArgs) -> Optional[float]:
   return numpy_caller_args.slope
 
@@ -240,7 +246,9 @@ image_pixel_NumpyBlueprint: Blueprint = Blueprint([
   NumpyCaller(0x00280107, 'US', _add_largest_pixel),     # LargestImagePixelValue
   NumpyCaller(0x00281052, 'DS', _add_intercept),         # RescaleIntercept
   NumpyCaller(0x00281053, 'DS', _add_slope),             # RescaleSlope
-  NumpyCaller(0x7FE00010, 'OB', _add_PixelData)          # PixelData
+  NumpyCaller(0x7FE00010, 'OB', _add_PixelData),          # PixelData,
+  # There's some General Image tags in here because, they don't know total images in that definition
+  NumpyCaller(0x00201002, 'IS', _add_images_in_acquisition)
 ])
 
 CTImageStorage_NumpyBlueprint: Blueprint = patient_blueprint\

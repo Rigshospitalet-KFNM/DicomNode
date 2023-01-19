@@ -316,8 +316,9 @@ def _get_random_number(_) -> int:
 patient_blueprint = Blueprint([
   CopyElement(0x00100010), # PatientName
   CopyElement(0x00100020), # PatientID
-  CopyElement(0x00100030), # PatientsBirthDate
-  CopyElement(0x00100040), # PatientSex
+  CopyElement(0x00100021, Optional=True), # Issuer of Patient ID
+  CopyElement(0x00100030, Optional=True), # PatientsBirthDate
+  CopyElement(0x00100040), # PatientSex  
 ])
 
 frame_of_reference_blueprint = Blueprint([
@@ -334,19 +335,60 @@ general_study_blueprint = Blueprint([
   CopyElement(0x0020000D), # StudyInstanceUID
 ])
 
-general_equipment_blueprint = Blueprint([])
+# You might argue that you should overwrite, since this is a synthetic image
+general_equipment_blueprint = Blueprint([
+  CopyElement(0x00080070, Optional=True), # Manufacturer
+  CopyElement(0x00080080, Optional=True), # Institution Name
+  CopyElement(0x00080081, Optional=True), # Institution Address
+  CopyElement(0x00081040, Optional=True), # Institution Department Name
+  CopyElement(0x00081090, Optional=True), # Manufacturer's Model Name
+])
 
-general_image_blueprint = Blueprint([])
+general_image_blueprint = Blueprint([
+  StaticElement(0x00080008, 'CS', ['DERIVED', 'PRIMARY']), # Image Type # write a test for this
+  CallElement(0x00200013, 'IS', _add_InstanceNumber), # InstanceNumber
 
-general_plane_blueprint = Blueprint([])
+])
 
-ct_image_blueprint = Blueprint([])
+# One might argue the optionality of these tags
+image_plane_blueprint = Blueprint([
+  CopyElement(0x00180050, Optional=True), # Slice thickness
+  CopyElement(0x00200032, Optional=True), # Image position
+  CopyElement(0x00200037, Optional=True), # Image Orientation
+  CopyElement(0x00201041, Optional=True), # Slice Location
+  CopyElement(0x00280030, Optional=True), # Pixel Spacing
+])
+
+ct_image_blueprint = Blueprint([
+  CopyElement(0x00080008, Optional=True), # Image Type
+  CopyElement(0x00180022, Optional=True), # Scan Options
+  CopyElement(0x00180060, Optional=True), # KVP
+  CopyElement(0x00180090, Optional=True), # Data Collection Diameter
+  CopyElement(0x00181100, Optional=True), # Reconstruction Diameter
+  CopyElement(0x00181110, Optional=True), # Distance Source to Detector
+  CopyElement(0x00181111, Optional=True), # Distance Source to Patient
+  CopyElement(0x00181120, Optional=True), # Gantry / Detector Tilt
+  CopyElement(0x00181130, Optional=True), # Table Height
+  CopyElement(0x00181140, Optional=True), # Rotation Direction
+  CopyElement(0x00181150, Optional=True), # Exposure Time
+  CopyElement(0x00181151, Optional=True), # X-Ray Tube Current
+  CopyElement(0x00181152, Optional=True), # Exposure
+  CopyElement(0x00181153, Optional=True), # Exposure in µAs
+  CopyElement(0x00181160, Optional=True), # Filter Type
+  CopyElement(0x00181170, Optional=True), # Generator Power
+  CopyElement(0x00181190, Optional=True), # Focal Spots
+  CopyElement(0x00181210, Optional=True), # Convolution Kernel
+  CopyElement(0x00189305, Optional=True), # Revolution Time
+])
 
 
 patient_study_blueprint = Blueprint([
   CopyElement(0x00101010, Optional=True), # PatientAge
   CopyElement(0x00101020, Optional=True), # PatientSize
+  CopyElement(0x00101022, Optional=True), # PatientBodyMassIndex
   CopyElement(0x00101030, Optional=True), # PatientWeight
+  CopyElement(0x001021A0, Optional=True), # SmokingStatus
+  CopyElement(0x001021C0, Optional=True), # PregnancyStatus
 ])
 
 
@@ -356,7 +398,8 @@ general_series_blueprint = Blueprint([
   SeriesElement(0x00080031, 'TM', _get_time), # SeriesTime
   SeriesElement(0x0020000E, 'UI', gen_uid),   # SeriesInstanceUID
   AttrElement(0x0008103E, 'LO', 'series_description'),
-  SeriesElement(0x00200011, 'IS', _get_random_number) # SeriesNumber
+  SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
+  CopyElement(0x00081070), # Operators' Name
 ])
 
 SOP_common_blueprint: Blueprint = Blueprint([
