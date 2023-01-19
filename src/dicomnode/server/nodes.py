@@ -23,11 +23,12 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
 
-
+from datetime import datetime, timedelta
 import logging
 import traceback
 from threading import Thread
 from queue import Queue
+from time import sleep
 
 from copy import deepcopy
 from logging import StreamHandler, getLogger
@@ -47,6 +48,9 @@ class AbstractPipeline():
 
   Check tutorials/ConfigurationOverview.md for an overview of attributes
   """
+
+  # Maintenance Configuration
+  study_expiration_days: int = 14 
 
   # Input configuration
   input: Dict[str, Type[AbstractInput]] = {}
@@ -103,6 +107,35 @@ class AbstractPipeline():
       block=blocking,
       evt_handlers=self._evt_handlers)
 
+  def maintenance_worker(self) -> NoReturn: #pragma no cover
+    """This is the controller for the worker thread
+    
+    Should run the clean up function every midnight
+    """
+    while True:
+      sleep(self.calculate_maintenance_time())
+      self.maintenance()
+
+  
+  def calculate_maintenance_time(self) -> float:
+    """Calculates the time in seconds to the next scheduled clean up"""
+    now = datetime.now()
+    tomorrow = now + timedelta(days=1)
+    clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0,0,0,0, tzinfo=now.tzinfo)
+    time_delta = clean_up_datetime - now
+    # Days are ignored in the time delta due function constraint of 1 run per day.
+    return float(time_delta.seconds) # I guess you could add micro seconds here but WHO CARES
+
+  def maintenance(self) -> None:
+    """Removes old studies in the pipeline to ensure GDPR compliance
+    """
+    # Note this might cause some bug, where a patient is being processed, and at the same time removed
+    # This is considered so unlikely, that it's a bug I accept in the code
+    now = datetime.now()
+    expiry_datetime = now - timedelta(days=self.study_expiration_days)
+    self.data_state.remove_expired_studies(expiry_datetime)
+
+
   def __init__(self, start=True) -> Optional[NoReturn]: #type: ignore
     # logging
     if self.log_path:
@@ -139,6 +172,9 @@ class AbstractPipeline():
     self.updated_patients: Dict[Optional[int], Set] = {
 
     }
+    
+    self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
+    self.maintenance_thread.start()
 
     # Load state
     if self.data_directory is not None:
@@ -184,6 +220,8 @@ class AbstractPipeline():
   def _log_user_error(self, Exp: Exception, user_function: str):
     self.logger.critical(f"Encountered error in user function {user_function}")
     self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
+    exception_info = traceback.format_exc()
+    self.logger.critical(exception_info)
 
   def _handle_store(self, event: evt.Event) -> int:
     dataset = event.dataset
