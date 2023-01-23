@@ -61,8 +61,14 @@ class PatientNode(ImageTreeInterface):
         raise InvalidRootDataDirectory
       self.options.container_path.mkdir(exist_ok=True)
 
-    if self.options.factory is not None and pivot is not None and self.options.header_blueprint is not None:
-      self.header = self.options.factory.make_series_header(pivot, self.options.header_blueprint)
+    if self.options.factory is not None and \
+        pivot is not None and \
+        self.options.header_blueprint is not None:
+      filling_strategy = self.options.filling_strategy
+      if filling_strategy is None:
+        filling_strategy = FillingStrategy.DISCARD
+      self.header = self.options.factory.make_series_header(
+        pivot, self.options.header_blueprint, filling_strategy)
     else:
       self.header = None
 
