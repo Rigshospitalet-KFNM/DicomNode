@@ -6,7 +6,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.imageTree import DicomTree
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.grinders import identity_grinder, list_grinder, many_meta_grinder, dicom_tree_grinder
+from dicomnode.lib.grinders import identity_grinder, list_grinder, many_meta_grinder, dicom_tree_grinder, tag_meta_grinder
 
 import numpy
 import logging
@@ -281,3 +281,36 @@ class GrinderTests(TestCase):
 
     self.assertRaises(InvalidDataset, numpy_grinder, ds)
 
+  def test_tag_meta_grinder(self):
+    patient_id = "12351"
+    patient_height = 1.72
+    patient_weight = 91
+
+    dataset = Dataset()
+    dataset.PatientID = patient_id
+    dataset.PatientSize = patient_height
+    dataset.PatientWeight = patient_weight
+
+    grinderFunc = tag_meta_grinder([0x00100020, 0x00101020,0x00101030])
+
+    tag_list = grinderFunc([dataset])
+
+    self.assertIn((0x00100020, patient_id), tag_list)
+    self.assertIn((0x00101020, patient_height), tag_list)
+    self.assertIn((0x00101030, patient_weight), tag_list)
+
+  def test_pivotless_tag_meta_grinder(self):
+    grinder_function = tag_meta_grinder([0x00100020, 0x00101020,0x00101030])
+    self.assertRaises(ValueError, grinder_function, [])
+
+  def test_invalid_dataset_tag_meta_grinder(self):
+    patient_id = "12351"
+    patient_height = 1.72
+
+    dataset = Dataset()
+    dataset.PatientID = patient_id
+    dataset.PatientSize = patient_height
+
+    grinder_function = tag_meta_grinder([0x00100020, 0x00101020,0x00101030], optional=False)
+
+    self.assertRaises(InvalidDataset, grinder_function, [dataset])

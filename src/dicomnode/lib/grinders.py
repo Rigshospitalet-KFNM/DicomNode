@@ -66,7 +66,7 @@ def dicom_tree_grinder(image_generator: Iterable[Dataset]) -> DicomTree:
   """
   return DicomTree(image_generator)
 
-def tag_meta_grinder(tag_list: List[int], optional=False) -> Callable[[Iterable[Dataset]], List[Tuple[int, Any]]]:
+def tag_meta_grinder(tag_list: List[int], optional=True) -> Callable[[Iterable[Dataset]], List[Tuple[int, Any]]]:
   """Generates a function that extracts values at a tag
       The tags are taken from an arbitrary dataset from the collection of datasets
       In other words ensure that the tag is equal among all datasets of the collection

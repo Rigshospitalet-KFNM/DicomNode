@@ -399,7 +399,7 @@ general_series_blueprint = Blueprint([
   SeriesElement(0x0020000E, 'UI', gen_uid),   # SeriesInstanceUID
   AttrElement(0x0008103E, 'LO', 'series_description'),
   SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
-  CopyElement(0x00081070), # Operators' Name
+  CopyElement(0x00081070, Optional=True), # Operators' Name
 ])
 
 SOP_common_blueprint: Blueprint = Blueprint([
