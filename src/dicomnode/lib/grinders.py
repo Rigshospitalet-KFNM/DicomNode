@@ -191,7 +191,7 @@ def numpy_grinder(datasets_iterator: Iterable[Dataset]) -> numpy.ndarray:
       0x00200013 InstanceNumber - Sorts the dataset ensuring correct order
 
   """
-  datasets: List[Dataset] = list(datasets_iterator)
+  datasets: List[Dataset] = [ds for ds in datasets_iterator]
   pivot = datasets[0]
 
   if 'InstanceNumber' in pivot:

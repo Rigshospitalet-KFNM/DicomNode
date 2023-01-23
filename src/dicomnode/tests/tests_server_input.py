@@ -7,7 +7,6 @@ from pydicom import Dataset
 from typing import List, Dict, Any, Callable, Iterator
 from sys import stdout
 
-
 import shutil
 import logging
 
@@ -47,13 +46,11 @@ class TestInput(AbstractInput):
     return True
 
 class TestDynamicInput(DynamicInput):
-  required_tags = [0x0020000E, 0x0020000D, 0x00100020, 0x00080018]
-
-  image_grinder = numpy_grinder
+  required_tags = [0x0020000D, 0x00100020, 0x00080018]
+  image_grinder = staticmethod(numpy_grinder)
 
   def validate(self) -> bool:
     return len(self.data) >= 2
-
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 class FaultyHistoricInput(HistoricAbstractInput):
@@ -294,15 +291,66 @@ class InputTestCase(TestCase):
 
     self.assertEqual(len(TDI.data),3)
 
+  def test_dynamic_invalid_dataset(self):
+    empty_dataset = Dataset()
+    TDI = TestDynamicInput()
+    self.assertRaises(InvalidDataset, TDI.add_image, empty_dataset)
+
+  def test_dynamic_missing_separator_tag(self):
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyInstanceUID = gen_uid()
+    dataset.PatientID = "2002112161"
+    TDI = TestDynamicInput()
+    self.assertRaises(InvalidDataset, TDI.add_image, dataset)
+
+  def test_silly_dynamic_input(self):
+    class TestSillyDynamicInput(DynamicInput):
+      required_tags = [0x0020000D, 0x00100020, 0x00080018]
+      separator_tag = 0x00200013
+
+      def validate(self) -> bool:
+        return False
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyInstanceUID = gen_uid()
+    dataset.PatientID = "2002112161"
+    dataset.InstanceNumber = 3
+    TDI = TestSillyDynamicInput()
+    TDI.add_image(dataset)
+
+  def test_dynamic_input_missing_static_method(self):
+    class TestSillyDynamicInput(DynamicInput):
+      required_tags = [0x0020000D, 0x00100020, 0x00080018]
+      image_grinder = numpy_grinder
+
+      def validate(self) -> bool:
+        return False
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyInstanceUID = gen_uid()
+    dataset.SeriesInstanceUID = gen_uid()
+    dataset.PatientID = "2002112161"
+    dataset.InstanceNumber = 3
+    TDI = TestSillyDynamicInput()
+    TDI.add_image(dataset)
+    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
+      self.assertRaises(IncorrectlyConfigured, TDI.get_data)
+    self.assertIn('CRITICAL:dicomnode:image grinder is not a static method!\nFor DynamicInputs set image_grinder=staticmethod(grinder_function)', cm.output)
+
   def test_dynamic_get_data(self):
     patient_ID = "2002112161"
     studyUID = gen_uid()
     seriesUID_1 = gen_uid()
     seriesUID_2 = gen_uid()
     seriesUID_3 = gen_uid()
-    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+    series_images = 4
+    datasets_1 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+
 
     TDI = TestDynamicInput()
 
@@ -311,8 +359,18 @@ class InputTestCase(TestCase):
       TDI.add_image(dataset_2)
       TDI.add_image(dataset_3)
 
+    self.assertEqual(len(TDI.data[seriesUID_1.name]),series_images)
+    self.assertEqual(len(TDI.data[seriesUID_2.name]),series_images)
+    self.assertEqual(len(TDI.data[seriesUID_3.name]),series_images)
+
     numpyDict = TDI.get_data()
 
     self.assertIsInstance(numpyDict[seriesUID_1.name], numpy.ndarray)
     self.assertIsInstance(numpyDict[seriesUID_2.name], numpy.ndarray)
     self.assertIsInstance(numpyDict[seriesUID_3.name], numpy.ndarray)
+
+    self.assertEqual(numpyDict[seriesUID_1.name].shape,(series_images,10,10))
+    self.assertEqual(numpyDict[seriesUID_2.name].shape,(series_images,10,10))
+    self.assertEqual(numpyDict[seriesUID_3.name].shape,(series_images,10,10))
+
+

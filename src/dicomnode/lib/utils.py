@@ -3,7 +3,6 @@ from typing import Any, Callable, Union
 from pydicom import Dataset
 from typing import Iterable, Mapping, Optional, Union
 
-
 from threading import Thread
 
 def str2bool(v:Union[str, bool]) -> bool:
@@ -32,17 +31,7 @@ def prefixInt(number: int, minLength: int= 4):
   zeroes = (minLength - len(numberStr)) * "0"
   return f"{zeroes}{numberStr}"
 
-def staticfy(func : Callable):
-  """Decorator function that removes the first argument.
 
-  The main use case is transform instance and class methods into static methods
-
-  Args:
-      func (Callable): method the
-  """
-  def wrapper(self,*args, **kwargs):
-    return func(*args, **kwargs)
-  return wrapper
 
 class ThreadWithReturnValue(Thread):
     def __init__(self, group=None, target=None, name=None,

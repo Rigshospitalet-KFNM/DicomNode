@@ -12,6 +12,7 @@ from pydicom import Dataset
 from pydicom.uid import UID
 from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type, Iterable, Union
 import logging
+import inspect
 
 from dicomnode.lib.dimse import Address, send_move_thread
 from dicomnode.lib.dicomFactory import DicomFactory, Blueprint
@@ -20,14 +21,13 @@ from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.lazyDataset import LazyDataset
 from dicomnode.lib.grinders import identity_grinder, dicom_tree_grinder
 from dicomnode.lib.imageTree import ImageTreeInterface
-from dicomnode.lib.utils import staticfy
 
 
 class AbstractInput(ImageTreeInterface, ABC):
   required_tags: List[int] = [0x00080018, 0x7FE00010] # InstanceUID, Pixel Data
   __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
   required_values: Dict[int, Any] = {}
-  image_grinder: Callable[[Iterator[Dataset]], Any] = identity_grinder
+  image_grinder: Callable[[Iterable[Dataset]], Any] = identity_grinder
 
   @dataclass
   class Options: # These are options that are injected into all input.
@@ -63,6 +63,7 @@ class AbstractInput(ImageTreeInterface, ABC):
         dcm = load_dicom(image_path, self.__private_tags)
         self.add_image(dcm)
 
+
   @abstractmethod
   def validate(self) -> bool:
     """Checks if the input have sufficient data, to start processing
@@ -86,7 +87,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     Returns:
         Any: Data ready for the pipelines process function.
     """
-    return staticfy(self.image_grinder)(self)
+    return self.image_grinder() # type: ignore self is parsed here, fuck python
 
   def get_path(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
@@ -214,8 +215,10 @@ class DynamicInput(AbstractInput):
     for key, leaf in self.data.items():
       if not isinstance(leaf, DynamicLeaf):
         raise InvalidTreeNode # pragma: no cover
-
-      returnDict[key] = staticfy(self.image_grinder)(list(leaf.data.values()))
+      if not isinstance(inspect.getattr_static(self, "image_grinder"), staticmethod):
+        self.logger.critical("image grinder is not a static method!\nFor DynamicInputs set image_grinder=staticmethod(grinder_function)")
+        raise IncorrectlyConfigured
+      returnDict[key] = self.image_grinder(leaf)
 
     return returnDict
 
