@@ -187,6 +187,7 @@ class NumpyFactory(DicomFactory):
             data_element = element(caller_args)
             if data_element is not None:
               dataset.add(data_element)
+        make_meta(dataset)
         list_dicom.append(dataset)
     return list_dicom
 
