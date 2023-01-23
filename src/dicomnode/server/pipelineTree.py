@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
+from datetime import datetime
+
 from pydicom import Dataset
 
 from dicomnode.lib.dicomFactory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
@@ -52,6 +54,7 @@ class PatientNode(ImageTreeInterface):
     ) -> None:
     super().__init__()
     self.options = options
+    self.creationTime = datetime.now()
 
     if self.options.container_path is not None:
       if self.options.container_path.is_file():
@@ -62,7 +65,6 @@ class PatientNode(ImageTreeInterface):
       self.header = self.options.factory.make_series_header(pivot, self.options.header_blueprint)
     else:
       self.header = None
-
 
     for arg_name, input in args.items():
       input_path: Optional[Path] = None
@@ -234,14 +236,14 @@ class PipelineTree(ImageTreeInterface):
     """Determines if a patient have all needed data and extract it if it does
 
     Args:
-        pid (str): patient to be validated
+      pid (str): patient to be validated
 
     Raises:
-        InvalidTreeNode: If value at patient id is not a PatientNode
+      InvalidTreeNode: If value at patient id is not a PatientNode
 
     Returns:
-        Optional[InputContainer]: If there's insufficient data returns None,
-          Otherwise a InputContainer with the grinded values
+      Optional[InputContainer]: If there's insufficient data returns None,
+        Otherwise a InputContainer with the grinded values
     """
     input_container = self[pid]
     if input_container is None:
@@ -255,6 +257,22 @@ class PipelineTree(ImageTreeInterface):
     else:
       raise InvalidTreeNode # pragma: no cover
 
+  def remove_expired_studies(self, expiry_time : datetime):
+    """Removes any study in the tree that have expired.
+
+    Args:
+      expiry_time (datetime): Any study created before expiry_time is considered to be expired.
+  
+    Raises:
+      InvalidTreeNode: If a node is not a PatientNode
+    """
+    for patient_id, patient_node in self.data:
+      if not isinstance(patient_node, PatientNode):
+        raise InvalidTreeNode # pragma: no cover
+      if patient_node.creationTime < expiry_time:
+        self.remove_patient(patient_id)
+
+
   def remove_patient(self,patient_id: str) -> None:
     """Removes a patient from the tree
 
@@ -265,9 +283,9 @@ class PipelineTree(ImageTreeInterface):
         InvalidTreeNode: If value at patient id is not a PatientNode
     """
     if patient_id in self:
-      IC = self[patient_id]
-      if isinstance(IC, PatientNode):
-        IC._cleanup()
+      patient_node = self[patient_id]
+      if isinstance(patient_node, PatientNode):
+        patient_node._cleanup()
         del self[patient_id]
       else:
         raise InvalidTreeNode # pragma: no cover
