@@ -1,13 +1,14 @@
 import logging
 
 from pathlib import Path
-from typing import Any, Dict, List, Iterable, Tuple, Type
+from typing import Any, Dict, List, Iterable, Tuple, Type, Callable
 from abc import ABC, abstractmethod
 
 from pydicom import Dataset
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.imageTree import DicomTree, ImageTreeInterface
+from dicomnode.lib.io import save_dicom
 
 
 logger = logging.getLogger("dicomnode")
@@ -63,18 +64,23 @@ class NoOutput(PipelineOutput):
   def send(self) -> bool:
     return True
 
+def save_dataset(path, dataset) -> None:
+  dataset_path: Path = path / dataset.StudyInstanceUID.name / dataset.SeriesInstanceUID.name / (dataset.SOPInstanceUID.name + '.dcm')
+  save_dicom(dataset_path,  dataset)
+  return None
+
 class FileOutput(PipelineOutput):
-  image_tree_interface_type: Type[ImageTreeInterface]
+  saving_function: Callable[[Path, Dataset], None]
   output: List[Tuple[Path, Iterable[Dataset]]]
 
-
-  def __init__(self, output: List[Tuple[Path, Iterable[Dataset]]], image_tree_interface_type: Type[ImageTreeInterface]=DicomTree) -> None:
+  def __init__(self,
+      output: List[Tuple[Path, Iterable[Dataset]]],
+      saving_function: Callable[[Path, Dataset], None]=save_dataset) -> None:
     super().__init__(output)
-    self.image_tree_interface_type = image_tree_interface_type
+    self.saving_function = saving_function
 
   def send(self) -> bool:
-    for Path, Datasets in self.output:
-      if not isinstance(Datasets, ImageTreeInterface):
-        Datasets = self.image_tree_interface_type(Datasets)
-      Datasets.save_tree(Path)
+    for path, datasets in self.output:
+      for dataset in datasets:
+        self.saving_function(path, dataset)
     return True
