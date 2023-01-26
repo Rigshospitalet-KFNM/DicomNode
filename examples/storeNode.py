@@ -7,7 +7,7 @@ from os import environ
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.output import FileOutput, PipelineOutput
 from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.lib.io import save_dicom
 
@@ -47,15 +47,10 @@ class storeNode(AbstractPipeline):
 
   archive_path: Path = Path(ARCHIVE_PATH)
 
-  def storeDataset(self, dataset) -> None:
-    dataset_path: Path = self.archive_path / dataset.StudyInstanceUID.name / dataset.SeriesInstanceUID.name / (dataset.SOPInstanceUID.name + '.dcm')
-    save_dicom(dataset_path,  dataset)
-    return None
-
   def process(self, input_data: InputContainer) -> PipelineOutput:
-    for dataset in input_data[INPUT_ARG]:
-      self.storeDataset(dataset)
-    return NoOutput()
+    datasets: List[Dataset] = [dataset for dataset in input_data[INPUT_ARG]]
+
+    return FileOutput([(self.archive_path, datasets)])
 
   def post_init(self, start: bool) -> None:
     self.archive_path.mkdir(exist_ok=True)

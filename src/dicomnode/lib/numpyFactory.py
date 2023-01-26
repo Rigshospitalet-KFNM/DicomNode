@@ -10,9 +10,10 @@ from dataclasses import dataclass
 
 from dicomnode.lib.dicom import make_meta, gen_uid
 from dicomnode.lib.dicomFactory import AttrElement, CallerArgs, CallElement, DicomFactory, SeriesHeader,\
-  StaticElement, Blueprint, patient_blueprint, general_series_blueprint,\
-  general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint,\
-  general_equipment_blueprint, general_image_blueprint, ct_image_blueprint
+  StaticElement, Blueprint, patient_blueprint, general_series_blueprint, \
+  general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint, \
+  general_equipment_blueprint, general_image_blueprint, ct_image_blueprint, \
+  image_plane_blueprint
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, InvalidEncoding
 
 import numpy
@@ -27,8 +28,8 @@ unsigned_array_encoding: Dict[int, type] = {
 
 @dataclass
 class NumpyCallerArgs(CallerArgs):
-  image : ndarray # Unmodified image
-  factory : 'NumpyFactory'
+  image : Optional[ndarray] = None # Unmodified image
+  factory : Optional['NumpyFactory'] = None
   intercept : Optional[float] = None
   slope : Optional[float] = None
   scaled_image: Optional[ndarray] = None
@@ -56,12 +57,7 @@ class NumpyCaller(CallElement):
     Returns:
         Optional[DataElement]: _description_
     """
-    caller_args.virtual_element = self
-    value = self.func(caller_args)
-    if value is not None:
-      return DataElement(self.tag, self.VR, value)
-    else:
-      return None
+    return super().__call__(caller_args)
 
 
 class NumpyFactory(DicomFactory):
@@ -145,12 +141,16 @@ class NumpyFactory(DicomFactory):
     min_val = image.min()
     max_val = image.max()
 
+    if max_val == min_val:
+      return image.astype(target_datatype), 1, 0
+
     image_max_value = ((1 << self.bits_stored) - 1)
 
-    slope = image_max_value / ( max_val - min_val)
-    intercept = - min_val * slope
+    slope = (max_val - min_val) / image_max_value
+    intercept = min_val
 
-    new_image = (image * slope + intercept).astype(target_datatype)
+    new_image = ((image - intercept) / slope).astype(target_datatype)
+
     return new_image, slope, intercept
 
 
@@ -159,8 +159,7 @@ class NumpyFactory(DicomFactory):
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
 
-    encode = image.dtype == target_datatype
-
+    encode = image.dtype != target_datatype
     list_dicom = []
     if len(image.shape) == 3:
       for i, slice in enumerate(image):
@@ -170,7 +169,7 @@ class NumpyFactory(DicomFactory):
           image=slice
         )
 
-        caller_args.total_images = image.shape[2]
+        caller_args.total_images = image.shape[0]
 
         # Encoding is done per slice basis
         if encode:
@@ -189,6 +188,8 @@ class NumpyFactory(DicomFactory):
               dataset.add(data_element)
         make_meta(dataset)
         list_dicom.append(dataset)
+    else:
+      raise IncorrectlyConfigured("3 dimensional images are only supported") # pragma: no cover
     return list_dicom
 
 def _get_image(numpy_caller_args: NumpyCallerArgs) -> ndarray:
@@ -196,6 +197,8 @@ def _get_image(numpy_caller_args: NumpyCallerArgs) -> ndarray:
     image = numpy_caller_args.scaled_image
   else:
     image = numpy_caller_args.image
+  if image is None:
+    raise IncorrectlyConfigured # pragma: no cover
   return image
 
 
@@ -209,11 +212,11 @@ def _add_Columns(numpy_caller_args: NumpyCallerArgs) -> int:
 
 def _add_smallest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
   image = _get_image(numpy_caller_args)
-  return image.min()
+  return int(image.min())
 
 def _add_largest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
   image = _get_image(numpy_caller_args)
-  return image.max()
+  return int(image.max())
 
 def _add_aspect_ratio(numpy_caller_args: NumpyCallerArgs) -> List[int]:
   image = _get_image(numpy_caller_args)
@@ -255,6 +258,7 @@ image_pixel_NumpyBlueprint: Blueprint = Blueprint([
 CTImageStorage_NumpyBlueprint: Blueprint = patient_blueprint\
                                            + general_study_blueprint \
                                            + general_series_blueprint \
+                                           + image_plane_blueprint \
                                            + frame_of_reference_blueprint \
                                            + general_equipment_blueprint \
                                            + general_image_blueprint \

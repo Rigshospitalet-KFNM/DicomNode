@@ -457,4 +457,3 @@ class DicomTree(ImageTreeInterface):
     for patientTree in self.data.values():
       patientStr += f"  {patientTree}"
     return f"Dicom Tree with {self.images} images\n{patientStr}"
-

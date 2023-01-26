@@ -11,7 +11,7 @@ from unittest import TestCase
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
-  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint
+  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -136,6 +136,8 @@ class HeaderBlueprintTestCase(TestCase):
 
     self.assertEqual(len(blueprint), 3)
 
+  def test_blueprint_get_required_tags(self):
+    self.assertListEqual(self.blueprint_1.get_required_tags(), [0x00100010, 0x00100020])
 
 class HeaderTestCase(TestCase):
   def setUp(self) -> None:
@@ -265,10 +267,10 @@ class DicomFactoryTestClass(TestCase):
 
     dataset.Modality = 'OT'
     dataset.PatientSize = 50
+    dataset.PatientPosition = 'FFP'
 
     header = self.factory.make_series_header(dataset, headerBP, FillingStrategy.DISCARD)
     headerCopy = self.factory.make_series_header(dataset, headerBP, FillingStrategy.COPY)
 
     self.assertNotIn(0x00101020, header)
     self.assertIn(0x00101020, headerCopy)
-

@@ -159,10 +159,9 @@ def _numpy_monochrome_grinder(datasets: List[Dataset]) -> numpy.ndarray:
   image_array: numpy.ndarray = numpy.empty((z_dim, y_dim, x_dim), dtype=dataType)
 
   for i, dataset in enumerate(datasets):
+    image = dataset.pixel_array
     if rescale:
-      image = (numpy.asarray(dataset.pixel_array, dtype=numpy.float64) - dataset.RescaleIntercept) * dataset.RescaleSlope
-    else:
-      image = dataset.pixel_array
+      image = image.astype(numpy.float64) * dataset.RescaleSlope + dataset.RescaleIntercept
     image_array[i,:,:] = image
 
   return image_array

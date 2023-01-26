@@ -50,7 +50,7 @@ class AbstractPipeline():
   """
 
   # Maintenance Configuration
-  study_expiration_days: int = 14 
+  study_expiration_days: int = 14
 
   # Input configuration
   input: Dict[str, Type[AbstractInput]] = {}
@@ -172,7 +172,7 @@ class AbstractPipeline():
     self.updated_patients: Dict[Optional[int], Set] = {
 
     }
-    
+
     self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
     self.maintenance_thread.start()
 

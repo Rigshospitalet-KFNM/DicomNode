@@ -45,7 +45,7 @@ class OutputTests(TestCase):
   def test_file_output(self):
     output = FileOutput([(self.path, self.datasets)])
     self.assertTrue(output.send())
-    self.assertTrue(Path(self.path / (self.dataset_1.SOPInstanceUID.name + ".dcm")).exists())
+    self.assertTrue(Path(self.path / self.dataset_1.StudyInstanceUID.name / self.dataset_1.SeriesInstanceUID.name / (self.dataset_1.SOPInstanceUID.name + ".dcm")).exists())
 
 
   def test_dicom_output_send(self):

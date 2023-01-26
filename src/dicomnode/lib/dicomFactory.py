@@ -13,9 +13,11 @@ from pydicom.tag import Tag, BaseTag
 from random import randint
 from typing import Any, Callable, Dict, List, Iterator,  Optional, Tuple, Union
 
+import numpy
+
 
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured, InvalidDataset
 
 class FillingStrategy(Enum):
   DISCARD = 0
@@ -69,7 +71,7 @@ class AttrElement(VirtualElement):
 @dataclass
 class CallerArgs:
   i : int
-  virtual_element: Optional[VirtualElement] = field(default=None, init=False) # This is required, However when object is created, it's missing
+  header_dataset: Optional[Dataset] = None
 
 
 class CallElement(VirtualElement):
@@ -79,12 +81,20 @@ class CallElement(VirtualElement):
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, func: Callable[[CallerArgs],Any]) -> None:
     super().__init__(tag, VR)
     self.func = func
+    self.header_dataset: Optional[Dataset] = None
 
-  def corporealialize(self, _DF: 'DicomFactory', _DS: Dataset) -> 'CallElement':
+  def corporealialize(self, _DF: 'DicomFactory', dataset: Dataset) -> 'CallElement':
+    self.header_dataset = dataset
     return self
 
-  def __call__(self, callerArgs: CallerArgs) -> DataElement:
-    return DataElement(self.tag, self.VR, self.func(callerArgs))
+  def __call__(self, caller_args: CallerArgs) -> Optional[DataElement]:
+    if self.header_dataset is None:
+      raise IncorrectlyConfigured("A call element is called before it's corporealialized")
+    caller_args.header_dataset = self.header_dataset
+    value = self.func(caller_args)
+    if value is None:
+      return None
+    return DataElement(self.tag, self.VR, value)
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
@@ -189,6 +199,13 @@ class Blueprint():
   def add_virtual_element(self, virtual_element: VirtualElement):
     self._dict[virtual_element.tag] = virtual_element
 
+  def get_required_tags(self) -> List[int]:
+    return_list = []
+    for tag in self._dict.keys():
+      return_list.append(tag)
+    return_list.sort()
+    return return_list
+
 
 class SeriesHeader():
   """A dicom dataset blueprint for a factory to produce a series of dicom
@@ -231,7 +248,7 @@ class DicomFactory(ABC):
     self.series_description: str = "Unnamed Pipeline post processing "
 
   def make_series_header(self,
-                  dataset: Dataset,
+                  pivot: Dataset,
                   elements: Blueprint,
                   filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     ) -> SeriesHeader:
@@ -241,23 +258,23 @@ class DicomFactory(ABC):
     is uniform for all input datasets
 
     Args:
-        dataset (Dataset): _description_
+        pivot (Dataset): The dataset which the header will be produced from
 
     Returns:
-        Dataset: The produced dataset
+        SeriesHeader: This object is a "header" for the series
     """
 
     header = SeriesHeader()
     if filling_strategy == FillingStrategy.COPY:
-      for data_element in dataset:
+      for data_element in pivot:
         if data_element.tag in elements:
           pass
         else:
           header.add_tag(data_element)
     for virtual_element in elements:
-        de = virtual_element.corporealialize(self, dataset)
-        if de is not None:
-          header.add_tag(de)
+      de = virtual_element.corporealialize(self, pivot)
+      if de is not None:
+        header.add_tag(de)
     return header
 
   @abstractmethod
@@ -268,15 +285,19 @@ class DicomFactory(ABC):
     raise NotImplementedError #pragma: no cover
 
   def build(self, pivot: Dataset, blueprint: Blueprint, filling_strategy: FillingStrategy = FillingStrategy.DISCARD) -> Dataset:
-    """Builds a singular dataset
+    """Builds a singular dataset from blueprint and pivot dataset
+
+    Intended to be used to construct message datasets
 
     Args:
-        pivot (Dataset): _description_
-        blueprint (Blueprint): _description_
-        filling_strategy (FillingStrategy, optional): _description_. Defaults to FillingStrategy.DISCARD.
+        pivot (Dataset): Dataset the blueprint will use to extract data from
+        blueprint (Blueprint): Determines what data will be in the newly construct dataset
+        filling_strategy (FillingStrategy, optional): strategy to handle tags in the dataset,
+        but in the blueprint. Defaults to FillingStrategy.DISCARD,
+        and for most dataset this is the sensible option
 
     Returns:
-        Dataset: _description_
+        Dataset: The constructed dataset
     """
     dataset = Dataset()
     if filling_strategy == FillingStrategy.COPY:
@@ -289,7 +310,6 @@ class DicomFactory(ABC):
       de = virtual_element.corporealialize(self, pivot)
       if isinstance(de, CallElement):
         args = CallerArgs(1)
-        args.virtual_element = de
         de = de(args)
       if de is not None:
         dataset.add(de)
@@ -311,6 +331,55 @@ def _get_time(_) -> time:
 
 def _get_random_number(_) -> int:
   return randint(1, 2147483646)
+
+def _get_image_position_patient(caller_args: CallerArgs) -> List[float]:
+  # I feel a comment is need to explain what is going on
+  # First this function finds the position from the first slice
+  #
+  # Now the important part here is the dicom standard orient the world around the patient
+  # Instead of the Gantry view. Which is to say, -Redacted- stupid
+  # Never the less, the solution must go on
+  if caller_args.header_dataset is None:
+    raise IncorrectlyConfigured # pragma: no cover
+  dataset: Dataset = caller_args.header_dataset
+  required_tags = [
+    0x00180050, # SliceThickness
+    0x00185100, # PatientPosition
+    0x00200013, # InstanceNumber
+    0x00200032, # ImagePositionPatient
+    0x00200037, # ImageOrientation
+  ]
+  for required_tag in required_tags:
+    if required_tag not in dataset: # Need Instance for offset calculation
+      raise InvalidDataset
+
+  if dataset[0x00200037].VM != 6:
+    raise InvalidDataset
+
+  if dataset[0x00200032].VM != 3:
+    raise InvalidDataset
+
+
+  head_first = dataset.PatientPosition.startswith('HF') # Head First
+  if head_first:
+    orientation = -1
+  else:
+    orientation = 1
+
+  cross_vector = dataset.SliceThickness * orientation * numpy.array([
+    dataset.ImageOrientationPatient[1] * dataset.ImageOrientationPatient[5] - dataset.ImageOrientationPatient[2] * dataset.ImageOrientationPatient[4],
+    dataset.ImageOrientationPatient[2] * dataset.ImageOrientationPatient[3] - dataset.ImageOrientationPatient[0] * dataset.ImageOrientationPatient[5],
+    dataset.ImageOrientationPatient[0] * dataset.ImageOrientationPatient[4] - dataset.ImageOrientationPatient[1] * dataset.ImageOrientationPatient[3],
+  ])
+
+  instance_offset = caller_args.i - dataset.InstanceNumber
+  position = numpy.array(dataset.ImagePositionPatient) + instance_offset * cross_vector
+  return list(position)
+
+def _get_slice_location(caller_args) -> float:
+  image_position = _get_image_position_patient(caller_args)
+  return image_position[2]
+
 ###### Header Tag Lists ######
 
 patient_blueprint = Blueprint([
@@ -318,7 +387,7 @@ patient_blueprint = Blueprint([
   CopyElement(0x00100020), # PatientID
   CopyElement(0x00100021, Optional=True), # Issuer of Patient ID
   CopyElement(0x00100030, Optional=True), # PatientsBirthDate
-  CopyElement(0x00100040), # PatientSex  
+  CopyElement(0x00100040), # PatientSex
 ])
 
 frame_of_reference_blueprint = Blueprint([
@@ -352,11 +421,11 @@ general_image_blueprint = Blueprint([
 
 # One might argue the optionality of these tags
 image_plane_blueprint = Blueprint([
-  CopyElement(0x00180050, Optional=True), # Slice thickness
-  CopyElement(0x00200032, Optional=True), # Image position
-  CopyElement(0x00200037, Optional=True), # Image Orientation
-  CopyElement(0x00201041, Optional=True), # Slice Location
-  CopyElement(0x00280030, Optional=True), # Pixel Spacing
+  CopyElement(0x00180050), # Slice thickness
+  CallElement(0x00200032, 'DS', _get_image_position_patient), # Image position
+  CopyElement(0x00200037), # Image Orientation
+  CallElement(0x00201041, 'DS', _get_slice_location), # Slice Location
+  CopyElement(0x00280030), # Pixel Spacing
 ])
 
 ct_image_blueprint = Blueprint([
@@ -400,6 +469,7 @@ general_series_blueprint = Blueprint([
   AttrElement(0x0008103E, 'LO', 'series_description'),
   SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
   CopyElement(0x00081070, Optional=True), # Operators' Name
+  CopyElement(0x00185100), # PatientPosition
 ])
 
 SOP_common_blueprint: Blueprint = Blueprint([
