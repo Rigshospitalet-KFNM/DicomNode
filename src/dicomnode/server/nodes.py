@@ -14,7 +14,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 from pynetdicom import evt
 from pynetdicom.ae import ApplicationEntity as AE
-from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext
+from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext, VerificationPresentationContexts
 from pydicom import Dataset
 
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
@@ -208,7 +208,10 @@ class AbstractPipeline():
 
     # Validates that Pipeline is configured correctly.
     self.ae = AE(ae_title = self.ae_title)
-    self.ae.supported_contexts = self.supported_contexts
+    # You need VerificationPresentationContexts for ECHOSCU
+    # and you want ECHO-SCU
+    contexts = VerificationPresentationContexts + self.supported_contexts
+    self.ae.supported_contexts = contexts
 
     self.ae.require_called_aet = self.require_called_aet
     self.ae.require_calling_aet = self.require_calling_aet
