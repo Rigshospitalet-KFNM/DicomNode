@@ -31,7 +31,14 @@ factory = NumpyFactory()
 factory.series_description = "Averaged Image"
 
 class SeriesInputs(DynamicInput):
-  image_grinder = staticmethod(many_meta_grinder(numpy_grinder, tag_meta_grinder([0x00080031])))
+  image_grinder = staticmethod(
+    many_meta_grinder(
+      numpy_grinder,
+      tag_meta_grinder([
+        0x00080031,
+      ])
+    )
+  )
   required_tags = blueprint.get_required_tags()
 
   def validate(self) -> bool:

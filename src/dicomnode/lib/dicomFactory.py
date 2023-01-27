@@ -201,8 +201,10 @@ class Blueprint():
 
   def get_required_tags(self) -> List[int]:
     return_list = []
-    for tag in self._dict.keys():
-      return_list.append(tag)
+    for ve in self._dict.values():
+      if isinstance(ve, CopyElement):
+        if ve.Optional == False:
+          return_list.append(int(ve.tag))
     return_list.sort()
     return return_list
 

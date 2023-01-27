@@ -109,14 +109,14 @@ class AbstractPipeline():
 
   def maintenance_worker(self) -> NoReturn: #pragma no cover
     """This is the controller for the worker thread
-    
+
     Should run the clean up function every midnight
     """
     while True:
       sleep(self.calculate_maintenance_time())
       self.maintenance()
 
-  
+
   def calculate_maintenance_time(self) -> float:
     """Calculates the time in seconds to the next scheduled clean up"""
     now = datetime.now()
