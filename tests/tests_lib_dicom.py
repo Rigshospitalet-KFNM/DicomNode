@@ -1,8 +1,8 @@
 from unittest import TestCase
 
 from pydicom import Dataset
-from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian, CTImageStorage
 
+from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian, CTImageStorage
 from dicomnode.lib.dicom import getTag, make_meta, gen_uid
 from dicomnode.lib.exceptions import InvalidDataset
 

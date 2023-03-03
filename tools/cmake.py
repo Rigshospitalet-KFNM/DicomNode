@@ -1,5 +1,4 @@
-from setuptools import setup, find_packages
-
+# File stolen from https://github.com/pybind/cmake_example/blob/master/setup.py
 import os
 import sys
 import re
@@ -8,6 +7,7 @@ from pathlib import Path
 
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
+
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -119,32 +119,3 @@ class CMakeBuild(build_ext):
         subprocess.run(
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
-
-if __name__ == '__main__':
-  setup(name='dicomnode',
-    version='0.0.2',
-    description='Test',
-    author='Christoffer Vilstrup Jensen',
-    author_email='christoffer.vilstrup.jensen@regionh.dk',
-    package_dir={"":"src"},
-    ext_modules=[CMakeExtension("dicomnode_c")],
-    cmdclass={"build_ext": CMakeBuild},
-    packages=find_packages(where="src", exclude=["bin", "tests"]),
-    install_requires=[
-      'pydicom>=2.3.1',
-      'pynetdicom>=2.0.2',
-      'psutil>=5.9.2',
-      'typing_extensions>=4.4.0',
-      'pylatex[matrices, matplotlib]',
-      'pybind11>=2.10.3',
-    ],
-    extras_require = {
-     "test" : ["coverage", "coverage-lcov"],
-    },
-    python_requires='>=3.9.1',
-    entry_points={
-      'console_scripts': [
-      'omnitool=dicomnode.bin.omnitool:entry_func'
-    ]},
-  )
-

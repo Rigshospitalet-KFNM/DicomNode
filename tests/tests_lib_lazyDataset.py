@@ -14,7 +14,7 @@ from dicomnode.lib.dicom import make_meta
 from dicomnode.lib.lazyDataset import LazyDataset
 from dicomnode.lib.io import save_dicom, load_dicom
 
-from dicomnode.tests.helpers import generate_numpy_datasets
+from tests.helpers import generate_numpy_datasets
 
 class LazyDatasetTestCase(TestCase):
   def setUp(self):

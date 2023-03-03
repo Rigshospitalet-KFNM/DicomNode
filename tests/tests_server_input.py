@@ -10,6 +10,8 @@ from sys import stdout
 import shutil
 import logging
 
+from tests.helpers import generate_numpy_datasets
+
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dicomFactory import Blueprint
@@ -18,7 +20,6 @@ from dicomnode.lib.grinders import numpy_grinder
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput
-from dicomnode.tests.helpers import generate_numpy_datasets
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"

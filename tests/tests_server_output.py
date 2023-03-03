@@ -9,7 +9,7 @@ from unittest import TestCase
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.server.output import DicomOutput, FileOutput
-from dicomnode.tests.helpers import get_test_ae
+from tests.helpers import get_test_ae
 
 
 class OutputTests(TestCase):

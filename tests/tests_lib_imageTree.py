@@ -6,7 +6,7 @@ from pydicom import Dataset
 from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
 from unittest import TestCase, skip
 
-from dicomnode.tests.helpers import generate_numpy_datasets, bench
+from tests.helpers import generate_numpy_datasets, bench
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.io import load_dicom

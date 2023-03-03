@@ -8,7 +8,7 @@ from pynetdicom import debug_logger
 
 from dicomnode.lib.dicom import make_meta
 from dicomnode.lib.dimse import send_move, Address
-from dicomnode.tests.helpers import get_test_ae
+from tests.helpers import get_test_ae
 
 class DIMSETestCases(TestCase):
   TEST_CASE_AE = "TEST_CASE"

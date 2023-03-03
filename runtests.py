@@ -16,10 +16,10 @@ if __name__ == "__main__":
 
   runner = TextTestRunner()
   loader = TestLoader()
-  suite: TestSuite = loader.discover("src")
+  suite: TestSuite = loader.discover("tests")
   if args.performance:
     loader.testMethodPrefix = "performance"
-    performance_tests = loader.discover("src")
+    performance_tests = loader.discover("tests")
     suite.addTests(performance_tests)
 
   cwd = os.getcwd()

@@ -12,7 +12,8 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 from pynetdicom import events
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts
-from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind,PatientRootQueryRetrieveInformationModelMove #type: ignore
+from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind,\
+  PatientRootQueryRetrieveInformationModelMove #type: ignore
 
 from dicomnode.lib.dicom import gen_uid, make_meta
 

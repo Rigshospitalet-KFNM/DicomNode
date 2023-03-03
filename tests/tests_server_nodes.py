@@ -17,7 +17,7 @@ from dicomnode.lib.numpyFactory import NumpyFactory
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.imageTree import DicomTree
 
-from dicomnode.tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae
+from tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae
 
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline

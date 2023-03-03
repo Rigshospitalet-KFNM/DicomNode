@@ -11,3 +11,4 @@ src/dicomnode/tests/test_data/*
 lcov.info
 *.austin
 performance/
+*.so

@@ -5,8 +5,8 @@ from copy import deepcopy
 from pydicom import Dataset, DataElement, Sequence
 from pydicom.valuerep import VR
 from pydicom.uid import MediaStorageDirectoryStorage
-from dicomnode.lib.anonymization import anonymize_dicom_tree, anonymize_dataset
 
+from dicomnode.lib.anonymization import anonymize_dicom_tree, anonymize_dataset
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.imageTree import DicomTree, IdentityMapping
 

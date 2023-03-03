@@ -1,7 +1,5 @@
 from datetime import datetime, date, time
 
-
-
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag
 from pydicom.uid import SecondaryCaptureImageStorage

@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from dicomnode.lib.dicom import gen_uid
 
-from dicomnode.tests.helpers import bench
+from tests.helpers import bench
 from dicomnode.lib.utils import str2bool
 
 

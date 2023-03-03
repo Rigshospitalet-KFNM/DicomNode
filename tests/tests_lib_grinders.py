@@ -11,7 +11,7 @@ from dicomnode.lib.grinders import identity_grinder, list_grinder, many_meta_gri
 import numpy
 import logging
 from dicomnode.lib.grinders import numpy_grinder
-from dicomnode.tests.helpers import generate_numpy_datasets
+from tests.helpers import generate_numpy_datasets
 
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
