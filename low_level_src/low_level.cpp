@@ -46,8 +46,9 @@ pybind11::array_t<double> add_arrays(
   return result;
 }
 
-PYBIND11_MODULE(dicomnode_c, m){
+PYBIND11_MODULE(_c, m){
   m.doc() = "pybind11 example plugin";
+  m.attr("__name__") = "dicomnode._c";
 
   m.def("add_arrays", &add_arrays, pybind11::return_value_policy::move, "A function that adds two numpy arrays");
 }

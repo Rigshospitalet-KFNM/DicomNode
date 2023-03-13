@@ -8,6 +8,7 @@ from pathlib import Path
 
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
+from pybind11.setup_helpers import Pybind11Extension
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -21,6 +22,7 @@ class CMakeExtension(Extension):
     def __init__(self, name: str, sourcedir: str = "") -> None:
         super().__init__(name, sources=[])
         self.sourcedir = os.fspath(Path(sourcedir).resolve())
+
 
 
 class CMakeBuild(build_ext):
@@ -113,6 +115,7 @@ class CMakeBuild(build_ext):
         if not build_temp.exists():
             build_temp.mkdir(parents=True)
 
+
         subprocess.run(
             ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
         )
@@ -127,7 +130,7 @@ if __name__ == '__main__':
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
     package_dir={"":"src"},
-    ext_modules=[CMakeExtension("dicomnode_c")],
+    ext_modules=[CMakeExtension("dicomnode._c"), CMakeExtension("dicomnode._cuda")],
     cmdclass={"build_ext": CMakeBuild},
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
