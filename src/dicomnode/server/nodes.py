@@ -64,7 +64,7 @@ class AbstractPipeline():
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
-  filling_strategy: Optional[FillingStrategy] = None
+  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
   header_blueprint: Optional[Blueprint] = None
   c_move_blueprint: Optional[Blueprint] = None
 

@@ -56,6 +56,17 @@ class VirtualElement(ABC):
   def corporealialize(self, factory: 'DicomFactory', dataset: Dataset) -> Optional[Union[DataElement, 'CallElement']]:
     raise NotImplemented # pragma: no cover
 
+class InstanceBasedVirtualElement(VirtualElement):
+  instances: Dict[Any, Any]
+
+  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int, int]], VR: str) -> None:
+    super().__init__(tag, VR)
+    self.instances = {}
+
+  @abstractmethod
+  def update_instances(self, dataset: Dataset) -> None:
+    raise NotImplemented # pragma: no cover
+
 
 class AttrElement(VirtualElement):
   """Reads an attribute from the factory and creates a data element
@@ -112,6 +123,15 @@ class CopyElement(VirtualElement):
         return None
       else:
         raise KeyError(f"{self.tag} not found in Header Parent Dataset")
+
+
+class InstanceCopy(InstanceBasedVirtualElement):
+  def update_instances(self, dataset: Dataset) -> None:
+    self.instances[dataset.InstanceNumber] = dataset[self.tag].value
+
+  def corporealialize(self, factory: 'DicomFactory', dataset: Dataset) -> Optional[Union[DataElement, 'CallElement']]:
+    pass
+
 
 class DiscardElement(VirtualElement):
   def __init__(self, tag) -> None:
@@ -240,17 +260,21 @@ class SeriesHeader():
     for element in self._blueprint.values():
       yield element
 
+  def update_tags(self, Dataset):
+    pass
 
 class DicomFactory(ABC):
-  """A DicomFactory is a class, that produces various collections of datasets
+  """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
+
+  This is a base class, as factories are specialized per image input type
   """
 
   def __init__(self) -> None:
-    #
+
     self.series_description: str = "Unnamed Pipeline post processing "
 
   def make_series_header(self,
-                  pivot: Dataset,
+                  pivot_list: List[Dataset],
                   elements: Blueprint,
                   filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     ) -> SeriesHeader:
@@ -267,6 +291,10 @@ class DicomFactory(ABC):
     """
 
     header = SeriesHeader()
+    if len(pivot_list) == 0:
+      raise ValueError("Cannot create header without a pivot dataset")
+    pivot = pivot_list[0]
+
     if filling_strategy == FillingStrategy.COPY:
       for data_element in pivot:
         if data_element.tag in elements:

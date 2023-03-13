@@ -1,4 +1,7 @@
-"""_summary_
+"""This module is the data structure of a servers dicom storage.
+
+
+
 """
 
 __author__ = "Christoffer Vilstrup Jensen"
@@ -8,7 +11,7 @@ from logging import Logger
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union, Iterable
 
 from datetime import datetime
 
@@ -18,7 +21,29 @@ from dicomnode.lib.dicomFactory import DicomFactory, SeriesHeader, Blueprint, Fi
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode)
 from dicomnode.lib.imageTree import ImageTreeInterface
-from dicomnode.server.input import AbstractInput
+from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
+
+def __type_check_list(dicom_list: List[Dataset], maybe_dicom_iterator: Iterable[Any]):
+  for maybe_dicom in maybe_dicom_iterator:
+    if isinstance(maybe_dicom, Dataset):
+      dicom_list.append(maybe_dicom)
+    else:
+      raise InvalidTreeNode
+
+def __extract_pivot_list(abstract_input: AbstractInput) -> List[Dataset]:
+  return_list: List[Dataset] = []
+  if isinstance(abstract_input, DynamicInput):
+    for dynamic_leaf in abstract_input.data.values():
+      if isinstance(dynamic_leaf, DynamicLeaf):
+        __type_check_list(return_list, dynamic_leaf)
+      else:
+        raise InvalidTreeNode # pragma: no cover
+      break
+  else:
+    __type_check_list(return_list, abstract_input)
+
+  return return_list
+
 
 class InputContainer:
   """Simple container class for grinded input.
@@ -33,7 +58,16 @@ class InputContainer:
 
 
 class PatientNode(ImageTreeInterface):
-  """This is the container containing all the Inputs of your pipeline."""
+  """This is an ImageTree node, where each subnode contains related images.
+  When filled can run through the pipelines process function.
+  The Node contains AbstractInputs and only AbstractInput
+
+  This class is responsible for:
+    - Determine if there's sufficient data to run the pipeline processing
+    - Initializing a SeriesHeader
+    - Creating InputContainer
+  """
+  #In most cases, each subnode is also a leaf.
 
   @dataclass
   class Options:
@@ -43,8 +77,9 @@ class PatientNode(ImageTreeInterface):
     lazy: bool = False
     logger: Optional[Logger] = None
     header_blueprint: Optional[Blueprint] = None
-    filling_strategy: Optional[FillingStrategy] = None
+    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     InputContainerType: Type[InputContainer] = InputContainer
+    pivot_input: Optional[str] = None
 
 
   def __init__(self,
@@ -60,17 +95,6 @@ class PatientNode(ImageTreeInterface):
       if self.options.container_path.is_file():
         raise InvalidRootDataDirectory
       self.options.container_path.mkdir(exist_ok=True)
-
-    if self.options.factory is not None and \
-        pivot is not None and \
-        self.options.header_blueprint is not None:
-      filling_strategy = self.options.filling_strategy
-      if filling_strategy is None:
-        filling_strategy = FillingStrategy.DISCARD
-      self.header = self.options.factory.make_series_header(
-        pivot, self.options.header_blueprint, filling_strategy)
-    else:
-      self.header = None
 
     for arg_name, input in args.items():
       input_path: Optional[Path] = None
@@ -106,6 +130,14 @@ class PatientNode(ImageTreeInterface):
     return valid
 
   def _get_data(self) -> InputContainer:
+    """Retrieved data in the way it's supposed to be processed in.
+
+    Raises:
+        InvalidTreeNode: _description_
+
+    Returns:
+        InputContainer: _description_
+    """
     new_instance: Dict[str, Any] = {}
     paths: Optional[Dict[str, Path]]
     if self.options.container_path is None:
@@ -119,18 +151,34 @@ class PatientNode(ImageTreeInterface):
           paths[arg_name] = input.path
       else:
         raise InvalidTreeNode # pragma: no cover
-    input_container = self.options.InputContainerType(new_instance, self.header, paths)
+    if self.options.factory is not None and self.options.header_blueprint is not None:
+      pivot_list: List[Dataset] = []
+
+      if self.options.pivot_input is not None:
+        pivot_input= self.data[self.options.pivot_input]
+        if isinstance(pivot_input, AbstractInput):
+          pivot_list = __extract_pivot_list(pivot_input)
+        else:
+          raise InvalidTreeNode # pragma: no cover
+      else:
+        for abstract_input in self.data.values():
+          if isinstance(abstract_input, AbstractInput):
+            pivot_list = __extract_pivot_list(abstract_input)
+          else:
+            raise InvalidTreeNode
+          break
+
+      header = self.options.factory.make_series_header(
+        pivot_list, self.options.header_blueprint, self.options.filling_strategy
+      )
+    else:
+      header = None
+
+    input_container = self.options.InputContainerType(new_instance, header, paths)
 
     return input_container
 
   def add_image(self, dicom: Dataset) -> int:
-    if not hasattr(self, 'header') and self.options.factory is not None and self.options.header_blueprint is not None:
-      self.logger.debug("Adding Series Header")
-      filling_strategy = self.options.filling_strategy
-      if filling_strategy is None:
-        filling_strategy = FillingStrategy.DISCARD
-      self.header = self.options.factory.make_series_header(dicom, self.options.header_blueprint, filling_strategy)
-
     added = 0
     for input in self.data.values():
       if isinstance(input, AbstractInput):
@@ -157,6 +205,12 @@ class PatientNode(ImageTreeInterface):
 class PipelineTree(ImageTreeInterface):
   """A more specialized ImageTree, which is used by a dicom node to keep track
   of studies.
+
+  This is the root node of the servers ImageTree, It contains leafs of PatientNodes and only PatientNodes.
+
+  The main responsibility of this class is to manage Patient Nodes: So
+    - Creating new PatientNodes when needed
+    - Deleting PatientNodes, when they're expired or processed
   """
 
   @dataclass
@@ -165,7 +219,7 @@ class PipelineTree(ImageTreeInterface):
     data_directory: Optional[Path] = None
     factory: Optional[DicomFactory] = None
     lazy: bool = False
-    filling_strategy: Optional[FillingStrategy] = None
+    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     input_container_type: Type[InputContainer] = InputContainer
     patient_container: Type[PatientNode] = PatientNode
     header_blueprint: Optional[Blueprint] = None
@@ -279,7 +333,7 @@ class PipelineTree(ImageTreeInterface):
         self.remove_patient(patient_id)
 
 
-  def remove_patient(self,patient_id: str) -> None:
+  def remove_patient(self, patient_id: str) -> None:
     """Removes a patient from the tree
 
     Args:
