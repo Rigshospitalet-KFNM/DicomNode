@@ -1,0 +1,1 @@
+add_executable(playground main.cu)
