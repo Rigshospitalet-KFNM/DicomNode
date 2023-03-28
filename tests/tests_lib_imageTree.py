@@ -10,7 +10,7 @@ from tests.helpers import generate_numpy_datasets, bench
 
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.io import load_dicom
-from dicomnode.lib.imageTree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
+from dicomnode.lib.image_tree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
 
 def get_test_dataset() -> Dataset:
   dataset = Dataset()

@@ -9,11 +9,11 @@ from typing import Dict, List, Union, Tuple, Any, Optional, Callable, Iterator
 from dataclasses import dataclass
 
 from dicomnode.lib.dicom import make_meta, gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CallerArgs, CallElement, DicomFactory, SeriesHeader,\
+from dicomnode.lib.dicom_factory import AttrElement, InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
   StaticElement, Blueprint, patient_blueprint, general_series_blueprint, \
   general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint, \
   general_equipment_blueprint, general_image_blueprint, ct_image_blueprint, \
-  image_plane_blueprint
+  image_plane_blueprint, InstanceVirtualElement
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, InvalidEncoding
 
 import numpy
@@ -25,40 +25,6 @@ unsigned_array_encoding: Dict[int, type] = {
   32 : numpy.uint32,
   64 : numpy.uint64,
 }
-
-@dataclass
-class NumpyCallerArgs(CallerArgs):
-  image : Optional[ndarray] = None # Unmodified image
-  factory : Optional['NumpyFactory'] = None
-  intercept : Optional[float] = None
-  slope : Optional[float] = None
-  scaled_image: Optional[ndarray] = None
-  total_images: Optional[int] = None
-
-class NumpyCaller(CallElement):
-  """Virtual Data Element, indicating that the value will produced from
-  a provided callable function"""
-  def __init__(self,
-               tag: Union[int, str, Tuple[int, int]],
-               VR: str,
-               func: Callable[[NumpyCallerArgs],Any]
-    ) -> None:
-    self.tag: Union[int, str, Tuple[int, int]] = tag
-    self.VR: str = VR
-    self.func: Callable[[NumpyCallerArgs],Any] = func
-
-  def __call__(self, caller_args : NumpyCallerArgs) -> Optional[DataElement]:
-    """Now There's a Liskov's Substitution principle violation here,
-    because NumpyCaller is more inherits from Caller Args.
-
-    Args:
-        caller_args (NumpyCallerArgs): _description_
-
-    Returns:
-        Optional[DataElement]: _description_
-    """
-    return super().__call__(caller_args)
-
 
 class NumpyFactory(DicomFactory):
   _bits_allocated: int = 16
@@ -155,6 +121,18 @@ class NumpyFactory(DicomFactory):
 
 
   def build_from_header(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
+    """This construct a dicom series from a header and numpy array containing 
+
+    Args:
+        header (SeriesHeader): _description_
+        image (ndarray): _description_
+
+    Raises:
+        IncorrectlyConfigured: _description_
+
+    Returns:
+        List[Dataset]: _description_
+    """
     target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
@@ -163,27 +141,26 @@ class NumpyFactory(DicomFactory):
     list_dicom = []
     if len(image.shape) == 3:
       for i, slice in enumerate(image):
-        caller_args = NumpyCallerArgs(
-          i=i,
+        instance_environment = InstanceEnvironment(
+          instance_number= i + 1,
           factory=self,
-          image=slice
+          image=slice,
+          total_images = image.shape[0],
         )
-
-        caller_args.total_images = image.shape[0]
 
         # Encoding is done per slice basis
         if encode:
           scaled_slice, slope, intercept = self.scale_image(slice)
-          caller_args.scaled_image = scaled_slice
-          caller_args.slope = slope
-          caller_args.intercept = intercept
+          instance_environment.scaled_image = scaled_slice
+          instance_environment.slope = slope
+          instance_environment.intercept = intercept
 
         dataset = Dataset()
         for element in header:
           if isinstance(element, DataElement):
             dataset.add(element)
-          elif isinstance(element, CallElement):
-            data_element = element(caller_args)
+          elif isinstance(element, InstanceVirtualElement):
+            data_element = element.produce(instance_environment)
             if data_element is not None:
               dataset.add(data_element)
         make_meta(dataset)
@@ -192,67 +169,67 @@ class NumpyFactory(DicomFactory):
       raise IncorrectlyConfigured("3 dimensional images are only supported") # pragma: no cover
     return list_dicom
 
-def _get_image(numpy_caller_args: NumpyCallerArgs) -> ndarray:
-  if numpy_caller_args.scaled_image is not None:
-    image = numpy_caller_args.scaled_image
+def _get_image(instance_environment: InstanceEnvironment) -> ndarray:
+  if instance_environment.scaled_image is not None:
+    image = instance_environment.scaled_image
   else:
-    image = numpy_caller_args.image
+    image = instance_environment.image
   if image is None:
     raise IncorrectlyConfigured # pragma: no cover
   return image
 
 
-def _add_Rows(numpy_caller_args: NumpyCallerArgs) -> int:
-  image = _get_image(numpy_caller_args)
+def _add_Rows(instance_environment: InstanceEnvironment) -> int:
+  image = _get_image(instance_environment)
   return image.shape[0]
 
-def _add_Columns(numpy_caller_args: NumpyCallerArgs) -> int:
-  image = _get_image(numpy_caller_args)
+def _add_Columns(instance_environment: InstanceEnvironment) -> int:
+  image = _get_image(instance_environment)
   return image.shape[1]
 
-def _add_smallest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
-  image = _get_image(numpy_caller_args)
+def _add_smallest_pixel(instance_environment: InstanceEnvironment) -> int:
+  image = _get_image(instance_environment)
   return int(image.min())
 
-def _add_largest_pixel(numpy_caller_args: NumpyCallerArgs) -> int:
-  image = _get_image(numpy_caller_args)
+def _add_largest_pixel(instance_environment: InstanceEnvironment) -> int:
+  image = _get_image(instance_environment)
   return int(image.max())
 
-def _add_aspect_ratio(numpy_caller_args: NumpyCallerArgs) -> List[int]:
-  image = _get_image(numpy_caller_args)
+def _add_aspect_ratio(instance_environment: InstanceEnvironment) -> List[int]:
+  image = _get_image(instance_environment)
   return [image.shape[0], image.shape[1]]
 
-def _add_images_in_acquisition(numpy_caller_args: NumpyCallerArgs) -> Optional[int]:
-  return numpy_caller_args.total_images
+def _add_images_in_acquisition(instance_environment: InstanceEnvironment) -> Optional[int]:
+  return instance_environment.total_images
 
-def _add_slope(numpy_caller_args: NumpyCallerArgs) -> Optional[float]:
-  return numpy_caller_args.slope
+def _add_slope(instance_environment: InstanceEnvironment) -> Optional[float]:
+  return instance_environment.slope
 
-def _add_intercept(numpy_caller_args: NumpyCallerArgs) -> Optional[float]:
-  return numpy_caller_args.intercept
+def _add_intercept(instance_environment: InstanceEnvironment) -> Optional[float]:
+  return instance_environment.intercept
 
-def _add_PixelData(numpy_caller_args: NumpyCallerArgs) -> bytes:
-  image = _get_image(numpy_caller_args)
+def _add_PixelData(instance_environment: InstanceEnvironment) -> bytes:
+  image = _get_image(instance_environment)
   return image.tobytes()
 
 ####### Header Tag groups #######
-image_pixel_NumpyBlueprint: Blueprint = Blueprint([
+image_pixel_blueprint: Blueprint = Blueprint([
   StaticElement(0x00280002, 'US', 1),                    # SamplesPerPixel
   StaticElement(0x00280004, 'CS', 'MONOCHROME2'),        # PhotometricInterpretation
-  NumpyCaller(0x00280010, 'US', _add_Rows),              # Rows
-  NumpyCaller(0x00280011, 'US', _add_Columns),           # Columns
-  NumpyCaller(0x00280034, 'IS', _add_aspect_ratio),      # PixelAspectRatio
+  FunctionalElement(0x00280010, 'US', _add_Rows),              # Rows
+  FunctionalElement(0x00280011, 'US', _add_Columns),           # Columns
+  FunctionalElement(0x00280034, 'IS', _add_aspect_ratio),      # PixelAspectRatio
   AttrElement(0x00280100, 'US', 'bits_allocated'),       # BitsAllocated
   AttrElement(0x00280101, 'US', 'bits_stored'),          # BitsStored
   AttrElement(0x00280102, 'US', 'high_bit'),             # HighBit
   AttrElement(0x00280103, 'US', 'pixel_representation'), # PixelRepresentation
-  NumpyCaller(0x00280106, 'US', _add_smallest_pixel),    # SmallestImagePixelValue
-  NumpyCaller(0x00280107, 'US', _add_largest_pixel),     # LargestImagePixelValue
-  NumpyCaller(0x00281052, 'DS', _add_intercept),         # RescaleIntercept
-  NumpyCaller(0x00281053, 'DS', _add_slope),             # RescaleSlope
-  NumpyCaller(0x7FE00010, 'OB', _add_PixelData),          # PixelData,
+  FunctionalElement(0x00280106, 'US', _add_smallest_pixel),    # SmallestImagePixelValue
+  FunctionalElement(0x00280107, 'US', _add_largest_pixel),     # LargestImagePixelValue
+  FunctionalElement(0x00281052, 'DS', _add_intercept),         # RescaleIntercept
+  FunctionalElement(0x00281053, 'DS', _add_slope),             # RescaleSlope
+  FunctionalElement(0x7FE00010, 'OB', _add_PixelData),          # PixelData,
   # There's some General Image tags in here because, they don't know total images in that definition
-  NumpyCaller(0x00201002, 'IS', _add_images_in_acquisition)
+  FunctionalElement(0x00201002, 'IS', _add_images_in_acquisition),
 ])
 
 CTImageStorage_NumpyBlueprint: Blueprint = patient_blueprint\
@@ -262,7 +239,7 @@ CTImageStorage_NumpyBlueprint: Blueprint = patient_blueprint\
                                            + frame_of_reference_blueprint \
                                            + general_equipment_blueprint \
                                            + general_image_blueprint \
-                                           + image_pixel_NumpyBlueprint\
+                                           + image_pixel_blueprint\
                                            + ct_image_blueprint \
                                            + SOP_common_blueprint
 

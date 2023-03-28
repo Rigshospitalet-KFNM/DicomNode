@@ -12,42 +12,49 @@
 
 __author__ = "Christoffer Vilstrup Jensen"
 
+# Standard lib
+from copy import deepcopy
+from datetime import datetime, timedelta
+import logging
+from logging import StreamHandler, getLogger
+from logging.handlers import TimedRotatingFileHandler
+from os import chdir, getcwd
+from pathlib import Path
+from queue import Queue, Empty
+import shutil
+from sys import stdout
+from threading import Thread
+from time import sleep
+import traceback
+from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple
+
+# Third part packages
 from pynetdicom import evt
 from pynetdicom.ae import ApplicationEntity as AE
 from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext, VerificationPresentationContexts
 from pydicom import Dataset
 
+# Dicomnode packages
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
-from dicomnode.lib.dicomFactory import Blueprint, DicomFactory, FillingStrategy
+from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, FillingStrategy
+from dicomnode.lib.logging import log_traceback
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
-
-from datetime import datetime, timedelta
-import logging
-import traceback
-from threading import Thread
-from queue import Queue
-from time import sleep
-
-from copy import deepcopy
-from logging import StreamHandler, getLogger
-from logging.handlers import TimedRotatingFileHandler
-from pathlib import Path
-from sys import stdout
-from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple
-
 
 correct_date_format = "%Y/%m/%d %H:%M:%S"
 
 class AbstractPipeline():
   """Base Class for an image processing Pipeline
-  Creates a SCP server on object instantiation unless passed start=False
+  Creates a SCP server and starts it, unless start=False is passed
 
   Should be subclassed with your implementation of the process function at least.
 
   Check tutorials/ConfigurationOverview.md for an overview of attributes
   """
+
+  # Directory for file Processing
+  processing_directory: Optional[Path] = None
 
   # Maintenance Configuration
   study_expiration_days: int = 14
@@ -88,10 +95,17 @@ class AbstractPipeline():
   disable_pynetdicom_logger: bool = True
 
   def close(self) -> None:
-    """Closes all connections active connections.
+    """Closes all connections active connections & cleans up any temporary working spaces.
+
       If your application includes additional connections, you should overwrite this method,
       And close any connections and call the super function.
     """
+    if self.processing_directory is not None:
+      chdir(self.__cwd)
+      shutil.rmtree(self.processing_directory)
+
+    self.logger.info("Closing Server!")
+
     self.ae.shutdown()
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -102,6 +116,15 @@ class AbstractPipeline():
       Keyword Args:
         blocking (bool) : if true, this functions doesn't return.
     """
+    if self.processing_directory is not None:
+      self.__cwd = getcwd()
+      if not self.processing_directory.exists():
+        # Multiple Threads might attempt to create the directory at the same time
+        self.processing_directory.mkdir(exist_ok=True)
+      chdir(self.processing_directory)
+
+    self.logger.info(f"Starting Server at port: {self.port} and AE: {self.ae_title}")
+
     self.ae.start_server(
       (self.ip,self.port),
       block=blocking,
@@ -113,11 +136,11 @@ class AbstractPipeline():
     Should run the clean up function every midnight
     """
     while True:
-      sleep(self.calculate_maintenance_time())
+      sleep(self.calculate_time_to_next_maintenance())
       self.maintenance()
 
 
-  def calculate_maintenance_time(self) -> float:
+  def calculate_time_to_next_maintenance(self) -> float:
     """Calculates the time in seconds to the next scheduled clean up"""
     now = datetime.now()
     tomorrow = now + timedelta(days=1)
@@ -126,60 +149,52 @@ class AbstractPipeline():
     # Days are ignored in the time delta due function constraint of 1 run per day.
     return float(time_delta.seconds) # I guess you could add micro seconds here but WHO CARES
 
-  def maintenance(self) -> None:
+  def maintenance(self, now = datetime.now()) -> None:
     """Removes old studies in the pipeline to ensure GDPR compliance
     """
     # Note this might cause some bug, where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code
-    now = datetime.now()
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.data_state.remove_expired_studies(expiry_datetime)
 
+  def __init__(self) -> None:
+    # This function starts and opens the server
+    #
+    # 1. Logging
+    # 2. File system
+    # 3. Create Server
+    # 4. If start is true, start the server
 
-  def __init__(self, start=True) -> Optional[NoReturn]: #type: ignore
     # logging
+    log_formatter = logging.Formatter(self.log_format)
+
     if self.log_path:
-      logging.basicConfig(
-        level=self.log_level,
-        format=self.log_format,
-        datefmt=correct_date_format,
-        handlers=[TimedRotatingFileHandler(
+      handler = TimedRotatingFileHandler(
           filename=self.log_path,
           when='W0',
           backupCount=self.backup_weeks,
-        )]
       )
     else:
-      logging.basicConfig(
-        level=self.log_level,
-        format=self.log_format,
-        datefmt=correct_date_format,
-        handlers=[StreamHandler(
-          stream=stdout
-        )]
-      )
+      handler = StreamHandler(stream=stdout)
+
+    handler.setLevel(self.log_level)
+    handler.setFormatter(log_formatter)
     self.logger = getLogger("dicomnode")
+    self.logger.handlers.clear()
+    self.logger.addHandler(handler)
+    self.logger.info("Set up logger!")
+    print(self.logger.handlers)
+
+
     if self.disable_pynetdicom_logger:
       getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
-
-    # Handler setup
-    # class needs to be instantiated before handlers can be defined
-    self._evt_handlers = [
-      (evt.EVT_C_STORE,  self._handle_store),
-      (evt.EVT_ACCEPTED, self._association_accepted),
-      (evt.EVT_RELEASED, self._association_released)
-    ]
-    self.updated_patients: Dict[Optional[int], Set] = {
-
-    }
 
     self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
     self.maintenance_thread.start()
 
-    # Load state
+    # Load any previous state
     if self.data_directory is not None:
       if not isinstance(self.data_directory, Path):
-        self.logger.warn("root_data_directory is not of type Path, attempting to convert!")
         self.data_directory = Path(self.data_directory)
 
       if self.data_directory.is_file():
@@ -187,7 +202,6 @@ class AbstractPipeline():
 
       if not self.data_directory.exists():
         self.data_directory.mkdir(parents=True)
-
 
     options = self.pipelineTreeType.Options(
       ae_title=self.ae_title,
@@ -206,7 +220,7 @@ class AbstractPipeline():
       options
     )
 
-    # Validates that Pipeline is configured correctly.
+    # Server validations and creation.
     self.ae = AE(ae_title = self.ae_title)
     # You need VerificationPresentationContexts for ECHOSCU
     # and you want ECHO-SCU
@@ -216,9 +230,16 @@ class AbstractPipeline():
     self.ae.require_called_aet = self.require_called_aet
     self.ae.require_calling_aet = self.require_calling_aet
 
-    self.post_init(start=start)
-    if start:
-      self.open() #pragma: no cover
+    # Handler setup
+    # class needs to be instantiated before handlers can be defined
+    self._evt_handlers = [
+      (evt.EVT_C_STORE,  self.handle_store),
+      (evt.EVT_ACCEPTED, self.association_accepted),
+      (evt.EVT_RELEASED, self.association_released)
+    ]
+    self.updated_patients: Dict[Optional[int], Set] = {}
+
+    self.post_init()
 
   def _log_user_error(self, Exp: Exception, user_function: str):
     self.logger.critical(f"Encountered error in user function {user_function}")
@@ -226,7 +247,7 @@ class AbstractPipeline():
     exception_info = traceback.format_exc()
     self.logger.critical(exception_info)
 
-  def _handle_store(self, event: evt.Event) -> int:
+  def handle_store(self, event: evt.Event) -> int:
     dataset = event.dataset
     dataset.file_meta = event.file_meta
     try:
@@ -251,7 +272,7 @@ class AbstractPipeline():
 
     return 0x0000
 
-  def _association_accepted(self, event: evt.Event):
+  def association_accepted(self, event: evt.Event):
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None:
@@ -260,20 +281,54 @@ class AbstractPipeline():
       else:
         self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
 
-  def _association_released(self, event: evt.Event):
+  def association_released(self, event: evt.Event):
+    """This function is called whenever an association is released
+    It's the controller function for processing data
+
+    Args:
+        event (evt.Event): _description_
+    """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.updated_patients[event.assoc.native_id]:
-      if (PatientData := self.data_state.validate_patient_ID(patient_ID)) is not None:
+      if self.data_state.validate_patient_ID(patient_ID):
+        self.logger.debug(f"Sufficient data for patient {patient_ID}")
+        if self.processing_directory is not None:
+          temporary_working_directory = self.processing_directory / str(patient_ID)
+          temporary_working_directory.mkdir(exist_ok=True)
+          chdir(temporary_working_directory)
+          self.logger.debug(f"Changed Working Directory to {temporary_working_directory}")
+
         try:
-          result = self.process(PatientData)
+          patient_input_container = self.data_state.get_patient_input_container(patient_ID)
+        except Exception as exception:
+          log_traceback(self.logger, exception, "Failed to extract input Container!")
+          raise exception
+
+
+        self.logger.debug(f"Starting Processing {patient_ID}")
+        try:
+          result = self.process(patient_input_container)
         except Exception as E:
+          self.logger.debug("processing_failed!")
           self._log_user_error(E, "Process")
+          raise E
         else:
+          self.logger.debug("Processing Successful, Dispatching output!")
           if self.dispatch(result):
+            self.logger.debug("Dispatching Successful")
             self.logger.debug(f"Removing Patient {patient_ID}")
             self.data_state.remove_patient(patient_ID)
           else:
-            self.logger.error("Unable to send output")
+            self.logger.error("Unable to dispatch pipeline output")
+        finally:
+          if self.processing_directory is not None:
+            self.logger.debug(f"Restoring directory {self.processing_directory}")
+            chdir(self.processing_directory)
+            if 'temporary_working_directory' in locals() and temporary_working_directory.exists(): #type: ignore
+              shutil.rmtree(temporary_working_directory) #type: ignore
+      else:
+        self.logger.debug(f"insufficient data for patient {patient_ID}")
+
       # Failure Logging is done by validate_patient_ID
     del self.updated_patients[event.assoc.native_id] # Removing updated Patients
 
@@ -317,7 +372,7 @@ class AbstractPipeline():
 
     return NoOutput() # pragma: no cover
 
-  def post_init(self, start : bool) -> None:
+  def post_init(self) -> None:
     """This function is called just before the server is started.
       The idea being that a user change this function to run some arbitrary code before the Dicom node starts.
       This would often be
@@ -330,59 +385,60 @@ class AbstractPipeline():
 
 class AbstractQueuedPipeline(AbstractPipeline):
   """A pipeline that processes each object one at a time
+
+  This might be very relevant when processing require a resource, such as GPU
   """
   process_queue: Queue[Tuple[str, InputContainer]]
-  dispatch_queue: Queue[Tuple[str,PipelineOutput]]
+  dispatch_queue: Queue[Tuple[str, PipelineOutput]]
+  queue_timeout = 0.05
 
   def process_worker(self):
     """Worker function for the process_queue"""
-    while True:
-      PatientID, input_container = self.process_queue.get()
+    while self.running:
       try:
-        output = self.process(input_container)
-      except Exception as E:
-        self._log_user_error(E, "process")
-      else:
-        self.dispatch_queue.put((PatientID, output))
-      finally:
-        self.process_queue.task_done()
+        PatientID, input_container = self.process_queue.get(timeout=self.queue_timeout)
+        self.logger.info(f"Process Queue extracted: {PatientID}")
+        try:
+          output = self.process(input_container)
+        except Exception as E:
+          self._log_user_error(E, "process")
+        else:
+          self.logger.info("Successfully Processed Task")
+          try:
+            success = self.dispatch(output)
+          except Exception as exception:
+            log_traceback(self.logger, exception, "Failed to process dispatch")
+          else:
+            if success:
+              self.data_state.remove_patient(PatientID)
+            else:
+              self.logger.error("could not export data!")
+        finally:
+          self.logger.info("Finished Handel Task")
+          self.process_queue.task_done()
+      except Empty as E:
+        pass
 
-  def dispatch_worker(self):
-    while True:
-      PatientID, output = self.dispatch_queue.get()
-      success = self.dispatch(output)
-      if success:
-        self.data_state.remove_patient(PatientID)
-      else:
-        self.logger.error(f"Could not export data")
-
-      self.dispatch_queue.task_done()
-
-  def _association_released(self, event: evt.Event):
+  def association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.updated_patients[event.assoc.native_id]:
-      if (input_container := self.data_state.validate_patient_ID(patient_ID)) is not None:
+      if self.data_state.validate_patient_ID(patient_ID):
         self.logger.debug(f"Sufficient data - Calling Processing")
-        self.process_queue.put((patient_ID, input_container))
+        self.process_queue.put((patient_ID, self.data_state.get_patient_input_container(patient_ID)))
     del self.updated_patients[event.assoc.native_id]
 
-  def __init__(self, start=True) -> Optional[NoReturn]:
+  def __init__(self) -> None:
+    self.running = True
+
     self.process_queue = Queue()
-    self.dispatch_queue = Queue()
-
-    self.process_thread = Thread(target=self.process_worker, daemon=True)
-    self.dispatch_thread = Thread(target=self.dispatch_worker, daemon=True)
-
+    self.process_thread = Thread(target=self.process_worker, daemon=False)
     self.process_thread.start()
-    self.dispatch_thread.start()
-
-
-
-    super().__init__(start)
+    # Super is called at the end of the function as it might not return
+    super().__init__()
 
   def close(self) -> None:
+    self.running = False
     self.process_queue.join()
-    self.dispatch_queue.join()
 
     return super().close()
 
@@ -391,8 +447,8 @@ class AbstractThreadedPipeline(AbstractPipeline):
   """
   threads: Dict[Optional[int],List[Thread]] = {}
 
-  def _handle_store(self, event: evt.Event) -> int:
-    thread: Thread = Thread(target=super()._handle_store, args=[event], daemon=True)
+  def handle_store(self, event: evt.Event) -> int:
+    thread: Thread = Thread(target=super().handle_store, args=[event], daemon=True)
     thread.start()
     if event.assoc.native_id in self.threads:
       self.threads[event.assoc.native_id].append(thread)
@@ -400,7 +456,7 @@ class AbstractThreadedPipeline(AbstractPipeline):
       self.threads[event.assoc.native_id] = [thread]
     return 0x0000
 
-  def _join_threads(self, assoc_name:Optional[int] = None) -> None:
+  def join_threads(self, assoc_name:Optional[int] = None) -> None:
     if assoc_name is None:
       for thread_list in self.threads.values():
         for thread in thread_list: # pragma: no cover
@@ -412,6 +468,6 @@ class AbstractThreadedPipeline(AbstractPipeline):
         thread.join()
       del self.threads[assoc_name]
 
-  def _association_released(self, event: evt.Event):
-    self._join_threads(event.assoc.native_id)
-    return super()._association_released(event)
+  def association_released(self, event: evt.Event):
+    self.join_threads(event.assoc.native_id)
+    return super().association_released(event)

@@ -143,6 +143,7 @@ if __name__ == '__main__':
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],
+     "nifty" : ["nibabel", "dicom2nifti"],
     },
     python_requires='>=3.9.1',
     entry_points={

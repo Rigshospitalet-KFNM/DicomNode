@@ -6,6 +6,9 @@ from pathlib import Path
 
 from unittest import TextTestRunner, TestSuite, TestLoader
 
+TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
+os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
   parser.add_argument("--verbose", type=int, default=1)
@@ -23,12 +26,11 @@ if __name__ == "__main__":
     suite.addTests(performance_tests)
 
   cwd = os.getcwd()
-  tmpDir = "/tmp/pipeline_tests"
-  tmpDirPath = Path(tmpDir)
+  tmpDirPath = Path(TESTING_TEMPORARY_DIRECTORY)
   if tmpDirPath.exists():
-    shutil.rmtree(tmpDir) #pragma: no cover
-  os.mkdir(tmpDir, mode=0o777)
-  os.chdir(tmpDir)
+    shutil.rmtree(TESTING_TEMPORARY_DIRECTORY) #pragma: no cover
+  os.mkdir(TESTING_TEMPORARY_DIRECTORY, mode=0o777)
+  os.chdir(TESTING_TEMPORARY_DIRECTORY)
   runner.run(suite)
   os.chdir(cwd)
-  shutil.rmtree(tmpDir)
+  shutil.rmtree(TESTING_TEMPORARY_DIRECTORY)

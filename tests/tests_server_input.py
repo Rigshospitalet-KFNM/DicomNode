@@ -1,25 +1,36 @@
-from unittest import TestCase
-from logging import StreamHandler
-import numpy
-from pathlib import Path
-from pydicom.uid import UID, SecondaryCaptureImageStorage
-from pydicom import Dataset
-from typing import List, Dict, Any, Callable, Iterator
-from sys import stdout
+"""Test file for src/dicomnode/server/input.py"""
 
-import shutil
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python Standard Library
 import logging
+from logging import StreamHandler
+import os
+from pathlib import Path
+from typing import List, Dict, Any, Callable, Iterator
+import shutil
+from sys import stdout
+from unittest import TestCase
 
-from tests.helpers import generate_numpy_datasets
+
+#Third Party libs
+
+import numpy
+from pydicom import Dataset
+from pydicom.uid import UID, SecondaryCaptureImageStorage
+
+
+# Dicomnode packages
+from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.dicomFactory import Blueprint
-from dicomnode.lib.numpyFactory import NumpyFactory
-from dicomnode.lib.grinders import numpy_grinder
+from dicomnode.lib.dicom_factory import Blueprint
+from dicomnode.lib.numpy_factory import NumpyFactory
+from dicomnode.lib.grinders import NumpyGrinder
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
-from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -48,10 +59,18 @@ class TestInput(AbstractInput):
 
 class TestDynamicInput(DynamicInput):
   required_tags = [0x0020000D, 0x00100020, 0x00080018]
-  image_grinder = staticmethod(numpy_grinder)
+  image_grinder = NumpyGrinder()
 
   def validate(self) -> bool:
     return len(self.data) >= 2
+
+class TestLazyDynamicMissingPathInput(DynamicInput):
+  required_tags = [0x0020000D, 0x00100020, 0x00080018]
+  image_grinder = NumpyGrinder()
+
+  def validate(self) -> bool:
+    return len(self.data) >= 2
+
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 class FaultyHistoricInput(HistoricAbstractInput):
@@ -88,6 +107,7 @@ class HistoricInput(HistoricAbstractInput):
 
 class InputTestCase(TestCase):
   def setUp(self) -> None:
+    os.chdir(TESTING_TEMPORARY_DIRECTORY)
     self.path = Path(self._testMethodName)
     self.options = TestInput.Options(
       data_directory=self.path
@@ -104,14 +124,18 @@ class InputTestCase(TestCase):
   def test_insertions(self):
     dataset = Dataset()
     self.assertRaises(InvalidDataset, self.test_input.add_image, dataset)
+    self.assertEqual(self.test_input.images, 0)
     dataset.SOPInstanceUID = gen_uid()
     self.assertRaises(InvalidDataset, self.test_input.add_image, dataset)
+    self.assertEqual(self.test_input.images, 0)
     dataset.SeriesDescription = 'Some other Description'
     self.assertRaises(InvalidDataset, self.test_input.add_image, dataset)
+    self.assertEqual(self.test_input.images, 0)
     dataset.SeriesDescription = SERIES_DESCRIPTION
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     self.test_input.add_image(dataset)
+    self.assertEqual(self.test_input.images, 1)
     self.assertTrue(self.test_input.get_path(dataset).exists()) # type: ignore
 
   def test_get_path(self):
@@ -321,26 +345,6 @@ class InputTestCase(TestCase):
     TDI = TestSillyDynamicInput()
     TDI.add_image(dataset)
 
-  def test_dynamic_input_missing_static_method(self):
-    class TestSillyDynamicInput(DynamicInput):
-      required_tags = [0x0020000D, 0x00100020, 0x00080018]
-      image_grinder = numpy_grinder
-
-      def validate(self) -> bool:
-        return False
-
-    dataset = Dataset()
-    dataset.SOPInstanceUID = gen_uid()
-    dataset.StudyInstanceUID = gen_uid()
-    dataset.SeriesInstanceUID = gen_uid()
-    dataset.PatientID = "2002112161"
-    dataset.InstanceNumber = 3
-    TDI = TestSillyDynamicInput()
-    TDI.add_image(dataset)
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, TDI.get_data)
-    self.assertIn('CRITICAL:dicomnode:image grinder is not a static method!\nFor DynamicInputs set image_grinder=staticmethod(grinder_function)', cm.output)
-
   def test_dynamic_get_data(self):
     patient_ID = "2002112161"
     studyUID = gen_uid()
@@ -353,18 +357,18 @@ class InputTestCase(TestCase):
     datasets_3 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
 
 
-    TDI = TestDynamicInput()
+    test_dynamic_input = TestDynamicInput()
 
     for dataset_1, dataset_2, dataset_3 in zip(datasets_1,datasets_2,datasets_3):
-      TDI.add_image(dataset_1)
-      TDI.add_image(dataset_2)
-      TDI.add_image(dataset_3)
+      test_dynamic_input.add_image(dataset_1)
+      test_dynamic_input.add_image(dataset_2)
+      test_dynamic_input.add_image(dataset_3)
 
-    self.assertEqual(len(TDI.data[seriesUID_1.name]),series_images)
-    self.assertEqual(len(TDI.data[seriesUID_2.name]),series_images)
-    self.assertEqual(len(TDI.data[seriesUID_3.name]),series_images)
+    self.assertEqual(len(test_dynamic_input.data[seriesUID_1.name]),series_images)
+    self.assertEqual(len(test_dynamic_input.data[seriesUID_2.name]),series_images)
+    self.assertEqual(len(test_dynamic_input.data[seriesUID_3.name]),series_images)
 
-    numpyDict = TDI.get_data()
+    numpyDict = test_dynamic_input.get_data()
 
     self.assertIsInstance(numpyDict[seriesUID_1.name], numpy.ndarray)
     self.assertIsInstance(numpyDict[seriesUID_2.name], numpy.ndarray)
@@ -374,4 +378,24 @@ class InputTestCase(TestCase):
     self.assertEqual(numpyDict[seriesUID_2.name].shape,(series_images,10,10))
     self.assertEqual(numpyDict[seriesUID_3.name].shape,(series_images,10,10))
 
+  def test_dynamic_input_lazy_missing_paths(self):
+    test_dynamic_input = TestDynamicInput(
+      options=TestDynamicInput.Options(
+      lazy=True,
+      data_directory=None
+      )
+    )
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyInstanceUID = gen_uid()
+    dataset.PatientID = "2002112161"
+    dataset.SeriesInstanceUID = gen_uid()
+    dataset.InstanceNumber = 3
+
+    self.assertRaises(IncorrectlyConfigured, test_dynamic_input.add_image, dataset)
+    dynamic_leaf = test_dynamic_input[dataset.SeriesInstanceUID]
+    self.assertIsInstance(dynamic_leaf, DynamicLeaf)
+
+    self.assertRaises(IncorrectlyConfigured, dynamic_leaf.get_path, dataset)  #type: ignore
 

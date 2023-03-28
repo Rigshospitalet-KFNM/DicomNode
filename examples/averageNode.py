@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 
 from dicomnode.lib.grinders import many_meta_grinder, tag_meta_grinder, numpy_grinder
-from dicomnode.lib.dicomFactory import Blueprint, CopyElement, FillingStrategy, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
-from dicomnode.lib.numpyFactory import NumpyFactory, image_pixel_NumpyBlueprint
+from dicomnode.lib.dicom_factory import Blueprint, CopyElement, FillingStrategy, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
+from dicomnode.lib.numpy_factory import NumpyFactory, image_pixel_blueprint
 
 
 from dicomnode.server.nodes import AbstractPipeline
@@ -24,7 +24,7 @@ INPUT_KW = "series"
 
 blueprint: Blueprint = SOP_common_blueprint \
   + image_plane_blueprint \
-  + image_pixel_NumpyBlueprint \
+  + image_pixel_blueprint \
   + general_series_blueprint
 
 factory = NumpyFactory()

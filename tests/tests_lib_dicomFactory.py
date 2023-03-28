@@ -8,8 +8,8 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicomFactory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
-  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint
+from dicomnode.lib.dicom_factory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
+  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -134,8 +134,17 @@ class HeaderBlueprintTestCase(TestCase):
 
     self.assertEqual(len(blueprint), 3)
 
-  def test_blueprint_get_required_tags(self):
-    self.assertListEqual(self.blueprint_1.get_required_tags(), [0x00100010, 0x00100020])
+  def test_blueprint_get_required_tags_empty(self):
+    self.assertListEqual(self.blueprint_1.get_required_tags(), [])
+
+  def test_blueprint_get_required_tags_many(self):
+    blueprint = Blueprint([
+      CopyElement(0x00100030),
+      CopyElement(0x00100040, Optional=True),
+      InstanceCopyElement(0x00100050, 'IS')
+    ])
+
+    self.assertListEqual(blueprint.get_required_tags(), [0x00100030, 0x00100050])
 
 class HeaderTestCase(TestCase):
   def setUp(self) -> None:
@@ -181,7 +190,7 @@ class DicomFactoryTestClass(TestCase):
   def test_AttributeElementCorporealialize(self):
     attribute_element = AttrElement(0x0008103E, 'LO','series_description')
 
-    de = attribute_element.corporealialize(self.factory, Dataset())
+    de = attribute_element.corporealialize(self.factory, [Dataset()])
 
     self.assertIsInstance(de, DataElement)
     self.assertEqual(de.tag, 0x0008103E)
@@ -193,13 +202,13 @@ class DicomFactoryTestClass(TestCase):
     optional_copy_element = CopyElement(0x00100020, Optional=True)
 
     dataset = Dataset()
-    self.assertRaises(KeyError, copy_element.corporealialize, self.factory, dataset)
-    self.assertIsNone(optional_copy_element.corporealialize(self.factory, dataset))
+    self.assertRaises(KeyError, copy_element.corporealialize, self.factory, [dataset])
+    self.assertIsNone(optional_copy_element.corporealialize(self.factory, [dataset]))
     cpr = '1502799995'
     dataset.PatientID = cpr
 
-    data_element = copy_element.corporealialize( self.factory, dataset)
-    data_element_optional = optional_copy_element.corporealialize(self.factory, dataset)
+    data_element = copy_element.corporealialize( self.factory, [dataset])
+    data_element_optional = optional_copy_element.corporealialize(self.factory, [dataset])
 
     if data_element is not None and data_element_optional is not None:
       self.assertIsInstance(data_element, DataElement)
@@ -218,13 +227,13 @@ class DicomFactoryTestClass(TestCase):
     dataset = Dataset()
     cpr = '1502799995'
     dataset.PatientID = cpr
-    self.assertIsNone(discard_element.corporealialize(self.factory, dataset))
+    self.assertIsNone(discard_element.corporealialize(self.factory, [dataset]))
 
   def test_series_element(self):
     series_element_no_arg = SeriesElement(0x0020000E, 'UI', gen_uid)
 
     dataset = Dataset()
-    de = series_element_no_arg.corporealialize(self.factory, dataset)
+    de = series_element_no_arg.corporealialize(self.factory, [dataset])
 
     self.assertEqual(de.tag, 0x0020000E)
     self.assertEqual('UI', de.VR)
@@ -241,7 +250,7 @@ class DicomFactoryTestClass(TestCase):
     dataset.PatientWeight = 90
     dataset.PatientSize = 2
 
-    de = series_element.corporealialize(self.factory, dataset)
+    de = series_element.corporealialize(self.factory, [dataset])
 
     self.assertEqual(de.tag, 0x00101022)
     self.assertEqual(de.VR, 'DS')
@@ -250,7 +259,7 @@ class DicomFactoryTestClass(TestCase):
   def test_static_element(self):
     patient_name = 'Face^Booty^Mac'
     static_element = StaticElement(0x00100010, 'PN', patient_name)
-    de = static_element.corporealialize(self.factory, Dataset())
+    de = static_element.corporealialize(self.factory, [Dataset()])
     if isinstance(de, DataElement):
       self.assertEqual(de.tag, 0x00100010)
       self.assertEqual(de.VR, 'PN')
@@ -267,8 +276,8 @@ class DicomFactoryTestClass(TestCase):
     dataset.PatientSize = 50
     dataset.PatientPosition = 'FFP'
 
-    header = self.factory.make_series_header(dataset, headerBP, FillingStrategy.DISCARD)
-    headerCopy = self.factory.make_series_header(dataset, headerBP, FillingStrategy.COPY)
+    header = self.factory.make_series_header([dataset], headerBP, FillingStrategy.DISCARD)
+    headerCopy = self.factory.make_series_header([dataset], headerBP, FillingStrategy.COPY)
 
     self.assertNotIn(0x00101020, header)
     self.assertIn(0x00101020, headerCopy)

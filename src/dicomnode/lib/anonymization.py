@@ -5,7 +5,7 @@ from pydicom.tag import BaseTag
 
 from typing import Callable, Optional
 
-from dicomnode.lib.imageTree import IdentityMapping
+from dicomnode.lib.image_tree import IdentityMapping
 
 BASE_ANONYMIZED_PATIENT_NAME = "Anonymized_PatientName"
 

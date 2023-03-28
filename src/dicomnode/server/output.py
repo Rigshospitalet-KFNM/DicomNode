@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pydicom import Dataset
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.dimse import Address, send_images
-from dicomnode.lib.imageTree import DicomTree, ImageTreeInterface
+from dicomnode.lib.image_tree import DicomTree, ImageTreeInterface
 from dicomnode.lib.io import save_dicom
 
 

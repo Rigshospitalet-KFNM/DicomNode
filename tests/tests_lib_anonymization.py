@@ -8,7 +8,7 @@ from pydicom.uid import MediaStorageDirectoryStorage
 
 from dicomnode.lib.anonymization import anonymize_dicom_tree, anonymize_dataset
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.imageTree import DicomTree, IdentityMapping
+from dicomnode.lib.image_tree import DicomTree, IdentityMapping
 
 class Lib_anonymization(TestCase):
   def setUp(self) -> None:

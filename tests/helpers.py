@@ -5,7 +5,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional,\
                     Tuple, Type, Union
-
+import os
 import numpy
 from pydicom import Dataset
 from pydicom.uid import UID, SecondaryCaptureImageStorage
@@ -14,6 +14,8 @@ from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts
 from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind,\
   PatientRootQueryRetrieveInformationModelMove #type: ignore
+
+TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
 
 from dicomnode.lib.dicom import gen_uid, make_meta
 

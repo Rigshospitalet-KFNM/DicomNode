@@ -13,21 +13,24 @@ from pydicom.uid import UID
 from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type, Iterable, Union
 import logging
 import inspect
+import os
 
 from dicomnode.lib.dimse import Address, send_move_thread
-from dicomnode.lib.dicomFactory import DicomFactory, Blueprint
+from dicomnode.lib.dicom_factory import DicomFactory, Blueprint
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
-from dicomnode.lib.lazyDataset import LazyDataset
-from dicomnode.lib.grinders import identity_grinder, dicom_tree_grinder
-from dicomnode.lib.imageTree import ImageTreeInterface
-
+from dicomnode.lib.lazy_dataset import LazyDataset
+from dicomnode.lib.grinders import Grinder, IdentityGrinder
+from dicomnode.lib.image_tree import ImageTreeInterface
+from dicomnode.lib.logging import log_traceback
 
 class AbstractInput(ImageTreeInterface, ABC):
-  required_tags: List[int] = [0x00080018, 0x7FE00010] # InstanceUID, Pixel Data
+  # Private tags should be injected, rather than put into the input
   __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
+
+  required_tags: List[int] = [0x000800180] # SOPInstanceUID
   required_values: Dict[int, Any] = {}
-  image_grinder: Callable[[Iterable[Dataset]], Any] = identity_grinder
+  image_grinder: Grinder = IdentityGrinder()
 
   @dataclass
   class Options: # These are options that are injected into all input.
@@ -73,12 +76,13 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     raise NotImplementedError #pragma: no cover
 
-  def _clean_up(self) -> None:
+  def _clean_up(self) -> int:
     """Removes any files, stored by the Input"""
     if self.path is not None:
       for dicom in self:
         p = self.get_path(dicom)
         p.unlink()
+    return self.images
 
   def get_data(self) -> Any:
     """This function retrieves all the data stores in the input,
@@ -87,7 +91,11 @@ class AbstractInput(ImageTreeInterface, ABC):
     Returns:
         Any: Data ready for the pipelines process function.
     """
-    return self.image_grinder() # type: ignore self is parsed here, fuck python
+    try:
+      return self.image_grinder(self)
+    except Exception as exception:
+      log_traceback(self.logger, exception)
+      raise exception # Reraise after logging
 
   def get_path(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
@@ -99,7 +107,7 @@ class AbstractInput(ImageTreeInterface, ABC):
         Path: The path for that dataset.
 
     Raises:
-      IncorrectlyConfigured : Calls to this function require a dictory
+      IncorrectlyConfigured : Calls to this function require a directory
     """
     if self.path is None:
       raise IncorrectlyConfigured
@@ -215,9 +223,6 @@ class DynamicInput(AbstractInput):
     for key, leaf in self.data.items():
       if not isinstance(leaf, DynamicLeaf):
         raise InvalidTreeNode # pragma: no cover
-      if not isinstance(inspect.getattr_static(self, "image_grinder"), staticmethod):
-        self.logger.critical("image grinder is not a static method!\nFor DynamicInputs set image_grinder=staticmethod(grinder_function)")
-        raise IncorrectlyConfigured
       returnDict[key] = self.image_grinder(leaf)
 
     return returnDict

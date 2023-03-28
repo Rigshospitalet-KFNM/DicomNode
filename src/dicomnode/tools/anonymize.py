@@ -6,7 +6,7 @@ from shutil import rmtree
 
 from argparse import _SubParsersAction, Namespace
 from dicomnode.lib.anonymization import anonymize_dicom_tree, BASE_ANONYMIZED_PATIENT_NAME
-from dicomnode.lib.imageTree import DicomTree, IdentityMapping, _PPrefix
+from dicomnode.lib.image_tree import DicomTree, IdentityMapping, _PPrefix
 
 
 from dicomnode.lib.utils import str2bool

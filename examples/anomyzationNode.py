@@ -2,7 +2,7 @@ from dicomnode.lib.anonymization import anonymize_dicom_tree
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.exceptions import InvalidTreeNode
 from dicomnode.lib.grinders import dicom_tree_grinder
-from dicomnode.lib.imageTree import DicomTree, IdentityMapping
+from dicomnode.lib.image_tree import DicomTree, IdentityMapping
 
 from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.server.input import AbstractInput

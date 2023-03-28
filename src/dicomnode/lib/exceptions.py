@@ -7,6 +7,9 @@ class CouldNotCompleteDIMSEMessage(Exception):
 class InvalidRootDataDirectory(Exception):
   """creating a pipelineTree with invalid root data directory"""
 
+class HeaderConstructionFailure(Exception):
+  """When a DicomFactory fails to construct a header"""
+
 class InvalidDataset(Exception):
   """Adding a dataset, which doesn't fulfil some requirements"""
 

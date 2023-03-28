@@ -11,7 +11,7 @@ import logging
 from os import environ
 
 from dicomnode.lib.dimse import Address
-from dicomnode.lib.numpyFactory import NumpyFactory, CTImageStorage_NumpyBlueprint
+from dicomnode.lib.numpy_factory import NumpyFactory, CTImageStorage_NumpyBlueprint
 from dicomnode.lib.grinders import numpy_grinder
 from dicomnode.lib.sop_mapping import CTImageStorage_required_tags
 

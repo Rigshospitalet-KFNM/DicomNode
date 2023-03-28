@@ -11,7 +11,7 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 from dicomnode.lib.dicom import make_meta
-from dicomnode.lib.lazyDataset import LazyDataset
+from dicomnode.lib.lazy_dataset import LazyDataset
 from dicomnode.lib.io import save_dicom, load_dicom
 
 from tests.helpers import generate_numpy_datasets

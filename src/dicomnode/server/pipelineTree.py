@@ -6,49 +6,36 @@
 
 __author__ = "Christoffer Vilstrup Jensen"
 
+# Python Standard Library
+from dataclasses import dataclass
+from datetime import datetime
 import logging
 from logging import Logger
-import shutil
-from dataclasses import dataclass
 from pathlib import Path
+import shutil
 from typing import Any, Callable, Dict, List, Optional, Type, Union, Iterable
+import traceback
 
-from datetime import datetime
 
+# Third Party Python Packages
 from pydicom import Dataset
 
-from dicomnode.lib.dicomFactory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
+
+# Dicomnode Library Packages
+from dicomnode.lib.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
-                                      InvalidTreeNode)
-from dicomnode.lib.imageTree import ImageTreeInterface
+                                      InvalidTreeNode, HeaderConstructionFailure)
+from dicomnode.lib.image_tree import ImageTreeInterface
+from dicomnode.lib.logging import log_traceback
 from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
-
-def __type_check_list(dicom_list: List[Dataset], maybe_dicom_iterator: Iterable[Any]):
-  for maybe_dicom in maybe_dicom_iterator:
-    if isinstance(maybe_dicom, Dataset):
-      dicom_list.append(maybe_dicom)
-    else:
-      raise InvalidTreeNode
-
-def __extract_pivot_list(abstract_input: AbstractInput) -> List[Dataset]:
-  return_list: List[Dataset] = []
-  if isinstance(abstract_input, DynamicInput):
-    for dynamic_leaf in abstract_input.data.values():
-      if isinstance(dynamic_leaf, DynamicLeaf):
-        __type_check_list(return_list, dynamic_leaf)
-      else:
-        raise InvalidTreeNode # pragma: no cover
-      break
-  else:
-    __type_check_list(return_list, abstract_input)
-
-  return return_list
-
 
 class InputContainer:
   """Simple container class for grinded input.
   """
-  def __init__(self, data: Dict[str, Any], header: Optional[SeriesHeader] = None, paths: Optional[Dict[str, Path]] = None) -> None:
+  def __init__(self,
+               data: Dict[str, Any],
+               header: Optional[SeriesHeader] = None,
+               paths: Optional[Dict[str, Path]] = None) -> None:
     self.__data = data
     self.header = header
     self.paths  = paths
@@ -111,16 +98,47 @@ class PatientNode(ImageTreeInterface):
     else:
       self.logger = logging.getLogger("dicomnode")
 
-  def _cleanup(self):
-    if self.options.container_path is not None:
-      for input in self.data.values():
-        if isinstance(input, AbstractInput):
-          input._clean_up()
+  # Helper function that must be class functions as name mangling fucks them up
+  # if they were just private module functions
+  def __type_check_list(self,dicom_list: List[Dataset], maybe_dicom_iterator: Iterable[Any]) -> None:
+    for maybe_dicom in maybe_dicom_iterator:
+      if isinstance(maybe_dicom, Dataset):
+        dicom_list.append(maybe_dicom)
+      else:
+        raise InvalidTreeNode #pragma: no cover
+
+  def __extract_pivot_list(self,abstract_input: AbstractInput) -> List[Dataset]:
+    return_list: List[Dataset] = []
+    if isinstance(abstract_input, DynamicInput):
+      for dynamic_leaf in abstract_input.data.values():
+        if isinstance(dynamic_leaf, DynamicLeaf):
+          self.__type_check_list(return_list, dynamic_leaf)
         else:
           raise InvalidTreeNode # pragma: no cover
-      shutil.rmtree(self.options.container_path)
+        break
+    else:
+      self.__type_check_list(return_list, abstract_input)
 
-  def _validateAll(self):
+    return return_list
+
+
+  def clean_up(self) -> int:
+    """This function cleans up the patient node and owned all inputs
+
+    Raises:
+        InvalidTreeNode: _description_
+    """
+    images_removed = 0
+    for input in self.data.values():
+      if isinstance(input, AbstractInput):
+        images_removed += input._clean_up()
+      else:
+        raise InvalidTreeNode # pragma: no cover
+    if self.options.container_path is not None:
+      shutil.rmtree(self.options.container_path)
+    return images_removed
+
+  def validate_inputs(self):
     valid = True
     for input in self.data.values():
       if isinstance(input, AbstractInput):
@@ -129,8 +147,8 @@ class PatientNode(ImageTreeInterface):
         raise InvalidTreeNode # pragma: no cover
     return valid
 
-  def _get_data(self) -> InputContainer:
-    """Retrieved data in the way it's supposed to be processed in.
+  def extract_input_container(self) -> InputContainer:
+    """Retrieved inputs' data in the way it's supposed to be processed in.
 
     Raises:
         InvalidTreeNode: _description_
@@ -138,43 +156,57 @@ class PatientNode(ImageTreeInterface):
     Returns:
         InputContainer: _description_
     """
-    new_instance: Dict[str, Any] = {}
-    paths: Optional[Dict[str, Path]]
+    data_directory: Dict[str, Any] = {}
+
+    path_directory: Optional[Dict[str, Path]]
     if self.options.container_path is None:
-      paths = None
+      path_directory = None
     else:
-      paths = {}
+      path_directory = {}
+
     for arg_name, input in self.data.items():
       if isinstance(input, AbstractInput):
-        new_instance[arg_name] = input.get_data()
-        if paths is not None and input.path is not None:
-          paths[arg_name] = input.path
+        self.logger.debug(f"Extracting input from {input.__class__.__name__}")
+        data_directory[arg_name] = input.get_data()
+        if path_directory is not None and input.path is not None:
+          path_directory[arg_name] = input.path
       else:
         raise InvalidTreeNode # pragma: no cover
+
+    self.logger.debug("Extracted data from all inputs")
+
     if self.options.factory is not None and self.options.header_blueprint is not None:
       pivot_list: List[Dataset] = []
 
       if self.options.pivot_input is not None:
         pivot_input= self.data[self.options.pivot_input]
         if isinstance(pivot_input, AbstractInput):
-          pivot_list = __extract_pivot_list(pivot_input)
+          pivot_list = self.__extract_pivot_list(pivot_input)
         else:
           raise InvalidTreeNode # pragma: no cover
       else:
-        for abstract_input in self.data.values():
-          if isinstance(abstract_input, AbstractInput):
-            pivot_list = __extract_pivot_list(abstract_input)
+        for pivot_input in self.data.values():
+          if isinstance(pivot_input, AbstractInput):
+            pivot_list = self.__extract_pivot_list(pivot_input)
           else:
-            raise InvalidTreeNode
+            raise InvalidTreeNode # pragma: no cover
           break
 
-      header = self.options.factory.make_series_header(
-        pivot_list, self.options.header_blueprint, self.options.filling_strategy
-      )
+      try:
+        header = self.options.factory.make_series_header(
+          pivot_list, self.options.header_blueprint, self.options.filling_strategy
+        )
+      except HeaderConstructionFailure as exception:
+        log_traceback(self.logger, exception, header_message="Failed to construct header")
+        raise exception
+      else:
+        self.logger.debug("Successfully Constructed Header")
     else:
+      self.logger.debug(f"Not Constructing header\nFactory is None: {self.options.factory is None}\nBlueprint is None: {self.options.header_blueprint is None}")
+
       header = None
 
-    input_container = self.options.InputContainerType(new_instance, header, paths)
+    input_container = self.options.InputContainerType(data_directory, header, path_directory)
 
     return input_container
 
@@ -184,7 +216,7 @@ class PatientNode(ImageTreeInterface):
       if isinstance(input, AbstractInput):
         try:
           added += input.add_image(dicom)
-        except InvalidDataset:
+        except InvalidDataset as E:
           pass
       else:
         raise InvalidTreeNode # pragma: no cover
@@ -202,11 +234,14 @@ class PatientNode(ImageTreeInterface):
         lazy=self.options.lazy
       )
 
+
 class PipelineTree(ImageTreeInterface):
   """A more specialized ImageTree, which is used by a dicom node to keep track
   of studies.
 
-  This is the root node of the servers ImageTree, It contains leafs of PatientNodes and only PatientNodes.
+  This is the root node of the servers ImageTree,
+  It contains leafs of PatientNodes and only PatientNodes.
+  Most function will raise the InvalidTreeNode exception if this is violated.
 
   The main responsibility of this class is to manage Patient Nodes: So
     - Creating new PatientNodes when needed
@@ -283,20 +318,20 @@ class PipelineTree(ImageTreeInterface):
       options = self.__get_PatientContainer_Options(IDC_path)
       self[key] = PatientNode(self.PipelineArgs, dicom, options)
 
-    IDC = self[key]
-    if isinstance(IDC, PatientNode):
-      added = IDC.add_image(dicom)
+    patient_node = self[key]
+    if isinstance(patient_node, PatientNode):
+      added = patient_node.add_image(dicom)
       self.images += added
       return added
     else:
       raise InvalidTreeNode # pragma: no cover
 
 
-  def validate_patient_ID(self, pid: str) -> Optional[InputContainer]:
+  def validate_patient_ID(self, patient_id: str) -> bool:
     """Determines if a patient have all needed data and extract it if it does
 
     Args:
-      pid (str): patient to be validated
+      patient_id (str): Patient reference
 
     Raises:
       InvalidTreeNode: If value at patient id is not a PatientNode
@@ -305,32 +340,57 @@ class PipelineTree(ImageTreeInterface):
       Optional[InputContainer]: If there's insufficient data returns None,
         Otherwise a InputContainer with the grinded values
     """
-    input_container = self[pid]
-    if input_container is None:
-      return None
-    elif isinstance(input_container, PatientNode):
-      if input_container._validateAll():
-        self.logger.debug(f"sufficient data for patient {pid}")
-        return input_container._get_data()
-      self.logger.debug(f"insufficient data for patient {pid}")
-      return None
+    patient_node = self[patient_id]
+    if isinstance(patient_node, PatientNode):
+      return patient_node.validate_inputs()
     else:
       raise InvalidTreeNode # pragma: no cover
 
+  def get_patient_input_container(self, patient_id: str) -> InputContainer:
+    """Gets the input container with the associated patient.
+    Assumes that patient id is in self
+
+    Args:
+        patient_id (str): The Patient that we want data from
+
+    Returns:
+        InputContainer: InputContainer with preprocessed data
+
+    Raises:
+      KeyError: If patient id is not in self
+      InvalidTreeNode: If value at patient_id is not a PatientNode instance
+    """
+    patient_node = self[patient_id]
+
+    self.logger.debug(f"Getting Patient node: {patient_id}")
+    if isinstance(patient_node, PatientNode):
+      return patient_node.extract_input_container()
+    else:
+      #self.logger.debug(f"get_patient_input_container - Pipeline Tree Patient node constraint violated! ")
+      raise InvalidTreeNode # pragma: no cover
+
+
   def remove_expired_studies(self, expiry_time : datetime):
-    """Removes any study in the tree that have expired.
+    """Removes any PatientNode in the tree that have expired.
 
     Args:
       expiry_time (datetime): Any study created before expiry_time is considered to be expired.
-  
     Raises:
       InvalidTreeNode: If a node is not a PatientNode
     """
-    for patient_id, patient_node in self.data:
-      if not isinstance(patient_node, PatientNode):
-        raise InvalidTreeNode # pragma: no cover
-      if patient_node.creationTime < expiry_time:
-        self.remove_patient(patient_id)
+    # Note here that iteration over a dict, require the dict not to change
+    # Hence the need to two loops.
+    # Note that this is a multi threaded application and there is a race condition
+    # if this function runs while another thread is iteration over the data dir.
+    to_be_removed = set()
+    for patient_id, patient_node in self.data.items():
+      if isinstance(patient_node, PatientNode):
+        if patient_node.creationTime < expiry_time:
+          to_be_removed.add(patient_id)
+      else:
+        raise InvalidTreeNode #pragma: no cover
+
+    self.remove_patients(to_be_removed)
 
 
   def remove_patient(self, patient_id: str) -> None:
@@ -342,13 +402,48 @@ class PipelineTree(ImageTreeInterface):
     Raises:
         InvalidTreeNode: If value at patient id is not a PatientNode
     """
-    if patient_id in self:
-      patient_node = self[patient_id]
-      if isinstance(patient_node, PatientNode):
-        patient_node._cleanup()
-        del self[patient_id]
+
+    # This function is a tad weird, since it needs to be thread safe.
+    new_data_dict = {}
+    removed_images = 0
+
+    for patient_id_dict, patient_node in self.data.items():
+      if patient_id_dict == patient_id:
+        if isinstance(patient_node, PatientNode):
+          removed_images = patient_node.clean_up()
+        else:
+          raise InvalidTreeNode # pragma: no cover
       else:
-        raise InvalidTreeNode # pragma: no cover
+        new_data_dict[patient_id_dict] = patient_node
+
+    self.images -= removed_images
+    self.data = new_data_dict
+
+
+  def remove_patients(self, patient_ids: Iterable[str]):
+    """Removes a number of patients from the tree
+
+    Args:
+        patient_ids (Iterable[str]): Collection of patient ids to be removed.
+
+    Raises:
+        InvalidTreeNode: _description_
+    """
+    new_data_dict = {}
+    removed_images = 0
+
+    for patient_id, patient_node in self.data.items():
+      if patient_id in patient_ids:
+        if isinstance(patient_node, PatientNode):
+          removed_images += patient_node.clean_up()
+        else:
+          raise InvalidTreeNode # pragma: no cover
+      else:
+        new_data_dict[patient_id] = patient_node
+
+    self.images -= removed_images
+    self.data = new_data_dict
+
 
 
   def __get_PatientContainer_Options(self, container_path: Optional[Path]) -> PatientNode.Options:

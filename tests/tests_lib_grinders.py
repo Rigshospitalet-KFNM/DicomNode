@@ -4,13 +4,13 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.lib.imageTree import DicomTree
+from dicomnode.lib.image_tree import DicomTree
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.grinders import identity_grinder, list_grinder, many_meta_grinder, dicom_tree_grinder, tag_meta_grinder
+from dicomnode.lib.grinders import IdentityGrinder, ListGrinder, DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder
 
 import numpy
 import logging
-from dicomnode.lib.grinders import numpy_grinder
+
 from tests.helpers import generate_numpy_datasets
 
 def get_test_dataset() -> Dataset:
@@ -107,12 +107,14 @@ class GrinderTests(TestCase):
     self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
 
   def test_identity_grinder(self):
-    self.assertEqual(id(identity_grinder(self.datasets)), id(self.datasets))
+    grinder = IdentityGrinder()
+    self.assertEqual(id(grinder(self.datasets)), id(self.datasets))
 
   def test_list_grinder(self):
+    grinder = ListGrinder()
     self.assertNotIsInstance(generate_numpy_datasets(3), list)
 
-    ds_list = list_grinder(generate_numpy_datasets(3))
+    ds_list = grinder(generate_numpy_datasets(3))
 
     self.assertIsInstance(ds_list, list)
     self.assertEqual(len(ds_list), 3)
@@ -121,7 +123,7 @@ class GrinderTests(TestCase):
 
 
   def test_meta_grinder(self):
-    meta_grinder = many_meta_grinder(list_grinder, dicom_tree_grinder, identity_grinder)
+    meta_grinder = ManyGrinder(ListGrinder(), DicomTreeGrinder(), IdentityGrinder())
     ds_list, dicom_tree, identity = meta_grinder(self.datasets)
 
     self.assertListEqual(ds_list, self.datasets)
@@ -135,8 +137,8 @@ class GrinderTests(TestCase):
     images = 10
     rows = 11
     cols = 12
-
-    cube = numpy_grinder(generate_numpy_datasets(
+    grinder = NumpyGrinder()
+    cube = grinder(generate_numpy_datasets(
       images, Cols=cols, Rows=rows
     ))
 
@@ -149,7 +151,8 @@ class GrinderTests(TestCase):
     rows = 11
     cols = 12
 
-    cube = numpy_grinder(generate_numpy_datasets(
+    grinder = NumpyGrinder()
+    cube = grinder(generate_numpy_datasets(
       images, Cols=cols, Rows=rows, rescale=False
     ))
 
@@ -162,7 +165,8 @@ class GrinderTests(TestCase):
     rows = 11
     cols = 12
 
-    cube = numpy_grinder(generate_numpy_datasets(
+    grinder = NumpyGrinder()
+    cube = grinder(generate_numpy_datasets(
       images, Cols=cols, Rows=rows, rescale=False, PixelRepresentation=1
     ))
 
@@ -180,7 +184,9 @@ class GrinderTests(TestCase):
     ds[1].InstanceNumber = 3
     ds[2].InstanceNumber = 2
 
-    cube = numpy_grinder(ds)
+
+    grinder = NumpyGrinder()
+    cube = grinder(ds)
 
     self.assertTrue((cube == numpy.array([[[1,1],[2,2]],[[3,3],[4,4]],[[5,5],[6,6]]])).all())
 
@@ -195,7 +201,8 @@ class GrinderTests(TestCase):
     del ds[1].InstanceNumber
     del ds[2].InstanceNumber
 
-    cube = numpy_grinder(ds)
+    grinder = NumpyGrinder()
+    cube = grinder(ds)
 
     self.assertLogs("Instance Number not present in dataset, arbitrary ordering of datasets", logging.WARNING)
     self.assertTrue((cube == numpy.array([[[1,1],[2,2]],[[5,5],[6,6]],[[3,3],[4,4]]])).all())
@@ -217,12 +224,13 @@ class GrinderTests(TestCase):
     ds[1].FloatPixelData = arr_2.tobytes()
     ds[2].FloatPixelData = arr_3.tobytes()
 
-    cube = numpy_grinder(ds)
-
+    grinder = NumpyGrinder()
+    cube = grinder(ds)
 
     self.assertTrue((cube[0,:,:] == arr_1).all())
     self.assertTrue((cube[1,:,:] == arr_2).all())
     self.assertTrue((cube[2,:,:] == arr_3).all())
+
 
   def test_numpy_double_float(self):
     ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=64))
@@ -239,7 +247,8 @@ class GrinderTests(TestCase):
     ds[1].DoubleFloatPixelData = arr_2.tobytes()
     ds[2].DoubleFloatPixelData = arr_3.tobytes()
 
-    cube = numpy_grinder(ds)
+    grinder = NumpyGrinder()
+    cube = grinder(ds)
 
     self.assertTrue((cube[0,:,:] == arr_1).all())
     self.assertTrue((cube[1,:,:] == arr_2).all())
@@ -252,7 +261,8 @@ class GrinderTests(TestCase):
     ds[1].BitsAllocated = 24
     ds[2].BitsAllocated = 24
 
-    self.assertRaises(InvalidDataset, numpy_grinder, ds)
+    grinder = NumpyGrinder()
+    self.assertRaises(InvalidDataset, grinder, ds)
 
   def test_numpy_SamplesPerPixel_3(self):
     ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
@@ -261,7 +271,8 @@ class GrinderTests(TestCase):
     ds[1].SamplesPerPixel = 3
     ds[2].SamplesPerPixel = 3
 
-    self.assertRaises(NotImplementedError, numpy_grinder, ds)
+    grinder = NumpyGrinder()
+    self.assertRaises(NotImplementedError, grinder, ds)
 
   def test_numpy_SamplesPerPixel_retired(self):
     ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
@@ -270,7 +281,8 @@ class GrinderTests(TestCase):
     ds[1].SamplesPerPixel = 4
     ds[2].SamplesPerPixel = 4
 
-    self.assertRaises(InvalidDataset, numpy_grinder, ds)
+    grinder = NumpyGrinder()
+    self.assertRaises(InvalidDataset, grinder, ds)
 
   def test_numpy_SamplesPerPixel_Nonsense(self):
     ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
@@ -279,7 +291,9 @@ class GrinderTests(TestCase):
     ds[1].SamplesPerPixel = 12
     ds[2].SamplesPerPixel = 12
 
-    self.assertRaises(InvalidDataset, numpy_grinder, ds)
+    grinder = NumpyGrinder()
+    self.assertRaises(InvalidDataset, grinder, ds)
+
 
   def test_tag_meta_grinder(self):
     patient_id = "12351"
@@ -291,17 +305,17 @@ class GrinderTests(TestCase):
     dataset.PatientSize = patient_height
     dataset.PatientWeight = patient_weight
 
-    grinderFunc = tag_meta_grinder([0x00100020, 0x00101020,0x00101030])
+    grinder = TagGrinder([0x00100020, 0x00101020,0x00101030])
 
-    tag_list = grinderFunc([dataset])
+    tag_list = grinder([dataset])
 
     self.assertIn((0x00100020, patient_id), tag_list)
     self.assertIn((0x00101020, patient_height), tag_list)
     self.assertIn((0x00101030, patient_weight), tag_list)
 
   def test_pivotless_tag_meta_grinder(self):
-    grinder_function = tag_meta_grinder([0x00100020, 0x00101020,0x00101030])
-    self.assertRaises(ValueError, grinder_function, [])
+    grinder = TagGrinder([0x00100020, 0x00101020,0x00101030])
+    self.assertRaises(ValueError, grinder, [])
 
   def test_invalid_dataset_tag_meta_grinder(self):
     patient_id = "12351"
@@ -311,6 +325,6 @@ class GrinderTests(TestCase):
     dataset.PatientID = patient_id
     dataset.PatientSize = patient_height
 
-    grinder_function = tag_meta_grinder([0x00100020, 0x00101020,0x00101030], optional=False)
+    grinder = TagGrinder([0x00100020, 0x00101020,0x00101030], optional=False)
 
-    self.assertRaises(InvalidDataset, grinder_function, [dataset])
+    self.assertRaises(InvalidDataset, grinder, [dataset])
