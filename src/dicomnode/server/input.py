@@ -4,22 +4,26 @@ number of classes which you should use to define your input for your process fun
 
 """
 
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python standard Library
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict
 from logging import Logger
 from pathlib import Path
+from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
+
+# Third party packages
 from pydicom import Dataset
 from pydicom.uid import UID
-from typing import List, Callable, Dict, Tuple, Any, Optional, Iterator, Type, Iterable, Union
-import logging
-import inspect
-import os
 
+# Dicomnode packages
 from dicomnode.lib.dimse import Address, send_move_thread
 from dicomnode.lib.dicom_factory import DicomFactory, Blueprint
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.lazy_dataset import LazyDataset
+from dicomnode.lib.logging import get_logger
 from dicomnode.lib.grinders import Grinder, IdentityGrinder
 from dicomnode.lib.image_tree import ImageTreeInterface
 from dicomnode.lib.logging import log_traceback
@@ -54,7 +58,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     if self.options.logger is not None:
       self.logger = self.options.logger
     else:
-      self.logger = logging.getLogger("dicomnode")
+      self.logger = get_logger()
 
     if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
       self.required_tags.append(0x00080018)

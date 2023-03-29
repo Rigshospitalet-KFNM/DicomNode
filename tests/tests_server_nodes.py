@@ -1,3 +1,8 @@
+""""""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Standard Python Library #
 from copy import deepcopy
 import logging
 import os
@@ -8,6 +13,7 @@ from time import sleep
 from typing import List, Dict, Any, Iterable
 from unittest import TestCase
 
+# Third Party packages #
 from pydicom import Dataset
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
@@ -17,15 +23,15 @@ from dicomnode.lib.dicom_factory import Blueprint, CopyElement, StaticElement
 from dicomnode.lib.numpy_factory import NumpyFactory
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.image_tree import DicomTree
-
-from tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae, TESTING_TEMPORARY_DIRECTORY
-
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.pipelineTree import InputContainer
 
+# Test Helpers #
+from tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae, TESTING_TEMPORARY_DIRECTORY, testing_logs
 
+# Constants declarations #
 TEST_AE_TITLE = "TEST_AE"
 SENDER_AE = "SENDER_AE"
 
@@ -63,7 +69,10 @@ class TestNeverValidatingInput(AbstractInput):
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
   required_tags: List[int] = [0x00080018]
-  c_move_blueprint = Blueprint([CopyElement(0x00100020), StaticElement(0x00080052, 'CS', 'PATIENT')])
+  c_move_blueprint = Blueprint(
+    [CopyElement(0x00100020),
+     StaticElement(0x00080052, 'CS', 'PATIENT')
+    ])
 
   def validate(self) -> bool:
     return True
@@ -79,6 +88,7 @@ class TestNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
+  log_output = None
   log_level: int = logging.DEBUG
   disable_pynetdicom_logger: bool = True
   processing_directory = None
@@ -92,6 +102,7 @@ class NeverValidateNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestNeverValidatingInput }
   require_calling_aet = [SENDER_AE]
+  log_output = None
   log_level: int = logging.DEBUG
   disable_pynetdicom_logger: bool = True
   processing_directory = None
@@ -105,6 +116,7 @@ class FaultyNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
+  log_output = None
   log_level: int = logging.DEBUG
   disable_pynetdicom_logger: bool = True
   processing_directory = None
@@ -118,6 +130,7 @@ class FileStorageNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
+  log_output = None
   log_level: int = logging.DEBUG
   disable_pynetdicom_logger: bool = True
   root_data_directory = DICOM_STORAGE_PATH
@@ -133,6 +146,7 @@ class FaultyFilterNode(AbstractPipeline):
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
   log_level: int = logging.DEBUG
+  log_output = None
   disable_pynetdicom_logger: bool = True
   processing_directory = None
 
@@ -147,6 +161,7 @@ class MaxFilterNode(AbstractPipeline):
   input = {INPUT_KW : TestInput }
   require_calling_aet = [SENDER_AE]
   log_level: int = logging.CRITICAL
+  log_output = None
   disable_pynetdicom_logger: bool = True
   processing_directory = None
 
@@ -163,6 +178,7 @@ class TestThreadedNode(AbstractThreadedPipeline):
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
   processing_directory = None
+  log_output = None
 
   def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
@@ -178,6 +194,7 @@ class FileStorageThreadedNode(AbstractThreadedPipeline):
   disable_pynetdicom_logger: bool = True
   root_data_directory = fs_threaded_path
   processing_directory = None
+  log_output = None
 
   def process(self, InputData: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
@@ -194,6 +211,7 @@ class HistoricPipeline(AbstractPipeline):
   disable_pynetdicom_logger: bool = False
   dicom_factory = NumpyFactory()
   processing_directory = None
+  log_output = None
 
   def process(self, input_container: InputContainer) -> PipelineOutput:
     return NoOutput()
@@ -205,6 +223,7 @@ class QueueNode(AbstractQueuedPipeline):
   ae_title = TEST_AE_TITLE
   disable_pynetdicom_logger = True
   processing_directory = None
+  log_output = None
 
   def process(self, input_container: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
@@ -216,6 +235,7 @@ class FaultyQueueNode(AbstractQueuedPipeline):
   ae_title = TEST_AE_TITLE
   disable_pynetdicom_logger = True
   processing_directory = None
+  log_output = None
 
   def process(self, input_container: InputContainer) -> PipelineOutput:
     raise Exception
@@ -248,7 +268,13 @@ class PipelineTestCase(TestCase):
 
   def test_reject_connection(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    self.assertRaises(CouldNotCompleteDIMSEMessage,send_image,"NOT_SENDER_AE", address, DEFAULT_DATASET)
+    self.assertRaises(
+      CouldNotCompleteDIMSEMessage,
+      send_image,
+      "NOT_SENDER_AE",
+      address,
+      DEFAULT_DATASET
+    )
 
   def test_missing_sex(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -625,6 +651,7 @@ class HistoricTestCase(TestCase):
 
   def tearDown(self) -> None:
     self.node.close()
+
 
   def test_create_and_send(self):
     address = Address("localhost", self.test_port, TEST_AE_TITLE)

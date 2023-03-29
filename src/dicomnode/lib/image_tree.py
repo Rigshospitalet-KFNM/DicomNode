@@ -1,24 +1,30 @@
-import logging
-from abc import ABC, abstractclassmethod, abstractmethod
+""""""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python Standard Library
+from abc import ABC, abstractmethod
 from math import ceil, log10
 from pathlib import Path
-from pprint import pformat, pprint
-from typing import (Any, Callable, Dict, Iterable, Iterator, List, Optional,
-                    Union)
+from pprint import pformat
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Union
 
+# Third party Packages
 from psutil import virtual_memory
-from pydicom import Dataset, FileDataset, write_file, DataElement
+from pydicom import Dataset, DataElement
 from pydicom.errors import InvalidDicomError
 from pydicom.uid import UID
 
+# Dicom node packages
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.logging import get_logger
 from dicomnode.lib.utils import prefixInt
 
 _PPrefix = "AnonymizedPatientID_"
 
-logger = logging.getLogger("dicomnode")
+logger = get_logger()
 
 class IdentityMapping():
   """

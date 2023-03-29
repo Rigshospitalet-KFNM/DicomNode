@@ -1,17 +1,24 @@
-import logging
+""""""
 
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python Standart Library
+from abc import ABC, abstractmethod
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Iterable, Tuple, Type, Callable
-from abc import ABC, abstractmethod
 
+# Third Party Packages
 from pydicom import Dataset
+
+# Dicomnode Packages
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.dimse import Address, send_images
 from dicomnode.lib.image_tree import DicomTree, ImageTreeInterface
 from dicomnode.lib.io import save_dicom
+from dicomnode.lib.logging import get_logger
 
-
-logger = logging.getLogger("dicomnode")
+logger = get_logger()
 
 class PipelineOutput(ABC):
   """Base Class for pipeline outputs.

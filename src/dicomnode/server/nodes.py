@@ -16,8 +16,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from copy import deepcopy
 from datetime import datetime, timedelta
 import logging
-from logging import StreamHandler, getLogger
-from logging.handlers import TimedRotatingFileHandler
+from logging import getLogger
 from os import chdir, getcwd
 from pathlib import Path
 from queue import Queue, Empty
@@ -26,7 +25,7 @@ from sys import stdout
 from threading import Thread
 from time import sleep
 import traceback
-from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple
+from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple, TextIO
 
 # Third part packages
 from pynetdicom import evt
@@ -35,14 +34,13 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 # Dicomnode packages
+from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
 from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, FillingStrategy
-from dicomnode.lib.logging import log_traceback
+from dicomnode.lib.logging import log_traceback, get_logger, set_logger
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
-
-correct_date_format = "%Y/%m/%d %H:%M:%S"
 
 class AbstractPipeline():
   """Base Class for an image processing Pipeline
@@ -89,10 +87,179 @@ class AbstractPipeline():
 
   #Logging Configuration
   backup_weeks: int = 8
-  log_path: Optional[Union[str, Path]] = None
+  log_date_format = "%Y/%m/%d %H:%M:%S"
+  log_output: Optional[Union[TextIO, Path, str]] = stdout
   log_level: int = logging.INFO
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
   disable_pynetdicom_logger: bool = True
+
+  def __init__(self) -> None:
+    # This function starts and opens the server
+    #
+    # 1. Logging
+    # 2. File system
+    # 3. Create Server
+    # 4. If start is true, start the server
+
+    # logging
+    if isinstance(self.log_output, str):
+      self.log_output = Path(self.log_output)
+
+    self.logger = get_logger()
+    """
+    self.logger = set_logger(
+      log_output=self.log_output,
+      log_level=self.log_level,
+      format=self.log_format,
+      date_format=self.log_date_format,
+      backupCount=self.backup_weeks
+    )
+    """
+
+    if self.disable_pynetdicom_logger:
+      getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
+
+    self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
+    self.maintenance_thread.start()
+
+    # Load any previous state
+    if self.data_directory is not None:
+      if not isinstance(self.data_directory, Path):
+        self.data_directory = Path(self.data_directory)
+
+      if self.data_directory.is_file():
+        raise IncorrectlyConfigured("The root data directory exists as a file.")
+
+      if not self.data_directory.exists():
+        self.data_directory.mkdir(parents=True)
+
+    options = self.pipelineTreeType.Options(
+      ae_title=self.ae_title,
+      data_directory=self.data_directory,
+      factory=self.dicom_factory,
+      filling_strategy=self.filling_strategy,
+      header_blueprint=self.header_blueprint,
+      lazy=self.lazy_storage,
+      input_container_type=self.InputContainerType,
+      patient_container=self.PatientContainerType,
+    )
+
+    self.data_state: PipelineTree = self.pipelineTreeType(
+      self.patient_identifier_tag,
+      self.input,
+      options
+    )
+
+    # Server validations and creation.
+    self.ae = AE(ae_title = self.ae_title)
+    # You need VerificationPresentationContexts for ECHOSCU
+    # and you want ECHO-SCU
+    contexts = VerificationPresentationContexts + self.supported_contexts
+    self.ae.supported_contexts = contexts
+
+    self.ae.require_called_aet = self.require_called_aet
+    self.ae.require_calling_aet = self.require_calling_aet
+
+    # Handler setup
+    # class needs to be instantiated before handlers can be defined
+    self._evt_handlers = [
+      (evt.EVT_C_STORE,  self.handle_C_STORE_message),
+      (evt.EVT_ACCEPTED, self.association_accepted),
+      (evt.EVT_RELEASED, self.association_released)
+    ]
+    self.updated_patients: Dict[Optional[int], Set] = {}
+
+    self.post_init()
+
+  def _log_user_error(self, Exp: Exception, user_function: str):
+    self.logger.critical(f"Encountered error in user function {user_function}")
+    self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
+    exception_info = traceback.format_exc()
+    self.logger.critical(exception_info)
+
+  def handle_C_STORE_message(self, event: evt.Event) -> int:
+    dataset = event.dataset
+    dataset.file_meta = event.file_meta
+    try:
+      if not self.filter(dataset):
+        self.logger.warning("Dataset discarded")
+        return 0xB006 # Element discarded
+    except Exception as E:
+      self._log_user_error(E, "Filter")
+      return 0xA801
+
+    if event.assoc.native_id is None:
+      raise IncorrectlyConfigured # pragma no cover # unreachable code
+
+    return self.store_dataset(dataset, event.assoc.native_id)
+
+  def store_dataset(self, dataset: Dataset, assoc_id: int) -> int:
+    if self.patient_identifier_tag in dataset:
+      patientID = deepcopy(dataset[self.patient_identifier_tag].value)
+      try:
+        self.data_state.add_image(dataset)
+        self.updated_patients[assoc_id].add(patientID)
+      except InvalidDataset:
+        self.logger.debug(f"Received dataset is not accepted by any inputs")
+        return 0xB006
+    else:
+      self.logger.debug(f"Node: Received dataset, doesn't have patient Identifier tag")
+      return 0xB007
+
+    return 0x0000
+
+
+  def association_accepted(self, event: evt.Event):
+    self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
+    for requested_context in event.assoc.requestor.requested_contexts:
+      if requested_context.abstract_syntax is not None:
+        if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
+          self.updated_patients[event.assoc.native_id] = set()
+      else:
+        self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
+
+  def association_released(self, event: evt.Event):
+    """This function is called whenever an association is released
+    It's the controller function for processing data
+
+    Args:
+        event (evt.Event): _description_
+    """
+    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
+    for patient_ID in self.updated_patients[event.assoc.native_id]:
+      self.initial_environment_for_processing_patient(patient_ID)
+    del self.updated_patients[event.assoc.native_id] # Removing updated Patients
+
+
+  def initial_environment_for_processing_patient(self, patient_ID: str) -> None:
+    if self.data_state.validate_patient_ID(patient_ID):
+      self.logger.debug(f"Sufficient data for patient {patient_ID}")
+      if self.processing_directory is not None:
+        with TemporaryWorkingDirectory(self.processing_directory / str(patient_ID)) as twd:
+          self.main_processing_loop(patient_ID)
+      else:
+        self.main_processing_loop(patient_ID)
+
+    else:
+      self.logger.debug(f"insufficient data for patient {patient_ID}")
+
+  def main_processing_loop(self, patient_ID):
+    try:
+      patient_input_container = self.data_state.get_patient_input_container(patient_ID)
+      result = self.process(patient_input_container)
+    except Exception as E:
+      self._log_user_error(E, "Process")
+      raise E
+    else:
+      self.logger.debug(f"Process {patient_ID} Successful, Dispatching output!")
+      if self.dispatch(result):
+        self.logger.debug("Dispatching Successful")
+        self.logger.debug(f"Removing Patient {patient_ID}")
+        self.data_state.remove_patient(patient_ID)
+      else:
+        self.logger.error("Unable to dispatch pipeline output")
+
+
 
   def close(self) -> None:
     """Closes all connections active connections & cleans up any temporary working spaces.
@@ -157,180 +324,7 @@ class AbstractPipeline():
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.data_state.remove_expired_studies(expiry_datetime)
 
-  def __init__(self) -> None:
-    # This function starts and opens the server
-    #
-    # 1. Logging
-    # 2. File system
-    # 3. Create Server
-    # 4. If start is true, start the server
 
-    # logging
-    log_formatter = logging.Formatter(self.log_format)
-
-    if self.log_path:
-      handler = TimedRotatingFileHandler(
-          filename=self.log_path,
-          when='W0',
-          backupCount=self.backup_weeks,
-      )
-    else:
-      handler = StreamHandler(stream=stdout)
-
-    handler.setLevel(self.log_level)
-    handler.setFormatter(log_formatter)
-    self.logger = getLogger("dicomnode")
-    self.logger.handlers.clear()
-    self.logger.addHandler(handler)
-    self.logger.info("Set up logger!")
-    print(self.logger.handlers)
-
-
-    if self.disable_pynetdicom_logger:
-      getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
-
-    self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
-    self.maintenance_thread.start()
-
-    # Load any previous state
-    if self.data_directory is not None:
-      if not isinstance(self.data_directory, Path):
-        self.data_directory = Path(self.data_directory)
-
-      if self.data_directory.is_file():
-        raise IncorrectlyConfigured("The root data directory exists as a file.")
-
-      if not self.data_directory.exists():
-        self.data_directory.mkdir(parents=True)
-
-    options = self.pipelineTreeType.Options(
-      ae_title=self.ae_title,
-      data_directory=self.data_directory,
-      factory=self.dicom_factory,
-      filling_strategy=self.filling_strategy,
-      header_blueprint=self.header_blueprint,
-      lazy=self.lazy_storage,
-      input_container_type=self.InputContainerType,
-      patient_container=self.PatientContainerType,
-    )
-
-    self.data_state: PipelineTree = self.pipelineTreeType(
-      self.patient_identifier_tag,
-      self.input,
-      options
-    )
-
-    # Server validations and creation.
-    self.ae = AE(ae_title = self.ae_title)
-    # You need VerificationPresentationContexts for ECHOSCU
-    # and you want ECHO-SCU
-    contexts = VerificationPresentationContexts + self.supported_contexts
-    self.ae.supported_contexts = contexts
-
-    self.ae.require_called_aet = self.require_called_aet
-    self.ae.require_calling_aet = self.require_calling_aet
-
-    # Handler setup
-    # class needs to be instantiated before handlers can be defined
-    self._evt_handlers = [
-      (evt.EVT_C_STORE,  self.handle_store),
-      (evt.EVT_ACCEPTED, self.association_accepted),
-      (evt.EVT_RELEASED, self.association_released)
-    ]
-    self.updated_patients: Dict[Optional[int], Set] = {}
-
-    self.post_init()
-
-  def _log_user_error(self, Exp: Exception, user_function: str):
-    self.logger.critical(f"Encountered error in user function {user_function}")
-    self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
-    exception_info = traceback.format_exc()
-    self.logger.critical(exception_info)
-
-  def handle_store(self, event: evt.Event) -> int:
-    dataset = event.dataset
-    dataset.file_meta = event.file_meta
-    try:
-      if not self.filter(dataset):
-        self.logger.warning("Dataset discarded")
-        return 0xB006 # Element discarded
-    except Exception as E:
-      self._log_user_error(E, "Filter")
-      return 0xA801
-
-    if self.patient_identifier_tag in dataset:
-      patientID = deepcopy(dataset[self.patient_identifier_tag].value)
-      try:
-        self.data_state.add_image(dataset)
-        self.updated_patients[event.assoc.native_id].add(patientID)
-      except InvalidDataset:
-        self.logger.debug(f"Received dataset is not accepted by any inputs")
-        return 0xB006
-    else:
-      self.logger.debug(f"Node: Received dataset, doesn't have patient Identifier tag")
-      return 0xB007
-
-    return 0x0000
-
-  def association_accepted(self, event: evt.Event):
-    self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
-    for requested_context in event.assoc.requestor.requested_contexts:
-      if requested_context.abstract_syntax is not None:
-        if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
-          self.updated_patients[event.assoc.native_id] = set()
-      else:
-        self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
-
-  def association_released(self, event: evt.Event):
-    """This function is called whenever an association is released
-    It's the controller function for processing data
-
-    Args:
-        event (evt.Event): _description_
-    """
-    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    for patient_ID in self.updated_patients[event.assoc.native_id]:
-      if self.data_state.validate_patient_ID(patient_ID):
-        self.logger.debug(f"Sufficient data for patient {patient_ID}")
-        if self.processing_directory is not None:
-          temporary_working_directory = self.processing_directory / str(patient_ID)
-          temporary_working_directory.mkdir(exist_ok=True)
-          chdir(temporary_working_directory)
-          self.logger.debug(f"Changed Working Directory to {temporary_working_directory}")
-
-        try:
-          patient_input_container = self.data_state.get_patient_input_container(patient_ID)
-        except Exception as exception:
-          log_traceback(self.logger, exception, "Failed to extract input Container!")
-          raise exception
-
-
-        self.logger.debug(f"Starting Processing {patient_ID}")
-        try:
-          result = self.process(patient_input_container)
-        except Exception as E:
-          self.logger.debug("processing_failed!")
-          self._log_user_error(E, "Process")
-          raise E
-        else:
-          self.logger.debug("Processing Successful, Dispatching output!")
-          if self.dispatch(result):
-            self.logger.debug("Dispatching Successful")
-            self.logger.debug(f"Removing Patient {patient_ID}")
-            self.data_state.remove_patient(patient_ID)
-          else:
-            self.logger.error("Unable to dispatch pipeline output")
-        finally:
-          if self.processing_directory is not None:
-            self.logger.debug(f"Restoring directory {self.processing_directory}")
-            chdir(self.processing_directory)
-            if 'temporary_working_directory' in locals() and temporary_working_directory.exists(): #type: ignore
-              shutil.rmtree(temporary_working_directory) #type: ignore
-      else:
-        self.logger.debug(f"insufficient data for patient {patient_ID}")
-
-      # Failure Logging is done by validate_patient_ID
-    del self.updated_patients[event.assoc.native_id] # Removing updated Patients
 
   def dispatch(self, output: PipelineOutput) -> bool:
     """This function is responsible for triggering exporting of data and handling errors.
@@ -447,8 +441,8 @@ class AbstractThreadedPipeline(AbstractPipeline):
   """
   threads: Dict[Optional[int],List[Thread]] = {}
 
-  def handle_store(self, event: evt.Event) -> int:
-    thread: Thread = Thread(target=super().handle_store, args=[event], daemon=True)
+  def handle_C_STORE_message(self, event: evt.Event) -> int:
+    thread: Thread = Thread(target=super().handle_C_STORE_message, args=[event], daemon=False)
     thread.start()
     if event.assoc.native_id in self.threads:
       self.threads[event.assoc.native_id].append(thread)

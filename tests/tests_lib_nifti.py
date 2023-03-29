@@ -5,6 +5,7 @@ import logging
 from pprint import pprint
 from random import randint
 import shutil
+from sys import stdout
 from time import sleep
 from typing import NoReturn, Optional
 from unittest import TestCase
@@ -22,11 +23,11 @@ from dicomnode.lib.dicom_factory import Blueprint, FillingStrategy, patient_blue
 from dicomnode.lib.numpy_factory import image_pixel_blueprint
 from dicomnode.lib.nifti import NiftiGrinder, NiftiFactory
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.nodes import AbstractQueuedPipeline
+from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipelineTree import InputContainer
 from dicomnode.server.output import NoOutput, Address, FileOutput
 
-from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
+from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY, testing_logs
 
 class NiftyGrinderTestCase(TestCase):
   def setUp(self) -> None:
@@ -120,7 +121,7 @@ class NiftiInput(AbstractInput):
     image_grinder = NiftiGrinder(None, reorient_nifti=False)
 
 
-class NiftiNode(AbstractQueuedPipeline):
+class NiftiNode(AbstractPipeline):
   # Directories
   output_dir = Path(f"{TESTING_TEMPORARY_DIRECTORY}/output")
   processing_directory = Path(f"{TESTING_TEMPORARY_DIRECTORY}/nifty_working_dir")
@@ -137,10 +138,9 @@ class NiftiNode(AbstractQueuedPipeline):
         + SOP_common_blueprint
   filling_strategy = FillingStrategy.COPY
 
-
-
   # Logging
-  log_level = logging.DEBUG
+  log_level = logging.INFO
+  log_output = stdout
   log_format = "%(asctime)s %(name)s %(funcName)s %(lineno)s %(levelname)s %(message)s"
 
   ae_title = TEST_AE_TITLE
@@ -194,10 +194,13 @@ class End2EndNiftiTestCase(TestCase):
     rows = 300
     cols = 400
 
+    PatientID = "FooBar"
+
+
     datasets = [ ds for ds in generate_numpy_datasets(slices,
                                                       Rows=rows,
                                                       Cols=cols,
-                                                      PatientID="FooBar"
+                                                      PatientID=PatientID
                                                       )]
     positions = extrapolate_image_position_patient(
       slice_thickness=slice_z,
@@ -213,28 +216,30 @@ class End2EndNiftiTestCase(TestCase):
     study_date = datetime.date(2012,8,3)
     study_time = datetime.time(11,00,00)
 
-    for dataset, position in zip(datasets, positions):
-      dataset.PatientName = "Test^Person^1"
-      dataset.PatientSex = "M"
-      dataset.AccessionNumber = "AccessionNumber"
-      dataset.StudyDate = study_date
-      dataset.StudyTime = study_time
-      dataset.SliceThickness=slice_z
-      dataset.FrameOfReferenceUID = frame_of_reference_uid
-      dataset.PositionReferenceIndicator = None
-      dataset.ImagePositionPatient = position
-      dataset.ImageOrientationPatient = image_orientation
-      dataset.PatientPosition = "FFS"
-      dataset.Modality = "CT"
-      dataset.PixelSpacing = [slice_x,slice_y]
-      dataset.SOPClassUID = CTImageStorage
-      make_meta(dataset)
-
     with self.assertLogs(node.logger, logging.DEBUG) as cm:
-      node.open(blocking=False)
-      send_images(SENDER_AE, address, datasets)
-      node.close()
+      for dataset, position in zip(datasets, positions):
+        dataset.PatientName = "Test^Person^1"
+        dataset.PatientSex = "M"
+        dataset.AccessionNumber = "AccessionNumber"
+        dataset.StudyDate = study_date
+        dataset.StudyTime = study_time
+        dataset.SliceThickness=slice_z
+        dataset.FrameOfReferenceUID = frame_of_reference_uid
+        dataset.PositionReferenceIndicator = None
+        dataset.ImagePositionPatient = position
+        dataset.ImageOrientationPatient = image_orientation
+        dataset.PatientPosition = "FFS"
+        dataset.Modality = "CT"
+        dataset.PixelSpacing = [slice_x,slice_y]
+        dataset.SOPClassUID = CTImageStorage
+        make_meta(dataset)
+        node.data_state.add_image(dataset)
+
+      node.initial_environment_for_processing_patient(patient_ID=PatientID)
+
 
     pprint(cm.output)
+
+    testing_logs()
 
 

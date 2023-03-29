@@ -1,23 +1,28 @@
+""""""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python standard Library
 from dataclasses import dataclass, field
 from enum import Enum
 from os import environ
-
 from pathlib import Path
+from typing import List, Tuple, Optional, Union
+import platform
+from shutil import which
+
+# Third party Packages
 from pydicom import Dataset
 from pylatex import Document, MiniPage, NoEscape, Package, Command, Head, Foot, \
   PageStyle, StandAloneGraphic, Tabular as LatexTable
 from pylatex.utils import bold
-from typing import List, Tuple, Optional, Union
 
-import logging
-
-import platform
-
-from shutil import which
-
+# Dicomnode packages
 from dicomnode.constants import DICOMNODE_ENV_FONT_PATH
 from dicomnode.lib.exceptions import InvalidLatexCompiler, InvalidFont
+from dicomnode.lib.logging import get_logger
 
+# List of known Latex compilers
 compilers: List[str] = [
   "pdflatex",
   "lualatex",
@@ -25,7 +30,7 @@ compilers: List[str] = [
   "latex",
 ]
 
-logger = logging.getLogger("dicomnode")
+logger = get_logger()
 
 @dataclass
 class PatientHeader:

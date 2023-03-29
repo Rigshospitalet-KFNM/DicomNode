@@ -8,6 +8,9 @@ from unittest import TextTestRunner, TestSuite, TestLoader
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
+# DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing 
+from tests.helpers import testing_logs
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
@@ -15,7 +18,7 @@ if __name__ == "__main__":
   parser.add_argument("-p", "--performance", action='store_true')
 
   args = parser.parse_args()
-
+  testing_logs()
 
   runner = TextTestRunner()
   loader = TestLoader()

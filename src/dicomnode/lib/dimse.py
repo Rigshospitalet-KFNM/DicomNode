@@ -6,7 +6,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from dataclasses import dataclass
 from enum import Enum
 
-import logging
+
 from typing import Iterable, Callable, Optional
 
 
@@ -18,8 +18,10 @@ from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove # 
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.lib.dicom import make_meta
 from dicomnode.lib.utils import ThreadWithReturnValue
+from dicomnode.lib.logging import get_logger
 
-logger = logging.getLogger("dicomnode")
+
+logger = get_logger()
 
 class QueryLevels(Enum):
   PATIENT="PATIENT"

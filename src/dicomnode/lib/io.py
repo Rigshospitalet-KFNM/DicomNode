@@ -1,15 +1,21 @@
+""""""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python Standard Library
 from argparse import Namespace
-from logging import Logger
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+import os
+from typing import Dict, Optional, Tuple, Type, Union
+import shutil
 
-
-from psutil import virtual_memory
-
+# Thrid party Packages
 import pydicom
 from pydicom import Dataset, Sequence
 from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Pydicom have some fancy import stuff.
+
+# Dicomnode Library
 from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
@@ -126,3 +132,33 @@ def load_private_tags_from_args(args : Namespace) -> Dict[int, Tuple[str,str,str
   if args.privatetags:
     private_tags = load_private_tags(args.privatetags, args.strictParsing)
   return private_tags
+
+
+
+class TemporaryWorkingDirectory():
+  """Creating a temporary directory for work to be done in
+
+  Args:
+    path_to_new_dir (Path | str) - path to the directory to be created
+
+  Example:
+  >>> with TemporaryWorkingDirectory("/tmp/dir") as dir:
+          os.getcwd # returns /tmp/dir
+  >>> os.getcwd # returns cwd + /tmp/dir is destroyed
+  """
+
+  def __init__(self, path_to_new_dir: Union[Path,str]) -> None:
+    if isinstance(path_to_new_dir, str):
+      path_to_new_dir = Path(path_to_new_dir)
+    self.__cwd = os.getcwd()
+    self.temp_directory_path = path_to_new_dir
+    if not path_to_new_dir.exists():
+      path_to_new_dir.mkdir(exist_ok=True, parents=True)
+
+  def __enter__(self):
+    os.chdir(self.temp_directory_path)
+    return self
+
+  def __exit__(self, exc_type: Type[Exception], exc_val: Exception, exc_tb):
+    os.chdir(self.__cwd)
+    shutil.rmtree(self.temp_directory_path)

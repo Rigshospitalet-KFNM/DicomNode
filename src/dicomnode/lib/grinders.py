@@ -16,18 +16,20 @@ called and not just referenced.
 
 __author__ = "Christoffer Vilstrup Jensen"
 
+# Python Standard Library
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
 
-from abc import ABC, abstractmethod
+# Third party packages
+import numpy
 from pydicom import Dataset
+
+# Dicom node package
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.image_tree import DicomTree
+from dicomnode.lib.logging import get_logger
 
-import numpy
-import logging
-
-logger = logging.getLogger("dicomnode")
-
+logger = get_logger()
 
 class Grinder(ABC):
   """Interface for injection of grinding method

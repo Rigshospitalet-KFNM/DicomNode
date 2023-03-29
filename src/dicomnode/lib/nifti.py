@@ -21,12 +21,13 @@ from nibabel.nifti1 import Nifti1Image
 from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicomnode
+from dicomnode.lib.dicom_factory import SeriesHeader
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.grinders import Grinder
-from dicomnode.lib.dicom_factory import SeriesHeader
 from dicomnode.lib.numpy_factory import NumpyFactory
+from dicomnode.lib.logging import get_logger
 
-logger = logging.getLogger("dicomnode")
+logger = get_logger()
 
 class NiftiGrinder(Grinder):
   INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need define a valid Path for output_directory"

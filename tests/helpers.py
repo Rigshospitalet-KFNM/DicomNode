@@ -12,11 +12,12 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 from pynetdicom import events
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts
-from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind,\
-  PatientRootQueryRetrieveInformationModelMove #type: ignore
+from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, PatientRootQueryRetrieveInformationModelMove #type: ignore
 
 TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
 
+# Dicomnode
+from dicomnode.lib.logging import set_logger
 from dicomnode.lib.dicom import gen_uid, make_meta
 
 unsigned_array_encoding: Dict[int, Type[numpy.unsignedinteger]] = {
@@ -209,3 +210,7 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
   )
 
   return ae
+
+def testing_logs():
+  """Set or reset logs up for testing"""
+  set_logger(None)

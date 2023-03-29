@@ -14,19 +14,16 @@ from logging import Logger
 from pathlib import Path
 import shutil
 from typing import Any, Callable, Dict, List, Optional, Type, Union, Iterable
-import traceback
-
 
 # Third Party Python Packages
 from pydicom import Dataset
-
 
 # Dicomnode Library Packages
 from dicomnode.lib.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode, HeaderConstructionFailure)
 from dicomnode.lib.image_tree import ImageTreeInterface
-from dicomnode.lib.logging import log_traceback
+from dicomnode.lib.logging import log_traceback, get_logger
 from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
 
 class InputContainer:
@@ -96,7 +93,7 @@ class PatientNode(ImageTreeInterface):
     if self.options.logger is not None:
       self.logger = self.options.logger
     else:
-      self.logger = logging.getLogger("dicomnode")
+      self.logger = get_logger()
 
   # Helper function that must be class functions as name mangling fucks them up
   # if they were just private module functions
@@ -253,8 +250,9 @@ class PipelineTree(ImageTreeInterface):
     ae_title: Optional[str] = None
     data_directory: Optional[Path] = None
     factory: Optional[DicomFactory] = None
-    lazy: bool = False
     filling_strategy: FillingStrategy = FillingStrategy.DISCARD
+    lazy: bool = False
+    logger: Optional[Logger] = None
     input_container_type: Type[InputContainer] = InputContainer
     patient_container: Type[PatientNode] = PatientNode
     header_blueprint: Optional[Blueprint] = None
@@ -284,7 +282,10 @@ class PipelineTree(ImageTreeInterface):
     self.options = options
 
     #Logger Setup
-    self.logger: logging.Logger = logging.getLogger("dicomnode")
+    if self.options.logger is None:
+      self.logger = get_logger()
+    else:
+      self.logger = self.options.logger
 
     #Load File state
     if self.root_data_directory is None: # There are no files to load if it's in memory
