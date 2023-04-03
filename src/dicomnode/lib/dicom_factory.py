@@ -293,6 +293,13 @@ class SeriesHeader():
     for element in self._blueprint.values():
       yield element
 
+  def __str__(self) -> str:
+    message = f"SeriesHeader with {len(self._blueprint)} tags:\n"
+    for tag in self:
+      message += f"    Tag: {tag.tag} - {tag.__class__.__name__}\n"
+
+    return message
+
 class DicomFactory(ABC):
   """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
 

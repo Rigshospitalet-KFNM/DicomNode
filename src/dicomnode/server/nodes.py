@@ -14,18 +14,21 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Standard lib
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 import logging
 from logging import getLogger
 from os import chdir, getcwd
 from pathlib import Path
 from queue import Queue, Empty
+import signal
 import shutil
 from sys import stdout
 from threading import Thread
 from time import sleep
 import traceback
-from typing import Dict, Type, List, Optional, Set, Any, NoReturn, Union, Tuple, TextIO
+from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO, Tuple, Type, Union
 
 # Third part packages
 from pynetdicom import evt
@@ -35,12 +38,75 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.lib.io import TemporaryWorkingDirectory
-from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured, InvalidPynetdicomEvent
 from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, FillingStrategy
 from dicomnode.lib.logging import log_traceback, get_logger, set_logger
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.output import PipelineOutput, NoOutput
+
+""" Dataclasses for pynetdicom.event extraction.
+
+These datacases exists mostly to make testing siginifigantly easier,
+because they allow emulation of a connection in test cases
+"""
+class AssociationTypes(Enum):
+  StoreAssocation = 1
+
+class AssocationDataContainer:
+  @classmethod
+  def get_event_id(cls, event: evt.Event) -> int:
+    if event.assoc.native_id is None:
+        raise ValueError("") # pragma no cover
+    return event.assoc.native_id
+
+
+@dataclass
+class AssociationAcceptedDataContainer(AssocationDataContainer):
+  assocation_id : int # Connects events triggered by this assocation
+  assocation_types : set[AssociationTypes] # Checks if this assocation is a store association or not
+
+  @classmethod
+  def from_event(cls, event: evt.Event):
+    association_types = set()
+    for requested_context in event.assoc.requestor.requested_contexts:
+      if requested_context.abstract_syntax is not None and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
+        association_types.add(AssociationTypes.StoreAssocation)
+    return cls(cls.get_event_id(event), association_types)
+
+
+@dataclass
+class AssociationReleasedDataContainer(AssocationDataContainer):
+  assocation_id : int # Connects events triggered by this assocation
+  assocation_types : set[AssociationTypes] # Checks if this assocation is a store association or not
+
+  @classmethod
+  def from_event(cls, event: evt.Event):
+    association_types = set()
+    for requested_context in event.assoc.requestor.requested_contexts:
+      if requested_context.abstract_syntax is not None and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
+        association_types.add(AssociationTypes.StoreAssocation)
+    return cls(cls.get_event_id(event), association_types)
+
+
+@dataclass
+class CStoreDataContainer(AssocationDataContainer):
+  assocation_id : int
+  dataset: Dataset
+
+  @classmethod
+  def from_event(cls, event: evt.Event):
+    dataset = event.dataset
+    dataset.file_meta = event.file_meta
+
+    return cls(cls.get_event_id(event), dataset)
+
+
+""" Abstract pipeliens
+  - These are the class you want to super class
+"""
+
+
 
 class AbstractPipeline():
   """Base Class for an image processing Pipeline
@@ -99,14 +165,11 @@ class AbstractPipeline():
     # 1. Logging
     # 2. File system
     # 3. Create Server
-    # 4. If start is true, start the server
 
     # logging
     if isinstance(self.log_output, str):
       self.log_output = Path(self.log_output)
 
-    self.logger = get_logger()
-    """
     self.logger = set_logger(
       log_output=self.log_output,
       log_level=self.log_level,
@@ -114,7 +177,6 @@ class AbstractPipeline():
       date_format=self.log_date_format,
       backupCount=self.backup_weeks
     )
-    """
 
     if self.disable_pynetdicom_logger:
       getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
@@ -133,7 +195,7 @@ class AbstractPipeline():
       if not self.data_directory.exists():
         self.data_directory.mkdir(parents=True)
 
-    options = self.pipelineTreeType.Options(
+    pipeline_tree_options = self.pipelineTreeType.Options(
       ae_title=self.ae_title,
       data_directory=self.data_directory,
       factory=self.dicom_factory,
@@ -147,7 +209,7 @@ class AbstractPipeline():
     self.data_state: PipelineTree = self.pipelineTreeType(
       self.patient_identifier_tag,
       self.input,
-      options
+      pipeline_tree_options
     )
 
     # Server validations and creation.
@@ -163,44 +225,41 @@ class AbstractPipeline():
     # Handler setup
     # class needs to be instantiated before handlers can be defined
     self._evt_handlers = [
-      (evt.EVT_C_STORE,  self.handle_C_STORE_message),
-      (evt.EVT_ACCEPTED, self.association_accepted),
+      (evt.EVT_C_STORE,  self.handle_c_store),
+      (evt.EVT_ACCEPTED, self.handle_association_accepted),
       (evt.EVT_RELEASED, self.association_released)
     ]
-    self.updated_patients: Dict[Optional[int], Set] = {}
+    self.updated_patients: Dict[Optional[int], Set[str]] = {}
 
     self.post_init()
 
-  def _log_user_error(self, Exp: Exception, user_function: str):
-    self.logger.critical(f"Encountered error in user function {user_function}")
-    self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
-    exception_info = traceback.format_exc()
-    self.logger.critical(exception_info)
+  # End def __init__
+  """ Store dataset process
 
-  def handle_C_STORE_message(self, event: evt.Event) -> int:
-    dataset = event.dataset
-    dataset.file_meta = event.file_meta
+  Responsiblities:
+    - handle_c_store_message - extracts information from event
+    - control_c_store_function - main function responsible for calling correct functions
+  """
+  def handle_c_store(self, event: evt.Event) -> int:
+    c_store_data_container = CStoreDataContainer.from_event(event)
+    return self.control_c_store(c_store_data_container)
+
+  def control_c_store(self, c_store_data_container: CStoreDataContainer) -> int:
     try:
-      if not self.filter(dataset):
+      if not self.filter(c_store_data_container.dataset):
         self.logger.warning("Dataset discarded")
         return 0xB006 # Element discarded
     except Exception as E:
       self._log_user_error(E, "Filter")
       return 0xA801
 
-    if event.assoc.native_id is None:
-      raise IncorrectlyConfigured # pragma no cover # unreachable code
-
-    return self.store_dataset(dataset, event.assoc.native_id)
-
-  def store_dataset(self, dataset: Dataset, assoc_id: int) -> int:
-    if self.patient_identifier_tag in dataset:
-      patientID = deepcopy(dataset[self.patient_identifier_tag].value)
+    if self.patient_identifier_tag in c_store_data_container.dataset:
+      patientID = deepcopy(c_store_data_container.dataset[self.patient_identifier_tag].value)
       try:
-        self.data_state.add_image(dataset)
-        self.updated_patients[assoc_id].add(patientID)
+        self.data_state.add_image(c_store_data_container.dataset)
+        self.updated_patients[c_store_data_container.assocation_id].add(patientID)
       except InvalidDataset:
-        self.logger.debug(f"Received dataset is not accepted by any inputs")
+        self.logger.info(f"Received dataset is not accepted by any inputs")
         return 0xB006
     else:
       self.logger.debug(f"Node: Received dataset, doesn't have patient Identifier tag")
@@ -209,14 +268,17 @@ class AbstractPipeline():
     return 0x0000
 
 
-  def association_accepted(self, event: evt.Event):
+  def handle_association_accepted(self, event: evt.Event):
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
-    for requested_context in event.assoc.requestor.requested_contexts:
-      if requested_context.abstract_syntax is not None:
-        if requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
-          self.updated_patients[event.assoc.native_id] = set()
-      else:
-        self.logger.error("Requestor have no abstract syntax? this is impossible") # pragma: no cover Unreachable code
+    association_accept_data_container = AssociationAcceptedDataContainer.from_event(event)
+
+    for association_type in association_accept_data_container.assocation_types:
+      handler = self.acceptation_handlers.get(association_type)
+      if handler is not None:
+        handler(self, association_accept_data_container)
+
+  def handler_accept_store_assocation(self, association: AssociationAcceptedDataContainer):
+    self.updated_patients[association.assocation_id] = set()
 
   def association_released(self, event: evt.Event):
     """This function is called whenever an association is released
@@ -226,22 +288,26 @@ class AbstractPipeline():
         event (evt.Event): _description_
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    for patient_ID in self.updated_patients[event.assoc.native_id]:
-      self.initial_environment_for_processing_patient(patient_ID)
-    del self.updated_patients[event.assoc.native_id] # Removing updated Patients
+    association_released_data_container = AssociationReleasedDataContainer.from_event(event)
+
+    for association_type in association_released_data_container.assocation_types:
+      handler = self.release_handlers.get(association_type)
+      if handler is not None:
+        handler(self, association_released_data_container)
 
 
-  def initial_environment_for_processing_patient(self, patient_ID: str) -> None:
-    if self.data_state.validate_patient_ID(patient_ID):
-      self.logger.debug(f"Sufficient data for patient {patient_ID}")
-      if self.processing_directory is not None:
-        with TemporaryWorkingDirectory(self.processing_directory / str(patient_ID)) as twd:
+  def handler_release_store_association(self, association_released_data_container: AssociationReleasedDataContainer):
+    for patient_ID in self.updated_patients[association_released_data_container.assocation_id]:
+      if self.data_state.validate_patient_ID(patient_ID):
+        self.logger.debug(f"Sufficient data for patient {patient_ID}")
+        if self.processing_directory is not None:
+          with TemporaryWorkingDirectory(self.processing_directory / str(patient_ID)) as twd:
+            self.main_processing_loop(patient_ID)
+        else:
           self.main_processing_loop(patient_ID)
       else:
-        self.main_processing_loop(patient_ID)
-
-    else:
-      self.logger.debug(f"insufficient data for patient {patient_ID}")
+        self.logger.debug(f"Insufficient data for patient {patient_ID}")
+    del self.updated_patients[association_released_data_container.assocation_id] # Removing updated Patients
 
   def main_processing_loop(self, patient_ID):
     try:
@@ -272,7 +338,6 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self.logger.info("Closing Server!")
-
     self.ae.shutdown()
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -297,6 +362,8 @@ class AbstractPipeline():
       block=blocking,
       evt_handlers=self._evt_handlers)
 
+
+  ### Mian
   def maintenance_worker(self) -> NoReturn: #pragma no cover
     """This is the controller for the worker thread
 
@@ -325,6 +392,15 @@ class AbstractPipeline():
     self.data_state.remove_expired_studies(expiry_datetime)
 
 
+  def _log_user_error(self, Exp: Exception, user_function: str):
+    self.logger.critical(f"Encountered error in user function {user_function}")
+    self.logger.critical(f"The exception type: {Exp.__class__.__name__}")
+    exception_info = traceback.format_exc()
+    self.logger.critical(exception_info)
+
+
+  ##### User functions ######
+  # These are the fucntions you should consider overwritting
 
   def dispatch(self, output: PipelineOutput) -> bool:
     """This function is responsible for triggering exporting of data and handling errors.
@@ -375,6 +451,18 @@ class AbstractPipeline():
         start (bool): Indication if the server should start
     """
     pass
+
+  ##### Handler Directories #####
+  # Handlers are an extendable way of 
+
+  # Extendable Handlers
+  acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AssociationAcceptedDataContainer], None]] # Note that Self is only a part of python 3.11
+    AssociationTypes.StoreAssocation : handler_accept_store_assocation
+  }
+
+  release_handlers = { # Dict[AssociationTypes, Callable[[Self, AssociationReleasedDataContainer], None]]
+    AssociationTypes.StoreAssocation : handler_release_store_association
+  }
 
 
 class AbstractQueuedPipeline(AbstractPipeline):
@@ -441,8 +529,8 @@ class AbstractThreadedPipeline(AbstractPipeline):
   """
   threads: Dict[Optional[int],List[Thread]] = {}
 
-  def handle_C_STORE_message(self, event: evt.Event) -> int:
-    thread: Thread = Thread(target=super().handle_C_STORE_message, args=[event], daemon=False)
+  def handle_c_store(self, event: evt.Event) -> int:
+    thread: Thread = Thread(target=super().handle_c_store, args=[event], daemon=False)
     thread.start()
     if event.assoc.native_id in self.threads:
       self.threads[event.assoc.native_id].append(thread)

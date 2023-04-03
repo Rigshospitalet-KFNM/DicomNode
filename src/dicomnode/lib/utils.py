@@ -1,9 +1,23 @@
-from argparse import ArgumentTypeError
-from typing import Any, Callable, Union
-from pydicom import Dataset
-from typing import Iterable, Mapping, Optional, Union
+"""Functions that doesn't have any strong home place
 
+Try and avoid putting functions in here
+"""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python standard Library
+from argparse import ArgumentTypeError
 from threading import Thread
+from typing import Any, Union
+
+# Third party packages
+import numpy
+from pydicom import Dataset
+
+# Dicomnode Packages
+
+# End of imports
+
 
 def str2bool(v:Union[str, bool]) -> bool:
   """This function convert commons strings to their respective boolean values
@@ -26,24 +40,48 @@ def str2bool(v:Union[str, bool]) -> bool:
   else:
     raise ArgumentTypeError("Boolean value expected")
 
+
 def prefixInt(number: int, minLength: int= 4):
   numberStr = str(number)
   zeroes = (minLength - len(numberStr)) * "0"
   return f"{zeroes}{numberStr}"
 
 
-
 class ThreadWithReturnValue(Thread):
-    def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs={}, daemon=True):
-        Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
-        self._return: Any = None
+  def __init__(self, group=None, target=None, name=None,
+              args=(), kwargs={}, daemon=True):
+    Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
+    self._return: Any = None
 
-    def run(self):
-        if self._target is not None:
-            self._return = self._target(*self._args, **self._kwargs)
+  def run(self):
+    if self._target is not None: # type: ignore # In python you don't have private variables
+      self._return = self._target(*self._args, **self._kwargs) #type: ignore
 
 
-    def join(self, *args):
-        Thread.join(self, *args)
-        return self._return
+  def join(self, *args):
+    Thread.join(self, *args)
+    return self._return
+
+def colomn_to_row_major_order(input: numpy.ndarray) -> numpy.ndarray:
+  """Converts an array from a Column major to row major
+
+  See https://en.wikipedia.org/wiki/Row-_and_column-major_order
+
+  Args:
+    input (numpy.ndarray): An three dimensional array of dimensions (x,y,z)
+
+  Returns:
+    (numpy.ndarray): An three dimensional array of dimensions (z,y,x) containing the data
+  """
+  # I should test this function on some real data.
+
+  if len(input.shape) != 3:
+    raise TypeError("Invalid Shape, accepts only three dimensional arrays")
+
+  return_array = numpy.empty(tuple(reversed(input.shape)), order='C')
+
+  for index in range(input.shape[2]):
+    return_array[index, :, :] = input[:,:,index].T
+
+  return return_array
+

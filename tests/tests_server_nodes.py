@@ -8,12 +8,15 @@ import logging
 import os
 from random import randint
 from pathlib import Path
-from sys import getrefcount
+from pprint import pprint
+from sys import getrefcount, stdout
 from time import sleep
 from typing import List, Dict, Any, Iterable
-from unittest import TestCase
+import threading
+from unittest import skip, TestCase
 
 # Third Party packages #
+from pynetdicom import debug_logger
 from pydicom import Dataset
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
@@ -83,21 +86,6 @@ class FaultyPipelineOutput(PipelineOutput):
     raise Exception
 
 ##### Test Pipeline Implementations #####
-
-class TestNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
-  log_output = None
-  log_level: int = logging.DEBUG
-  disable_pynetdicom_logger: bool = True
-  processing_directory = None
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    self.logger.info("process is called")
-    return NoOutput()
-
-
 class NeverValidateNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestNeverValidatingInput }
@@ -242,8 +230,21 @@ class FaultyQueueNode(AbstractQueuedPipeline):
 
 ##### Test Cases #####
 class PipelineTestCase(TestCase):
+  class TestNode(AbstractPipeline):
+    ae_title = TEST_AE_TITLE
+    input = {INPUT_KW : TestInput }
+    require_calling_aet = [SENDER_AE]
+    log_output = None
+    log_level: int = logging.DEBUG
+    disable_pynetdicom_logger: bool = True
+    processing_directory = None
+
+    def process(self, InputData: InputContainer) -> PipelineOutput:
+      self.logger.info("process is called")
+      return NoOutput()
+
   def setUp(self):
-    self.node = TestNode()
+    self.node = self.TestNode()
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
@@ -341,6 +342,8 @@ class FileStorageTestCase(TestCase):
   def tearDown(self) -> None:
     while self.node.ae.active_associations != []:
       sleep(0.005)
+
+    #pprint([t for t in threading.enumerate()])
     self.node.close()
 
   @bench
@@ -390,8 +393,11 @@ class FileStorageTestCase(TestCase):
       ret_1 = thread_1.join()
       ret_2 = thread_2.join()
 
-    self.assertIn(f"INFO:dicomnode:process is called at cwd: {str(self.node.processing_directory)}/{CPR_1}",cm.output)
-    self.assertIn(f"INFO:dicomnode:process is called at cwd: {str(self.node.processing_directory)}/{CPR_2}",cm.output)
+    log_entry_1 = f"INFO:dicomnode:process is called at cwd: {str(self.node.processing_directory)}/{CPR_1}"
+    log_entry_2 = f"INFO:dicomnode:process is called at cwd: {str(self.node.processing_directory)}/{CPR_2}"
+
+    self.assertIn(log_entry_1, cm.output)
+    self.assertIn(log_entry_2, cm.output)
 
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
@@ -475,13 +481,10 @@ class TestNodeTestCase(TestCase):
       ]
     ))
 
-
     thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-
     ret_1 = thread_1.join()
 
     self.assertEqual(ret_1, 0)
-
     self.assertEqual(self.node.data_state.images, 50) # type: ignore
 
   def test_threaded_send_concurrently(self):
@@ -512,12 +515,10 @@ class TestNodeTestCase(TestCase):
       ret_1 = thread_1.join()
       ret_2 = thread_2.join()
 
-    self.assertIn("DEBUG:dicomnode:insufficient data for patient 1502799995", cm.output)
-    self.assertIn("DEBUG:dicomnode:insufficient data for patient 0201919996", cm.output)
-
+    self.assertIn("DEBUG:dicomnode:Insufficient data for patient 1502799995", cm.output)
+    self.assertIn("DEBUG:dicomnode:Insufficient data for patient 0201919996", cm.output)
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
-
     self.assertEqual(self.node.data_state.images, 2* num_images)
 
 
@@ -536,6 +537,7 @@ class FileStorageThreadedNodeTestCase(TestCase):
 
   @bench
   def performance_threaded_send_concurrently_fs(self):
+    # Setup
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
     images_2 = DicomTree(generate_numpy_datasets(50, PatientID = "0201919996"))
@@ -555,6 +557,7 @@ class FileStorageThreadedNodeTestCase(TestCase):
       ]
     ))
 
+    # Test
     thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
     thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
 
@@ -563,8 +566,8 @@ class FileStorageThreadedNodeTestCase(TestCase):
 
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
-
     self.assertEqual(self.node.data_state.images,100) # type: ignore
+
 
   def test_threaded_send_concurrently_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -586,16 +589,15 @@ class FileStorageThreadedNodeTestCase(TestCase):
         (0x00100040,"CS", "M")
       ]
     ))
-
+    # Test
     thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
     thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
-
+    # Wait for text completion
     ret_1 = thread_1.join()
     ret_2 = thread_2.join()
-
+    # Asserts
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
-
     self.assertEqual(self.node.data_state.images,2 * num_images)
 
 class QueuedNodeTestCase(TestCase):
@@ -652,12 +654,13 @@ class HistoricTestCase(TestCase):
   def tearDown(self) -> None:
     self.node.close()
 
-
   def test_create_and_send(self):
     address = Address("localhost", self.test_port, TEST_AE_TITLE)
-    endpoint = get_test_ae(ENDPOINT_PORT, self.test_port, logging.getLogger("dicomnode"))
+    endpoint = get_test_ae(ENDPOINT_PORT, self.test_port, self.node.logger)
 
-    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+    with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
       response = send_image(SENDER_AE, address, DEFAULT_DATASET)
       sleep(0.25) # wait for all the threads to be done
     endpoint.shutdown()
+
+    

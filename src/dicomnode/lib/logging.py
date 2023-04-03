@@ -10,7 +10,7 @@ from typing import Optional, Union, TextIO
 from traceback import format_exc
 
 # Global Variables for configuration
-
+__propergate = False
 __number_of_backups = 8
 __when = "W0"
 __date_format = "%Y/%m/%d %H:%M:%S"
@@ -47,10 +47,11 @@ def __setup_logger() -> Logger:
   global __log_output
   global __when
   global __number_of_backups
+  global __propergate
 
   __logger = getLogger(__logger_name)
   __logger.setLevel(__log_level)
-  __logger.handlers.clear()
+
 
   if __log_output is None:
     __logger.setLevel(CRITICAL + 1)
@@ -66,10 +67,11 @@ def __setup_logger() -> Logger:
       backupCount=__number_of_backups
     )
 
-  print(f"Setting Format to: {__format}")
-
   log_formatter = Formatter(fmt=__format, datefmt=__date_format)
   handler.setFormatter(log_formatter)
+  if __logger.hasHandlers():
+    __logger.handlers.clear()
+  __logger.propagate = __propergate
   __logger.addHandler(handler)
 
   return __logger
@@ -82,7 +84,8 @@ def set_logger(
     date_format: Optional[str] = None,
     logger_name: Optional[str] = None,
     when: Optional[str] = None,
-    backupCount: Optional[int] = None
+    backupCount: Optional[int] = None,
+    propergate: Optional[bool]  = None,
   ) -> Logger:
   global __log_output
   global __date_format
@@ -91,6 +94,7 @@ def set_logger(
   global __logger_name
   global __when
   global __number_of_backups
+  global __propergate
 
   __log_output = log_output
 
@@ -111,6 +115,9 @@ def set_logger(
 
   if backupCount is not None:
     __number_of_backups = backupCount
+
+  if propergate is not None:
+    __propergate = propergate
 
   return __setup_logger()
 

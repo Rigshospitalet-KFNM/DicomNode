@@ -121,7 +121,8 @@ class NumpyFactory(DicomFactory):
 
 
   def build_from_header(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
-    """This construct a dicom series from a header and numpy array containing 
+    """This construct a dicom series from a header and numpy array containing
+    the Image
 
     Args:
         header (SeriesHeader): _description_
@@ -133,6 +134,9 @@ class NumpyFactory(DicomFactory):
     Returns:
         List[Dataset]: _description_
     """
+    if image.flags['F_CONTIGUOUS']:
+      image = image.T
+
     target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid

@@ -11,10 +11,13 @@ from pydicom import Dataset
 from pydicom.uid import UID, SecondaryCaptureImageStorage
 from pynetdicom import events
 from pynetdicom.ae import ApplicationEntity
-from pynetdicom.presentation import AllStoragePresentationContexts
-from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, PatientRootQueryRetrieveInformationModelMove #type: ignore
+from pynetdicom.presentation import AllStoragePresentationContexts, build_context
+from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, StudyRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind, PatientRootQueryRetrieveInformationModelMove  #type: ignore
 
-TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
+try:
+  TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
+except KeyError:
+  TESTING_TEMPORARY_DIRECTORY = "/tmp/dicomnode_tests"
 
 # Dicomnode
 from dicomnode.lib.logging import set_logger
@@ -156,25 +159,33 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 
   def _handle_C_store(evt: events.Event):
     logger.info("Received C Store")
+
     return 0x0000
 
   def _handle_C_move(evt: events.Event):
     logger.info("Received C Move")
     identifier = evt.identifier # Dataset send by c move
+    reqested_contexts = [build_context(identifier.SOPClassUID)]
 
     # yield destination ip address and port
-    yield 'localhost', destination_port
+    kwargs = {
+      "contexts": reqested_contexts
+    }
+
+    yield ('127.0.0.1', destination_port, kwargs)
     # yield number of C-stores
-    yield 1
 
-    # For dataset in container:
-    #    if Cancelled
-    #       yield 0xFE00, None
-    #    yield (0xFF00,dataset)
-    if evt.is_cancelled:
-      yield 0xFE00, None
+    number_of_datasets = 1
 
-    yield 0xFF00, Dataset
+    yield number_of_datasets
+
+    for dataset_index in range(number_of_datasets):
+      if evt.is_cancelled:
+        yield 0xFE00, None
+
+      yield 0xFF00, dataset
+
+    logger.info("Finished handling C Move")
 
   def _handle_C_find(evt: events.Event):
     if 'QueryRetrieveLevel' not in evt.identifier:
@@ -195,10 +206,12 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 
     yield 0xFF00, dataset
 
-  ae = ApplicationEntity(ae_title="DUMMY")
+  ae = ApplicationEntity()
   ae.supported_contexts = AllStoragePresentationContexts
   ae.add_supported_context(StudyRootQueryRetrieveInformationModelFind)
+  ae.add_supported_context(StudyRootQueryRetrieveInformationModelMove)
   ae.add_supported_context(PatientRootQueryRetrieveInformationModelMove)
+  ae.add_supported_context(PatientRootQueryRetrieveInformationModelFind)
   ae.start_server(('127.0.0.1', port),
     evt_handlers=[
       (events.EVT_C_MOVE, _handle_C_move),

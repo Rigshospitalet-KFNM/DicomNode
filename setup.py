@@ -5,6 +5,8 @@ import sys
 import re
 import subprocess
 from pathlib import Path
+import shutil
+
 
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
@@ -124,13 +126,22 @@ class CMakeBuild(build_ext):
         )
 
 if __name__ == '__main__':
+  extensions = [
+    CMakeExtension("dicomnode._c")
+  ]
+
+  if shutil.which("nvcc"):
+    extensions.append(
+      CMakeExtension("dicomnode._cuda")
+    )
+
   setup(name='dicomnode',
     version='0.0.2',
     description='Test',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
     package_dir={"":"src"},
-    ext_modules=[CMakeExtension("dicomnode._c"), CMakeExtension("dicomnode._cuda")],
+    ext_modules=extensions,
     cmdclass={"build_ext": CMakeBuild},
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
@@ -143,7 +154,7 @@ if __name__ == '__main__':
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],
-     "nifty" : ["nibabel", "dicom2nifti"],
+     "nifti" : ["nibabel", "dicom2nifti"],
     },
     python_requires='>=3.9.1',
     entry_points={

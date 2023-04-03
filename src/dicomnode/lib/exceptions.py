@@ -33,3 +33,6 @@ class InvalidLatexCompiler(Exception):
 
 class InvalidFont(Exception):
   """When a font isn't a OTF or a TTF font"""
+
+class InvalidPynetdicomEvent(Exception):
+  """When a pynetdicom event is belongs to an unexcepted type"""

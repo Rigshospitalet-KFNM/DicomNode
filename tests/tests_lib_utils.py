@@ -1,11 +1,23 @@
+"""This file contains test from dicomnode.lib.utils and other tests
+That do not have any home.
+"""
+
+__author__ = "Christoffer Vilstrup Jensen"
+
+# Python Standard Library
 from argparse import ArgumentTypeError
-from pydicom import Dataset
 from unittest import TestCase
 
-from dicomnode.lib.dicom import gen_uid
+# Thrid Party packages
+import numpy
+from pydicom import Dataset
 
+# Dicomnode packages
+from dicomnode.lib.dicom import gen_uid
+from dicomnode.lib.utils import str2bool, colomn_to_row_major_order
+
+# Testing helpers
 from tests.helpers import bench
-from dicomnode.lib.utils import str2bool
 
 
 class Lib_util_TestCase(TestCase):
@@ -54,5 +66,27 @@ class pydicomTestCases(TestCase):
       dataset.add_new(0x0020000D,'UI',gen_uid())
       dataset.add_new(0x0020000E,'UI',gen_uid())
       dataset.add_new(0x00080016,'UI',gen_uid())
-      dataset.add_new(0x00100020, 'LO', "Helloworld")
+      dataset.add_new(0x00100020,'LO',"Helloworld")
       datasets.append(dataset)
+
+
+  def test_row_to_column(self):
+    input_array = numpy.arange(4*3*2).reshape((4,3,2))
+    test_array = colomn_to_row_major_order(input_array)
+
+    self.assertEqual(test_array.shape, (2,3,4))
+    to_list = [[[ elem for elem in subsublist] # Convert to build-in lists
+                for subsublist in sublist]
+                for sublist in test_array ]
+    self.assertListEqual(to_list, [
+      [[ 0.0,  6.0,  12.0, 18.0],
+       [ 2.0,  8.0, 14.0, 20.0],
+       [ 4.0, 10.0, 16.0, 22.0],
+      ],
+      [[ 1.0,  7.0, 13.0, 19.0],
+       [ 3.0,  9.0, 15.0, 21.0],
+       [ 5.0, 11.0, 17.0, 23.0],
+      ]
+    ])
+
+

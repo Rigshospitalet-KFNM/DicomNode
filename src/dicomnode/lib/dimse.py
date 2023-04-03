@@ -143,9 +143,6 @@ def send_move(SCU_AE: str,
   if "QueryRetrieveLevel" not in dataset:
     dataset.QueryRetrieveLevel = query_level
 
-  if 0x00080052 not in dataset:
-    dataset.add_new(0x00080052,'CS', query_level.value)
-
   if query_level == QueryLevels.PATIENT and 'PatientID' not in dataset:
     logger.error("Attempted to send a move at Patient level without a PatientID tag")
     raise InvalidQueryDataset
@@ -169,12 +166,8 @@ def send_move(SCU_AE: str,
 
   successful_send = True
   if assoc.is_established:
-    try:
-      response = assoc.send_c_move(dataset, SCU_AE, query_request_context)
-    except Exception as E: #pragma: no cover
-      logger.critical("Exception Rose in sending image")
-      assoc.release()
-      raise E
+    logger.debug("Sending C move")
+    response = assoc.send_c_move(dataset, SCU_AE, query_request_context)
     for (status, identifier) in response:
       if status:
         logger.debug(f"status: {status}")
@@ -190,9 +183,10 @@ def send_move(SCU_AE: str,
       IP: {address.ip}
       Port: {address.port}
       SCP AE: {address.ae_title}
-      SCU AE:{SCU_AE}
+      SCU AE: {SCU_AE}
     """
     logger.error(error_message)
+    successful_send = False
 
   if not successful_send:
     raise CouldNotCompleteDIMSEMessage

@@ -13,9 +13,11 @@ This module have extra dependencies on nibabel and dicom2nifty and can be instal
 # Python standard library
 import logging
 from pathlib import Path
+from pprint import pprint
 from typing import Iterable, List, Optional
 
 # Third party packages
+import numpy
 from pydicom import Dataset
 from nibabel.nifti1 import Nifti1Image
 from dicom2nifti.convert_dicom import dicom_array_to_nifti
@@ -67,6 +69,29 @@ class NiftiGrinder(Grinder):
 
 class NiftiFactory(NumpyFactory):
   def build_from_header(self, header: SeriesHeader, image: Nifti1Image) -> List[Dataset]:
+    """Builds a dicom serie from a nifti image and a header
+
+    Args:
+      header (dicomnode.lib.dicom_factory.SeriesHeader): The container for header information
+      image (nibabel.Nifti1Image): Image to be converted into a dicom series.
+
+    Returns:
+      List[pydicom.Dataset]: Series of Dicom Datasets containing the input image
+    >>>
+
+    """
+    # So nifti in all is wisdom they decided to use coulmn major arrays
+    # I have no idea why but a conversion is needed
+    # I Need to check test this, and i wrote a util function for this.
     numpy_image = image.get_fdata()
 
-    return super().build_from_header(header, numpy_image)
+    if image.ndim == 3:
+      coloumn_major_shape = image.header.get_data_shape() # type: ignore cols, rows, slices, volumes
+      row_major_shape = (coloumn_major_shape[2], coloumn_major_shape[1], coloumn_major_shape[0])
+
+      if numpy_image.shape != row_major_shape:
+        numpy_image = numpy.ascontiguousarray(numpy_image.T)
+
+      return super().build_from_header(header, numpy_image)
+    else:
+      raise NotImplemented # pragma: no cover

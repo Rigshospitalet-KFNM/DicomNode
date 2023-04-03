@@ -8,8 +8,9 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicom_factory import AttrElement, CopyElement, DicomFactory, DiscardElement, FillingStrategy, \
-  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement
+from dicomnode.lib.dicom_factory import AttrElement, CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
+  general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
+  InstanceEnvironment
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -281,3 +282,36 @@ class DicomFactoryTestClass(TestCase):
 
     self.assertNotIn(0x00101020, header)
     self.assertIn(0x00101020, headerCopy)
+
+  def test_create_instance_copy(self):
+    datasets = []
+
+    for dataset_index in reversed(range(1,11,1)):
+      dataset = Dataset()
+      dataset.InstanceNumber = dataset_index
+      dataset.ImagePositionPatient = [0,0,dataset_index - 1]
+      datasets.append(dataset)
+
+    blueprint = Blueprint([
+      FunctionalElement(0x00200013, 'IS', _add_InstanceNumber),
+      InstanceCopyElement(0x00200032, 'DS')
+    ])
+
+    header = self.factory.make_series_header(datasets, blueprint)
+
+    instance_copy_element = header[0x00200032]
+    # This is mostly to make my type checker happy
+    if not isinstance(instance_copy_element, InstanceCopyElement):
+      raise AssertionError
+
+    instance_copy_element_refence_2 = instance_copy_element.corporealialize(self.factory, datasets)
+    self.assertIs(instance_copy_element, instance_copy_element_refence_2)
+    for i in range(1,11,1):
+      instance_environment = InstanceEnvironment(instance_number=i)
+      data_element = instance_copy_element.produce(instance_environment)
+
+      self.assertIsInstance(data_element, DataElement)
+      self.assertEqual(data_element.tag, 0x00200032)
+      self.assertListEqual(list(data_element.value), [0,0, i - 1])
+
+

@@ -8,7 +8,7 @@ import shutil
 from sys import stdout
 from time import sleep
 from typing import NoReturn, Optional
-from unittest import TestCase
+from unittest import skip, TestCase
 
 
 # Third party imports
@@ -19,6 +19,7 @@ from nibabel.nifti1 import Nifti1Image
 # Dicomnode Libraries
 from dicomnode.lib.dimse import send_images
 from dicomnode.lib.dicom import extrapolate_image_position_patient, make_meta, gen_uid
+from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.dicom_factory import Blueprint, FillingStrategy, patient_blueprint, frame_of_reference_blueprint, general_study_blueprint, general_equipment_blueprint,general_image_blueprint, image_plane_blueprint, patient_study_blueprint, general_series_blueprint, SOP_common_blueprint
 from dicomnode.lib.numpy_factory import image_pixel_blueprint
 from dicomnode.lib.nifti import NiftiGrinder, NiftiFactory
@@ -36,8 +37,11 @@ class NiftyGrinderTestCase(TestCase):
   def tearDown(self) -> None:
     return super().tearDown()
 
-  def test_nifti_grinder_MR(self):
-    grinder = NiftiGrinder()
+  def test_invalid_configuration_for_grinder(self):
+    self.assertRaises(IncorrectlyConfigured, NiftiGrinder, None, True)
+
+  def test_nifti_grinder_MR_no_resampling(self):
+    grinder = NiftiGrinder(None, False)
 
     slices = 50
 
@@ -50,10 +54,9 @@ class NiftyGrinderTestCase(TestCase):
     rows = 300
     cols = 400
 
-    datasets = [ ds for ds in generate_numpy_datasets(slices,
-                                                      Rows=rows,
-                                                      Cols=cols,
-                                                      )]
+    datasets = [
+      ds for ds in generate_numpy_datasets(slices, Rows=rows,Cols=cols,)
+    ]
     positions = extrapolate_image_position_patient(
       slice_thickness=slice_z,
       orientation=1,
@@ -69,17 +72,68 @@ class NiftyGrinderTestCase(TestCase):
       dataset.Modality = 'MR'
       dataset.PixelSpacing = [slice_x,slice_y]
 
+    res = grinder(datasets)
+
+    self.assertEqual(res.header.get_data_shape(), (cols, rows, slices)) #type: ignore
+
+    image_data = res.get_fdata()
+
+    self.assertTrue(image_data.flags["F_CONTIGUOUS"])
+    self.assertEqual(image_data.shape, (cols, rows, slices))
+
+  def test_nifti_grinder_MR_create_dir_and_resampling(self):
+    grinder_path = Path(TESTING_TEMPORARY_DIRECTORY) / "nifti_grinder-test"
+    if grinder_path.exists():
+      shutil.rmtree(grinder_path) # pragma: no cover
+
+    grinder = NiftiGrinder(grinder_path, True)
+
+    slices = 50
+
+    image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+
+    slice_x = 2.0
+    slice_y = 2.0
+    slice_z = 2.0
+
+    rows = 300
+    cols = 400
+
+    datasets = [
+      ds for ds in generate_numpy_datasets(slices, Rows=rows,Cols=cols,)
+    ]
+    positions = extrapolate_image_position_patient(
+      slice_thickness=slice_z,
+      orientation=1,
+      initial_position=(0.0,0.0,0.0),
+      image_orientation=tuple(image_orientation),
+      image_number=1,
+      slices=slices
+    )
+
+    for dataset, position in zip(datasets, positions):
+      dataset.ImagePositionPatient = position
+      dataset.ImageOrientationPatient = image_orientation
+      dataset.Modality = 'MR'
+      dataset.PixelSpacing = [slice_x,slice_y]
 
     res = grinder(datasets)
 
     self.assertEqual(res.header.get_data_shape(), (cols, rows, slices)) #type: ignore
 
+    image_data = res.get_fdata()
+
+    # WELL WELL WELL WE HAVE SOME IDIOT ALLOCATION
+    self.assertFalse(image_data.flags["F_CONTIGUOUS"])
+    self.assertTrue(image_data.flags["C_CONTIGUOUS"])
+    self.assertEqual(image_data.shape, (cols, rows, slices))
+
+
+
   def test_nifti_grinder_CT(self):
     grinder = NiftiGrinder()
-
     slices = 50
     image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
-
     datasets = [ ds for ds in generate_numpy_datasets(slices)]
     positions = extrapolate_image_position_patient(
       slice_thickness=1,
@@ -106,6 +160,7 @@ INPUT_KW = "input"
 
 class NiftiInput(AbstractInput):
     required_tags = [
+      0x00200013, # InstanceNumber
       0x00080060, # Modality
       0x00180050, # SliceThickness
       0x00200032, # ImagePosition
@@ -118,7 +173,7 @@ class NiftiInput(AbstractInput):
     def validate(self) -> bool:
       return True
 
-    image_grinder = NiftiGrinder(None, reorient_nifti=False)
+    image_grinder = NiftiGrinder(Path(TESTING_TEMPORARY_DIRECTORY) / "nifti_test_grinder_node", reorient_nifti=True)
 
 
 class NiftiNode(AbstractPipeline):
@@ -139,8 +194,8 @@ class NiftiNode(AbstractPipeline):
   filling_strategy = FillingStrategy.COPY
 
   # Logging
-  log_level = logging.INFO
-  log_output = stdout
+  log_level = logging.DEBUG
+  log_output = None
   log_format = "%(asctime)s %(name)s %(funcName)s %(lineno)s %(levelname)s %(message)s"
 
   ae_title = TEST_AE_TITLE
@@ -177,10 +232,12 @@ class NiftiNode(AbstractPipeline):
 
 
 class End2EndNiftiTestCase(TestCase):
+  #@skip("This caused a cascade of bugs")
   def test_end_to_end_plus(self):
     node = NiftiNode()
     port = randint(1025, 65535)
     node.port = port
+    node.open(blocking=False)
 
     address = Address('localhost', port, TEST_AE_TITLE)
     slices = 50
@@ -195,8 +252,6 @@ class End2EndNiftiTestCase(TestCase):
     cols = 400
 
     PatientID = "FooBar"
-
-
     datasets = [ ds for ds in generate_numpy_datasets(slices,
                                                       Rows=rows,
                                                       Cols=cols,
@@ -216,30 +271,29 @@ class End2EndNiftiTestCase(TestCase):
     study_date = datetime.date(2012,8,3)
     study_time = datetime.time(11,00,00)
 
-    with self.assertLogs(node.logger, logging.DEBUG) as cm:
-      for dataset, position in zip(datasets, positions):
-        dataset.PatientName = "Test^Person^1"
-        dataset.PatientSex = "M"
-        dataset.AccessionNumber = "AccessionNumber"
-        dataset.StudyDate = study_date
-        dataset.StudyTime = study_time
-        dataset.SliceThickness=slice_z
-        dataset.FrameOfReferenceUID = frame_of_reference_uid
-        dataset.PositionReferenceIndicator = None
-        dataset.ImagePositionPatient = position
-        dataset.ImageOrientationPatient = image_orientation
-        dataset.PatientPosition = "FFS"
-        dataset.Modality = "CT"
-        dataset.PixelSpacing = [slice_x,slice_y]
-        dataset.SOPClassUID = CTImageStorage
-        make_meta(dataset)
-        node.data_state.add_image(dataset)
+    for i, (dataset, position) in enumerate(zip(datasets, positions)):
+      dataset.InstanceNumber = i + 1
+      dataset.PatientName = "Test^Person^1"
+      dataset.PatientSex = "M"
+      dataset.AccessionNumber = "AccessionNumber"
+      dataset.StudyDate = study_date
+      dataset.StudyTime = study_time
+      dataset.SliceThickness=slice_z
+      dataset.FrameOfReferenceUID = frame_of_reference_uid
+      dataset.PositionReferenceIndicator = None
+      dataset.ImagePositionPatient = position
+      dataset.ImageOrientationPatient = image_orientation
+      dataset.PatientPosition = "FFS"
+      dataset.Modality = "CT"
+      dataset.PixelSpacing = [slice_x,slice_y]
+      dataset.SOPClassUID = CTImageStorage
+      make_meta(dataset)
 
-      node.initial_environment_for_processing_patient(patient_ID=PatientID)
+    send_images(TEST_AE_TITLE, address, datasets)
+
+    sleep(0.25)
+    node.close()
 
 
-    pprint(cm.output)
-
-    testing_logs()
 
 

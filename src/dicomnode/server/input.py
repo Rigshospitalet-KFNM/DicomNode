@@ -95,11 +95,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     Returns:
         Any: Data ready for the pipelines process function.
     """
-    try:
-      return self.image_grinder(self)
-    except Exception as exception:
-      log_traceback(self.logger, exception)
-      raise exception # Reraise after logging
+    return self.image_grinder(self)
 
   def get_path(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
