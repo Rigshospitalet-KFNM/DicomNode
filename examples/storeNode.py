@@ -8,7 +8,7 @@ from os import environ
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import FileOutput, PipelineOutput
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.lib.io import save_dicom
 
 from typing import Any, Dict, Iterable, List

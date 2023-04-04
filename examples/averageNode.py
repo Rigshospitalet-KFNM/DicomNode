@@ -4,14 +4,14 @@ import os
 
 from pathlib import Path
 
-from dicomnode.lib.grinders import many_meta_grinder, tag_meta_grinder, numpy_grinder
+from dicomnode.lib.grinders import ManyGrinder, TagGrinder, NumpyGrinder
 from dicomnode.lib.dicom_factory import Blueprint, CopyElement, FillingStrategy, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
 from dicomnode.lib.numpy_factory import NumpyFactory, image_pixel_blueprint
 
 
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import DynamicInput
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import PipelineOutput, FileOutput, NoOutput
 
 from typing import Dict, Any
@@ -31,14 +31,7 @@ factory = NumpyFactory()
 factory.series_description = "Averaged Image"
 
 class SeriesInputs(DynamicInput):
-  image_grinder = staticmethod(
-    many_meta_grinder(
-      numpy_grinder,
-      tag_meta_grinder([
-        0x00080031,
-      ])
-    )
-  )
+  image_grinder = ManyGrinder(NumpyGrinder(), TagGrinder(0x00080031))
   required_tags = blueprint.get_required_tags()
 
   def validate(self) -> bool:

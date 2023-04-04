@@ -12,13 +12,13 @@ from os import environ
 
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.numpy_factory import NumpyFactory, CTImageStorage_NumpyBlueprint
-from dicomnode.lib.grinders import numpy_grinder
+from dicomnode.lib.grinders import NumpyGrinder
 from dicomnode.lib.sop_mapping import CTImageStorage_required_tags
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput, DicomOutput
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 
 
 INPUT_KW = "CT_IMAGE"
@@ -26,7 +26,7 @@ INPUT_KW = "CT_IMAGE"
 class CTInput(AbstractInput):
   required_tags = CTImageStorage_required_tags
 
-  image_grinder = numpy_grinder
+  image_grinder = NumpyGrinder()
 
   def validate(self):
     return self.images > 150

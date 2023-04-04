@@ -1,10 +1,10 @@
 from dicomnode.lib.anonymization import anonymize_dicom_tree
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.exceptions import InvalidTreeNode
-from dicomnode.lib.grinders import dicom_tree_grinder
+from dicomnode.lib.grinders import DicomTreeGrinder
 from dicomnode.lib.image_tree import DicomTree, IdentityMapping
 
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 
@@ -23,7 +23,7 @@ class DicomObjectInput(AbstractInput):
     0x0020000E, # SeriesInstanceUID
   ]
 
-  image_grinder: Callable[[Iterator[Dataset]], DicomTree] = dicom_tree_grinder
+  image_grinder = DicomTreeGrinder()
 
   def validate(self):
     return True
