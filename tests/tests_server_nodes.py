@@ -29,7 +29,7 @@ from dicomnode.lib.image_tree import DicomTree
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 
 # Test Helpers #
 from tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae, TESTING_TEMPORARY_DIRECTORY, testing_logs

@@ -7,11 +7,13 @@ from random import randint
 import shutil
 from sys import stdout
 from time import sleep
-from typing import NoReturn, Optional
+from typing import Iterable, NoReturn, Optional
 from unittest import skip, TestCase
+import subprocess
 
 
 # Third party imports
+from pydicom import Dataset
 from pydicom.uid import MRImageStorage, CTImageStorage
 from pathlib import Path
 from nibabel.nifti1 import Nifti1Image
@@ -25,7 +27,7 @@ from dicomnode.lib.numpy_factory import image_pixel_blueprint
 from dicomnode.lib.nifti import NiftiGrinder, NiftiFactory
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.pipelineTree import InputContainer
+from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import NoOutput, Address, FileOutput
 
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY, testing_logs
@@ -176,6 +178,9 @@ class NiftiInput(AbstractInput):
     image_grinder = NiftiGrinder(Path(TESTING_TEMPORARY_DIRECTORY) / "nifti_test_grinder_node", reorient_nifti=True)
 
 
+def save_instance_number(path: Path, datasets: Iterable[Dataset]):
+  pass
+
 class NiftiNode(AbstractPipeline):
   # Directories
   output_dir = Path(f"{TESTING_TEMPORARY_DIRECTORY}/output")
@@ -211,13 +216,13 @@ class NiftiNode(AbstractPipeline):
     if input_container.header is None or self.dicom_factory is None:
       raise Exception
 
-    self.dicom_factory.build_from_header(
+    series = self.dicom_factory.build_from_header(
       input_container.header,
       nifti_object
     )
 
     return FileOutput(
-      []
+      [(self.output_dir, series)]
     )
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -226,7 +231,10 @@ class NiftiNode(AbstractPipeline):
     return super().open(blocking)
 
   def close(self) -> None:
-    shutil.rmtree(self.output_dir)
+    try:
+      shutil.rmtree(self.output_dir)
+    except Exception as E:
+      self.logger.error(E)
     return super().close()
 
 

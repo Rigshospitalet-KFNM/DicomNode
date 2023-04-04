@@ -37,12 +37,14 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.lib.io import TemporaryWorkingDirectory
-from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured, InvalidPynetdicomEvent
 from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, FillingStrategy
+from dicomnode.lib.dimse import Address
+from dicomnode.lib.exceptions import InvalidDataset, CouldNotCompleteDIMSEMessage, IncorrectlyConfigured, InvalidPynetdicomEvent
+from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import log_traceback, get_logger, set_logger
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
+from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
+from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
 
 """ Dataclasses for pynetdicom.event extraction.
@@ -65,6 +67,8 @@ class AssocationDataContainer:
 class AssociationAcceptedDataContainer(AssocationDataContainer):
   assocation_id : int # Connects events triggered by this assocation
   assocation_types : set[AssociationTypes] # Checks if this assocation is a store association or not
+  assocation_ae : str
+  assocation_ip : Optional[str]
 
   @classmethod
   def from_event(cls, event: evt.Event):
@@ -72,13 +76,24 @@ class AssociationAcceptedDataContainer(AssocationDataContainer):
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
         association_types.add(AssociationTypes.StoreAssocation)
-    return cls(cls.get_event_id(event), association_types)
+    assocation_ae = event.assoc.requestor.ae_title
+    assocation_ip = event.assoc.requestor.address
+
+
+    return cls(
+      cls.get_event_id(event),
+      association_types,
+      assocation_ae,
+      assocation_ip,
+    )
 
 
 @dataclass
 class AssociationReleasedDataContainer(AssocationDataContainer):
   assocation_id : int # Connects events triggered by this assocation
   assocation_types : set[AssociationTypes] # Checks if this assocation is a store association or not
+  assocation_ae : str
+  assocation_ip : Optional[str]
 
   @classmethod
   def from_event(cls, event: evt.Event):
@@ -86,7 +101,15 @@ class AssociationReleasedDataContainer(AssocationDataContainer):
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
         association_types.add(AssociationTypes.StoreAssocation)
-    return cls(cls.get_event_id(event), association_types)
+    assocation_ae = event.assoc.requestor.ae_title
+    assocation_ip = event.assoc.requestor.address
+
+    return cls(
+      cls.get_event_id(event),
+      association_types,
+      assocation_ae,
+      assocation_ip,
+      )
 
 
 @dataclass
@@ -121,6 +144,7 @@ class AbstractPipeline():
   processing_directory: Optional[Path] = None
 
   # Maintenance Configuration
+  maintenance_thread: Type[MaintenanceThread] = MaintenanceThread
   study_expiration_days: int = 14
 
   # Input configuration
@@ -149,6 +173,8 @@ class AbstractPipeline():
   supported_contexts: List[PresentationContext] = AllStoragePresentationContexts
   require_called_aet: bool = True
   require_calling_aet: List[str] = []
+  known_endpoints: Dict[str, Address] = {}
+  _active_assocations: Dict[int, Address] = {}
 
 
   #Logging Configuration
@@ -181,9 +207,6 @@ class AbstractPipeline():
     if self.disable_pynetdicom_logger:
       getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
 
-    self.maintenance_thread = Thread(target=self.maintenance_worker, daemon=True)
-    self.maintenance_thread.start()
-
     # Load any previous state
     if self.data_directory is not None:
       if not isinstance(self.data_directory, Path):
@@ -212,6 +235,11 @@ class AbstractPipeline():
       pipeline_tree_options
     )
 
+    self._maintenance_thread = self.maintenance_thread(
+      self.data_state, self.study_expiration_days, daemon=True)
+    self._maintenance_thread.start()
+
+
     # Server validations and creation.
     self.ae = AE(ae_title = self.ae_title)
     # You need VerificationPresentationContexts for ECHOSCU
@@ -227,7 +255,7 @@ class AbstractPipeline():
     self._evt_handlers = [
       (evt.EVT_C_STORE,  self.handle_c_store),
       (evt.EVT_ACCEPTED, self.handle_association_accepted),
-      (evt.EVT_RELEASED, self.association_released)
+      (evt.EVT_RELEASED, self.handle_association_released)
     ]
     self.updated_patients: Dict[Optional[int], Set[str]] = {}
 
@@ -280,7 +308,7 @@ class AbstractPipeline():
   def handler_accept_store_assocation(self, association: AssociationAcceptedDataContainer):
     self.updated_patients[association.assocation_id] = set()
 
-  def association_released(self, event: evt.Event):
+  def handle_association_released(self, event: evt.Event):
     """This function is called whenever an association is released
     It's the controller function for processing data
 
@@ -337,6 +365,8 @@ class AbstractPipeline():
       chdir(self.__cwd)
       shutil.rmtree(self.processing_directory)
 
+    self._maintenance_thread.stop()
+
     self.logger.info("Closing Server!")
     self.ae.shutdown()
 
@@ -361,35 +391,6 @@ class AbstractPipeline():
       (self.ip,self.port),
       block=blocking,
       evt_handlers=self._evt_handlers)
-
-
-  ### Mian
-  def maintenance_worker(self) -> NoReturn: #pragma no cover
-    """This is the controller for the worker thread
-
-    Should run the clean up function every midnight
-    """
-    while True:
-      sleep(self.calculate_time_to_next_maintenance())
-      self.maintenance()
-
-
-  def calculate_time_to_next_maintenance(self) -> float:
-    """Calculates the time in seconds to the next scheduled clean up"""
-    now = datetime.now()
-    tomorrow = now + timedelta(days=1)
-    clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0,0,0,0, tzinfo=now.tzinfo)
-    time_delta = clean_up_datetime - now
-    # Days are ignored in the time delta due function constraint of 1 run per day.
-    return float(time_delta.seconds) # I guess you could add micro seconds here but WHO CARES
-
-  def maintenance(self, now = datetime.now()) -> None:
-    """Removes old studies in the pipeline to ensure GDPR compliance
-    """
-    # Note this might cause some bug, where a patient is being processed, and at the same time removed
-    # This is considered so unlikely, that it's a bug I accept in the code
-    expiry_datetime = now - timedelta(days=self.study_expiration_days)
-    self.data_state.remove_expired_studies(expiry_datetime)
 
 
   def _log_user_error(self, Exp: Exception, user_function: str):
@@ -456,7 +457,7 @@ class AbstractPipeline():
   # Handlers are an extendable way of 
 
   # Extendable Handlers
-  acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AssociationAcceptedDataContainer], None]] # Note that Self is only a part of python 3.11
+  acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AssociationAcceptedDataContainer], None]] # Note that Self type is only a part of python 3.11
     AssociationTypes.StoreAssocation : handler_accept_store_assocation
   }
 
@@ -478,7 +479,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
     """Worker function for the process_queue"""
     while self.running:
       try:
-        PatientID, input_container = self.process_queue.get(timeout=self.queue_timeout)
+        PatientID, input_container = self.process_queue.get(
+          timeout=self.queue_timeout)
         self.logger.info(f"Process Queue extracted: {PatientID}")
         try:
           output = self.process(input_container)
@@ -501,7 +503,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       except Empty as E:
         pass
 
-  def association_released(self, event: evt.Event):
+  def handle_association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     for patient_ID in self.updated_patients[event.assoc.native_id]:
       if self.data_state.validate_patient_ID(patient_ID):
@@ -550,6 +552,6 @@ class AbstractThreadedPipeline(AbstractPipeline):
         thread.join()
       del self.threads[assoc_name]
 
-  def association_released(self, event: evt.Event):
+  def handle_association_released(self, event: evt.Event):
     self.join_threads(event.assoc.native_id)
-    return super().association_released(event)
+    return super().handle_association_released(event)

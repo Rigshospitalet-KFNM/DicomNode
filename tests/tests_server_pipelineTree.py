@@ -23,7 +23,7 @@ from dicomnode.lib.dicom_factory import Blueprint, StaticElement, InstanceCopyEl
 from dicomnode.lib.numpy_factory import NumpyFactory
 from dicomnode.lib.grinders import Grinder
 from dicomnode.server.input import AbstractInput, DynamicInput
-from dicomnode.server.pipelineTree import PipelineTree, InputContainer, PatientNode
+from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 
 SERIES_DESCRIPTION = "Fancy Description"
 
