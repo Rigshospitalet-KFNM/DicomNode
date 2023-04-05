@@ -2,7 +2,6 @@
 # Python standard
 from unittest import TestCase
 
-
 # Dicomnode package
 import dicomnode
 
