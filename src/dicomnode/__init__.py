@@ -1,4 +1,4 @@
-__version__ = "0.0.4.1" # This is gonna be annoying
+__version__ = "0.0.4.2" # This is gonna be annoying
 
 __author__ = "Christoffer Vilstrup Jensen"
 

@@ -130,8 +130,6 @@ class NiftyGrinderTestCase(TestCase):
     self.assertTrue(image_data.flags["C_CONTIGUOUS"])
     self.assertEqual(image_data.shape, (cols, rows, slices))
 
-
-
   def test_nifti_grinder_CT(self):
     grinder = NiftiGrinder()
     slices = 50

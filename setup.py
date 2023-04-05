@@ -136,7 +136,7 @@ if __name__ == '__main__':
     )
 
   setup(name='dicomnode',
-    version='0.0.4.1',
+    version='0.0.4.2',
     description='Test',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
