@@ -127,6 +127,5 @@ def log_traceback(logger: Logger, exception: Exception, header_message: Optional
 
   exception_name_message = f"Encountered exception: {exception.__class__.__name__}"
   logger.critical(exception_name_message)
-
   traceback_message = format_exc()
   logger.critical(traceback_message)

@@ -1,14 +1,20 @@
-"""_summary_
+"""This is an extention of the pydicom dataset. It creates a lazy dataset,
+ie a Dataset that have a very small memory print until you actually use it.
 
 Must code have been shamelessly stolen from https://coderbook.com/python/2020/04/23/how-to-make-lazy-python.html
-  """
+"""
 
+__author__ = "Christoffer Vilstrup Jensen"
 
+# Python Standard Library
 from pathlib import Path
-from pydicom import Dataset
 import operator
-
 from typing import Callable
+
+# Thrid Party Operator
+from pydicom import Dataset
+
+# Dicomnode packages
 from dicomnode.lib.io import load_dicom
 
 class LazyDataset(Dataset): # It's not need to set this as a dataset, since we overwrite it later, however typechecker can't figure out my magic
@@ -31,7 +37,7 @@ class LazyDataset(Dataset): # It's not need to set this as a dataset, since we o
     def inner(self, *args, **kwargs):
       if not self._is_init:
         self._setup()
-      return func(self._wrapped, *args, **kwargs)
+      return func(self._wrapped, *args, **kwargs) #type: ignore
     return inner
 
   def __setattr__(self, name, value):

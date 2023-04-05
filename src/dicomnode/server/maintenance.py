@@ -57,17 +57,22 @@ class MaintenanceThread(Thread):
       self.waiting_event.set()
 
 
-  def calculate_seconds_to_next_maintenance(self, now=datetime.now()) -> float:
+  def calculate_seconds_to_next_maintenance(self, now=None) -> float:
     """Calculates the time in seconds to the next scheduled clean up"""
+    if now is None:
+      now = datetime.now()
+
     tomorrow = now + timedelta(days=1)
     clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0,0,0,0, tzinfo=now.tzinfo)
     time_delta = clean_up_datetime - now
     return time_delta.days * self._seconds_in_a_day + float(time_delta.seconds) # I guess you could add micro seconds here but WHO CARES
 
 
-  def maintenance(self, now = datetime.now()) -> None:
+  def maintenance(self, now = None) -> None:
     """Removes old studies in the pipeline tree to ensure GDPR compliance
     """
+    if now is None:
+      now = datetime.now()
     # Note this might cause some bug, where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code
     expiry_datetime = now - timedelta(days=self.study_expiration_days)

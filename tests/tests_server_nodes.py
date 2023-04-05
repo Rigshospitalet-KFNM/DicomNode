@@ -86,31 +86,6 @@ class FaultyPipelineOutput(PipelineOutput):
     raise Exception
 
 ##### Test Pipeline Implementations #####
-class NeverValidateNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestNeverValidatingInput }
-  require_calling_aet = [SENDER_AE]
-  log_output = None
-  log_level: int = logging.DEBUG
-  disable_pynetdicom_logger: bool = True
-  processing_directory = None
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    self.logger.info("process is called")
-    return NoOutput()
-
-
-class FaultyNode(AbstractPipeline):
-  ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
-  log_output = None
-  log_level: int = logging.DEBUG
-  disable_pynetdicom_logger: bool = True
-  processing_directory = None
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
-    raise Exception
 
 
 
@@ -139,9 +114,6 @@ class FaultyFilterNode(AbstractPipeline):
   processing_directory = None
 
   def filter(self, dataset: Dataset) -> bool:
-    raise Exception
-
-  def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
 
 class MaxFilterNode(AbstractPipeline):
@@ -261,7 +233,7 @@ class PipelineTestCase(TestCase):
 
     self.assertEqual(response.Status, 0x0000)
     self.assertIn("INFO:dicomnode:process is called", cm.output)
-    self.assertIn(f"DEBUG:dicomnode:Removing Patient {DEFAULT_DATASET.PatientID}", cm.output)
+    self.assertIn(f"DEBUG:dicomnode:Removed {DEFAULT_DATASET.PatientID} and 1 images from Pipeline", cm.output)
 
     # Okay This is mostly to ensure lazyness
     # See the advanced docs guide for details
@@ -312,11 +284,31 @@ class NeverValidatingTestNode(TestCase):
   This is relevant to test various state changes without processing
 
   """
-
+  class NeverValidateNode(AbstractPipeline):
+    ae_title = TEST_AE_TITLE
+    input = {INPUT_KW : TestNeverValidatingInput }
+    require_calling_aet = [SENDER_AE]
+    log_output = None
+    log_level: int = logging.DEBUG
+    disable_pynetdicom_logger: bool = True
+    processing_directory = None
 
 class FaultyNodeTestCase(TestCase):
+  class FaultyNode(AbstractPipeline):
+    ae_title = TEST_AE_TITLE
+    input = {INPUT_KW : TestInput }
+    require_calling_aet = [SENDER_AE]
+    log_output = None
+    log_level: int = logging.DEBUG
+    disable_pynetdicom_logger: bool = True
+    processing_directory = None
+
+    def process(self, InputData: InputContainer) -> PipelineOutput:
+      raise Exception
+
+
   def setUp(self):
-    self.node = FaultyNode()
+    self.node = self.FaultyNode()
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
@@ -329,7 +321,9 @@ class FaultyNodeTestCase(TestCase):
       address = Address('localhost', self.test_port, TEST_AE_TITLE)
       response = send_image(SENDER_AE, address, DEFAULT_DATASET)
       self.assertEqual(response.Status, 0x0000)
-    self.assertIn("CRITICAL:dicomnode:Encountered error in user function Process", cm.output)
+    self.assertIn("CRITICAL:dicomnode:processing", cm.output)
+    self.assertIn("CRITICAL:dicomnode:Encountered exception: Exception", cm.output)
+
 
 class FileStorageTestCase(TestCase):
   def setUp(self):
@@ -410,6 +404,7 @@ class SetupLessFileStorageTestCase(TestCase):
   Args:
       TestCase (_type_): _description_
   """
+
   def test_setup_and_teardown_of_tmp_directories(self):
     os.chdir(TESTING_TEMPORARY_DIRECTORY)
     node = FileStorageNode()
@@ -620,6 +615,8 @@ class QueuedNodeTestCase(TestCase):
 
     self.assertIn("INFO:dicomnode:process is called", cm.output)
     self.assertNotIn("ERROR:dicomnode:Could not export data", cm.output)
+    self.assertIn("INFO:dicomnode:Finished queued task",cm.output)
+
 
     self.assertEqual(response.Status, 0x0000)
     self.assertEqual(self.node.data_state.images,0)
@@ -641,7 +638,9 @@ class FaultyQueueTestCase(TestCase):
 
     self.node.process_queue.join()
 
-    self.assertIn("CRITICAL:dicomnode:Encountered error in user function process", cm.output)
+    self.assertIn("CRITICAL:dicomnode:processing", cm.output)
+    self.assertIn("CRITICAL:dicomnode:Encountered exception: Exception", cm.output)
+
     self.assertEqual(response.Status, 0x0000)
 
 class HistoricTestCase(TestCase):

@@ -20,6 +20,7 @@ from pydicom import Dataset
 
 # Dicomnode Library Packages
 from dicomnode.lib.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
+from dicomnode.lib.dimse import Address
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode, HeaderConstructionFailure)
 from dicomnode.lib.image_tree import ImageTreeInterface
@@ -29,6 +30,8 @@ from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
 class InputContainer:
   """Simple container class for grinded input.
   """
+  responding_address: Optional[Address] = None
+
   def __init__(self,
                data: Dict[str, Any],
                header: Optional[SeriesHeader] = None,
@@ -419,17 +422,20 @@ class PipelineTree(ImageTreeInterface):
 
     self.images -= removed_images
     self.data = new_data_dict
+    self.logger.debug(f"Removed {patient_id} and {removed_images} images from Pipeline")
 
 
   def remove_patients(self, patient_ids: Iterable[str]):
-    """Removes a number of patients from the tree
+    """Removes many patients from the pipeline tree
 
     Args:
         patient_ids (Iterable[str]): Collection of patient ids to be removed.
 
     Raises:
-        InvalidTreeNode: _description_
+        InvalidTreeNode: If nodes are not PatientNodes
     """
+    #Due to the fact, that you cannot iterator over a changing directory
+    #Threr
     new_data_dict = {}
     removed_images = 0
 
