@@ -87,7 +87,9 @@ class NiftiFactory(NumpyFactory):
 
     if image.ndim == 3:
       coloumn_major_shape = image.header.get_data_shape() # type: ignore cols, rows, slices, volumes
+
       row_major_shape = (coloumn_major_shape[2], coloumn_major_shape[1], coloumn_major_shape[0])
+      logger.debug(image.header)
 
       if numpy_image.shape != row_major_shape:
         numpy_image = numpy.ascontiguousarray(numpy_image.T)

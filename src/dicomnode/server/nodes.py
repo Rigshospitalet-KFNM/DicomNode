@@ -183,7 +183,7 @@ class AbstractPipeline():
   def _handle_c_store(self, event: evt.Event) -> int:
     c_store_container = self._assocation_container_factory.build_assocation_c_store(event)
     status = self.consume_c_store_container(c_store_container)
-    self.logger.debug(f"Handled C STORE with {hex(status)}")
+    self.logger.debug(f"Handled C STORE with status {hex(status)}")
     return status
 
   def consume_c_store_container(self, c_store_container: CStoreContainer) -> int:
@@ -203,6 +203,8 @@ class AbstractPipeline():
       except InvalidDataset:
         self.logger.info(f"Received dataset is not accepted by any inputs")
         return 0xB006
+      except Exception as exception:
+        log_traceback(self.logger, exception, "Adding Image")
     else:
       self.logger.debug(f"Node: Received dataset, doesn't have patient Identifier tag")
       return 0xB007

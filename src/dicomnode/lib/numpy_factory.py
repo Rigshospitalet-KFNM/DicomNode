@@ -1,13 +1,19 @@
+"""Specialized DicomFactory for building dicom series from
+numpy arrays
+
 """
 
-  Requires numpy
-"""
-from pydicom import DataElement, Dataset
-from pydicom.tag import BaseTag, Tag
+# Python Standard Library
 from typing import Dict, List, Union, Tuple, Any, Optional, Callable, Iterator
 
-from dataclasses import dataclass
+# Third party packages
+import numpy
+from numpy import ndarray
+from pydicom import DataElement, Dataset
+from pydicom.tag import BaseTag, Tag
 
+# Dicomnode packages
+from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import make_meta, gen_uid
 from dicomnode.lib.dicom_factory import AttrElement, InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
   StaticElement, Blueprint, patient_blueprint, general_series_blueprint, \
@@ -16,21 +22,22 @@ from dicomnode.lib.dicom_factory import AttrElement, InstanceEnvironment, Functi
   image_plane_blueprint, InstanceVirtualElement
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, InvalidEncoding
 
-import numpy
-from numpy import ndarray
 
-unsigned_array_encoding: Dict[int, type] = {
-  8 : numpy.uint8,
-  16 : numpy.uint16,
-  32 : numpy.uint32,
-  64 : numpy.uint64,
-}
+logger = get_logger()
 
 class NumpyFactory(DicomFactory):
   _bits_allocated: int = 16
   _bits_stored: int = 16
   _high_bit: int = 15
   _pixel_representation: int = 0
+
+
+  _unsigned_array_encoding: Dict[int, type] = {
+    8 : numpy.uint8,
+    16 : numpy.uint16,
+    32 : numpy.uint32,
+    64 : numpy.uint64,
+  }
 
   @property
   def pixel_representation(self) -> int:
@@ -103,7 +110,7 @@ class NumpyFactory(DicomFactory):
       raise ValueError(error_message)
 
   def scale_image(self, image: ndarray) -> Tuple[ndarray, float, float]:
-    target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
+    target_datatype = self._unsigned_array_encoding.get(self.bits_allocated, None)
     min_val = image.min()
     max_val = image.max()
 
@@ -134,16 +141,14 @@ class NumpyFactory(DicomFactory):
     Returns:
         List[Dataset]: _description_
     """
-    if image.flags['F_CONTIGUOUS']:
-      image = image.T
-
-    target_datatype = unsigned_array_encoding.get(self.bits_allocated, None)
+    target_datatype = self._unsigned_array_encoding.get(self.bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
 
     encode = image.dtype != target_datatype
     list_dicom = []
     if len(image.shape) == 3:
+      logger.debug(f"Building dicom series of images {image.shape[0]} of dimension: {image.shape[2]}x{image.shape[1]} ")
       for i, slice in enumerate(image):
         instance_environment = InstanceEnvironment(
           instance_number= i + 1,
