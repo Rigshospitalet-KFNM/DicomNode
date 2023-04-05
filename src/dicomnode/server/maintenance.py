@@ -8,7 +8,7 @@ __author__ = "Christoffer"
 # Python3 standard Library
 from datetime import datetime, timedelta
 from threading import Thread, Event
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 # Thrid party Packages
 
@@ -27,11 +27,11 @@ class MaintenanceThread(Thread):
                pipeline_tree: PipelineTree,
                study_expiration_days: int,
                group: None = None,
-               name: str | None = None,
+               name: Optional[str] = None,
                args: Iterable[Any] = ...,
-               kwargs: Mapping[str, Any] | None = None,
+               kwargs: Optional[Mapping[str, Any]] = None,
                *,
-               daemon: bool | None = None) -> None:
+               daemon: Optional[bool]= None) -> None:
     super().__init__(group, None, name, args, kwargs, daemon=daemon)
     self.pipeline_tree = pipeline_tree
     self.study_expiration_days = study_expiration_days
