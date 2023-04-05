@@ -182,7 +182,9 @@ class AbstractPipeline():
   """
   def _handle_c_store(self, event: evt.Event) -> int:
     c_store_container = self._assocation_container_factory.build_assocation_c_store(event)
-    return self.consume_c_store_container(c_store_container)
+    status = self.consume_c_store_container(c_store_container)
+    self.logger.debug(f"Handled C STORE with {hex(status)}")
+    return status
 
   def consume_c_store_container(self, c_store_container: CStoreContainer) -> int:
     try:
@@ -262,6 +264,7 @@ class AbstractPipeline():
         about the released association
 
     """
+    self.logger.debug(f"PatientID to be updated in: {self.updated_patients}")
     for patient_ID in self.updated_patients[released_container.assocation_id]:
       if self.data_state.validate_patient_ID(patient_ID):
         self.logger.debug(f"Sufficient data for patient {patient_ID}")
@@ -284,6 +287,7 @@ class AbstractPipeline():
         after an assocation is released. This is the data from the released
         association.
     """
+    self.logger.debug(f"Processing {patient_ID}")
     try:
       patient_input_container = self.get_input_container(patient_ID, released_container)
       result = self.process(patient_input_container)
