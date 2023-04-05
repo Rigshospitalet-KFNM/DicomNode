@@ -27,7 +27,7 @@ from dicomnode.lib.dimse import Address
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dicom_factory import Blueprint
 from dicomnode.lib.numpy_factory import NumpyFactory
-from dicomnode.lib.grinders import NumpyGrinder
+from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf

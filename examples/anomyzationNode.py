@@ -1,12 +1,12 @@
 from dicomnode.lib.anonymization import anonymize_dicom_tree
 from dicomnode.lib.dimse import Address
 from dicomnode.lib.exceptions import InvalidTreeNode
-from dicomnode.lib.grinders import DicomTreeGrinder
 from dicomnode.lib.image_tree import DicomTree, IdentityMapping
 
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.grinders import DicomTreeGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
+from dicomnode.server.pipeline_tree import InputContainer
 
 from pydicom import Dataset
 from pathlib import Path

@@ -4,7 +4,7 @@ import os
 
 from pathlib import Path
 
-from dicomnode.lib.grinders import ManyGrinder, TagGrinder, NumpyGrinder
+from dicomnode.server.grinders import ManyGrinder, TagGrinder, NumpyGrinder
 from dicomnode.lib.dicom_factory import Blueprint, CopyElement, FillingStrategy, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
 from dicomnode.lib.numpy_factory import NumpyFactory, image_pixel_blueprint
 

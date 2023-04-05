@@ -24,7 +24,7 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, Inva
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.lazy_dataset import LazyDataset
 from dicomnode.lib.logging import get_logger
-from dicomnode.lib.grinders import Grinder, IdentityGrinder
+from dicomnode.server.grinders import Grinder, IdentityGrinder
 from dicomnode.lib.image_tree import ImageTreeInterface
 from dicomnode.lib.logging import log_traceback
 

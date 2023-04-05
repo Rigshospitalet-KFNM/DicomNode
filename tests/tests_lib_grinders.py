@@ -6,7 +6,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.lib.image_tree import DicomTree
 from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.grinders import IdentityGrinder, ListGrinder, DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder
+from dicomnode.server.grinders import IdentityGrinder, ListGrinder, DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder
 
 import numpy
 import logging

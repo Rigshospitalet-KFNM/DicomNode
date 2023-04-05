@@ -3,7 +3,6 @@ from . import dicom
 from . import dicom_factory
 from . import dimse
 from . import exceptions
-from . import grinders
 from . import logging
 from . import nifti
 from . import numpy_factory

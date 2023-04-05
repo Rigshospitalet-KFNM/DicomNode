@@ -25,9 +25,9 @@ from dicom2nifti.convert_dicom import dicom_array_to_nifti
 # Dicomnode
 from dicomnode.lib.dicom_factory import SeriesHeader
 from dicomnode.lib.exceptions import IncorrectlyConfigured
-from dicomnode.lib.grinders import Grinder
 from dicomnode.lib.numpy_factory import NumpyFactory
 from dicomnode.lib.logging import get_logger
+from dicomnode.server.grinders import Grinder
 
 logger = get_logger()
 

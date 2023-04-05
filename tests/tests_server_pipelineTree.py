@@ -21,7 +21,7 @@ from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
 from dicomnode.lib.dicom_factory import Blueprint, StaticElement, InstanceCopyElement, CopyElement
 from dicomnode.lib.numpy_factory import NumpyFactory
-from dicomnode.lib.grinders import Grinder
+from dicomnode.server.grinders import Grinder
 from dicomnode.server.input import AbstractInput, DynamicInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 
