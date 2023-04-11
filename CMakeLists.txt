@@ -4,8 +4,14 @@ project(dicomnode_c LANGUAGES CXX)
 set(VERSION_INFO 0.0.1)
 
 find_package(Python COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG REQUIRED)
-#add_subdirectory(extern/pybind11 REQUIRED)
+
+if(EXISTS  "${CMAKE_SOURCE_DIR}/extern/pybind11")
+  add_subdirectory(extern/pybind11 REQUIRED)
+else()
+  find_package(pybind11 CONFIG REQUIRED)
+endif()
+
+
 pybind11_add_module(_c low_level_src/low_level.cpp)
 target_compile_definitions(_c
                            PRIVATE VERSION_INFO={EXAMPLE_VERSION_INFO})

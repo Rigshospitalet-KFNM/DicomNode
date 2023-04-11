@@ -53,49 +53,115 @@ class AbstractPipeline():
 
   # Directory for file Processing
   processing_directory: Optional[Path] = None
+  """Base directory that the processing will take place in.
+  The specific directory that will run is: `processing_directory/patient_ID`
+  """
+
 
   # Maintenance Configuration
   maintenance_thread: Type[MaintenanceThread] = MaintenanceThread
+  """Class of MaintenanceThread to be created when the server opens"""
+
   study_expiration_days: int = 14
+  """The amount of days a study will hang in memory, before being clean up by the MaintenanceThread"""
+
 
   # Input configuration
   input: Dict[str, Type[AbstractInput]] = {}
+  "Defines the AbstractInput leafs for each Patient Node."
+
   input_config: Dict[str, Dict[str, Any]] = {}
+
   patient_identifier_tag: int = 0x00100020 # Patient ID
+  "Dicom tag to separate each study in the PipelineTree"
+
   data_directory: Optional[Path] = None
+  """If it's Path then the Pipeline tree will use this as a root path for file storage
+  If None the PipelineTree will not store incoming dicom objects on the file system
+  """
+
   lazy_storage: bool = False
-  pipelineTreeType: Type[PipelineTree] = PipelineTree
-  PatientContainerType: Type[PatientNode] = PatientNode
-  InputContainerType: Type[InputContainer] = InputContainer
+  "Indicates if the abstract inputs should use Lazy datasets or not"
+
+  pipeline_tree_type: Type[PipelineTree] = PipelineTree
+  "Class of PipelineTree that the node will create as main data storage"
+
+  patient_container_type: Type[PatientNode] = PatientNode
+  "Class of PatientNode that the the PipelineTree should create as nodes."
+
+  input_container_type: Type[InputContainer] = InputContainer
+  "Class of PatientContainer that the PatientNode should create when processing a patient"
+
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
-  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
-  header_blueprint: Optional[Blueprint] = None
-  c_move_blueprint: Optional[Blueprint] = None
+  "Class for producing various Dicom objects and series"
 
-  # Output Configuration
-  output: Type[PipelineOutput] = PipelineOutput
+  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
+  "Filling strategy the dicom factory should follow in the case of unspecified tags in the blueprint."
+
+  header_blueprint: Optional[Blueprint] = None
+  "Blueprint for creating a series header"
+
+  c_move_blueprint: Optional[Blueprint] = None
+  "Blueprint for create a C Move object"
 
   # Dicom communication configuration tags
   ae_title: str = "Your_AE_TITLE"
-  ip: str = 'localhost'
+  "AE title of the dicomnode"
+
+  ip: str = "localhost"
+  "IP of node either 0.0.0.0 or localhost"
+
   port: int = 104
+  "Port of Node, int in range 1-65535 (Requires root access to open port <1024)"
+
   supported_contexts: List[PresentationContext] = AllStoragePresentationContexts
+  "Presentation contexts accepted by the node"
+
   require_called_aet: bool = True
+  "Require caller to specify AE title of node"
+
   require_calling_aet: List[str] = []
+  "If not empty require the node only to accept connection from AE titles in this attribute"
+
   known_endpoints: Dict[str, Address] = {}
-  _assocations_responds_addresses: Dict[int, Address] = {}
-  assocation_container_factory: Type[AssociationContainerFactory] = AssociationContainerFactory
+  "Address book indexed by AE titles."
+
+  _associations_responds_addresses: Dict[int, Address] = {}
+  "Internal variable containing a mapping of association to endpoint address"
+
+  association_container_factory: Type[AssociationContainerFactory] = AssociationContainerFactory
+  "Class of Factory, that extracts information from the association to the underlying processing function."
+
   default_response_port: int = 104
+  "Default Port used for unspecified Dicomnodes"
 
   #Logging Configuration
-  backup_weeks: int = 8
+  number_of_backups: int = 8
+  "Backup of log are made weekly, this specifies how many weeks of logs is saved"
+
   log_date_format = "%Y/%m/%d %H:%M:%S"
+  "String format for timestamps in logs."
+
   log_output: Optional[Union[TextIO, Path, str]] = stdout
+  """Destination of log output:
+  * `None` - Disables The logger
+  * `TextIO` - output to that stream, This is stdout / stderr
+  * `Path | str` - creates a rotating log at the path
+  """
+
   log_level: int = logging.INFO
+  "Level of Logger"
+
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
+  "Format of log messages using the '%' style."
+
   disable_pynetdicom_logger: bool = True
+  "Disables pynetdicom logger"
+
+
+  # End of Attributes definitions.
 
   def __init__(self) -> None:
     # This function starts and opens the server
@@ -113,7 +179,7 @@ class AbstractPipeline():
       log_level=self.log_level,
       format=self.log_format,
       date_format=self.log_date_format,
-      backupCount=self.backup_weeks
+      backupCount=self.number_of_backups
     )
 
     if self.disable_pynetdicom_logger:
@@ -130,18 +196,18 @@ class AbstractPipeline():
       if not self.data_directory.exists():
         self.data_directory.mkdir(parents=True)
 
-    pipeline_tree_options = self.pipelineTreeType.Options(
+    pipeline_tree_options = self.pipeline_tree_type.Options(
       ae_title=self.ae_title,
       data_directory=self.data_directory,
       factory=self.dicom_factory,
       filling_strategy=self.filling_strategy,
       header_blueprint=self.header_blueprint,
       lazy=self.lazy_storage,
-      input_container_type=self.InputContainerType,
-      patient_container=self.PatientContainerType,
+      input_container_type=self.input_container_type,
+      patient_container=self.patient_container_type,
     )
 
-    self.data_state: PipelineTree = self.pipelineTreeType(
+    self.data_state: PipelineTree = self.pipeline_tree_type(
       self.patient_identifier_tag,
       self.input,
       pipeline_tree_options
@@ -150,7 +216,7 @@ class AbstractPipeline():
     self._maintenance_thread = self.maintenance_thread(
       self.data_state, self.study_expiration_days, daemon=True)
 
-    self._assocation_container_factory = self.assocation_container_factory()
+    self._association_container_factory = self.association_container_factory()
 
     # Server validations and creation.
     self.ae = AE(ae_title = self.ae_title)
@@ -181,12 +247,12 @@ class AbstractPipeline():
     - control_c_store_function - main function responsible for calling correct functions
   """
   def _handle_c_store(self, event: evt.Event) -> int:
-    c_store_container = self._assocation_container_factory.build_assocation_c_store(event)
-    status = self.consume_c_store_container(c_store_container)
+    c_store_container = self._association_container_factory.build_assocation_c_store(event)
+    status = self._consume_c_store_container(c_store_container)
     self.logger.debug(f"Handled C STORE with status {hex(status)}")
     return status
 
-  def consume_c_store_container(self, c_store_container: CStoreContainer) -> int:
+  def _consume_c_store_container(self, c_store_container: CStoreContainer) -> int:
     try:
       if not self.filter(c_store_container.dataset):
         self.logger.warning("Dataset discarded")
@@ -222,19 +288,19 @@ class AbstractPipeline():
     extend the handler functions consume
     """
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
-    association_accept_container = self._assocation_container_factory.build_assocation_accepted(event)
+    association_accept_container = self._association_container_factory.build_assocation_accepted(event)
 
     for association_type in association_accept_container.assocation_types:
-      handler = self.acceptation_handlers.get(association_type)
+      handler = self._acceptation_handlers.get(association_type)
       if handler is not None:
         handler(self, association_accept_container)
 
-  def consume_association_accept_store_assocation(
+  def _consume_association_accept_store_association(
       self, accepted_container: AcceptedContainer):
     """This function completes all the calculation nessesarry for
     """
     if accepted_container.assocation_ip is not None:
-      self._assocations_responds_addresses[accepted_container.assocation_id] = Address(
+      self._associations_responds_addresses[accepted_container.assocation_id] = Address(
         accepted_container.assocation_ip, self.default_response_port, accepted_container.assocation_ae)
 
     self.updated_patients[accepted_container.assocation_id] = set()
@@ -248,15 +314,15 @@ class AbstractPipeline():
         event (evt.Event):
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    released_container = self._assocation_container_factory.build_assocation_released(event)
+    released_container = self._association_container_factory.build_assocation_released(event)
 
     for association_type in released_container.assocation_types:
-      handler = self.release_handlers.get(association_type)
+      handler = self._release_handlers.get(association_type)
       if handler is not None:
         handler(self, released_container)
 
 
-  def consume_association_release_store_association(
+  def _consume_association_release_store_association(
       self, released_container: ReleasedContainer) -> None:
     """This function is called when an association, which stored
     some datasets is released.
@@ -291,7 +357,7 @@ class AbstractPipeline():
     """
     self.logger.debug(f"Processing {patient_ID}")
     try:
-      patient_input_container = self.get_input_container(patient_ID, released_container)
+      patient_input_container = self._get_input_container(patient_ID, released_container)
       result = self.process(patient_input_container)
     except Exception as exception:
       log_traceback(self.logger, exception, "processing")
@@ -319,7 +385,7 @@ class AbstractPipeline():
       success = False
     return success
 
-  def get_input_container(self, patient_ID: str, released_container: ReleasedContainer) -> InputContainer:
+  def _get_input_container(self, patient_ID: str, released_container: ReleasedContainer) -> InputContainer:
     """This function retrives an input container for processing and
     fills out any information unavailable at object creation.
 
@@ -332,8 +398,8 @@ class AbstractPipeline():
 
     if released_container.assocation_ae_title in self.known_endpoints:
       input_container.responding_address = self.known_endpoints[released_container.assocation_ae_title]
-    elif released_container.assocation_id in self._assocations_responds_addresses:
-      input_container.responding_address = self._assocations_responds_addresses[released_container.assocation_id]
+    elif released_container.assocation_id in self._associations_responds_addresses:
+      input_container.responding_address = self._associations_responds_addresses[released_container.assocation_id]
 
     return input_container
 
@@ -418,12 +484,12 @@ class AbstractPipeline():
   # Handlers are an extendable way of
 
   # Extendable Handlers
-  acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AcceptedContainer], None]] # Note that Self type is only a part of python 3.11
-    AssociationTypes.StoreAssocation : consume_association_accept_store_assocation
+  _acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AcceptedContainer], None]] # Note that Self type is only a part of python 3.11
+    AssociationTypes.StoreAssociation : _consume_association_accept_store_association
   }
 
-  release_handlers = { # Dict[AssociationTypes, Callable[[Self, ReleasedContainer], None]]
-    AssociationTypes.StoreAssocation : consume_association_release_store_association
+  _release_handlers = { # Dict[AssociationTypes, Callable[[Self, ReleasedContainer], None]]
+    AssociationTypes.StoreAssociation : _consume_association_release_store_association
   }
 
 
@@ -443,7 +509,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
         released_container = self.process_queue.get(timeout=self.queue_timeout)
         try:
           for association_type in released_container.assocation_types:
-            handler = self.release_handlers.get(association_type)
+            handler = self._release_handlers.get(association_type)
             if handler is not None:
               handler(self, released_container)
         except Exception as exception:
@@ -456,7 +522,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
   def _handle_association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    released_container = self._assocation_container_factory.build_assocation_released(event)
+    released_container = self._association_container_factory.build_assocation_released(event)
 
     self.process_queue.put(released_container)
 

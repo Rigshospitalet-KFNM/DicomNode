@@ -33,8 +33,14 @@ class AbstractInput(ImageTreeInterface, ABC):
   __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
 
   required_tags: List[int] = [0x000800180] # SOPInstanceUID
+  """The list of tags that must be present in a dataset to be accepted
+  into the input. Consider checking SOP_mapping.py for collections of Tags."""
+
   required_values: Dict[int, Any] = {}
+  "A Mapping of tags and associated values, doesn't work for values in sequences"
+
   image_grinder: Grinder = IdentityGrinder()
+  "Grinder for converting stored dicom images into a data usable by the processing function"
 
   @dataclass
   class Options: # These are options that are injected into all input.

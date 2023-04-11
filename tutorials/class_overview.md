@@ -103,4 +103,3 @@ This module contains classes for building an medical image processing pipeline.
 * InputContainer - A glorified dict with additional data
 * PatientContainer - An ImageTreeInterface that manages all Abstract input.
 * PipelineTree - An ImageTreeInterface that manages all PatientContainers.
-

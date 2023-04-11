@@ -18,7 +18,7 @@ from pynetdicom.events import Event, EventType, EVT_ACCEPTED, EVT_RELEASED, EVT_
 
 
 class AssociationTypes(Enum):
-  StoreAssocation = 1
+  StoreAssociation = 1
 
 class AssocationContainer:
   pass
@@ -57,7 +57,7 @@ class AssociationContainerFactory:
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None \
           and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
-        association_types.add(AssociationTypes.StoreAssocation)
+        association_types.add(AssociationTypes.StoreAssociation)
     assocation_ae = event.assoc.requestor.ae_title
     assocation_ip = event.assoc.requestor.address
 
@@ -74,7 +74,7 @@ class AssociationContainerFactory:
     for requested_context in event.assoc.requestor.requested_contexts:
       if requested_context.abstract_syntax is not None \
           and requested_context.abstract_syntax.startswith("1.2.840.10008.5.1.4.1.1"):
-        association_types.add(AssociationTypes.StoreAssocation)
+        association_types.add(AssociationTypes.StoreAssociation)
     assocation_ae = event.assoc.requestor.ae_title
     assocation_ip = event.assoc.requestor.address
 
