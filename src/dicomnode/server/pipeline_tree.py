@@ -307,12 +307,7 @@ class PipelineTree(ImageTreeInterface):
       self[patient_directory.name] = PatientNode(self.PipelineArgs, None, options)
 
   def add_image(self, dicom : Dataset) -> int:
-    if self.patient_identifier_tag not in dicom:
-      self.logger.debug(f"{hex(self.patient_identifier_tag)} not in dataset")
-      self.logger.debug("Patient Identifier tag not in dicom")
-      raise InvalidDataset()
-
-    key = str(dicom[self.patient_identifier_tag].value)
+    key = self.get_patient_id(dicom)
 
     if key not in self:
       IDC_path: Optional[Path] = None
@@ -349,6 +344,15 @@ class PipelineTree(ImageTreeInterface):
       return patient_node.validate_inputs()
     else:
       raise InvalidTreeNode # pragma: no cover
+
+  def get_patient_id(self, dataset: Dataset) -> str:
+    """"""
+    if self.patient_identifier_tag not in dataset:
+      self.logger.debug(f"{hex(self.patient_identifier_tag)} not in dataset")
+      self.logger.debug("Patient Identifier tag not in dataset")
+      raise InvalidDataset()
+
+    return str(dataset[self.patient_identifier_tag].value)
 
   def get_patient_input_container(self, patient_id: str) -> InputContainer:
     """Gets the input container with the associated patient.
@@ -450,7 +454,6 @@ class PipelineTree(ImageTreeInterface):
 
     self.images -= removed_images
     self.data = new_data_dict
-
 
 
   def __get_PatientContainer_Options(self, container_path: Optional[Path]) -> PatientNode.Options:

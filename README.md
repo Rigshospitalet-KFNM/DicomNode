@@ -1,9 +1,16 @@
 # DicomNode
 
-Dicom node is a toolkit and library for the various scripts and tools used for dicom communication
-It contains the tools to set up an post processing pipeline of medical images.
+DicomNode is a framework for building post-processing pipeline of medical images.
+It specializes in converted dicom images into formats usable formats (e.g. Nifti, Minc) and back to dicom.
 
 ## Installation
+
+The Library require:
+
+* g++
+* cmake
+* pybind11
+* Python developer tools
 
 To install this library
 > `pip install git+https://github.com/Rigshospitalet-KFNM/DicomNode.git`

@@ -12,3 +12,4 @@ lcov.info
 *.austin
 performance/
 *.so
+cspell.json

@@ -29,7 +29,6 @@ An instanced virtual elements is a virtual element that is different for each im
 * FunctionalElement - An element that uses a injected function to calculate the value of Data Element.
 * InstanceCopyElement - An element that copies all values from a header dicom series to a produced dicom series, indexed by instance number.
 
-
 ### NIFTI
 
 * NiftiGrinder - Grinder for converting dicom to nifti
