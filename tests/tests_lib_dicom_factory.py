@@ -8,7 +8,7 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicom_factory import AttrElement, CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
+from dicomnode.lib.dicom_factory import AttributeElement, CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
   InstanceEnvironment
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
@@ -189,7 +189,7 @@ class DicomFactoryTestClass(TestCase):
     self.assertRaises(NotImplementedError, self.factory.build_from_header, SeriesHeader(), None)
 
   def test_AttributeElementCorporealialize(self):
-    attribute_element = AttrElement(0x0008103E, 'LO','series_description')
+    attribute_element = AttributeElement(0x0008103E, 'LO','series_description')
 
     de = attribute_element.corporealialize(self.factory, [Dataset()])
 

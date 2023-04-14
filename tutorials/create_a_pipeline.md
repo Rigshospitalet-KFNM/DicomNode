@@ -53,7 +53,7 @@ class MyPipeline(AbstractPipeline):
   ...
 ```
 
-A full overview available configuration of the `AbstractPipeline` and other classes look at [Configuration overview](tutorials/configuration_overview.md)
+A full overview available configuration of the `AbstractPipeline` and other classes look at [Configuration overview](./tutorials/configuration_overview.md)
 
 ### Step 2 and 3: Inputs for the pipeline
 
@@ -188,24 +188,13 @@ An `InputContainer` also may contain:
 * `response_address` - A `Dicomnode.lib.dimse.Address` - which represent the last association to send picture to this patient.
 Take the running example, if our PET and CT picture originate from two different sources, the response address is last to add studies to the Patient.
 
+You should now hopefully have all the data that you need to perform your post processing.
+
 #### Building new Dicom Series
 
-After applying some post processing to an image, you need to return to the Dicom format. For this you need a header and a specialized factory.
+For most applications you need to return a dicom series, using the previous datasets.
 
-Both base classes can be found in `dicomnode.lib.dicom_factory`.
-
-* `Blueprint` - A static blueprint for a dicom series
-* `DicomFactory` - Factory that build dicom series.
-
-Building a new dicom series happens in three steps.
-
-1. A `Blueprint` and Specialized `DicomFactory` is given to an AbstractPipeline
-2. A Father dicom Series and a `Blueprint` produce a `SeriesHeader`
-3. A `SeriesHeader` and an image produces the new Dicom Series.
-
-You'll have to perform step 3 in the processing function.
-
-For a more in-depth tutorial, see [Create a dicom Series](tutorials/create_a_dicom_series.md)
+This library provides some tool to help with this explained in: [Create a dicom Series](tutorials/create_a_dicom_series.md)
 
 
 ### Exporting Data
@@ -213,7 +202,13 @@ For a more in-depth tutorial, see [Create a dicom Series](tutorials/create_a_dic
 The final step of a pipeline is to send data to an endpoint. This is done by
 `PipelineOutput`-objects, but you have to create them in the processing.
 
-Different type of `PipelineOutput` sends 
+The library provides the following `PipelineOutput`:
+
+* `NoOutput` - has no functionality. Useful if you export your data in the processing function.
+* `FileOutput` - saves to a local file storage
+* `DicomOutput` - Sends the files by DIMSE message to an external address
+
+The outputs can support multiple datasets and multiple paths, as they are passed as arguments of pairs with (endpoint, series of datasets)
 
 ```python
 

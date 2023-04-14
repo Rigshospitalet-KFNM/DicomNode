@@ -15,7 +15,7 @@ from pydicom.tag import BaseTag, Tag
 # Dicomnode packages
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import make_meta, gen_uid
-from dicomnode.lib.dicom_factory import AttrElement, InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
+from dicomnode.lib.dicom_factory import AttributeElement, InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
   StaticElement, Blueprint, patient_blueprint, general_series_blueprint, \
   general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint, \
   general_equipment_blueprint, general_image_blueprint, ct_image_blueprint, \
@@ -228,10 +228,10 @@ image_pixel_blueprint: Blueprint = Blueprint([
   FunctionalElement(0x00280010, 'US', _add_Rows),              # Rows
   FunctionalElement(0x00280011, 'US', _add_Columns),           # Columns
   FunctionalElement(0x00280034, 'IS', _add_aspect_ratio),      # PixelAspectRatio
-  AttrElement(0x00280100, 'US', 'bits_allocated'),       # BitsAllocated
-  AttrElement(0x00280101, 'US', 'bits_stored'),          # BitsStored
-  AttrElement(0x00280102, 'US', 'high_bit'),             # HighBit
-  AttrElement(0x00280103, 'US', 'pixel_representation'), # PixelRepresentation
+  AttributeElement(0x00280100, 'US', 'bits_allocated'),       # BitsAllocated
+  AttributeElement(0x00280101, 'US', 'bits_stored'),          # BitsStored
+  AttributeElement(0x00280102, 'US', 'high_bit'),             # HighBit
+  AttributeElement(0x00280103, 'US', 'pixel_representation'), # PixelRepresentation
   FunctionalElement(0x00280106, 'US', _add_smallest_pixel),    # SmallestImagePixelValue
   FunctionalElement(0x00280107, 'US', _add_largest_pixel),     # LargestImagePixelValue
   FunctionalElement(0x00281052, 'DS', _add_intercept),         # RescaleIntercept

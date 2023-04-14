@@ -68,7 +68,7 @@ class VirtualElement(ABC):
     raise NotImplemented # pragma: no cover
 
 # Static Virtual Elements
-class AttrElement(VirtualElement):
+class AttributeElement(VirtualElement):
   """Reads an attribute from the factory and creates a data element
   from it"""
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, attribute: str) -> None:
@@ -495,7 +495,7 @@ general_series_blueprint = Blueprint([
   SeriesElement(0x00080021, 'DA', _get_today),         # SeriesDate
   SeriesElement(0x00080031, 'TM', _get_time),          # SeriesTime
   SeriesElement(0x0020000E, 'UI', gen_uid),            # SeriesInstanceUID
-  AttrElement(0x0008103E, 'LO', 'series_description'), # SeriesDescription
+  AttributeElement(0x0008103E, 'LO', 'series_description'), # SeriesDescription
   SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
   CopyElement(0x00081070, Optional=True),              # Operators' Name
   CopyElement(0x00185100),                             # PatientPosition

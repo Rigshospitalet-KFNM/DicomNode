@@ -8,7 +8,13 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Python standard Library
 from argparse import ArgumentTypeError
 from threading import Thread
-from typing import Any, Union
+from logging import Logger
+from typing import Any, Optional, Union
+try:
+  from os import getuid, setuid
+  UNIX = True
+except ImportError:
+  UNIX = False
 
 # Third party packages
 import numpy
@@ -85,3 +91,22 @@ def colomn_to_row_major_order(input: numpy.ndarray) -> numpy.ndarray:
 
   return return_array
 
+def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None:
+  """Drops privileges of program to run as a user
+
+  An issue with this is that you have to open the socket / files and then drop the privileges
+  and sadly you need to go deep in the pynetdicom library.
+
+  Args:
+      
+  """
+  if UNIX and getuid() == root_uid:
+    if logger is not None:
+      logger.info("Dropping privileges to:")
+    setuid(new_user_uid)
+  else:
+    if logger is not None:
+      if UNIX:
+        logger.info("Cannot drop privileges, not root UID")
+      else:
+        logger.info("Cannot drop privileges, Not on a unix system")

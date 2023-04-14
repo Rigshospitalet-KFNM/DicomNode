@@ -52,6 +52,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     data_directory: Optional[Path]  = None
     factory: Optional[DicomFactory] = None
     lazy: bool = False
+    "Indicate if the Abstract input should use "
 
   def __init__(self,
       pivot: Optional[Dataset] = None,
@@ -59,10 +60,12 @@ class AbstractInput(ImageTreeInterface, ABC):
     ):
     super().__init__()
     self.options = options
+    "Options for this Abstract input"
 
     self.path: Optional[Path] = options.data_directory
     if self.options.logger is not None:
       self.logger = self.options.logger
+      "Logger for logging"
     else:
       self.logger = get_logger()
 

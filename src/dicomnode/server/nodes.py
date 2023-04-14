@@ -106,6 +106,11 @@ class AbstractPipeline():
   c_move_blueprint: Optional[Blueprint] = None
   "Blueprint for create a C Move object"
 
+  parent_input: Optional[str] = None
+  """Input to be used for SeriesHeader generation
+  Must be a key in the input attribute.
+  """
+
   # Dicom communication configuration tags
   ae_title: str = "Your_AE_TITLE"
   "AE title of the dicomnode"
