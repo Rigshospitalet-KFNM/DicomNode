@@ -251,14 +251,35 @@ class PipelineTree(ImageTreeInterface):
   @dataclass
   class Options:
     ae_title: Optional[str] = None
+    "AE title of node"
+
     data_directory: Optional[Path] = None
+    "Root directory for file storage"
+
     factory: Optional[DicomFactory] = None
+    "DicomFactory for constructing Series Header"
+
     filling_strategy: FillingStrategy = FillingStrategy.DISCARD
-    lazy: bool = False
-    logger: Optional[Logger] = None
-    input_container_type: Type[InputContainer] = InputContainer
-    patient_container: Type[PatientNode] = PatientNode
+    "Filling Strategy for 'factory'"
+
     header_blueprint: Optional[Blueprint] = None
+    "Blueprint for factory to use"
+
+    lazy: bool = False
+    "If underlying inputs should use lazy datasets"
+
+    logger: Optional[Logger] = None
+    "Logger to send message to"
+
+    input_container_type: Type[InputContainer] = InputContainer
+    "type of input containers get_patient_input_container should return"
+
+    parent_input: Optional[str] = None
+    "Input, that should be used as parent"
+
+    patient_container: Type[PatientNode] = PatientNode
+    "Type of node that's under this tree."
+
 
   def __init__(self,
                patient_identifier: int,
@@ -281,7 +302,7 @@ class PipelineTree(ImageTreeInterface):
     # Args setup
     self.patient_identifier_tag: int = patient_identifier
     self.PipelineArgs: Dict[str, Type[AbstractInput]] = pipelineArgs
-    self.root_data_directory: Optional[Path] = options.data_directory
+    #self.root_data_directory: Optional[Path] = options.data_directory
     self.options = options
 
     #Logger Setup
@@ -291,13 +312,13 @@ class PipelineTree(ImageTreeInterface):
       self.logger = self.options.logger
 
     #Load File state
-    if self.root_data_directory is None: # There are no files to load if it's in memory
+    if self.options.data_directory is None: # There are no files to load if it's in memory
       return
 
-    if not self.root_data_directory.exists():
-      self.root_data_directory.mkdir()
+    if not self.options.data_directory.exists():
+      self.options.data_directory.mkdir()
 
-    for patient_directory in self.root_data_directory.iterdir():
+    for patient_directory in self.options.data_directory.iterdir():
       if patient_directory.is_file():
         self.logger.error(f"{patient_directory.name} in root_data_directory is a file not a directory")
         raise InvalidRootDataDirectory()
@@ -311,8 +332,8 @@ class PipelineTree(ImageTreeInterface):
 
     if key not in self:
       IDC_path: Optional[Path] = None
-      if self.root_data_directory is not None:
-        IDC_path = self.root_data_directory / key
+      if self.options.data_directory is not None:
+        IDC_path = self.options.data_directory / key
 
       options = self.__get_PatientContainer_Options(IDC_path)
       self[key] = PatientNode(self.PipelineArgs, dicom, options)
@@ -439,7 +460,7 @@ class PipelineTree(ImageTreeInterface):
         InvalidTreeNode: If nodes are not PatientNodes
     """
     #Due to the fact, that you cannot iterator over a changing directory
-    #Threr
+
     new_data_dict = {}
     removed_images = 0
 

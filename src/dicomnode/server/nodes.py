@@ -144,7 +144,7 @@ class AbstractPipeline():
 
   #Logging Configuration
   number_of_backups: int = 8
-  "Backup of log are made weekly, this specifies how many weeks of logs is saved"
+  "Number of backups before the os starts deleting old logs"
 
   log_date_format = "%Y/%m/%d %H:%M:%S"
   "String format for timestamps in logs."
@@ -155,6 +155,9 @@ class AbstractPipeline():
   * `TextIO` - output to that stream, This is stdout / stderr
   * `Path | str` - creates a rotating log at the path
   """
+
+  log_when = "w0"
+  "At what points in time the log should roll over, defaults to monday midnight"
 
   log_level: int = logging.INFO
   "Level of Logger"
@@ -184,7 +187,8 @@ class AbstractPipeline():
       log_level=self.log_level,
       format=self.log_format,
       date_format=self.log_date_format,
-      backupCount=self.number_of_backups
+      backupCount=self.number_of_backups,
+      when=self.log_when
     )
 
     if self.disable_pynetdicom_logger:
@@ -210,6 +214,7 @@ class AbstractPipeline():
       lazy=self.lazy_storage,
       input_container_type=self.input_container_type,
       patient_container=self.patient_container_type,
+      parent_input=self.parent_input,
     )
 
     self.data_state: PipelineTree = self.pipeline_tree_type(
