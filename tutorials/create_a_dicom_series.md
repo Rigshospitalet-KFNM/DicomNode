@@ -17,7 +17,7 @@ Building a new dicom series happens in three steps.
 
 With the data flow seen can be seen below:
 
-[Image](./Images/blueprint.drawio.svg)
+![Image](./Images/blueprint.drawio.svg)
 
 ## Definitions
 
