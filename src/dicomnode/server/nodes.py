@@ -192,7 +192,7 @@ class AbstractPipeline():
     )
 
     if self.disable_pynetdicom_logger:
-      getLogger("pynetdicom").setLevel(logging.CRITICAL + 1)
+      getLogger("pynetdicom").setLevel(logging.INFO + 1)
 
     # Load any previous state
     if self.data_directory is not None:

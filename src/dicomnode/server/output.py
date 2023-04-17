@@ -39,7 +39,7 @@ class PipelineOutput(ABC):
     """Method that should send all the data in output
 
     Returns:
-        bool: _description_
+        bool: If the send was successful or not
     """
     raise NotImplementedError # pragma: no cover
 
@@ -77,6 +77,24 @@ def save_dataset(path, dataset) -> None:
   return None
 
 class FileOutput(PipelineOutput):
+  """PipelineOutput that saves series at a destination using the injected save_function
+
+    Args:
+        output (List[Tuple[Path, Iterable[Dataset]]]): A list of outputs
+        saving_function (Callable[[Path, Dataset], None], optional):
+          function that does the actual saving
+          Defaults to save_dataset, which saves the datasets at:
+           path / StudyInstanceUID / SeriesInstanceUID / SOP instanceUID
+
+    Example:
+    >>> file_output = FileOutput([
+        (path_1, datasets_1),
+        (path_2, datasets_2),
+      ])
+    >>> # Stores store dataset_1 at path_1 and
+  >>># dataset_2 at path 2
+  """
+
   saving_function: Callable[[Path, Dataset], None]
   output: List[Tuple[Path, Iterable[Dataset]]]
 
@@ -91,3 +109,40 @@ class FileOutput(PipelineOutput):
       for dataset in datasets:
         self.saving_function(path, dataset)
     return True
+
+class MultiOutput(PipelineOutput):
+  """This pipeline allows for multiple modality outputs
+
+  Args:
+    outputs (IterablePipelineOutput]): The outputs to send
+
+  Example:
+
+  >>>multi_output = MultiOutput([
+      DicomOutput([
+        (address_1, datasets_1),
+        (address_2, datasets_1),
+        (address_1, datasets_2),
+      ]),
+      FileOutput([
+        (path_1, datasets_1),
+        (path_2, datasets_2),
+      ])
+    ])
+  >>># Send datasets_1 to address_1 and address_2,
+  >>># datasets_2 to address_1, and store dataset_1 at path_1 and
+  >>># dataset_2 at path 2
+  >>>multi_output.send()
+  True
+  """
+
+  def __init__(self, outputs: Iterable[PipelineOutput]) -> None:
+    self.outputs = outputs
+
+  def send(self) -> bool:
+    success = True
+
+    for output in self.outputs:
+      success &= output.send()
+
+    return success
