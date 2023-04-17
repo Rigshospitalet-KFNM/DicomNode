@@ -27,6 +27,7 @@ This library heavily uses inheritance, to allow users flexibility and replace an
 ### The main class
 
 Create a file and import the `AbstractPipeline` class from `dicomnode.server.node` module.
+For This example named: `node.py`
 
 Superclass it and open it with the following code:
 
@@ -196,7 +197,6 @@ For most applications you need to return a dicom series, using the previous data
 
 This library provides some tool to help with this explained in: [Create a dicom Series](tutorials/create_a_dicom_series.md)
 
-
 ### Exporting Data
 
 The final step of a pipeline is to send data to an endpoint. This is done by
@@ -227,3 +227,26 @@ class MyPipeline(AbstractPipeline):
 
 If you have performed the steps above you now have a functional pipeline.
 
+### Testing The pipeline
+
+To run the node, run the following command:
+
+`source venv/bin/activate && python3 node.py`
+
+Now the server should start and open sitting idle.
+Now to test the server you need to send some dicom datasets using the DIMSE protocol, in this case the tutorial will assume they are at: `path/to/dicom`.
+
+To send the node some data you can use the library's omnitool. Namely the store functionality.
+`source venv/bin/activate`
+`omnitool store $localhost $port $Store_AE_title $Node_AE_title $path/to/dicom`
+
+Or alternative use DCM-tk
+
+storescu --scan-directories -nh -xs --recurse -aec $YourAETitle $localhost $port $path/to/dicoms
+
+### Final notes
+
+The node is build with flexibility in mind, and there's plenty options for configuration.
+Check [Configuring a Pipeline](./configuring_a_pipeline.md) for all the options
+
+When something goes wrong as you do in programming, remember that logs are your best friend, and create an issue on github at <https://github.com/Rigshospitalet-KFNM/DicomNode/issues>

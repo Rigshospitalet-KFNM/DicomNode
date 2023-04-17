@@ -2,13 +2,20 @@
 
 __author__ = "Christoffer Vilstrup Jensen"
 
+# Python standard library
 from argparse import _SubParsersAction, Namespace
 from pathlib import Path
-from dicomnode.lib.dimse import send_images
-from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 
-from dicomnode.lib.utils import str2bool
+# Third party packages
+
+# Dicomnode packages
+from dicomnode.lib.dimse import send_images, Address
+from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
+from dicomnode.lib.image_tree import StudyTree
 from dicomnode.lib.io import load_dicom, load_private_tags_from_args
+from dicomnode.lib.utils import str2bool
+
+
 
 
 
@@ -25,8 +32,11 @@ def get_parser(subparser : _SubParsersAction):
 
 def entry_func(args : Namespace):
   private_tags = load_private_tags_from_args(args)
-  dicom_object = load_dicom(args.dicomfile, private_tags)
+  study_tree = StudyTree()
+  study_tree.discover(args.dicomfile)
+  address = Address(args.ip, args.port, args.SCU_AE)
+
   try:
-    c_store_resp = send_images(args.ip, args.port, args.SCP_AE, args.SCU_AE, dicom_object)
+    c_store_resp = send_images(args.SCP_AE, address, study_tree)
   except CouldNotCompleteDIMSEMessage:
     print(f"Could not connect to the SCP with the following inputs:\nIP: {args.ip}\nPort: {args.port}\nSCP AE: {args.SCP_AE}\n SCU AE:{args.SCU_AE}")
