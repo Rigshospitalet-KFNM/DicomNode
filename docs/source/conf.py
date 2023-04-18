@@ -16,7 +16,7 @@ release = '0.0.4'
 
 import os
 import sys
-sys.path.insert(0, '../src')
+sys.path.insert(0, '../../src')
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon']
 

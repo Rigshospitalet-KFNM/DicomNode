@@ -5,13 +5,13 @@
 
 Welcome to dicom node's documentation!
 ======================================
+.. automodule:: dicomnode
+    :members:
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-.. automodule:: dicomnode.lib
-    :members:
 
 Indices and tables
 ==================
