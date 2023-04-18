@@ -64,13 +64,33 @@ class VirtualElement(ABC):
     return dataset
 
   @abstractmethod
-  def corporealialize(self, factory: 'DicomFactory', dataset: Iterable[Dataset]) -> Optional[Union[DataElement, 'InstanceVirtualElement']]:
+  def corporealialize(self,
+                      factory: 'DicomFactory',
+                      parent_datasets: Iterable[Dataset]
+                      ) -> Optional[Union[DataElement,
+                                          'InstanceVirtualElement']]:
+    """Extracts data from the parent datasets and either produces a static
+    element or a InstancedVirtualElement, in the case of that the produced tag
+    should vary image instance to image instance.
+
+    Args:
+      factory (DicomFactory): Factory that's producing the series header
+      parent_datasets (Iterable[Dataset]): Parent datasets to be extracted
+
+    """
     raise NotImplemented # pragma: no cover
 
 # Static Virtual Elements
 class AttributeElement(VirtualElement):
   """Reads an attribute from the factory and creates a data element
-  from it"""
+    from it. Type of the factory attribute is carried over
+
+    Args:
+      tag (Union[BaseTag, str, int, Tuple[int,int]]): Tag of the Virtual Element
+      VR (str): VR of the virtual element
+      attribute (str): Name of the attribute read from input factory.
+
+  """
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, attribute: str) -> None:
     super().__init__(tag, VR)
     self.attribute = attribute
@@ -321,10 +341,10 @@ class DicomFactory(ABC):
     https://github.com/Rigshospitalet-KFNM/DicomNode/tutorials/MakingHeaders.md
 
     Args:
-        pivot (Dataset): The dataset which the header will be produced from
+      pivot (Dataset): The dataset which the header will be produced from
 
     Returns:
-        SeriesHeader: This object is a "header" for the series
+      SeriesHeader: This object is a "header" for the series
     """
     failed_tags = []
     header = SeriesHeader()

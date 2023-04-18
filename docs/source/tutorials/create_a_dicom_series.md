@@ -3,6 +3,8 @@ author: Christoffer Vilstrup Jensen
 title: Create a dicom series
 ---
 
+# Building a dicom Series
+
 ## Introduction
 
 It can be just as much of a headache going back to dicom image format, this tutorial showcases the library tools for creating new dicom series.

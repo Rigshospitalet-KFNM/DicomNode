@@ -5,14 +5,25 @@
 
 Welcome to dicom node's documentation!
 ======================================
-.. automodule:: dicomnode
-    :members:
+
+**Dicomnode** is a Python library for creating dicom-to-dicom post processing
+dicom nodes.
+
+It contains methods for converting from dicom into other formats such as nifti.
+
+Source code can be found at: https://github.com/Rigshospitalet-KFNM/DicomNode
+
+Tutorials can be found at :doc:`tutorials/tutorial_index`
+
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
+   :maxdepth: 1
    :caption: Contents:
 
-   modules
+   tutorials/tutorial_index
+   dicomnode
+
 
 
 

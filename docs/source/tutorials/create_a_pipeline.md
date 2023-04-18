@@ -3,13 +3,13 @@ title: Create a pipeline
 author: Christoffer Vilstrup Jensen
 ---
 
-## Introduction & Definitions
+# Introduction & Definitions
 
 Throughout the library and tutorials the word: "pipeline" and "dicomnode" are used interchangeably.
 First and foremost it's important to define what is a "pipeline". In this library it's defined as:
 A dicom SCP which performs some post processing on the images and the output is shipped to some endpoint. To pass data to a pipeline is by sending dicom images to it using DIMSE messages rather than some CLI.
 
-#### Workflow of the pipeline
+## Workflow of the pipeline
 
 In board terms a pipeline is a server program running through the following stages:
 
@@ -22,9 +22,9 @@ In board terms a pipeline is a server program running through the following stag
 
 This library heavily uses inheritance, to allow users flexibility and replace any functionality that is unwanted or insufficient.
 
-## Building the your first pipeline
+# Building the your first pipeline
 
-### The main class
+## The main class
 
 Create a file and import the `AbstractPipeline` class from `dicomnode.server.node` module.
 For This example named: `node.py`
@@ -54,9 +54,9 @@ class MyPipeline(AbstractPipeline):
   ...
 ```
 
-A full overview available configuration of the `AbstractPipeline` and other classes look at [Configuration overview](./tutorials/configuration_overview.md)
+A full overview available configuration of the `AbstractPipeline` and other classes look at [Configuration overview](./configuration_overview.md)
 
-### Step 2 and 3: Inputs for the pipeline
+## Step 2 and 3: Inputs for the pipeline
 
 Your pipeline is going to need some inputs and for this you'll superclass another class: `AbstractInput` found in the `server.input` module.
 
@@ -70,7 +70,7 @@ You must implement a method to check if the input have all the images it needs.
 
 And finally you must provide a method for transforming the dicom images into a format used by your processing step.
 
-#### Filtering example
+### Filtering example
 
 Say you need a CT- and a PET series as inputs to your pipeline. You would create two inputs and let them have different `required_values`:
 
@@ -101,7 +101,7 @@ class MyPETInput(AbstractInput):
 
 A pipeline attempt to store a picture in ALL of its inputs so an image can be stored in multiple inputs. If the Pipeline fails to store an image in at least 1 input, it will return status code: `0xB006`.
 
-#### Validation
+### Validation
 
 After each storage connection is released, each input should check if it contains sufficient data to start processing. This is done by a `validate` function call, where an input should inspect itself and determine this and return `True` if it contains sufficient data and `False` if not.
 
@@ -118,11 +118,11 @@ class MyInput(AbstractInput):
     return self.images == max_instanceNumber
 ```
 
-#### Data extraction
+### Data extraction
 
 After an input have validated, most medical image processing programs often work with a different file format to overcome the fractured nature of dicom images. So the input transforms its dicom images into some other format using a "Grinder" function.
 
-##### Grinders
+#### Grinders
 
 A Grinder is a glorified function, that does just that, they can be found in `dicomnode.server.grinders`.
 
@@ -163,7 +163,7 @@ class MyPipeline(AbstractPipeline):
   ...
 ```
 
-### Processing
+## Processing
 
 The processing is handled by the process method, so you need to overwrite it with your own post-processing, however it must have a specific call structure.
 
@@ -191,13 +191,13 @@ Take the running example, if our PET and CT picture originate from two different
 
 You should now hopefully have all the data that you need to perform your post processing.
 
-#### Building new Dicom Series
+### Building new Dicom Series
 
 For most applications you need to return a dicom series, using the previous datasets.
 
-This library provides some tool to help with this explained in: [Create a dicom Series](tutorials/create_a_dicom_series.md)
+This library provides some tool to help with this explained in: [Create a dicom Series](./create_a_dicom_series.md)
 
-### Exporting Data
+## Exporting Data
 
 The final step of a pipeline is to send data to an endpoint. This is done by
 `PipelineOutput`-objects, but you have to create them in the processing.
@@ -227,7 +227,7 @@ class MyPipeline(AbstractPipeline):
 
 If you have performed the steps above you now have a functional pipeline.
 
-### Testing The pipeline
+## Testing The pipeline
 
 To run the node, run the following command:
 
@@ -244,7 +244,7 @@ Or alternative use DCM-tk
 
 storescu --scan-directories -nh -xs --recurse -aec $YourAETitle $localhost $port $path/to/dicoms
 
-### Final notes
+## Final notes
 
 The node is build with flexibility in mind, and there's plenty options for configuration.
 Check [Configuring a Pipeline](./configuring_a_pipeline.md) for all the options

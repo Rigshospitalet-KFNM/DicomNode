@@ -27,13 +27,18 @@ _PPrefix = "AnonymizedPatientID_"
 logger = get_logger()
 
 class IdentityMapping():
-  """
+  """Class for containing an identity mapping then anonymising a dicom series
 
-  Programmer Note: This class is here instead of lib.anonymization to
-  prevent circular imports, for typings sake.
-    Note to the Note: It might be possible to resolve it with a type hint
-    'dicomnode.lib.studyTree.DicomTree'
+  Class assumes that there's no overlap between:
+    * StudyInstanceUID
+    * SeriesInstanceUID
+    * StudyInstanceUID
+    * PatientID (Not that's relevant)
   """
+  #This class is here instead of lib.anonymization to
+  #prevent circular imports, for typings sake.
+  #  Note to the Note: It might be possible to resolve it with a type hint
+  #  'dicomnode.lib.studyTree.DicomTree'
   def __init__(self, prefix_size = 4) -> None:
     self.StudyUIDMapping : Dict[str, UID] = {}
     self.SeriesUIDMapping : Dict[str, UID] = {}
@@ -431,18 +436,8 @@ class PatientTree(ImageTreeInterface):
     return f"Patient {self.TreeName} with {self.images} images\n{studyStr}"
 
 class DicomTree(ImageTreeInterface):
-  """This is a Root node of an ImageTree structure that sort Dicom Images in the following way:
-
-  The Structure is as follows:
-                     DicomTree\n
-                    /   ...    \\
-            PatientTree...\n
-            /   ...    \\
-          StudyTree...\n
-          /    ...  \\
-     SeriesTree...\n
-    /   ...   \\
-  DataSet ... Dataset
+  """This is a Root node of an Tree structure, with the ability to index
+  multiple studies
   """
 
   def add_image(self, dicom : Dataset) -> int:

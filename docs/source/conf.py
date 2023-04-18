@@ -16,9 +16,10 @@ release = '0.0.4'
 
 import os
 import sys
-sys.path.insert(0, '../../src')
+sys.path.insert(0, '../../src/dicomnode')
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'myst_parser']
+napoleon_include_private_with_doc = True
 
 templates_path = ['_templates']
 exclude_patterns = []
@@ -28,5 +29,5 @@ language = 'english'
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+html_theme = 'groundwork'
 html_static_path = ['_static']
