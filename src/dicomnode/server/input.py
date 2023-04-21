@@ -32,7 +32,7 @@ class AbstractInput(ImageTreeInterface, ABC):
   # Private tags should be injected, rather than put into the input
   __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
 
-  required_tags: List[int] = [0x000800180] # SOPInstanceUID
+  required_tags: List[int] = [0x00080018] # SOPInstanceUID
   """The list of tags that must be present in a dataset to be accepted
   into the input. Consider checking SOP_mapping.py for collections of Tags."""
 
