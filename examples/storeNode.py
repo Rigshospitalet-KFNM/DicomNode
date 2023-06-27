@@ -24,6 +24,7 @@ INPUT_ARG: str = "dataset"
 class DicomObjectInput(AbstractInput):
   required_tags: List[int] = [
     0x00080016, # SOPInstanceUID
+    0x00100020, # PatientID
     0x0020000D, # StudyInstanceUID
     0x0020000E, # SeriesInstanceUID
   ]
@@ -51,7 +52,7 @@ class StoreNode(AbstractPipeline):
   archive_path: Path = Path(ARCHIVE_PATH)
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
-    return FileOutput([(self.archive_path, input_data[INPUT_ARG])])
+    return FileOutput([(self.archive_path, input_data[INPUT_ARG])], saving_function=save_dicom)
 
   def post_init(self) -> None:
     self.archive_path.mkdir(exist_ok=True)
