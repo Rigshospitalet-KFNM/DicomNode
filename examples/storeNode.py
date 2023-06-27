@@ -38,7 +38,7 @@ class DicomObjectInput(AbstractInput):
 
 
 class StoreNode(AbstractPipeline):
-  log_path: str = "log.log"
+  log_output: str = "log.log"
   ae_title: str = "STORENODE"
   port: int = 1337
   ip: str = '0.0.0.0'
