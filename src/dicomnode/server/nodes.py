@@ -21,8 +21,8 @@ from pathlib import Path
 from queue import Queue, Empty
 import shutil
 from sys import stdout
-from threading import Thread
-from typing import Any, Dict, List, NoReturn, Optional, Set, TextIO, Type, Union
+from threading import Thread, Lock, get_native_id
+from typing import Any, Dict, List, NoReturn, Optional, Set, TextIO, Type, Union, Tuple
 
 # Third part packages
 from pynetdicom import evt
@@ -245,8 +245,9 @@ class AbstractPipeline():
       (evt.EVT_ACCEPTED, self._handle_association_accepted),
       (evt.EVT_RELEASED, self._handle_association_released)
     ]
-    self.updated_patients: Dict[Optional[int], Set[str]] = {}
-
+    self._updated_patients: Dict[Optional[int], Set[str]] = {}
+    self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
+    self._lock_key = Lock()
     self.post_init()
 
   # End def __init__
@@ -257,7 +258,7 @@ class AbstractPipeline():
     - control_c_store_function - main function responsible for calling correct functions
   """
   def _handle_c_store(self, event: evt.Event) -> int:
-    c_store_container = self._association_container_factory.build_assocation_c_store(event)
+    c_store_container = self._association_container_factory.build_association_c_store(event)
     status = self._consume_c_store_container(c_store_container)
     self.logger.debug(f"Handled C STORE with status {hex(status)}")
     return status
@@ -272,10 +273,24 @@ class AbstractPipeline():
       return 0xA801
 
     if self.patient_identifier_tag in c_store_container.dataset:
-      patientID = deepcopy(c_store_container.dataset[self.patient_identifier_tag].value)
+      patientID = str(c_store_container.dataset[self.patient_identifier_tag].value)
+      # Critical zone for managing keys
+      with self._lock_key:
+        if patientID in self._patient_locks:
+          threads, patient_lock = self._patient_locks[patientID]
+        else:
+          threads, patient_lock = ({get_native_id()}, Lock())
+          self._patient_locks[patientID] = (threads, patient_lock)
+
+        if patientID not in self._updated_patients[c_store_container.assocation_id]:
+          self._updated_patients[c_store_container.assocation_id].add(patientID)
+          threads.add(get_native_id())
+      # End of Critical zone
       try:
-        self.data_state.add_image(c_store_container.dataset)
-        self.updated_patients[c_store_container.assocation_id].add(patientID)
+        # Critical Patient zone
+        with patient_lock:
+          self.data_state.add_image(c_store_container.dataset)
+        # End of Critical Zone
       except InvalidDataset:
         self.logger.info(f"Received dataset is not accepted by any inputs")
         return 0xB006
@@ -298,9 +313,9 @@ class AbstractPipeline():
     extend the handler functions consume
     """
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title} - {event.assoc.requestor.address} Accepted")
-    association_accept_container = self._association_container_factory.build_assocation_accepted(event)
+    association_accept_container = self._association_container_factory.build_association_accepted(event)
 
-    for association_type in association_accept_container.assocation_types:
+    for association_type in association_accept_container.association_types:
       handler = self._acceptation_handlers.get(association_type)
       if handler is not None:
         handler(self, association_accept_container)
@@ -309,11 +324,11 @@ class AbstractPipeline():
       self, accepted_container: AcceptedContainer):
     """This function completes all the calculation nessesarry for
     """
-    if accepted_container.assocation_ip is not None:
-      self._associations_responds_addresses[accepted_container.assocation_id] = Address(
-        accepted_container.assocation_ip, self.default_response_port, accepted_container.assocation_ae)
+    if accepted_container.association_ip is not None:
+      self._associations_responds_addresses[accepted_container.association_id] = Address(
+        accepted_container.association_ip, self.default_response_port, accepted_container.association_ae)
 
-    self.updated_patients[accepted_container.assocation_id] = set()
+    self._updated_patients[accepted_container.association_id] = set()
 
   def _handle_association_released(self, event: evt.Event):
     """This function is called whenever an association is released
@@ -324,9 +339,9 @@ class AbstractPipeline():
         event (evt.Event):
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    released_container = self._association_container_factory.build_assocation_released(event)
+    released_container = self._association_container_factory.build_association_released(event)
 
-    for association_type in released_container.assocation_types:
+    for association_type in released_container.association_types:
       handler = self._release_handlers.get(association_type)
       if handler is not None:
         handler(self, released_container)
@@ -342,21 +357,39 @@ class AbstractPipeline():
         about the released association
 
     """
-    self.logger.debug(f"PatientID to be updated in: {self.updated_patients}")
-    for patient_ID in self.updated_patients[released_container.assocation_id]:
-      if self.data_state.validate_patient_ID(patient_ID):
-        self.logger.debug(f"Sufficient data for patient {patient_ID}")
-        # Sadly my python Foo is not strong enough make a pretty solution here
-        if self.processing_directory is not None:
-          with TemporaryWorkingDirectory(self.processing_directory / str(patient_ID)) as twd:
-            self._pipeline_processing(patient_ID, released_container)
+    self.logger.debug(f"PatientID to be updated in: {self._updated_patients}")
+    for patient_ID in self._updated_patients[released_container.association_id]:
+      with self._lock_key:
+        if patient_ID in self._patient_locks:
+          threads, patient_lock = self._patient_locks[patient_ID]
         else:
-          self._pipeline_processing(patient_ID, released_container)
-      else:
-        self.logger.debug(f"Insufficient data for patient {patient_ID}")
-    del self.updated_patients[released_container.assocation_id] # Removing updated Patients
+          self.logger.critical("Another thread deleted thread-set and Patient log")
+          self.logger.critical("This is a bug in the library, please report it")
+          continue
+        with patient_lock:
+          if len(threads) == 1:
+            if self.data_state.validate_patient_ID(patient_ID):
+              patient_input_container = self._get_input_container(patient_ID, released_container)
+              self.data_state.remove_patient(patient_ID)
+              del self._patient_locks[patient_ID]
+            else:
+              self.logger.debug(f"Insufficient data for patient {patient_ID}")
+              continue
+          else:
+            threads.remove(get_native_id())
+            continue
+      # End of Critical Zone
 
-  def _pipeline_processing(self, patient_ID: str, released_container: ReleasedContainer):
+      self.logger.debug(f"Sufficient data for patient {patient_ID}")
+      # Sadly my python Foo is not strong enough make a pretty solution here
+      if self.processing_directory is not None:
+        with TemporaryWorkingDirectory(self.processing_directory / str(patient_ID)):
+          self._pipeline_processing(patient_ID, released_container, patient_input_container)
+      else:
+        self._pipeline_processing(patient_ID, released_container,patient_input_container)
+    del self._updated_patients[released_container.association_id] # Removing updated Patients
+
+  def _pipeline_processing(self, patient_ID: str, released_container: ReleasedContainer, patient_input_container):
     """Processes a patient through the pipeline and starts exporting it
 
     Args:
@@ -367,7 +400,7 @@ class AbstractPipeline():
     """
     self.logger.debug(f"Processing {patient_ID}")
     try:
-      patient_input_container = self._get_input_container(patient_ID, released_container)
+
       result = self.process(patient_input_container)
     except Exception as exception:
       log_traceback(self.logger, exception, "processing")
@@ -375,7 +408,6 @@ class AbstractPipeline():
       self.logger.debug(f"Process {patient_ID} Successful, Dispatching output!")
       if self._dispatch(result):
         self.logger.debug("Dispatching Successful")
-        self.data_state.remove_patient(patient_ID)
       else:
         self.logger.error("Unable to dispatch pipeline output")
 
@@ -406,10 +438,10 @@ class AbstractPipeline():
     """
     input_container = self.data_state.get_patient_input_container(patient_ID)
 
-    if released_container.assocation_ae_title in self.known_endpoints:
-      input_container.responding_address = self.known_endpoints[released_container.assocation_ae_title]
-    elif released_container.assocation_id in self._associations_responds_addresses:
-      input_container.responding_address = self._associations_responds_addresses[released_container.assocation_id]
+    if released_container.association_ae_title in self.known_endpoints:
+      input_container.responding_address = self.known_endpoints[released_container.association_ae_title]
+    elif released_container.association_id in self._associations_responds_addresses:
+      input_container.responding_address = self._associations_responds_addresses[released_container.association_id]
 
     return input_container
 
@@ -518,7 +550,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       try:
         released_container = self.process_queue.get(timeout=self.queue_timeout)
         try:
-          for association_type in released_container.assocation_types:
+          for association_type in released_container.association_types:
             handler = self._release_handlers.get(association_type)
             if handler is not None:
               handler(self, released_container)
@@ -532,7 +564,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
   def _handle_association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
-    released_container = self._association_container_factory.build_assocation_released(event)
+    released_container = self._association_container_factory.build_association_released(event)
 
     self.process_queue.put(released_container)
 

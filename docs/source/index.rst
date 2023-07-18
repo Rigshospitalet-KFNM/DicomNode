@@ -7,13 +7,17 @@ Welcome to dicom node's documentation!
 ======================================
 
 **Dicomnode** is a Python library for creating dicom-to-dicom post processing
-dicom nodes.
+dicom nodes. It aims to standardize this type of server and conversion to and
+from dicom and other medical image formats, such as nifti.
 
-It contains methods for converting from dicom into other formats such as nifti.
+Tutorials are focus on writing pipelines can be found at
+:doc:`tutorials/tutorial_index`
+
+While documentation on the overall idea of the library and the inner working of
+the library can be found at :doc:`documentation/documentation`
 
 Source code can be found at: https://github.com/Rigshospitalet-KFNM/DicomNode
 
-Tutorials can be found at :doc:`tutorials/tutorial_index`
 
 
 .. toctree::
@@ -22,6 +26,7 @@ Tutorials can be found at :doc:`tutorials/tutorial_index`
    :caption: Contents:
 
    tutorials/tutorial_index
+   documentation/documentation
    dicomnode
 
 

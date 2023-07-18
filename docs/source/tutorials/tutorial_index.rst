@@ -3,16 +3,17 @@ Tutorials
 
 *A tool is broken if you do not know how to use it. ~ Some guy*
 
-A software library is a difficult thing to learn, especially when that library is heavily
-
+This library is intended to be used by all levels of programming experiences.
+As such not all tutorials are specific too this library and also contain
+general help on writing maintainable programs.
 
 .. toctree::
-    :hidden:
+    :maxdepth: 1
 
+    python_software_engineering
+    dicom_for_dummies
     class_overview
     configuring_a_pipeline
     configuration_overview
     create_a_pipeline
     create_a_dicom_series
-    dicom_for_dummies
-    python_software_engineering

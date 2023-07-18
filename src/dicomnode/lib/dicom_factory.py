@@ -88,9 +88,8 @@ class AttributeElement(VirtualElement):
     Args:
       tag (Union[BaseTag, str, int, Tuple[int,int]]): Tag of the Virtual Element
       VR (str): VR of the virtual element
-      attribute (str): Name of the attribute read from input factory.
+      attribute (str): Name of the attribute read from input factory."""
 
-  """
   def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, attribute: str) -> None:
     super().__init__(tag, VR)
     self.attribute = attribute
@@ -98,6 +97,7 @@ class AttributeElement(VirtualElement):
   def corporealialize(self, factory: 'DicomFactory', _: Iterable[Dataset]) -> DataElement:
     value = getattr(factory, self.attribute)
     return DataElement(self.tag, self.VR, value)
+
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
@@ -526,3 +526,4 @@ SOP_common_blueprint: Blueprint = Blueprint([
   FunctionalElement(0x00080018, 'UI', _add_SOPInstanceUID), # SOPInstanceUID
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
 ])
+
