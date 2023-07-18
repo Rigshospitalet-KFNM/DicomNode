@@ -35,7 +35,7 @@ Python have something called the Global Interpreter Lock, which ensures that
 only one thread can modify the state of program at a time. This means we can
 think of the possible execution of our program. If we have a single thread, then
 the execution path is the ordering of statement as the programmer wrote them.
-If you have two threads then you have :math:`{n + m \choose n}` different execution
+If you have two threads then you have :math:`\binom(n+m,n)` different execution
 paths where :math:`n` and :math:`m` is the number of statement in each thread.
 Now this isn't a
 problem unless different execution paths leads to different states i.e.
