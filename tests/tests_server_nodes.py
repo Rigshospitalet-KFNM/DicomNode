@@ -11,7 +11,7 @@ from pathlib import Path
 from pprint import pprint
 from sys import getrefcount, stdout
 from time import sleep
-from typing import List, Dict, Any, Iterable
+from typing import List, Dict, Any, Iterable, Optional
 import threading
 from unittest import skip, TestCase
 
@@ -26,17 +26,19 @@ from dicomnode.lib.dicom_factory import Blueprint, CopyElement, StaticElement
 from dicomnode.lib.numpy_factory import NumpyFactory
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.image_tree import DicomTree
+from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
-from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.output import NoOutput, PipelineOutput, DicomOutput
 from dicomnode.server.pipeline_tree import InputContainer
 
 # Test Helpers #
 from tests.helpers import generate_numpy_datasets, personify, bench, get_test_ae, TESTING_TEMPORARY_DIRECTORY, testing_logs
+from tests.storage_endpoint import ENDPOINT_AE_TITLE, ENDPOINT_PORT, TestStorageEndpoint
 
 # Constants declarations #
-TEST_AE_TITLE = "TEST_AE"
-SENDER_AE = "SENDER_AE"
+TEST_AE_TITLE = "NODE_TITLE"
+SENDER_AE_TITLE = "SENDER_TITLE"
 
 DEFAULT_DATASET = Dataset()
 DEFAULT_DATASET.SOPClassUID = RawDataStorage
@@ -45,6 +47,7 @@ make_meta(DEFAULT_DATASET)
 DATASET_SOPInstanceUID = DEFAULT_DATASET.SOPInstanceUID.name
 
 ENDPOINT_PORT = 50000
+ENDPOINT_AE = "ENDPOINT_AT"
 
 TEST_CPR = "1502799995"
 INPUT_KW = "test_input"
@@ -80,6 +83,15 @@ class TestHistoricInput(HistoricAbstractInput):
   def validate(self) -> bool:
     return True
 
+class ListInput(AbstractInput):
+  required_tags = [0x0008_0018]
+
+  image_grinder = ListGrinder()
+
+  def validate(self) -> bool:
+    return True
+
+
 ##### Test Output Implementations #####
 class FaultyPipelineOutput(PipelineOutput):
   def send(self) -> bool:
@@ -92,9 +104,9 @@ class FaultyPipelineOutput(PipelineOutput):
 class FileStorageNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   log_output = None
-  log_level: int = logging.DEBUG
+  log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
   root_data_directory = DICOM_STORAGE_PATH
   processing_directory = PROCESSING_DIRECTORY
@@ -107,7 +119,7 @@ class FileStorageNode(AbstractPipeline):
 class FaultyFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   log_level: int = logging.DEBUG
   log_output = None
   disable_pynetdicom_logger: bool = True
@@ -119,7 +131,7 @@ class FaultyFilterNode(AbstractPipeline):
 class MaxFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   log_level: int = logging.CRITICAL
   log_output = None
   disable_pynetdicom_logger: bool = True
@@ -131,10 +143,35 @@ class MaxFilterNode(AbstractPipeline):
   def process(self, InputData: InputContainer) -> PipelineOutput:
     raise Exception
 
+class ConcurrencyNode(AbstractPipeline):
+  """The main purpose of this pipeline is to have multiple associations
+  And have them send data into the same input object at the same time.
+
+  The Goal should be that the process functions runs once with all the pictures.
+
+  This is mainly to showcase that file storage node support multiple associations.
+  """
+
+  patient_identifier_tag = 0x0020_000E
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : ListInput }
+  require_calling_aet = [SENDER_AE_TITLE]
+  log_level: int = logging.CRITICAL
+  images_processed: Optional[int] = None
+  processing_directory = None
+
+
+  def process(self, input_data: InputContainer) -> PipelineOutput:
+    image_list = input_data[INPUT_KW]
+
+    self.images_processed = len(image_list)
+
+    return DicomOutput([(Address('127.0.0.1', ENDPOINT_PORT, ENDPOINT_AE), image_list)], self.ae_title)
+
 class TestThreadedNode(AbstractThreadedPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestNeverValidatingInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
   processing_directory = None
@@ -149,7 +186,7 @@ fs_threaded_path = Path("/tmp/pipeline_tests/fs_threaded")
 class FileStorageThreadedNode(AbstractThreadedPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestNeverValidatingInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = True
   root_data_directory = fs_threaded_path
@@ -166,8 +203,8 @@ class HistoricPipeline(AbstractPipeline):
     INPUT_KW : TestNeverValidatingInput,
     HISTORIC_KW : TestHistoricInput
    }
-  require_calling_aet = [SENDER_AE, "DUMMY"]
-  log_level: int = logging.DEBUG
+  require_calling_aet = [SENDER_AE_TITLE, "DUMMY"]
+  log_level: int = logging.CRITICAL
   disable_pynetdicom_logger: bool = False
   dicom_factory = NumpyFactory()
   processing_directory = None
@@ -179,11 +216,12 @@ class HistoricPipeline(AbstractPipeline):
 
 class QueueNode(AbstractQueuedPipeline):
   input = { INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   ae_title = TEST_AE_TITLE
   disable_pynetdicom_logger = True
   processing_directory = None
   log_output = None
+  log_level = logging.CRITICAL
 
   def process(self, input_container: InputContainer) -> PipelineOutput:
     self.logger.info("process is called")
@@ -191,11 +229,12 @@ class QueueNode(AbstractQueuedPipeline):
 
 class FaultyQueueNode(AbstractQueuedPipeline):
   input = { INPUT_KW : TestInput }
-  require_calling_aet = [SENDER_AE]
+  require_calling_aet = [SENDER_AE_TITLE]
   ae_title = TEST_AE_TITLE
   disable_pynetdicom_logger = True
   processing_directory = None
   log_output = None
+  log_level = logging.CRITICAL
 
   def process(self, input_container: InputContainer) -> PipelineOutput:
     raise Exception
@@ -205,7 +244,7 @@ class PipelineTestCase(TestCase):
   class TestNode(AbstractPipeline):
     ae_title = TEST_AE_TITLE
     input = {INPUT_KW : TestInput }
-    require_calling_aet = [SENDER_AE]
+    require_calling_aet = [SENDER_AE_TITLE]
     log_output = None
     log_level: int = logging.DEBUG
     disable_pynetdicom_logger: bool = True
@@ -229,7 +268,7 @@ class PipelineTestCase(TestCase):
   def test_send_C_store_success(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
-      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
 
     self.assertEqual(response.Status, 0x0000)
     self.assertIn("INFO:dicomnode:process is called", cm.output)
@@ -253,14 +292,14 @@ class PipelineTestCase(TestCase):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     ds = deepcopy(DEFAULT_DATASET)
     del ds.PatientSex
-    response = send_image(SENDER_AE, address, ds)
+    response = send_image(SENDER_AE_TITLE, address, ds)
     self.assertEqual(response.Status, 0xB006)
 
   def test_missing_PatientID(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     ds = deepcopy(DEFAULT_DATASET)
     del ds.PatientID
-    response = send_image(SENDER_AE, address, ds)
+    response = send_image(SENDER_AE_TITLE, address, ds)
     self.assertEqual(response.Status, 0xB007)
 
   @bench
@@ -274,7 +313,7 @@ class PipelineTestCase(TestCase):
         (0x00100040, "CS", "M")
       ]
     ))
-    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
     ret_1 = thread_1.join()
 
 
@@ -287,7 +326,7 @@ class NeverValidatingTestNode(TestCase):
   class NeverValidateNode(AbstractPipeline):
     ae_title = TEST_AE_TITLE
     input = {INPUT_KW : TestNeverValidatingInput }
-    require_calling_aet = [SENDER_AE]
+    require_calling_aet = [SENDER_AE_TITLE]
     log_output = None
     log_level: int = logging.DEBUG
     disable_pynetdicom_logger: bool = True
@@ -297,7 +336,7 @@ class FaultyNodeTestCase(TestCase):
   class FaultyNode(AbstractPipeline):
     ae_title = TEST_AE_TITLE
     input = {INPUT_KW : TestInput }
-    require_calling_aet = [SENDER_AE]
+    require_calling_aet = [SENDER_AE_TITLE]
     log_output = None
     log_level: int = logging.DEBUG
     disable_pynetdicom_logger: bool = True
@@ -319,7 +358,7 @@ class FaultyNodeTestCase(TestCase):
   def test_faulty_process(self):
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
       address = Address('localhost', self.test_port, TEST_AE_TITLE)
-      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
       self.assertEqual(response.Status, 0x0000)
     self.assertIn("CRITICAL:dicomnode:processing", cm.output)
     self.assertIn("CRITICAL:dicomnode:Encountered exception: Exception", cm.output)
@@ -352,7 +391,7 @@ class FileStorageTestCase(TestCase):
       ]
     ))
 
-    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
     ret_1 = thread_1.join()
     self.assertEqual(ret_1, 0)
     self.assertEqual(self.node.data_state.images,50) # type: ignore
@@ -382,8 +421,8 @@ class FileStorageTestCase(TestCase):
     ))
 
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
-      thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-      thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+      thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+      thread_2 = send_images_thread(SENDER_AE_TITLE, address, images_2, None, False)
       ret_1 = thread_1.join()
       ret_2 = thread_2.join()
 
@@ -431,7 +470,7 @@ class MaxFilterTestCase(TestCase):
 
   def test_send_C_store_rejected(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
     self.assertEqual(response.Status, 0xB006)
 
 
@@ -447,7 +486,7 @@ class FaultyFilterTestCase(TestCase):
 
   def test_send_C_store_rejected(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+    response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
     self.assertEqual(response.Status, 0xA801)
 
 
@@ -476,7 +515,7 @@ class TestNodeTestCase(TestCase):
       ]
     ))
 
-    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
     ret_1 = thread_1.join()
 
     self.assertEqual(ret_1, 0)
@@ -504,8 +543,8 @@ class TestNodeTestCase(TestCase):
     ))
 
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
-      thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-      thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+      thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+      thread_2 = send_images_thread(SENDER_AE_TITLE, address, images_2, None, False)
 
       ret_1 = thread_1.join()
       ret_2 = thread_2.join()
@@ -553,8 +592,8 @@ class FileStorageThreadedNodeTestCase(TestCase):
     ))
 
     # Test
-    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-    thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+    thread_2 = send_images_thread(SENDER_AE_TITLE, address, images_2, None, False)
 
     ret_1 = thread_1.join()
     ret_2 = thread_2.join()
@@ -585,8 +624,8 @@ class FileStorageThreadedNodeTestCase(TestCase):
       ]
     ))
     # Test
-    thread_1 = send_images_thread(SENDER_AE, address, images_1, None, False)
-    thread_2 = send_images_thread(SENDER_AE, address, images_2, None, False)
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+    thread_2 = send_images_thread(SENDER_AE_TITLE, address, images_2, None, False)
     # Wait for text completion
     ret_1 = thread_1.join()
     ret_2 = thread_2.join()
@@ -611,7 +650,7 @@ class QueuedNodeTestCase(TestCase):
   def test_send_C_store_success(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     with self.assertLogs("dicomnode", logging.DEBUG) as cm:
-      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
 
     self.assertIn("INFO:dicomnode:process is called", cm.output)
     self.assertNotIn("ERROR:dicomnode:Could not export data", cm.output)
@@ -634,7 +673,7 @@ class FaultyQueueTestCase(TestCase):
   def test_send_C_store_Faulty(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
 
     self.node.process_queue.join()
 
@@ -658,8 +697,60 @@ class HistoricTestCase(TestCase):
     endpoint = get_test_ae(ENDPOINT_PORT, self.test_port, self.node.logger)
 
     with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
-      response = send_image(SENDER_AE, address, DEFAULT_DATASET)
+      response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
       sleep(0.25) # wait for all the threads to be done
     endpoint.shutdown()
 
-    
+class ConcurrencyTestCase(TestCase):
+  """These test are similar to the concurrent test earlier but with focus on
+     some production issues from multiple assocation sending to the same
+     input"""
+  def setUp(self):
+    self.node = ConcurrencyNode()
+    self.test_port = randint(1025, 49999)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    self.node.close()
+
+
+  def test_spam_to_same_input(self):
+    release_event = threading.Event()
+    self.endpoint = TestStorageEndpoint(release_event=release_event)
+    self.endpoint.open()
+
+    num_threads = 3
+    num_images = 50
+
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    patient_cpr = "0201919996"
+
+    sender_threads: List[threading.Thread] = []
+
+    study_uid = gen_uid()
+    series_uid = gen_uid()
+
+    for thread_id in range(num_threads):
+      images = DicomTree(generate_numpy_datasets(num_images,
+                                                 PatientID = patient_cpr,
+                                                 SeriesUID=series_uid,
+                                                 StudyUID=study_uid,
+                                                 ))
+      images.map(personify(
+        tags=[
+          (0x00100010, "PN", "Odd Name Test"),
+          (0x00100040, "CS", "M")
+        ]
+      ))
+
+      thread = send_images_thread(SENDER_AE_TITLE, address, images, None, False)
+      sender_threads.append(thread)
+
+    [thread.join() for thread in sender_threads]
+
+    release_event.wait(timeout=2)
+    self.assertEqual(len(self.endpoint.storage[patient_cpr]), num_threads * num_images)
+    self.assertEqual(self.endpoint.accepted_associations, 1)
+
+    self.endpoint.close()

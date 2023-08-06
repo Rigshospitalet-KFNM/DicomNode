@@ -12,3 +12,4 @@ guides that better explain what is going on.
     :maxdepth: 1
 
     Threads
+    design_dicomnode

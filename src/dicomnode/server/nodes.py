@@ -22,6 +22,7 @@ from queue import Queue, Empty
 import shutil
 from sys import stdout
 from threading import Thread, Lock, get_native_id
+from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Set, TextIO, Type, Union, Tuple
 
 # Third part packages
@@ -36,7 +37,7 @@ from dicomnode.lib.dimse import Address
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import log_traceback, set_logger
-from dicomnode.server.assocation_container import AcceptedContainer, AssociationContainerFactory, AssociationTypes, CStoreContainer, ReleasedContainer
+from dicomnode.server.association_container import AcceptedContainer, AssociationContainerFactory, AssociationTypes, CStoreContainer, ReleasedContainer
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
@@ -249,11 +250,11 @@ class AbstractPipeline():
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
     self.post_init()
-
   # End def __init__
+
   """ Store dataset process
 
-  Responsiblities:
+  Responsibility's:
     - handle_c_store_message - extracts information from event
     - control_c_store_function - main function responsible for calling correct functions
   """
@@ -489,6 +490,9 @@ class AbstractPipeline():
       If your application includes additional connections, you should overwrite this method,
       And close any connections and call the super function.
     """
+    while self.ae.active_associations != []:
+      sleep(0.005)
+
     self.logger.info("Closing Server!")
     if self.processing_directory is not None:
       chdir(self.__cwd)
