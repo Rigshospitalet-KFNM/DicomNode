@@ -7,7 +7,7 @@ import logging
 from logging import StreamHandler
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Callable, Iterator
+from typing import List, Dict, Any
 import shutil
 from sys import stdout
 from unittest import TestCase
@@ -28,7 +28,7 @@ from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.dicom_factory import Blueprint
 from dicomnode.lib.numpy_factory import NumpyFactory
 from dicomnode.server.grinders import NumpyGrinder
-from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf
 
@@ -73,34 +73,12 @@ class TestLazyDynamicMissingPathInput(DynamicInput):
 
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
-class FaultyHistoricInput(HistoricAbstractInput):
-  required_tags: List[int] = []
-  required_values: Dict[int, Any] = {
-    0x0008103E : SERIES_DESCRIPTION
-  }
-
-  def validate(self) -> bool:
-    return True
-
-class FaultyBlueprintHistoricInput(HistoricAbstractInput):
-  required_tags: List[int] = []
-  required_values: Dict[int, Any] = {
-    0x0008103E : SERIES_DESCRIPTION
-  }
-
-  c_move_blueprint = Blueprint([])
-
-  def validate(self) -> bool:
-    return True
 
 class HistoricInput(HistoricAbstractInput):
   required_tags: List[int] = []
   required_values: Dict[int, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
-
-  address = Address('localhost', 50001, "DUMMY")
-  c_move_blueprint = Blueprint([])
 
   def validate(self) -> bool:
     return True
@@ -112,7 +90,7 @@ class InputTestCase(TestCase):
     self.options = TestInput.Options(
       data_directory=self.path
     )
-    self.test_input = TestInput(None, self.options)
+    self.test_input = TestInput(self.options)
     self.logger = logger
 
   def tearDown(self) -> None:
@@ -136,17 +114,20 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.test_input.add_image(dataset)
     self.assertEqual(self.test_input.images, 1)
-    self.assertTrue(self.test_input.get_path(dataset).exists()) # type: ignore
+    self.assertTrue(self.test_input.get_path(dataset).exists())
 
   def test_get_path(self):
     dataset = Dataset()
     SOPInstanceUID = gen_uid()
     dataset.SOPInstanceUID = SOPInstanceUID
-    self.assertEqual(self.test_input.get_path(dataset).name, f'image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name,
+                     f'image_{SOPInstanceUID.name}.dcm')
     dataset.Modality = 'CT'
-    self.assertEqual(self.test_input.get_path(dataset).name, f'CT_image_{SOPInstanceUID.name}.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name,
+                     f'CT_image_{SOPInstanceUID.name}.dcm')
     dataset.InstanceNumber = 431
-    self.assertEqual(self.test_input.get_path(dataset).name, f'CT_image_431.dcm') # type: ignore
+    self.assertEqual(self.test_input.get_path(dataset).name,
+                     'CT_image_431.dcm')
 
   def test_cleanup(self):
     dataset = Dataset()
@@ -155,7 +136,7 @@ class InputTestCase(TestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     self.test_input.add_image(dataset)
-    self.test_input._clean_up()
+    self.test_input.clean_up()
     self.assertFalse(self.test_input.get_path(dataset).exists())
 
   def test_get_data(self):
@@ -184,7 +165,7 @@ class InputTestCase(TestCase):
     ds_2_path = self.path / "ds_2.dcm"
     save_dicom(ds_2_path, dataset_2)
 
-    test_input = TestInput(None, options=TestInput.Options(data_directory=self.path))
+    test_input = TestInput(options=TestInput.Options(data_directory=self.path))
 
     self.assertEqual(len(test_input),2)
     self.assertIn(dataset_1.SOPInstanceUID, test_input)
@@ -207,7 +188,7 @@ class InputTestCase(TestCase):
     self.assertIs(input.logger, logger)
 
   def test_lazy_testInput(self):
-    input = TestInput(None, options=TestInput.Options(data_directory=self.path, lazy=True))
+    input = TestInput(options=TestInput.Options(data_directory=self.path, lazy=True))
 
     dataset = Dataset()
     dataset.SOPInstanceUID = gen_uid()
@@ -219,7 +200,7 @@ class InputTestCase(TestCase):
     self.assertTrue(input.get_path(dataset).exists())
 
   def test_lazy_testInput_NoPath(self):
-    input = TestInput(None, options=TestInput.Options(data_directory=None, lazy=True))
+    input = TestInput(options=TestInput.Options(data_directory=None, lazy=True))
 
     dataset = Dataset()
     dataset.SOPInstanceUID = gen_uid()
@@ -229,28 +210,39 @@ class InputTestCase(TestCase):
     self.assertRaises(IncorrectlyConfigured, input.add_image, dataset)
 
   def test_historic_input_missing_pivot(self):
+    options = HistoricInput.Options()
+
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, FaultyHistoricInput)
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
     self.assertIn("CRITICAL:dicomnode:You forgot to parse the pivot to The Input", cm.output)
 
   def test_historic_input_missing_blueprint(self):
+    options = HistoricInput.Options(pivot=Dataset())
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, FaultyHistoricInput, Dataset())
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
     self.assertIn("CRITICAL:dicomnode:A C move blueprint is missing", cm.output)
 
   def test_historic_input_missing_address(self):
+    options = HistoricInput.Options(pivot=Dataset(), blueprint = Blueprint([]))
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, FaultyBlueprintHistoricInput, Dataset())
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
     self.assertIn("CRITICAL:dicomnode:A target address is needed to send a C-Move to", cm.output)
 
   def test_historic_input_missing_factory(self):
+    options = HistoricInput.Options(pivot=Dataset(),
+                                    blueprint = Blueprint([]),
+                                    address = Address('localhost', 50001, "DUMMY"))
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, Dataset())
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
     self.assertIn("CRITICAL:dicomnode:A Factory is needed to generate a C move message", cm.output)
 
   def test_historic_input_missing_ae_title(self):
+    options = HistoricInput.Options(pivot=Dataset(),
+                                    blueprint = Blueprint([]),
+                                    address = Address('localhost', 50001, "DUMMY"),
+                                    factory=NumpyFactory())
     with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, Dataset(), HistoricInput.Options(factory=NumpyFactory()))
+      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
     self.assertIn("CRITICAL:dicomnode:Historic Inputs needs a AE Title of the SCU", cm.output)
 
   def test_dynamic_output(self):
@@ -259,9 +251,12 @@ class InputTestCase(TestCase):
     seriesUID_1 = gen_uid()
     seriesUID_2 = gen_uid()
     seriesUID_3 = gen_uid()
-    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
 
     TDI = TestDynamicInput()
 
@@ -279,9 +274,12 @@ class InputTestCase(TestCase):
     seriesUID_1 = gen_uid()
     seriesUID_2 = gen_uid()
     seriesUID_3 = gen_uid()
-    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
 
     options = TestDynamicInput.Options(data_directory=self.path)
 
@@ -301,9 +299,12 @@ class InputTestCase(TestCase):
     seriesUID_1 = gen_uid()
     seriesUID_2 = gen_uid()
     seriesUID_3 = gen_uid()
-    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_1 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_1,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_2,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
 
     options = TestDynamicInput.Options(data_directory=self.path, lazy=True)
 
@@ -352,9 +353,12 @@ class InputTestCase(TestCase):
     seriesUID_2 = gen_uid()
     seriesUID_3 = gen_uid()
     series_images = 4
-    datasets_1 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_1, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_2 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_2, Cols=10, Rows=10, PatientID = patient_ID)
-    datasets_3 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_3, Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_1 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_1,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_2 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_2,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
+    datasets_3 = generate_numpy_datasets(series_images, StudyUID=studyUID, SeriesUID=seriesUID_3,
+                                         Cols=10, Rows=10, PatientID = patient_ID)
 
 
     test_dynamic_input = TestDynamicInput()
@@ -398,4 +402,3 @@ class InputTestCase(TestCase):
     self.assertIsInstance(dynamic_leaf, DynamicLeaf)
 
     self.assertRaises(IncorrectlyConfigured, dynamic_leaf.get_path, dataset)  #type: ignore
-

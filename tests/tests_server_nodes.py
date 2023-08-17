@@ -261,7 +261,7 @@ class PipelineTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
     self.node.close()
 
@@ -373,7 +373,7 @@ class FileStorageTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
 
     #pprint([t for t in threading.enumerate()])
@@ -464,7 +464,7 @@ class MaxFilterTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
     self.node.close()
 
@@ -499,7 +499,7 @@ class TestNodeTestCase(TestCase):
 
   def tearDown(self) -> None:
     self.node.join_threads()
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
     self.node.close()
 
@@ -565,7 +565,7 @@ class FileStorageThreadedNodeTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
     self.node.close()
 
@@ -642,7 +642,7 @@ class QueuedNodeTestCase(TestCase):
     self.node.open(blocking=False)
 
   def tearDown(self) -> None:
-    while self.node.ae.active_associations != []:
+    while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005)
     self.node.close()
     os.chdir(TESTING_TEMPORARY_DIRECTORY)

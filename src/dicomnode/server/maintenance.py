@@ -8,7 +8,7 @@ __author__ = "Christoffer"
 # Python3 standard Library
 from datetime import datetime, timedelta
 from threading import Thread, Event
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 # Thrid party Packages
 
@@ -35,24 +35,24 @@ class MaintenanceThread(Thread):
     super().__init__(group, None, name, args, kwargs, daemon=daemon)
     self.pipeline_tree = pipeline_tree
     self.study_expiration_days = study_expiration_days
-    self.__running = True
+    self._running = True
     self.waiting_event = None
 
 
   def run(self):
-    while self.__running:
+    while self._running:
       self.waiting_event = Event()
       waiting = self.waiting_event.wait(
         self.calculate_seconds_to_next_maintenance())
       if waiting:
         break
-      else:
-        self.maintenance()
+
+      self.maintenance()
 
 
   def stop(self):
     """Wakes the thread and kills it"""
-    self.__running = False
+    self._running = False
     if self.waiting_event is not None:
       self.waiting_event.set()
 
@@ -63,9 +63,11 @@ class MaintenanceThread(Thread):
       now = datetime.now()
 
     tomorrow = now + timedelta(days=1)
-    clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 0,0,0,0, tzinfo=now.tzinfo)
+    clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day,
+                                 0,0,0,0, tzinfo=now.tzinfo)
     time_delta = clean_up_datetime - now
-    return time_delta.days * self._seconds_in_a_day + float(time_delta.seconds) # I guess you could add micro seconds here but WHO CARES
+    # I guess you could add micro seconds here but WHO CARES
+    return time_delta.days * self._seconds_in_a_day + float(time_delta.seconds)
 
 
   def maintenance(self, now = None) -> None:
@@ -73,7 +75,8 @@ class MaintenanceThread(Thread):
     """
     if now is None:
       now = datetime.now()
-    # Note this might cause some bug, where a patient is being processed, and at the same time removed
+    # Note this might cause some bug,
+    # where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.pipeline_tree.remove_expired_studies(expiry_datetime)

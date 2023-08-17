@@ -31,7 +31,7 @@ factory = NumpyFactory()
 factory.series_description = "Averaged Image"
 
 class SeriesInputs(DynamicInput):
-  image_grinder = ManyGrinder(NumpyGrinder(), TagGrinder(0x00080031))
+  image_grinder = NumpyGrinder()
   required_tags = blueprint.get_required_tags()
 
   def validate(self) -> bool:
@@ -63,18 +63,12 @@ class AveragingPipeline(AbstractPipeline):
     if input_data.header is None or self.dicom_factory is None:
       raise Exception
 
-    images = []
-    SeriesTimes = []
-    for image, SeriesTime in input_data[INPUT_KW].values():
-      images.append(image)
-      for __tag, series_time in SeriesTime:
-        SeriesTimes.append(series_time)
-
-    studies = numpy.array(images)
+    studies = numpy.array(input_data[INPUT_KW])
     result = studies.mean(axis=0)
     series = self.dicom_factory.build_from_header(input_data.header, result)
 
     return FileOutput([(OUTPUT_PATH, series)])
 
 if __name__ == "__main__":
-  AveragingPipeline()
+  pipe = AveragingPipeline()
+  pipe.open()

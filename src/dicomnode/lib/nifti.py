@@ -4,9 +4,11 @@
 
  that depends on nifty.
 
-Nifty is a different image format that is oriented towards data processing rather than storage
+Nifty is a different image format that is oriented towards data processing
+rather than storage
 
-This module have extra dependencies on nibabel and dicom2nifty and can be install using pip install dicomnode[nifty]
+This module have extra dependencies on nibabel and dicom2nifty and can be
+install using pip install dicomnode[nifty]
 
 """
 
@@ -32,7 +34,8 @@ from dicomnode.server.grinders import Grinder
 logger = get_logger()
 
 class NiftiGrinder(Grinder):
-  INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need define a valid Path for output_directory"
+  INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need \
+    define a valid Path for output_directory"
 
   def __init__(self, output_directory: Optional[Path] = None, reorient_nifti: bool=False) -> None:
 

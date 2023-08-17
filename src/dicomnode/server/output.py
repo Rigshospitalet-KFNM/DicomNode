@@ -1,12 +1,16 @@
-""""""
+"""This module defines all the different types of output for a pipeline
+
+These pipeline all inherit from the pipeline output, which is just an interface
+for exporting the images
+
+"""
 
 __author__ = "Christoffer Vilstrup Jensen"
 
-# Python Standart Library
+# Python Standard Library
 from abc import ABC, abstractmethod
-import logging
 from pathlib import Path
-from typing import Any, Dict, List, Iterable, Tuple, Type, Callable
+from typing import Any, List, Iterable, Tuple, Callable
 
 # Third Party Packages
 from pydicom import Dataset
@@ -14,7 +18,6 @@ from pydicom import Dataset
 # Dicomnode Packages
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.lib.dimse import Address, send_images
-from dicomnode.lib.image_tree import DicomTree, ImageTreeInterface
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.logging import get_logger
 
@@ -26,9 +29,7 @@ class PipelineOutput(ABC):
 
   Should have an output attribute with the form
     Iterable[destination, payload]
-
   """
-
   output: List[Tuple[Any, Any]]
 
   def __init__(self, output: List[Tuple[Any, Any]]) -> None:
@@ -63,31 +64,50 @@ class DicomOutput(PipelineOutput):
   def __init__(self,
                output: List[Tuple[Address, Iterable[Dataset]]],
                ae_title: str) -> None:
-    self.ae = ae_title
+    self.ae_title = ae_title
     super().__init__(output)
 
   def send(self) -> bool:
     success = True
     for address, datasets in self:
       try:
-        send_images(self.ae, address, datasets)
+        send_images(self.ae_title, address, datasets)
       except CouldNotCompleteDIMSEMessage:
         logger.error(f"Could not send to images to {address.ae_title}")
         success = False
     return success
 
 class NoOutput(PipelineOutput):
+  """This class represents, that the pipeline doesn't have any outputs
+  useful when you test or you export your data in the process function call
+
+  Args:
+      PipelineOutput (_type_): _description_
+  """
   output = []
   def __init__(self) -> None:
-    pass
+    super().__init__([])
 
   def send(self) -> bool:
     return True
 
 def save_dataset(path, dataset) -> None:
-  dataset_path: Path = path / dataset.StudyInstanceUID.name / dataset.SeriesInstanceUID.name / (dataset.SOPInstanceUID.name + '.dcm')
+  """Saves a data set at
+
+  path / dataset.StudyInstanceUID.name
+       / dataset.SeriesInstanceUID.name
+       / dataset.SOPInstanceUID.name + .dcm
+
+  Args:
+      path (_type_): _description_
+      dataset (_type_): _description_
+
+  """
+  dataset_path: Path = path / dataset.StudyInstanceUID.name \
+                        / dataset.SeriesInstanceUID.name \
+                        / (dataset.SOPInstanceUID.name + '.dcm')
   save_dicom(dataset_path,  dataset)
-  return None
+
 
 class FileOutput(PipelineOutput):
   """PipelineOutput that saves series at a destination using the injected save_function
@@ -146,13 +166,15 @@ class MultiOutput(PipelineOutput):
   True
   """
 
+  output: Iterable[PipelineOutput]
+
   def __init__(self, outputs: Iterable[PipelineOutput]) -> None:
-    self.outputs = outputs
+    super().__init__(outputs)
 
   def send(self) -> bool:
     success = True
 
-    for output in self.outputs:
+    for output in self.output:
       success &= output.send()
 
     return success
