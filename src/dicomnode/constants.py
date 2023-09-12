@@ -1,3 +1,6 @@
+"""This module contains various constants used throughout the module,
+
+"""
 from pydicom.uid import UID
 
 # These are the names of the environment variables not the values of them
@@ -11,7 +14,6 @@ DICOMNODE_ENV_FONT_PATH = "DICOMNODE_ENV_FONT_PATH"
 DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
 
 DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
-DICOMNODE_VERSION = '0.0.2'
+DICOMNODE_VERSION = "0.0.4.2" # Remember to update this
 
 DICOMNODE_PRIVATE_TAG_GROUP = 0x1337 # I might regret this choice.
-

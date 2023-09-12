@@ -19,13 +19,13 @@ from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Py
 from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
-  """ Updated the dicom dictionary with a set of new private tags,
-    allowing pydicom to reconize private tags.
+  """Updated the dicom dictionary with a set of new private tags,
+  allowing pydicom to reconize private tags.
 
   Args:
-    new_dict_items : dict[int, Tuple[str, str, str, str, str]]
+    new_dict_items (dict[int, Tuple[str, str, str, str, str]])
 
-  Example
+  Example:
   >>> try:
   >>>   dicomObject.NewPrivateTag
   >>> except AttributeError:
@@ -51,18 +51,17 @@ def apply_private_tags(
       dataset (Dataset): Dataset to be updated
       private_tags (Dict[int, Tuple[str, str, str, str, str]], optional): Private tags to update the dataset with. Defaults to {}.
       is_implicit_VR (bool, optional): encoding of dicom. Defaults to True.
-      is_little_endian (bool, optional): _description_. Defaults to True.
+      is_little_endian (bool, optional): Byte Encoding of dicom image. Defaults to True.
 
   Returns:
-      _type_: _description_
+      Dataset: Modified dataset with updated index
 
-  Exampel
-
+  Example:
   >>> ds = Dataset()
   >>> ds.add_new(0x13374269, 'UN', self.test_string.encode())
   >>> io.apply_private_tags(ds, {0x13374269 : ("LO", "1", "New Private Tag", "", "NewPrivateTag")})
   >>> ds
-    (1337, 4269) Private tag data                    LO: 'hello world'
+  (1337, 4269) Private tag data                    LO: 'hello world'
 
   """
   for data_element in dataset:
@@ -122,11 +121,13 @@ def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str,
           print(f"Line: {line} could not be parsed")
   return private_tags
 
-def load_private_tags_from_args(args : Namespace) -> Dict[int, Tuple[str,str,str,str,str]]:
-  """Wrapper function to load_private_tags that extracts arguments from a namespace
+def load_private_tags_from_args(
+    args : Namespace) -> Dict[int, Tuple[str,str,str,str,str]]:
+  """Wrapper function to load_private_tags that extracts arguments from a
+  namespace
 
   Args:
-      args (_type_): _description_
+    args (Namespace): _description_
   """
   private_tags = {}
   if args.privatetags:
@@ -142,9 +143,14 @@ class TemporaryWorkingDirectory():
     path_to_new_dir (Path | str) - path to the directory to be created
 
   Example:
-  >>> with TemporaryWorkingDirectory("/tmp/dir") as dir:
-          os.getcwd # returns /tmp/dir
-  >>> os.getcwd # returns cwd + /tmp/dir is destroyed
+  basic use-case
+
+  >>>with TemporaryWorkingDirectory("/tmp/dir") as dir:
+  >>>  os.getcwd()
+  /tmp/dir
+  >>>os.getcwd()
+  current/working/directory
+
   """
 
   def __init__(self, path_to_new_dir: Union[Path,str]) -> None:

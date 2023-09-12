@@ -1,4 +1,4 @@
-# Introduction
+# Building Software in Python
 
 This document is focus around developing maintainable python applications. It contains tips and tricks how to ensure that your program remains reasonable. This is a programming term that means how well you are able to reason about the program so its structure and what different parts of the program is doing.
 

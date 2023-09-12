@@ -13,7 +13,7 @@ The Library require:
 * Python developer tools
 
 Using apt:
-> `sudo apt install g++ cmake pybind11 python-dev`
+> `sudo apt install g++ cmake python3-pybind11 python3-dev`
 
 To install this library
 > `pip install git+https://github.com/Rigshospitalet-KFNM/DicomNode.git`
