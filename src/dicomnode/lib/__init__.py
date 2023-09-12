@@ -11,5 +11,5 @@ from . import image_tree
 from . import utils
 try:
   from . import nifti
-except ModuleNotFoundError:
-  pass
+except ModuleNotFoundError: # pragma: no cover
+  pass # pragma: no cover

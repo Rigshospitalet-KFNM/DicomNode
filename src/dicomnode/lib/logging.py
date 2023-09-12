@@ -10,7 +10,7 @@ from typing import Optional, Union, TextIO
 from traceback import format_exc
 
 # Global Variables for configuration
-__propergate = False
+__propagate = False
 __number_of_backups = 8
 __when = "W0"
 __date_format = "%Y/%m/%d %H:%M:%S"
@@ -28,11 +28,7 @@ basicConfig(
 
 
 def get_logger() -> Logger:
-  global __log_level
   global __logger
-  global __logger_name
-  global __date_format
-  global __format
   if __logger is not None:
     return __logger
 
@@ -47,7 +43,7 @@ def __setup_logger() -> Logger:
   global __log_output
   global __when
   global __number_of_backups
-  global __propergate
+  global __propagate
 
   __logger = getLogger(__logger_name)
   __logger.setLevel(__log_level)
@@ -71,7 +67,7 @@ def __setup_logger() -> Logger:
   handler.setFormatter(log_formatter)
   if __logger.hasHandlers():
     __logger.handlers.clear()
-  __logger.propagate = __propergate
+  __logger.propagate = __propagate
   __logger.addHandler(handler)
 
   return __logger
@@ -85,7 +81,7 @@ def set_logger(
     logger_name: Optional[str] = None,
     when: Optional[str] = None,
     backupCount: Optional[int] = None,
-    propergate: Optional[bool]  = None,
+    propagate: Optional[bool]  = None,
   ) -> Logger:
   global __log_output
   global __date_format
@@ -94,7 +90,7 @@ def set_logger(
   global __logger_name
   global __when
   global __number_of_backups
-  global __propergate
+  global __propagate
 
   __log_output = log_output
 
@@ -116,8 +112,8 @@ def set_logger(
   if backupCount is not None:
     __number_of_backups = backupCount
 
-  if propergate is not None:
-    __propergate = propergate
+  if propagate is not None:
+    __propagate = propagate
 
   return __setup_logger()
 

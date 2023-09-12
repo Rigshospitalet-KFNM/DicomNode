@@ -437,12 +437,37 @@ class lib_imageTree(TestCase):
     self.assertEqual(dicom, self.dataset_1)
     dicom_path.unlink()
 
+  def test_save_to_dir(self):
+    dir_path = Path(self._testMethodName)
+    dir_path.mkdir()
+    DT = DicomTree(self.dataset_1)
+    DT.save_tree(dir_path)
+
+    dicom_path = dir_path / (self.dataset_1_SOPInstanceUID.name + '.dcm')
+    self.assertTrue(dicom_path.exists())
+    self.assertTrue(dicom_path.is_file())
+
+    dicom = load_dicom(dicom_path)
+
+    self.assertEqual(dicom, self.dataset_1)
+    shutil.rmtree(dir_path)
+
 
   # Test Iteration
   def test_iteration(self):
     DT = DicomTree(self.datasets)
     for image in DT:
       self.assertIn(image, self.datasets)
+
+
+  def test_image_tree_contains(self):
+    series_tree = SeriesTree([self.dataset_1])
+    self.assertIn(self.dataset_1[0x00080018], series_tree)
+
+    # You might argue that should raise an error here
+    # You might also argue that the functionality should be very very different.
+    self.assertNotIn(123, series_tree)
+
 
   @bench
   def performance_max_recursion(self):

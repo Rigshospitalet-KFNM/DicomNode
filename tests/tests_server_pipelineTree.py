@@ -300,7 +300,7 @@ class PatientNodeTestCase(TestCase):
     options = PatientNode.Options(
       header_blueprint=blueprint,
       factory=NumpyFactory(),
-      pivot_input="arg_1"
+      parent_input="arg_1"
     )
 
     patient_node = PatientNode({
@@ -331,7 +331,7 @@ class PatientNodeTestCase(TestCase):
     options = PatientNode.Options(
       header_blueprint=blueprint,
       factory=NumpyFactory(),
-      pivot_input="arg_1"
+      parent_input="arg_1"
     )
 
     patient_dynamic_node = PatientNode({

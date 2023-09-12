@@ -49,7 +49,7 @@ class CStoreContainer(AssocationContainer):
 class AssociationContainerFactory:
   def __get_event_id(self, event: Event) -> int:
     if event.assoc.native_id is None:
-      raise ValueError("") # pragma no cover
+      raise ValueError("") # pragma: no cover
     return event.assoc.native_id
 
   def build_assocation_accepted(self, event: Event) -> AcceptedContainer:

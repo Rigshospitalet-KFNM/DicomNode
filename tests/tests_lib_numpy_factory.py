@@ -74,18 +74,37 @@ class NumpyFactoryTestCase(TestCase):
     for image_val, recreated_val in zip(image.flatten(), recreated_image.flatten()):
       self.assertAlmostEqual(image_val, recreated_val, places=1) # I have no idea but numerical unstably
 
+  def test_scale_zero_image(self):
+    image = numpy.zeros((50,50))
+    new_image, slope, intercept = self.factory.scale_image(image)
+
+    self.assertEqual(slope, 1)
+    self.assertEqual(intercept, 0)
+    self.assertTrue((image == new_image).all())
+
+  def test_scale_empty_CT_slice(self):
+    image = numpy.zeros((5,5), numpy.float64) - 1024.0
+    new_image, slope, intercept = self.factory.scale_image(image)
+
+
+    self.assertEqual(slope, 1)
+    self.assertEqual(intercept, 0)
+    print(image, new_image)
+    self.assertTrue((image == new_image).all())
+
+
   def test_numpy_factory_properties(self):
     factory = NumpyFactory()
 
     try:
       factory.pixel_representation = 3
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 
     try:
       factory.pixel_representation = "asdf"
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except TypeError:
       pass
 
@@ -94,19 +113,19 @@ class NumpyFactoryTestCase(TestCase):
 
     try:
       factory.bits_allocated = "asdf" #type: ignore the point of this test
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except TypeError:
       pass
 
     try:
       factory.bits_allocated = 17
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 
     try:
       factory.bits_allocated = -16
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 
@@ -115,19 +134,19 @@ class NumpyFactoryTestCase(TestCase):
 
     try:
       factory.bits_stored = "asdf" #type: ignore the point of this test
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except TypeError:
       pass
 
     try:
       factory.bits_stored = -16
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 
     try:
       factory.bits_stored = 0
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 

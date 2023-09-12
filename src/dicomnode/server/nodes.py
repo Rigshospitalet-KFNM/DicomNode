@@ -165,9 +165,9 @@ class AbstractPipeline():
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
   "Format of log messages using the '%' style."
 
-  disable_pynetdicom_logger: bool = True
-  "Disables pynetdicom logger"
-
+  pynetdicom_logger_level: int = logging.CRITICAL + 1
+  """Sets the level pynetdicom logger, note that traceback from
+  associations are logged to pynetdicom, which can be helpful for bugfixing"""
 
   # End of Attributes definitions.
 
@@ -190,9 +190,8 @@ class AbstractPipeline():
       backupCount=self.number_of_backups,
       when=self.log_when
     )
-
-    if self.disable_pynetdicom_logger:
-      getLogger("pynetdicom").setLevel(logging.INFO + 1)
+    # Set pynetdicom logger
+    getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
 
     # Load any previous state
     if self.data_directory is not None:
@@ -252,7 +251,7 @@ class AbstractPipeline():
   # End def __init__
   """ Store dataset process
 
-  Responsiblities:
+  Responsibilities:
     - handle_c_store_message - extracts information from event
     - control_c_store_function - main function responsible for calling correct functions
   """
@@ -268,7 +267,7 @@ class AbstractPipeline():
         self.logger.warning("Dataset discarded")
         return 0xB006 # Element discarded
     except Exception as exception:
-      log_traceback(self.logger, exception, "User flter")
+      log_traceback(self.logger, exception, "User filter")
       return 0xA801
 
     if self.patient_identifier_tag in c_store_container.dataset:

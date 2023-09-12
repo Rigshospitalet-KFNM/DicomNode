@@ -31,12 +31,18 @@ class NumpyFactory(DicomFactory):
   _high_bit: int = 15
   _pixel_representation: int = 0
 
-
   _unsigned_array_encoding: Dict[int, type] = {
     8 : numpy.uint8,
     16 : numpy.uint16,
     32 : numpy.uint32,
     64 : numpy.uint64,
+  }
+
+  _signed_array_encoding: Dict[int, type] = {
+    8 : numpy.int8,
+    16 : numpy.int16,
+    32 : numpy.int32,
+    64 : numpy.int64,
   }
 
   @property

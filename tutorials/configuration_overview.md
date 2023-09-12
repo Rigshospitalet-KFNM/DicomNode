@@ -65,7 +65,8 @@ This class is the server running the dicom node. It contains configuration for t
 * `log_date_format: str` - String format for timestamps in logs.
 * `log_level: int = logging.INFO` - Level of Logger
 * `log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"` - Log format as per pythons logging module.
-* `disable_pynetdicom_logger: bool = True` - Disables pynetdicom logger
+* `pynetdicom_logger_level: bool = True` - Sets the level pynetdicom logger, note that traceback from
+  associations are logged to pynetdicom, which can be helpful for bugfixing
 * `log_output Optional[Union[TextIO, Path, str]]` - Destination of log output:
   * `None` - Disables The logger
   * `TextIO` - output to that stream, This is stdout / stderr

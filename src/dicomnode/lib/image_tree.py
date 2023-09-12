@@ -309,8 +309,10 @@ class ImageTreeInterface(ABC):
   def __contains__(self, key: Union[str, UID, DataElement]) -> bool:
     if isinstance(key, DataElement):
       key = key.value
+
     if isinstance(key, UID):
       key = key.name
+
     if not isinstance(key, str):
       key = str(key)
     return key in self.data

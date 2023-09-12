@@ -10,7 +10,7 @@ from dicomnode.lib.io import load_dicom, load_private_tags_from_args
 
 from pprint import pprint
 
-def get_parser(subparser : _SubParsersAction):
+def get_parser(subparser: _SubParsersAction):
   _, _, tool_name = __name__.split(".")
   module_parser = subparser.add_parser(tool_name,  help="Displays a dicom file")
   module_parser.add_argument('dicomfile', type=Path, nargs='*', help="Path to dicom file to be shown")

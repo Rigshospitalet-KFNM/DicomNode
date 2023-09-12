@@ -62,8 +62,9 @@ class MyPipeline(AbstractPipeline):
   log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
   "Format of log messages using the '%' style."
 
-  disable_pynetdicom_logger: bool = True
-  "Disables pynetdicom logger"
+  pynetdicom_logger_level: int = logging.CRITICAL + 1
+  """Sets the level pynetdicom logger, note that traceback from
+  associations are logged to pynetdicom, which can be helpful for bugfixing"""
 
   ...
 ```

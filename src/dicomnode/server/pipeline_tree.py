@@ -58,15 +58,44 @@ class PatientNode(ImageTreeInterface):
 
   @dataclass
   class Options:
-    ae_title: Optional[str] = None
-    container_path: Optional[Path] = None
-    factory: Optional[DicomFactory] = None
-    lazy: bool = False
-    logger: Optional[Logger] = None
-    header_blueprint: Optional[Blueprint] = None
-    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
     InputContainerType: Type[InputContainer] = InputContainer
-    pivot_input: Optional[str] = None
+    "Type that this node should return from a extract_input_container call"
+
+
+    container_path: Optional[Path] = None
+    """Path to permanent storage
+    If None no permanent storage will be 
+    """
+
+    ae_title: Optional[str] = None
+    ""
+    lazy: bool = False
+    ""
+    logger: Optional[Logger] = None
+    """Logger that this object uses for any logs
+    If None it will create a 'dicomnode' logger and log to it
+    Injected Into AbstractInputs
+    """
+
+    # Dicom Header creation
+    factory: Optional[DicomFactory] = None
+    """Factory that should produce the series header, if None produce
+    no Series header
+    Injected Into AbstractInputs
+    """
+    header_blueprint: Optional[Blueprint] = None
+    """The blueprint that the series header should be created from,
+    if None no SeriesHeader will produced.
+    Injected Into AbstractInputs
+    """
+    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
+    """Strategy that DicomFactory will follow, when creating SeriesHeader
+    Injected Into AbstractInputs
+    """
+    parent_input: Optional[str] = None
+    """The input that will be used as parent input in header creation,
+    if None an arbitrary input is used.
+    Injected Into AbstractInputs"""
 
 
   def __init__(self,
@@ -138,7 +167,7 @@ class PatientNode(ImageTreeInterface):
       shutil.rmtree(self.options.container_path)
     return images_removed
 
-  def validate_inputs(self):
+  def validate_inputs(self) -> bool:
     valid = True
     for input in self.data.values():
       if isinstance(input, AbstractInput):
@@ -178,8 +207,8 @@ class PatientNode(ImageTreeInterface):
     if self.options.factory is not None and self.options.header_blueprint is not None:
       pivot_list: List[Dataset] = []
 
-      if self.options.pivot_input is not None:
-        pivot_input= self.data[self.options.pivot_input]
+      if self.options.parent_input is not None:
+        pivot_input= self.data[self.options.parent_input]
         if isinstance(pivot_input, AbstractInput):
           pivot_list = self.__extract_pivot_list(pivot_input)
         else:

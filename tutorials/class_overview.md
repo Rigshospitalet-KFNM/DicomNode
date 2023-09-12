@@ -23,6 +23,7 @@ VirtualElement is base abstract class representing a tag in a blueprint. A Virtu
 * SeriesElement - Produces a method which will produce a DataElement when called. The value is shared between datasets in the same series
 
 ##### InstancedVirtualElements
+
 An instanced virtual elements is a virtual element that is different for each image in the series. Example: InstanceNumber
 
 * InstanceEnvironment - dataclass for environment at dicom series production
