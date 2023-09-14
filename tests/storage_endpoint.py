@@ -82,8 +82,8 @@ class TestStorageEndpoint():
 
   def close(self):
     if self.running:
-      self.running = False
       self.ae.shutdown()
+      self.running = False
 
   def wait_till_ready(self):
     if self.running:

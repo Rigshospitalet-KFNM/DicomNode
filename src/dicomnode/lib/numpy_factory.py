@@ -121,7 +121,7 @@ class NumpyFactory(DicomFactory):
     max_val = image.max()
 
     if max_val == min_val:
-      return image.astype(target_datatype), 1, 0
+      return numpy.zeros_like(image), 1, min_val
 
     image_max_value = ((1 << self.bits_stored) - 1)
 

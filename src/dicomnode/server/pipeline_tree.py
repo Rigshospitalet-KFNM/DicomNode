@@ -486,7 +486,6 @@ class PipelineTree(ImageTreeInterface):
     for patient_id, patient_node in self.data.items():
       if isinstance(patient_node, PatientNode):
         if patient_node.creation_time < expiry_time:
-          print()
           to_be_removed.add(patient_id)
       else:
         raise InvalidTreeNode #pragma: no cover

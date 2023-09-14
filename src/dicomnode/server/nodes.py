@@ -375,9 +375,9 @@ class AbstractPipeline():
         if patient_id in self._patient_locks:
           threads, patient_lock = self._patient_locks[patient_id]
         else:
-          self.logger.critical("Another thread deleted thread-set and Patient log")
-          self.logger.critical("This is a bug in the library, please report it")
-          continue
+          self.logger.critical("Another thread deleted thread-set and Patient log") # pragma: no cover
+          self.logger.critical("This is a bug in the library, please report it") # pragma: no cover
+          continue # pragma: no cover
         with patient_lock:
           if len(threads) == 1:
             if self.data_state.validate_patient_id(patient_id):
@@ -388,7 +388,9 @@ class AbstractPipeline():
               self.logger.debug(f"Insufficient data for patient {patient_id}")
               continue
           else:
-            threads.remove(get_native_id())
+            thread_id = get_native_id()
+            self.logger.debug(f"Thread: {thread_id} leaving {patient_id}-container")
+            threads.remove(thread_id)
             continue
       # End of Critical Zone
 
@@ -413,7 +415,7 @@ class AbstractPipeline():
         after an assocation is released. This is the data from the released
         association.
     """
-    self.logger.debug(f"Processing {patient_id}")
+    self.logger.info(f"Processing {patient_id}")
     try:
 
       result = self.process(patient_input_container)
@@ -456,9 +458,9 @@ class AbstractPipeline():
     """
     input_container = self.data_state.get_patient_input_container(patient_id)
 
-    if released_container.association_ae_title in self.known_endpoints:
+    if released_container.association_ae in self.known_endpoints:
       input_container.responding_address = self.known_endpoints[
-        released_container.association_ae_title]
+        released_container.association_ae]
     elif released_container.association_id in self._associations_responds_addresses:
       input_container.responding_address = self._associations_responds_addresses[
         released_container.association_id]

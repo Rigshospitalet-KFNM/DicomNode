@@ -221,7 +221,7 @@ class DicomFactoryTestClass(TestCase):
       self.assertEqual(data_element.value, cpr)
       self.assertEqual(data_element_optional.value, cpr)
     else:
-      self.assertEqual(1,2)
+      self.assertEqual(1,2) # pragma: ignore
 
   def test_discard_element(self):
     discard_element = DiscardElement(0x00100020)

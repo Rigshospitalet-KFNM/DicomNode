@@ -13,7 +13,7 @@ from dicomnode.lib.exceptions import InvalidDataset
 class NumpyFactoryTestCase(TestCase):
   def setUp(self) -> None:
     self.blueprint = image_pixel_blueprint + SOP_common_blueprint
-    self.factory = NumpyFactory()
+    self.factory: NumpyFactory= NumpyFactory()
     self.header_dataset = Dataset()
     self.header_dataset.SOPClassUID = SecondaryCaptureImageStorage
     self.header = self.factory.make_series_header([self.header_dataset], self.blueprint)
@@ -86,11 +86,10 @@ class NumpyFactoryTestCase(TestCase):
     image = numpy.zeros((5,5), numpy.float64) - 1024.0
     new_image, slope, intercept = self.factory.scale_image(image)
 
-
     self.assertEqual(slope, 1)
-    self.assertEqual(intercept, 0)
-    print(image, new_image)
-    self.assertTrue((image == new_image).all())
+    self.assertEqual(intercept, -1024)
+
+    self.assertTrue((numpy.zeros_like(image) == new_image).all())
 
 
   def test_numpy_factory_properties(self):
@@ -159,19 +158,19 @@ class NumpyFactoryTestCase(TestCase):
 
     try:
       factory.high_bit = "asdf" #type: ignore the point of this test
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except TypeError:
       pass
 
     try:
       factory.high_bit = -16
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 
     try:
       factory.high_bit = 0
-      self.assertFalse(True)
+      self.assertFalse(True) #pragma: no cover
     except ValueError:
       pass
 

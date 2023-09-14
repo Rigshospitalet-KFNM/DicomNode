@@ -13,7 +13,10 @@ DICOMNODE_ENV_FONT_PATH = "DICOMNODE_ENV_FONT_PATH"
 # At https://www.medicalconnections.co.uk/FreeUID.html
 DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
 
+
+# Remember this these need to less than 16 characters!
+# Be cause they are stored in a SH
 DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
-DICOMNODE_VERSION = "0.0.4.2" # Remember to update this
+DICOMNODE_VERSION = "0.0.4" # Remember to update this
 
 DICOMNODE_PRIVATE_TAG_GROUP = 0x1337 # I might regret this choice.

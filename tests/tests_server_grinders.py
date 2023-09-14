@@ -104,7 +104,14 @@ class GrinderTests(TestCase):
     self.dataset_6.PatientName = self.patientName_2
     self.dataset_6.fix_meta_info()
 
-    self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
+
+
+    self.datasets = [self.dataset_1,
+                     self.dataset_2,
+                     self.dataset_3,
+                     self.dataset_4,
+                     self.dataset_5,
+                     self.dataset_6]
 
   def test_identity_grinder(self):
     grinder = IdentityGrinder()
