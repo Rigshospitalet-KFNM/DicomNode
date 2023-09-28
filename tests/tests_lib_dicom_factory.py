@@ -8,7 +8,7 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicom_factory import AttrElement, CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
+from dicomnode.lib.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
   InstanceEnvironment
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
@@ -188,15 +188,6 @@ class DicomFactoryTestClass(TestCase):
   def test_make_series_dont_call_super(self):
     self.assertRaises(NotImplementedError, self.factory.build_from_header, SeriesHeader(), None)
 
-  def test_AttributeElementCorporealialize(self):
-    attribute_element = AttrElement(0x0008103E, 'LO','series_description')
-
-    de = attribute_element.corporealialize(self.factory, [Dataset()])
-
-    self.assertIsInstance(de, DataElement)
-    self.assertEqual(de.tag, 0x0008103E)
-    self.assertEqual(de.VR, 'LO')
-    self.assertEqual(de.value, self.my_desc)
 
   def test_CopyElementCorporealialize(self):
     copy_element = CopyElement(0x00100020)
@@ -314,4 +305,30 @@ class DicomFactoryTestClass(TestCase):
       self.assertEqual(data_element.tag, 0x00200032)
       self.assertListEqual(list(data_element.value), [0,0, i - 1])
 
+
+  def test_write_private_tags(self):
+    # Assemble
+    blueprint = Blueprint()
+
+    # Act
+    blueprint.add_virtual_element(
+      StaticElement(0x00115000, 'IS', 124, "name")
+    )
+
+    # Assert
+    self.assertIn(0x00115000, blueprint)
+    self.assertIn(0x001150FE, blueprint)
+    self.assertIn(0x001150FF, blueprint)
+    self.assertIn(0x00110050, blueprint)
+
+
+  def test_overwrite_private_tag(self):
+    blueprint = Blueprint()
+    blueprint.add_virtual_element(
+      StaticElement(0x00115000, 'IS', 124, name="name")
+    )
+
+    blueprint.add_virtual_element(
+      StaticElement(0x00115000, 'LO', "A Test string", name="overwritten name")
+    )
 

@@ -3,8 +3,6 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
-
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
@@ -12,20 +10,33 @@ from enum import Enum
 from inspect import getfullargspec
 from pprint import pformat
 from random import randint
-from typing import Any, Callable, Dict, List, Iterator,  Optional, Tuple, Union, Iterable
+from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
 
 # Third Party Library
 import numpy
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag, BaseTag
+from sortedcontainers import SortedDict
 
 # Dicomnode Library
+from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
+
+logger = get_logger()
+
+T = TypeVar('T')
 
 class FillingStrategy(Enum):
   DISCARD = 0
   COPY = 1
+
+PRIVATIZATION_VERSION = 1
+
+class Reserved_Tags(Enum):
+  PRIVATE_TAG_NAMES = 0xFE
+  PRIVATE_TAG_VRS = 0xFF
+
 
 class VirtualElement(ABC):
   """Represents an element in a blueprint.
@@ -48,13 +59,25 @@ class VirtualElement(ABC):
   def VR(self) -> str:
     return self.__VR
 
+  @property
+  def is_private(self) -> bool:
+    return bool((self.tag >> 16) % 2)
+
   @VR.setter
   def VR(self, val: str) -> None:
     self.__VR = val
 
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str) -> None:
+  def __init__(self,
+               tag: Union[BaseTag, str, int, Tuple[int,int]],
+               VR: str,
+               name: Optional[str]=None) -> None:
     self.tag = tag
     self.VR = VR
+    if name is None:
+      name = DataElement(tag, VR, None).name
+    if 64 < len(name):
+      logger.warning(f"Virtual Element name is being truncated from {name} to {name[64:]}")
+    self.name = name[64:]
 
   def get_pivot(self, datasets: Iterable[Dataset]) -> Optional[Dataset]:
     dataset = None
@@ -67,17 +90,6 @@ class VirtualElement(ABC):
   def corporealialize(self, factory: 'DicomFactory', dataset: Iterable[Dataset]) -> Optional[Union[DataElement, 'InstanceVirtualElement']]:
     raise NotImplemented # pragma: no cover
 
-# Static Virtual Elements
-class AttrElement(VirtualElement):
-  """Reads an attribute from the factory and creates a data element
-  from it"""
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, attribute: str) -> None:
-    super().__init__(tag, VR)
-    self.attribute = attribute
-
-  def corporealialize(self, factory: 'DicomFactory', _: Iterable[Dataset]) -> DataElement:
-    value = getattr(factory, self.attribute)
-    return DataElement(self.tag, self.VR, value)
 
 class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
@@ -110,11 +122,13 @@ class DiscardElement(VirtualElement):
     return None
 
 
-class StaticElement(VirtualElement):
-  def __init__(self, tag, VR, value) -> None:
-    self.tag = tag
-    self.VR = VR
-    self.value = value
+class StaticElement(VirtualElement, Generic[T]):
+  def __init__(self,
+               tag: Union[str, BaseTag, int, Tuple[int, int]],
+               VR: str, value: T,
+               name:Optional[str]=None) -> None:
+    super().__init__(tag, VR, name=name)
+    self.value: T = value
 
   def corporealialize(self, _factory: 'DicomFactory', _datasets: Iterable[Dataset]) -> DataElement:
     return DataElement(self.tag, self.VR, self.value)
@@ -125,9 +139,9 @@ class SeriesElement(VirtualElement):
   def __init__(self,
                tag: Union[BaseTag, str, int, Tuple[int,int]],
                VR: str,
-               func: Union[Callable[[Dataset], Any], Callable[[],Any]]) -> None:
-    self.tag = tag
-    self.VR  = VR
+               func: Union[Callable[[Dataset], Any], Callable[[],Any]],
+               name=None) -> None:
+    super().__init__(tag, VR, name=name)
     self.func:  Union[Callable[[Dataset], Any], Callable[[],Any]] = func
     self.require_dataset: bool = len(getfullargspec(func).args) == 1
 
@@ -167,8 +181,12 @@ class FunctionalElement(InstanceVirtualElement):
   """Abstract tag. This class represents a tag, that will be
   instantiated from with an image slice.
   """
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], VR: str, func: Callable[[InstanceEnvironment],Any]) -> None:
-    super().__init__(tag, VR)
+  def __init__(self,
+               tag: Union[BaseTag, str, int, Tuple[int,int]],
+               VR: str,
+               func: Callable[[InstanceEnvironment],Any],
+               name: Optional[str]= None) -> None:
+    super().__init__(tag, VR, name=name)
     self.func = func
     self.header_dataset: Optional[Dataset] = None
 
@@ -201,24 +219,24 @@ class InstanceCopyElement(InstanceVirtualElement):
 class Blueprint():
   """Blueprint for a dicom series. A blueprint contains no information on a specific series.
   """
-  def __getitem__(self, __tag: int):
-    return self._dict[__tag]
+  def __getitem__(self, tag: int) -> VirtualElement:
+    return self._dict[tag]
 
-  def __setitem__(self, __tag: int, __ve: VirtualElement) -> None:
-    if not isinstance(__tag, BaseTag):
-      __tag = Tag(__tag)
-    if not isinstance(__ve, VirtualElement):
+  def __setitem__(self, tag: int, virtual_element: VirtualElement) -> None:
+    if not isinstance(tag, BaseTag):
+      tag = Tag(tag)
+    if not isinstance(virtual_element, VirtualElement):
       raise TypeError("HeaderBlueprint only accepts VirtualElements as element")
-    if __tag != __ve.tag:
+    if tag != virtual_element.tag:
       raise ValueError("Miss match between tag and VirtualElement's tag")
-    self.add_virtual_element(__ve)
+    self.add_virtual_element(virtual_element)
 
   def __delitem__(self, tag):
     del self._dict[tag]
 
   def __init__(self, virtual_elements: Union[List[VirtualElement],'Blueprint'] = []) -> None:
     # Init
-    self._dict: Dict[int, VirtualElement] = {}
+    self._dict: SortedDict = SortedDict()
 
     # Fill from init
     for ve in virtual_elements:
@@ -243,9 +261,42 @@ class Blueprint():
 
   def __iter__(self) -> Iterator[VirtualElement]:
     for ve in self._dict.values():
-      yield ve
+      # https://github.com/grantjenks/python-sortedcontainers/pull/107
+      # # YAY open source
+      # If wanna fix this
+      # https://github.com/althonos/python-sortedcontainers
+      yield ve # type: ignore
 
   def add_virtual_element(self, virtual_element: VirtualElement):
+    tag = virtual_element.tag
+    if virtual_element.is_private:
+      if not self.__validatePrivateTags(virtual_element):
+        # Logging was done by validate tags
+        return
+      group_id = (tag & 0xFFFF0000) + ((tag >> 8) & 0xFF)
+      tag_group = tag & 0xFFFFFF00
+      index = len(list(self._dict.irange(tag_group, tag)))
+      tag_name = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
+      tag_VR = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
+
+      # Check if the Group is allocated
+
+      if not group_id in self:
+        self._dict[group_id] = StaticElement[str](group_id, "LO", f"Dicomnode - Private tags version: {PRIVATIZATION_VERSION}")
+        self._dict[tag_name] = StaticElement[List[str]](tag_name, "LO", [])
+        self._dict[tag_VR] = StaticElement[List[str]](tag_VR, "LO", [])
+
+      if tag in self:
+        for reserved_tag_header in Reserved_Tags:
+          static_element: StaticElement[List[str]] = self[tag_group + reserved_tag_header.value] # type: ignore
+          del static_element.value[index]
+
+      VE_names: StaticElement[List[str]] = self._dict[tag_name]
+      VE_names.value.insert(index, virtual_element.name)
+      VE_VR: StaticElement[List[str]] = self._dict[tag_VR]
+      VE_VR.value.insert(index, virtual_element.VR)
+
+      # End private tag handling
     self._dict[virtual_element.tag] = virtual_element
 
   def get_required_tags(self) -> List[int]:
@@ -258,6 +309,23 @@ class Blueprint():
         return_list.append(int(virtual_element.tag))
     return_list.sort()
     return return_list
+
+  def __validatePrivateTags(self, virtual_element: VirtualElement) -> bool:
+    ALLOCATE_TAG_FILTER = 0xFF00
+    tags_is_an_allocator = not bool(virtual_element.tag & ALLOCATE_TAG_FILTER)
+
+    if tags_is_an_allocator:
+      logger.error("Dicom node will automatically allocate private tag ranges")
+      return False
+
+    for reserved_tag in Reserved_Tags:
+      subTag = virtual_element.tag & 0xFF
+      if subTag == reserved_tag.value:
+        logger.error("You are trying to add a private tag, that have been reserved by Dicomnode")
+        return False
+
+    return True
+
 
 
 class SeriesHeader():
@@ -410,7 +478,6 @@ def _get_random_number(_) -> int:
   return randint(1, 2147483646)
 
 ###### Header Tag Lists ######
-
 patient_blueprint = Blueprint([
   CopyElement(0x00100010), # PatientName
   CopyElement(0x00100020), # PatientID
@@ -480,6 +547,8 @@ ct_image_blueprint = Blueprint([
 ])
 
 
+
+
 patient_study_blueprint = Blueprint([
   CopyElement(0x00101010, Optional=True), # PatientAge
   CopyElement(0x00101020, Optional=True), # PatientSize
@@ -495,7 +564,7 @@ general_series_blueprint = Blueprint([
   SeriesElement(0x00080021, 'DA', _get_today),         # SeriesDate
   SeriesElement(0x00080031, 'TM', _get_time),          # SeriesTime
   SeriesElement(0x0020000E, 'UI', gen_uid),            # SeriesInstanceUID
-  AttrElement(0x0008103E, 'LO', 'series_description'), # SeriesDescription
+  SeriesElement(0x0008103E, 'LO', lambda: "Dicomnode pipeline output"), # SeriesDescription
   SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
   CopyElement(0x00081070, Optional=True),              # Operators' Name
   CopyElement(0x00185100),                             # PatientPosition

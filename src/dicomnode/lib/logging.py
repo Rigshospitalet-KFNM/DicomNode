@@ -1,13 +1,23 @@
+""""""
+
 __author__ = "Christoffer Vilstrup Jensen"
 
+# Python standard library
 from logging import Logger, basicConfig, StreamHandler, getLogger, Formatter,\
-  DEBUG, INFO, WARNING, ERROR, CRITICAL, NullHandler
+  DEBUG, INFO, CRITICAL
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from io import TextIOBase, TextIOWrapper
+from io import TextIOWrapper
 from sys import stdout
 from typing import Optional, Union, TextIO
 from traceback import format_exc
+
+# Third party packages
+
+# Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
+
+
 
 # Global Variables for configuration
 __propergate = False
@@ -16,7 +26,7 @@ __when = "W0"
 __date_format = "%Y/%m/%d %H:%M:%S"
 __format = "%(asctime)s - %(name)s %(funcName)s %(lineno)s - %(levelname)s - %(message)s"
 __log_level = INFO
-__logger_name = "dicomnode"
+__logger_name = DICOMNODE_LOGGER_NAME
 __log_output: Optional[Union[Path, TextIO]] = stdout
 __logger = None
 

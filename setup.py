@@ -145,6 +145,7 @@ if __name__ == '__main__':
     cmdclass={"build_ext": CMakeBuild},
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
+      'sortedcontainers>=2.4.0',
       'pydicom>=2.3.1',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',

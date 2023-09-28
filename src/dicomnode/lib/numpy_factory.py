@@ -15,7 +15,7 @@ from pydicom.tag import BaseTag, Tag
 # Dicomnode packages
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import make_meta, gen_uid
-from dicomnode.lib.dicom_factory import AttrElement, InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
+from dicomnode.lib.dicom_factory import InstanceEnvironment, FunctionalElement, DicomFactory, SeriesHeader,\
   StaticElement, Blueprint, patient_blueprint, general_series_blueprint, \
   general_study_blueprint, SOP_common_blueprint, frame_of_reference_blueprint, \
   general_equipment_blueprint, general_image_blueprint, ct_image_blueprint, \
@@ -26,10 +26,6 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, Inva
 logger = get_logger()
 
 class NumpyFactory(DicomFactory):
-  _bits_allocated: int = 16
-  _bits_stored: int = 16
-  _high_bit: int = 15
-  _pixel_representation: int = 0
 
 
   _unsigned_array_encoding: Dict[int, type] = {
@@ -109,15 +105,19 @@ class NumpyFactory(DicomFactory):
       error_message = f"high bit must equal to {self.bits_stored - 1}"
       raise ValueError(error_message)
 
-  def scale_image(self, image: ndarray) -> Tuple[ndarray, float, float]:
-    target_datatype = self._unsigned_array_encoding.get(self.bits_allocated, None)
+  def scale_image(self,
+                  image: ndarray,
+                  bits_stored = 16,
+                  bits_allocated = 16,
+                ) -> Tuple[ndarray, float, float]:
+    target_datatype = self._unsigned_array_encoding.get(bits_allocated, None)
     min_val = image.min()
     max_val = image.max()
 
     if max_val == min_val:
       return image.astype(target_datatype), 1, 0
 
-    image_max_value = ((1 << self.bits_stored) - 1)
+    image_max_value = ((1 << bits_stored) - 1)
 
     slope = (max_val - min_val) / image_max_value
     intercept = min_val
@@ -127,7 +127,9 @@ class NumpyFactory(DicomFactory):
     return new_image, slope, intercept
 
 
-  def build_from_header(self, header : SeriesHeader, image: ndarray) -> List[Dataset]:
+  def build_from_header(self,
+                        header : SeriesHeader,
+                        image: ndarray) -> List[Dataset]:
     """This construct a dicom series from a header and numpy array containing
     the Image
 
@@ -141,7 +143,14 @@ class NumpyFactory(DicomFactory):
     Returns:
         List[Dataset]: _description_
     """
-    target_datatype = self._unsigned_array_encoding.get(self.bits_allocated, None)
+    bits_allocated_tag = header[0x00280100] # Bits Allocated
+    if isinstance(bits_allocated_tag, DataElement):
+      bits_allocated = bits_allocated_tag.value
+    else:
+      logger.error(f"Trying to build a Dicom series, but bit allocated is not in the Series header")
+      raise Exception
+
+    target_datatype = self._unsigned_array_encoding.get(bits_allocated, None)
     if target_datatype is None:
       raise IncorrectlyConfigured("There's no target Datatype") # pragma: no cover this might happen, if people are stupid
 
@@ -228,10 +237,10 @@ image_pixel_blueprint: Blueprint = Blueprint([
   FunctionalElement(0x00280010, 'US', _add_Rows),              # Rows
   FunctionalElement(0x00280011, 'US', _add_Columns),           # Columns
   FunctionalElement(0x00280034, 'IS', _add_aspect_ratio),      # PixelAspectRatio
-  AttrElement(0x00280100, 'US', 'bits_allocated'),       # BitsAllocated
-  AttrElement(0x00280101, 'US', 'bits_stored'),          # BitsStored
-  AttrElement(0x00280102, 'US', 'high_bit'),             # HighBit
-  AttrElement(0x00280103, 'US', 'pixel_representation'), # PixelRepresentation
+  StaticElement(0x00280100, 'US', 16),                         # BitsAllocated
+  StaticElement(0x00280101, 'US', 16),                         # BitsStored
+  StaticElement(0x00280102, 'US', 15),                         # HighBit
+  StaticElement(0x00280103, 'US', 0), # PixelRepresentation
   FunctionalElement(0x00280106, 'US', _add_smallest_pixel),    # SmallestImagePixelValue
   FunctionalElement(0x00280107, 'US', _add_largest_pixel),     # LargestImagePixelValue
   FunctionalElement(0x00281052, 'DS', _add_intercept),         # RescaleIntercept
