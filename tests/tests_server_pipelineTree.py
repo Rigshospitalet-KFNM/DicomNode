@@ -134,8 +134,8 @@ class PipelineTestCase(TestCase):
     self.assertIsInstance(patient_node_2, PatientNode)
 
     # Monkey patching creation time circumventing, injection of datetime.
-    patient_node_1.creationTime = datetime.datetime(2002, 5, 7) # type: ignore
-    patient_node_2.creationTime = datetime.datetime(2002, 6, 7) # type: ignore
+    patient_node_1.creation_time = datetime.datetime(2002, 5, 7) # type: ignore
+    patient_node_2.creation_time = datetime.datetime(2002, 6, 7) # type: ignore
 
     expiry_time = datetime.datetime(2002,5,15)
 
@@ -300,7 +300,7 @@ class PatientNodeTestCase(TestCase):
     options = PatientNode.Options(
       header_blueprint=blueprint,
       factory=NumpyFactory(),
-      pivot_input="arg_1"
+      parent_input="arg_1"
     )
 
     patient_node = PatientNode({
@@ -331,7 +331,7 @@ class PatientNodeTestCase(TestCase):
     options = PatientNode.Options(
       header_blueprint=blueprint,
       factory=NumpyFactory(),
-      pivot_input="arg_1"
+      parent_input="arg_1"
     )
 
     patient_dynamic_node = PatientNode({

@@ -23,12 +23,12 @@ VirtualElement is base abstract class representing a tag in a blueprint. A Virtu
 * SeriesElement - Produces a method which will produce a DataElement when called. The value is shared between datasets in the same series
 
 ##### InstancedVirtualElements
+
 An instanced virtual elements is a virtual element that is different for each image in the series. Example: InstanceNumber
 
 * InstanceEnvironment - dataclass for environment at dicom series production
 * FunctionalElement - An element that uses a injected function to calculate the value of Data Element.
 * InstanceCopyElement - An element that copies all values from a header dicom series to a produced dicom series, indexed by instance number.
-
 
 ### NIFTI
 
@@ -103,4 +103,3 @@ This module contains classes for building an medical image processing pipeline.
 * InputContainer - A glorified dict with additional data
 * PatientContainer - An ImageTreeInterface that manages all Abstract input.
 * PipelineTree - An ImageTreeInterface that manages all PatientContainers.
-

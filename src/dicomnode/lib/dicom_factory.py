@@ -87,8 +87,22 @@ class VirtualElement(ABC):
     return dataset
 
   @abstractmethod
-  def corporealialize(self, factory: 'DicomFactory', dataset: Iterable[Dataset]) -> Optional[Union[DataElement, 'InstanceVirtualElement']]:
+  def corporealialize(self,
+                      factory: 'DicomFactory',
+                      parent_datasets: Iterable[Dataset]
+                      ) -> Optional[Union[DataElement,
+                                          'InstanceVirtualElement']]:
+    """Extracts data from the parent datasets and either produces a static
+    element or a InstancedVirtualElement, in the case of that the produced tag
+    should vary image instance to image instance.
+
+    Args:
+      factory (DicomFactory): Factory that's producing the series header
+      parent_datasets (Iterable[Dataset]): Parent datasets to be extracted
+
+    """
     raise NotImplemented # pragma: no cover
+
 
 
 class CopyElement(VirtualElement):
@@ -389,10 +403,10 @@ class DicomFactory(ABC):
     https://github.com/Rigshospitalet-KFNM/DicomNode/tutorials/MakingHeaders.md
 
     Args:
-        pivot (Dataset): The dataset which the header will be produced from
+      pivot (Dataset): The dataset which the header will be produced from
 
     Returns:
-        SeriesHeader: This object is a "header" for the series
+      SeriesHeader: This object is a "header" for the series
     """
     failed_tags = []
     header = SeriesHeader()
@@ -575,3 +589,4 @@ SOP_common_blueprint: Blueprint = Blueprint([
   FunctionalElement(0x00080018, 'UI', _add_SOPInstanceUID), # SOPInstanceUID
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
 ])
+

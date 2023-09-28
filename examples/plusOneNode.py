@@ -32,17 +32,18 @@ class CTInput(AbstractInput):
     return self.images > 150
 
 class PlusOnePipeline(AbstractPipeline):
-  log_path: str = "log.log"
   ae_title: str = "PLUSONE"
   port: int = 1337
   ip: str = '0.0.0.0'
+
   disable_pynetdicom_logger=True
   log_level: int = logging.INFO
+  log_output: str = "log.log"
+
+  dicom_factory: NumpyFactory = NumpyFactory()
   header_blueprint = CTImageStorage_NumpyBlueprint
 
   endpoint = Address('1.2.3.4', 104, "ENDPOINT_AE")
-
-  dicom_factory: NumpyFactory = NumpyFactory()
 
   input = {
     INPUT_KW : CTInput

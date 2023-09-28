@@ -8,7 +8,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
 from abc import abstractmethod, ABC
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
@@ -26,18 +26,33 @@ from dicomnode.lib.lazy_dataset import LazyDataset
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 from dicomnode.lib.image_tree import ImageTreeInterface
-from dicomnode.lib.logging import log_traceback
 
 class AbstractInput(ImageTreeInterface, ABC):
-  # Private tags should be injected, rather than put into the input
-  __private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
+  """Container for dicom sets fulfilling the validate image function.
 
-  required_tags: List[int] = [0x000800180] # SOPInstanceUID
+    Args:
+        options (Options, optional): Options for the abstract input. Used to add
+                                     Additional arguments to the
+                                     Defaults to Options().
+    """
+  # Private tags should be injected, rather than put into the input
+  _private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
+
+  required_tags: List[int] = [0x00080018] # SOPInstanceUID
+  """The list of tags that must be present in a dataset to be accepted
+  into the input. Consider checking SOP_mapping.py for collections of Tags."""
+
   required_values: Dict[int, Any] = {}
+  "A Mapping of tags and associated values, doesn't work for values in sequences"
+
   image_grinder: Grinder = IdentityGrinder()
+  """Grinder for converting stored dicom images
+  into a data usable by the processing function"""
 
   @dataclass
-  class Options: # These are options that are injected into all input.
+  class Options:
+    """These are the options to an abstract input"""
+    # These are options that are injected into all input.
     # Note the reason, why there some options, that are not used by this class
     # is because of Liskov's Substitution principle, and subclasses might need
     # these options.
@@ -46,28 +61,31 @@ class AbstractInput(ImageTreeInterface, ABC):
     data_directory: Optional[Path]  = None
     factory: Optional[DicomFactory] = None
     lazy: bool = False
+    "Indicate if the Abstract input should use "
 
   def __init__(self,
-      pivot: Optional[Dataset] = None,
       options: Options = Options(),
     ):
     super().__init__()
     self.options = options
+    "Options for this Abstract input"
 
     self.path: Optional[Path] = options.data_directory
     if self.options.logger is not None:
       self.logger = self.options.logger
+      "Logger for logging"
     else:
       self.logger = get_logger()
 
-    if 0x00080018 not in self.required_tags: # Tag for SOPInstance is (0x0008,0018)
+    # Tag for SOPInstance is (0x0008,0018)
+    if 0x00080018 not in self.required_tags:
       self.required_tags.append(0x00080018)
 
     if self.path is not None:
       if not self.path.exists():
         self.path.mkdir(exist_ok=True)
       for image_path in self.path.iterdir():
-        dcm = load_dicom(image_path, self.__private_tags)
+        dcm = load_dicom(image_path, self._private_tags)
         self.add_image(dcm)
 
 
@@ -80,12 +98,12 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     raise NotImplementedError #pragma: no cover
 
-  def _clean_up(self) -> int:
+  def clean_up(self) -> int:
     """Removes any files, stored by the Input"""
     if self.path is not None:
       for dicom in self:
-        p = self.get_path(dicom)
-        p.unlink()
+        path = self.get_path(dicom)
+        path.unlink()
     return self.images
 
   def get_data(self) -> Any:
@@ -146,7 +164,8 @@ class AbstractInput(ImageTreeInterface, ABC):
         self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
       if dicom[required_tag].value != required_value:
-        self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
+        self.logger.debug(f"required value {required_value}\
+                           not match {dicom[required_tag]} in dicom")
         return False
 
     return True
@@ -185,12 +204,27 @@ class AbstractInput(ImageTreeInterface, ABC):
 
 class DynamicLeaf(ImageTreeInterface):
   """Subclass to DynamicInput, each instance is a separate series"""
-  def __init__(self, dcm: Union[Iterable[Dataset], Dataset] = [], lazy = False, path: Optional[Path] = None) -> None:
+  def __init__(self,
+               dcm: Union[Iterable[Dataset], Dataset],
+               lazy = False,
+               path: Optional[Path] = None) -> None:
     super().__init__(dcm)
     self.lazy = lazy
     self.path = path
 
   def get_path(self, dicom: Dataset) -> Path:
+    """Retrieves the path of a dataset, if it would be stored in this this node
+    on the file system
+
+    Args:
+        dicom (Dataset): dataset to be stored
+
+    Raises:
+        IncorrectlyConfigured: If the DynamicLeaf is configured only to work in memory
+
+    Returns:
+        Path: Path where this dataset would be stored
+    """
     if self.path is None:
       raise IncorrectlyConfigured("getting the path needs a base path")
     return self.path / (dicom.SOPInstanceUID.name + ".dcm")
@@ -219,36 +253,38 @@ class DynamicInput(AbstractInput):
   separator_tag: int = 0x0020000E # SeriesInstanceUID
 
   def get_data(self) -> Dict[str, Any]:
-    returnDict = {}
+    return_dict = {}
     for key, leaf in self.data.items():
       if not isinstance(leaf, DynamicLeaf):
         raise InvalidTreeNode # pragma: no cover
-      returnDict[key] = self.image_grinder(leaf)
+      return_dict[key] = self.image_grinder(leaf)
 
-    return returnDict
+    return return_dict
 
-  def add_image(self, dataset: Dataset) -> int:
-    if not self.validate_image(dataset):
+  def add_image(self, dicom: Dataset) -> int:
+    if not self.validate_image(dicom):
       raise InvalidDataset
 
-    if self.separator_tag not in dataset:
+    if self.separator_tag not in dicom:
       raise InvalidDataset
 
-    key = dataset[self.separator_tag].value
+    key = dicom[self.separator_tag].value
     if isinstance(key, UID):
       key = key.name
-      # This is to ensure the assumption that underlying data dict is Dict[str, Union[Dataset, ImageTreeInterface]]
+      # This is to ensure the assumption that underlying data dict is:
+      #  Dict[str, Union[Dataset, ImageTreeInterface]]
     if not isinstance(key, str):
       key = str(key) # Otherwise the imageTree throws a type error
 
     if key in self:
       image_tree = self[key]
       if isinstance(image_tree, ImageTreeInterface):
-        ret_value = image_tree.add_image(dataset)
+        ret_value = image_tree.add_image(dicom)
       else:
         raise InvalidTreeNode #pragma: no cover
     else:
-      # Don't use the add image functionality of the constructor due to fact that, it's return value is needed
+      # Don't use the add image functionality of the constructor due to fact
+      # that, it's return value is needed
       if self.path is not None:
         leaf_path = self.path / key
         leaf_path.mkdir(parents=True, exist_ok=True)
@@ -256,27 +292,51 @@ class DynamicInput(AbstractInput):
         leaf_path = None
       leaf = self.leaf_class([], self.options.lazy, leaf_path)
       self[key] = leaf
-      ret_value = leaf.add_image(dataset)
+      ret_value = leaf.add_image(dicom)
     self.images += ret_value
     return ret_value
 
 
 class HistoricAbstractInput(AbstractInput):
-  address: Optional[Address] = None
-  c_move_blueprint: Optional[Blueprint] = None
+  """This input sends a DIMSE C-MOVE to location on creation
 
-  def __init__(self, pivot: Optional[Dataset] = None, options: AbstractInput.Options = AbstractInput.Options()):
-    super().__init__(pivot, options)
+  An Example could be that your node receives a pet image, then this input can
+  fetch some CT stored at some database.
 
-    if pivot is None:
+  Raises:
+      IncorrectlyConfigured: _description_
+      IncorrectlyConfigured: _description_
+      IncorrectlyConfigured: _description_
+      IncorrectlyConfigured: _description_
+      IncorrectlyConfigured: _description_
+  """
+
+  @dataclass
+  class Options(AbstractInput.Options):
+    """Options for a HistoricAbstractInput
+
+    """
+    address: Optional[Address] = None
+    "The address that historic input should send the C-Move too on creation"
+    blueprint: Optional[Blueprint] = None
+    "The blue print for the C-Move message"
+    pivot: Optional[Dataset] = None
+    "The Dataset that is used with the blueprint to create the message"
+  options: Options
+
+  def __init__(self,
+               options: Options = Options()):
+    super().__init__(options)
+
+    if self.options.pivot is None:
       self.logger.critical("You forgot to parse the pivot to The Input")
       raise IncorrectlyConfigured
 
-    if self.c_move_blueprint is None:
+    if self.options.blueprint is None:
       self.logger.critical("A C move blueprint is missing")
       raise IncorrectlyConfigured
 
-    if self.address is None:
+    if self.options.address is None:
       self.logger.critical("A target address is needed to send a C-Move to")
       raise IncorrectlyConfigured
 
@@ -288,7 +348,5 @@ class HistoricAbstractInput(AbstractInput):
       self.logger.critical("Historic Inputs needs a AE Title of the SCU")
       raise IncorrectlyConfigured
 
-    message = self.options.factory.build(pivot,self.c_move_blueprint)
-
-    send_move_thread(self.options.ae_title, self.address, message)
-
+    message = self.options.factory.build(self.options.pivot,self.options.blueprint)
+    send_move_thread(self.options.ae_title, self.options.address, message)

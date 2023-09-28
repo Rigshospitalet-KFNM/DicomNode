@@ -27,7 +27,6 @@ logger = get_logger()
 
 class NumpyFactory(DicomFactory):
 
-
   _unsigned_array_encoding: Dict[int, type] = {
     8 : numpy.uint8,
     16 : numpy.uint16,
@@ -35,75 +34,12 @@ class NumpyFactory(DicomFactory):
     64 : numpy.uint64,
   }
 
-  @property
-  def pixel_representation(self) -> int:
-    """Indicates encoding of pixel:
-      0 : unsigned
-      1 : two's compliment encoding
-    """
-    return self._pixel_representation
-
-  @pixel_representation.setter
-  def pixel_representation(self, val):
-    if not isinstance(val, int):
-      raise TypeError("pixel representation must be an int")
-    if val == 0 or val == 1:
-      self._pixel_representation = val
-    else:
-      raise ValueError("Pixel Representation can take two values 0 or 1")
-
-  @property
-  def bits_allocated(self) -> int:
-    """Determines how many bits will be allocated per pixel
-    Must be 1 or a positive multiple of 8
-
-    Defaults to 16
-    """
-    return self._bits_allocated
-
-  @bits_allocated.setter
-  def bits_allocated(self, val: int) -> None:
-    if not isinstance(val, int):
-      raise TypeError("Bits allocated must be a positive integer of multiple 8")
-    if val > 0 and (val == 1 or (val % 8 == 0)):
-      self._bits_allocated = val
-    else:
-      raise ValueError("Bits allocated must be 1 or a positive multiple of 8")
-
-  @property
-  def bits_stored(self) -> int:
-    """Defines how many of the bits will be used, must be less than allocated
-
-    Defaults to 15
-    """
-    return self._bits_stored
-
-  @bits_stored.setter
-  def bits_stored(self, val: int):
-    if not isinstance(val, int):
-      raise TypeError("bits stored must be an int") # type: ignore
-    if 1 <= val <= self.bits_allocated:
-      self._bits_stored = val
-    else:
-      raise ValueError(f"bit stored must be in range [1, {self.bits_allocated}]")
-
-  @property
-  def high_bit(self) -> int:
-    """Defines the high bit, must be equal to bit stored - 1
-
-    Defaults to 15
-    """
-    return self._high_bit
-
-  @high_bit.setter
-  def high_bit(self, val: int):
-    if not isinstance(val, int):
-      raise TypeError("High bit must be an int")
-    if val + 1 == self.bits_stored:
-      self._high_bit = val
-    else:
-      error_message = f"high bit must equal to {self.bits_stored - 1}"
-      raise ValueError(error_message)
+  _signed_array_encoding: Dict[int, type] = {
+    8 : numpy.int8,
+    16 : numpy.int16,
+    32 : numpy.int32,
+    64 : numpy.int64,
+  }
 
   def scale_image(self,
                   image: ndarray,
@@ -115,7 +51,7 @@ class NumpyFactory(DicomFactory):
     max_val = image.max()
 
     if max_val == min_val:
-      return image.astype(target_datatype), 1, 0
+      return numpy.zeros_like(image), 1, min_val
 
     image_max_value = ((1 << bits_stored) - 1)
 

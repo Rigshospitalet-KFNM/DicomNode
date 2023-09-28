@@ -141,7 +141,7 @@ def send_move(SCU_AE: str,
     InvalidQueryDataset:
   """
   if "QueryRetrieveLevel" not in dataset:
-    dataset.QueryRetrieveLevel = query_level
+    dataset.QueryRetrieveLevel = query_level.value
 
   if query_level == QueryLevels.PATIENT and 'PatientID' not in dataset:
     logger.error("Attempted to send a move at Patient level without a PatientID tag")

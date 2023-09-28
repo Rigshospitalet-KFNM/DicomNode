@@ -1,12 +1,24 @@
 # DicomNode
 
-Dicom node is a toolkit and library for the various scripts and tools used for dicom communication
-It contains the tools to set up an post processing pipeline of medical images.
+DicomNode is a framework for building post-processing pipeline of medical images.
+It specializes in converted dicom images into formats usable formats (e.g. Nifti, Minc) and back to dicom.
 
 ## Installation
 
+The Library require:
+
+* g++
+* cmake
+* pybind11
+* Python developer tools
+
+Using apt:
+> `sudo apt install g++ cmake python3-pybind11 python3-dev`
+
 To install this library
 > `pip install git+https://github.com/Rigshospitalet-KFNM/DicomNode.git`
+
+
 
 ## Toolkit Usage
 
@@ -24,10 +36,10 @@ To use the toolkit use:
 This library contains modules to set up a dicom SCP optimized for a data pipeline.
 A number of tutorials can be found in the tutorial folder.
 
-I recommend reading the [createPipeline.md](tutorials/CreatePipeline.md) document first.
-After this look through a couple of examples for instance: [plusOneNode](examples/plusOneNode.py)
-The library contains a bunch of classes for common problems, consider looking through the [ClassesOverview.md](tutorials/ClassOverview.md) to determine if there's something that could help you.
-The classes can be configured in different ways. Look through [ConfigurationOverview.md](tutorials/ConfigurationOverview.md) to see the flexibility of the classes.
+I recommend reading the [createPipeline.md](./tutorials/create_a_pipeline.md) document first.
+After this look through a couple of examples for instance: [plusOneNode](./examples/plusOneNode.py)
+The library contains a bunch of classes for common problems, consider looking through the [ClassesOverview.md](./tutorials/class_overview.md) to determine if there's something that could help you.
+The classes can be configured in different ways. Look through [ConfigurationOverview.md](./tutorials/configuration_overview.md) to see the flexibility of the classes.
 
 ## Tests
 

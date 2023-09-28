@@ -1,0 +1,13 @@
+[MAIN]
+
+ignore-paths=venv/*
+
+disable=duplicate-code, too-few-public-methods, broad-exception-caught
+
+[FORMAT]
+
+indent-string='  '
+
+[LOGGING]
+
+disable=logging-fstring-interpolation

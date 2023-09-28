@@ -195,7 +195,7 @@ class NumpyGrinder(Grinder):
     if 'InstanceNumber' in pivot:
       datasets.sort(key=lambda ds: ds.InstanceNumber)
     else:
-      logger.warn("Instance Number not present in dataset, arbitrary ordering of datasets")
+      logger.warning("Instance Number not present in dataset, arbitrary ordering of datasets")
 
     if pivot.SamplesPerPixel == 1:
       return self.__numpy_monochrome_grinder(datasets)

@@ -8,6 +8,7 @@ from unittest import TestCase
 
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
+
 from dicomnode.lib.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
   InstanceEnvironment
@@ -212,7 +213,7 @@ class DicomFactoryTestClass(TestCase):
       self.assertEqual(data_element.value, cpr)
       self.assertEqual(data_element_optional.value, cpr)
     else:
-      self.assertEqual(1,2)
+      self.assertEqual(1,2) # pragma: ignore
 
   def test_discard_element(self):
     discard_element = DiscardElement(0x00100020)

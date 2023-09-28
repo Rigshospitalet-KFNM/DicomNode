@@ -13,7 +13,7 @@ from dicomnode.lib.exceptions import InvalidDataset
 class NumpyFactoryTestCase(TestCase):
   def setUp(self) -> None:
     self.blueprint = image_pixel_blueprint + SOP_common_blueprint
-    self.factory = NumpyFactory()
+    self.factory: NumpyFactory= NumpyFactory()
     self.header_dataset = Dataset()
     self.header_dataset.SOPClassUID = SecondaryCaptureImageStorage
     self.header = self.factory.make_series_header([self.header_dataset], self.blueprint)
@@ -73,6 +73,24 @@ class NumpyFactoryTestCase(TestCase):
 
     for image_val, recreated_val in zip(image.flatten(), recreated_image.flatten()):
       self.assertAlmostEqual(image_val, recreated_val, places=1) # I have no idea but numerical unstably
+
+  def test_scale_zero_image(self):
+    image = numpy.zeros((50,50))
+    new_image, slope, intercept = self.factory.scale_image(image)
+
+    self.assertEqual(slope, 1)
+    self.assertEqual(intercept, 0)
+    self.assertTrue((image == new_image).all())
+
+  def test_scale_empty_CT_slice(self):
+    image = numpy.zeros((5,5), numpy.float64) - 1024.0
+    new_image, slope, intercept = self.factory.scale_image(image)
+
+    self.assertEqual(slope, 1)
+    self.assertEqual(intercept, -1024)
+
+    self.assertTrue((numpy.zeros_like(image) == new_image).all())
+
 
   # Dicom factory
 

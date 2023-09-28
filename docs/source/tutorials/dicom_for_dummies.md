@@ -1,8 +1,3 @@
----
-title: Dicom for dummies
-author: Christoffer Vilstrup Jensen
----
-
 # Dicom For Dummies
 
 Digital Imaging and Communications in Medicine is a file format and a message protocol owned and partly developed by the National Electrical Manufacturers Association (NEMA).
