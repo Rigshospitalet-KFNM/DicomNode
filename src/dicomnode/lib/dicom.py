@@ -1,14 +1,26 @@
 """Library methods for manipulation of pydicom.dataset objects
 """
-from typing import Any, List, Callable, Tuple
 
+# Python Standard Library
+from enum import Enum
+from typing import Any, List, Callable, Optional, Tuple
+
+# Third Party Libraries
 import numpy
-
-from pydicom import Dataset
+from pydicom import Dataset, DataElement
+from pydicom.tag import BaseTag
 from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian, ExplicitVRLittleEndian
 
+# Dicomnode packages
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
 from dicomnode.lib.exceptions import InvalidDataset
+
+PRIVATIZATION_VERSION = 1
+
+class Reserved_Tags(Enum):
+  PRIVATE_TAG_NAMES = 0xFD
+  PRIVATE_TAG_VRS = 0xFE
+  PRIVATE_TAG_VM = 0xFF
 
 
 def gen_uid() -> UID:
@@ -58,6 +70,45 @@ def get_tag(Tag: int) -> Callable[[Dataset], Any]:
       return None
   return retFunc
 
+def __check_if_tag_is_creator(tag: BaseTag) -> bool:
+  return not(tag & 0xFF00)
+
+def reader_function_version_1(dataset: Dataset, data_element: DataElement):
+  # This is too ensure that the reserved tags remains the same.
+  class Reserved_Tags(Enum):
+    PRIVATE_TAG_NAMES = 0xFD
+    PRIVATE_TAG_VRS = 0xFE
+    PRIVATE_TAG_VM = 0xFF
+
+  
+  
+
+
+__reader_functions = {
+  1 : reader_function_version_1
+}
+
+def get_dicomnode_creator_header():
+  return f"Dicomnode - Private tags version: {PRIVATIZATION_VERSION}"
+
+
+def __get_reader_function(data_element: DataElement) -> Optional[Callable[[Dataset, DataElement], None]]:
+  stringified_value = str(data_element.value)
+  if not stringified_value.startswith("Dicomnode - Private tags version: "):
+    return None
+
+  _, version_str = stringified_value.split("Dicomnode - Private tags version: ")
+
+  return __reader_functions.get(int(version_str), None)
+
+
+def refresh_dataset_dict(dataset: Dataset):
+  for data_element in dataset:
+    if data_element.is_private and __check_if_tag_is_creator(data_element.tag):
+      read_function  = __get_reader_function(data_element)
+      if read_function is not None:
+        read_function(dataset, data_element)
+
 
 def extrapolate_image_position_patient(
     slice_thickness:float,
@@ -90,7 +141,6 @@ def extrapolate_image_position_patient(
     image_orientation[0] * image_orientation[4] - image_orientation[1] * image_orientation[3],
   ])
 
-  
   position = [numpy.array(initial_position) + (slice_num - image_number) * cross_vector for slice_num in numpy.arange(1,slices + 1, 1, dtype=numpy.float64)]
 
   return [[float(val) for val in pos] for pos in position]
