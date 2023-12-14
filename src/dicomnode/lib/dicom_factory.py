@@ -18,6 +18,7 @@ from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
+from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
@@ -174,9 +175,10 @@ class SeriesElement(VirtualElement):
 # End of static Virtual Elements
 # InstanceBasedVirtual Elements
 
-@dataclass
+@dataclass(slots=True)
 class InstanceEnvironment:
   instance_number: int
+  kwargs : Dict[Any, Any] = field(default_factory=dict)
   header_dataset: Optional[Dataset] = None
   image: Optional[Any] = None # Unmodified image
   factory: Optional['DicomFactory'] = None
@@ -189,41 +191,49 @@ class InstanceVirtualElement(VirtualElement):
   """Represents a virtual element, that is unique per image slice"""
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    raise NotImplemented
+    raise NotImplemented # type: ignore
 
 class SequenceElement(InstanceVirtualElement):
   def __init__(self,
                tag: Union[BaseTag,str, int, Tuple[int, int]],
-               sequence_blueprint: 'Blueprint',
+               sequence_blueprints: Iterable['Blueprint'],
                name: Optional[str] = None) -> None:
     super().__init__(tag, 'SQ', name)
 
-    self._blueprint = sequence_blueprint
-    self._partial_initialized_sequence: Optional[List[
-      Union['InstanceVirtualElement', DataElement]]] = None
+    self._blueprints = sequence_blueprints
+    self._partial_initialized_sequences: Optional[List[List[
+      Union['InstanceVirtualElement', DataElement]]]] = None
 
   def corporealialize(self,
                       factory: 'DicomFactory',
                       parent_datasets: Iterable[Dataset]) -> 'SequenceElement':
-    self._partial_initialized_sequence = []
-    for virtual_element in self._blueprint:
-      corporealialize_value = virtual_element.corporealialize(factory, parent_datasets)
-      if corporealialize_value is not None:
-        self._partial_initialized_sequence.append(corporealialize_value)
+    self._partial_initialized_sequences = []
+    for blueprint in self._blueprints:
+      partial_initialized_sequence = []
+      for virtual_element in blueprint:
+        corporealialize_value = virtual_element.corporealialize(factory, parent_datasets)
+        if corporealialize_value is not None:
+          partial_initialized_sequence.append(corporealialize_value)
+      self._partial_initialized_sequences.append(partial_initialized_sequence)
+
     return self
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    if self._partial_initialized_sequence is None:
+    if self._partial_initialized_sequences is None:
       logger.error("You are attempting to produce from an uninitialized sequence element")
       raise Exception
-    sequence_dataset = []
-    for partial_initialized_data_element in self._partial_initialized_sequence:
-      if isinstance(partial_initialized_data_element, DataElement):
-        sequence_dataset.append(partial_initialized_data_element)
-      else:
-        sequence_dataset.append(partial_initialized_data_element.produce(instance_environment))
 
-    return DataElement(self.tag, 'SQ', Sequence(sequence_dataset))
+    sequence_datasets = []
+    for partial_initialized_sequence in self._partial_initialized_sequences:
+      sequence_dataset = Dataset()
+      for partial_initialized_data_element in partial_initialized_sequence:
+        if isinstance(partial_initialized_data_element, DataElement):
+          sequence_dataset.add(partial_initialized_data_element)
+        else:
+          sequence_dataset.add(partial_initialized_data_element.produce(instance_environment))
+      sequence_datasets.append(sequence_dataset)
+
+    return DataElement(self.tag, 'SQ', Sequence(sequence_datasets))
 
 
 class FunctionalElement(InstanceVirtualElement):
@@ -317,12 +327,12 @@ class Blueprint():
     if virtual_element.is_private:
       if not self.__validatePrivateTags(virtual_element):
         # Logging was done by validate tags
-        return
+        raise IncorrectlyConfigured
       group_id = (tag & 0xFFFF0000) + ((tag >> 8) & 0xFF)
       tag_group = tag & 0xFFFFFF00
       index = len(list(self._dict.irange(tag_group, tag)))
       tag_name = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
-      tag_VR = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
+      tag_VR = tag_group + Reserved_Tags.PRIVATE_TAG_VRS.value
 
       # Check if the Group is allocated
 
@@ -363,8 +373,8 @@ class Blueprint():
       logger.error("Dicom node will automatically allocate private tag ranges")
       return False
 
+    subTag = virtual_element.tag & 0xFF
     for reserved_tag in Reserved_Tags:
-      subTag = virtual_element.tag & 0xFF
       if subTag == reserved_tag.value:
         logger.error("You are trying to add a private tag, that have been reserved by Dicomnode")
         return False
@@ -429,7 +439,7 @@ class DicomFactory(ABC):
   def make_series_header(self,
                   pivot_list: List[Dataset],
                   blueprint: Blueprint,
-                  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
+                  filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
     ) -> SeriesHeader:
     """This function produces a header dataset based on an input datasets.
 
@@ -470,11 +480,16 @@ class DicomFactory(ABC):
   @abstractmethod
   def build_from_header(self,
                   header : SeriesHeader,
-                  image : Any
+                  image : Any,
+                  kwargs : Dict[Any, Any] = {}
     ) -> List[Dataset]:
     raise NotImplementedError #pragma: no cover
 
-  def build(self, pivot: Dataset, blueprint: Blueprint, filling_strategy: FillingStrategy = FillingStrategy.DISCARD) -> Dataset:
+  def build(self,
+            pivot: Dataset, 
+            blueprint: Blueprint, 
+            filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
+            kwargs: Dict[Any, Any] = {}) -> Dataset:
     """Builds a singular dataset from blueprint and pivot dataset
 
     Intended to be used to construct message datasets
@@ -500,7 +515,7 @@ class DicomFactory(ABC):
     for virtual_element in blueprint:
       de = virtual_element.corporealialize(self, [pivot])
       if isinstance(de, InstanceVirtualElement):
-        args = InstanceEnvironment(1)
+        args = InstanceEnvironment(1, kwargs=kwargs)
         de = de.produce(args)
       if de is not None:
         dataset.add(de)

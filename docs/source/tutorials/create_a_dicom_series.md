@@ -132,6 +132,7 @@ from dicomnode.lib.dicom_factory import FunctionalElement
 @dataclass
 class InstanceEnvironment:
   instance_number: int
+  kwargs : Dict[Any, Any] = {}
   header_dataset: Optional[Dataset] = None
   image: Optional[Any] = None # Unmodified image
   factory: Optional['DicomFactory'] = None
@@ -154,6 +155,40 @@ to copy the value of a varying tag. You need to use an InstanceCopyElement.
 **A requirement to using InstanceCopyElement is that the original series has**
 **the InstanceNumber(0020,0013) tag filled!**
 Otherwise the element is similar to a CopyElement
+
+##### SequenceElement
+
+Adding a Sequence to the produced image can be tricky. In the case where you
+know how many Sequence elements that should be created you can use a
+`SequenceElement`, by injecting the tag with a list of blueprint. Each
+blueprint corresponds to member of the Sequence.
+
+```python
+from dicomnode.lib.dicom_factory import SequenceElement
+
+blueprint = Blueprint()
+sequence_blueprint()
+
+```
+
+Dynamic length sequences are a tag more tricky but can created using
+`FunctionalElement`'s:
+
+```python
+from pydicom import Sequence
+from random import randint
+
+def my_sequence_generator(instance_environment: InstanceEnvironment):
+  sequence = [Dataset() for _ in range(randint(1,10))]
+
+  return Sequence(sequence)
+
+blueprint.add_virtual_element(FunctionElement(tag,
+                                              'SQ',
+                                              my_sequence_generator))
+```
+
+You can parse user defined data in by the kwargs value when you build the series.
 
 ### Factories & Default blueprints
 

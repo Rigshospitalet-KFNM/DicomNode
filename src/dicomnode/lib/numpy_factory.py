@@ -65,13 +65,15 @@ class NumpyFactory(DicomFactory):
 
   def build_from_header(self,
                         header : SeriesHeader,
-                        image: ndarray) -> List[Dataset]:
+                        image: ndarray,
+                        kwargs: Dict[Any, Any] = {}) -> List[Dataset]:
     """This construct a dicom series from a header and numpy array containing
     the Image
 
     Args:
-        header (SeriesHeader): _description_
-        image (ndarray): _description_
+        header (SeriesHeader): The header which contains data
+        image (ndarray): The image that will be produced into a dicom series
+        kwargs (Dict[Any, Any]): Keyword arguments that is parsed to InstancedVirtualElement
 
     Raises:
         IncorrectlyConfigured: _description_
@@ -100,6 +102,7 @@ class NumpyFactory(DicomFactory):
           factory=self,
           image=slice,
           total_images = image.shape[0],
+          kwargs=kwargs
         )
 
         # Encoding is done per slice basis
