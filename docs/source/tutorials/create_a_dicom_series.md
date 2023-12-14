@@ -7,121 +7,217 @@ title: Create a dicom series
 
 ## Introduction
 
-It can be just as much of a headache going back to dicom image format, this tutorial showcases the library tools for creating new dicom series.
+Dicom node is a dicom in and dicom out, however in most pipeline you will
+transform the dicom input into some other data format, for processing.
+You will need to transform data back into dicom, which this tutorial is about.
 
-For this you need a header and a specialized factory, both base classes can be found in `dicomnode.lib.dicom_factory`.
+## Building a series
 
-Building a new dicom series happens in three steps.
+### The Blueprint.
 
-1. A `Blueprint` and Specialized `DicomFactory` is given to an AbstractPipeline
-2. A parent dicom Series and a `Blueprint` produce a `SeriesHeader`
-3. A `SeriesHeader` and an image produces the new Dicom Series.
+Try and image you should build a house however, there is still many unknowns:
+The soil, the material, the interior and so fourth. You would start with
+drawing a blueprint, and as more information become available you would make
+the blueprint more and more concrete until you had a house.
+
+This library is in the business of making dicom series, and there's many
+unknowns, but we start by making a blueprint of series, which is found in:
+ `dicomnode.lib.dicom_factory`
+
+```Python
+from dicomnode.lib.dicom_factory import Blueprint
+
+blueprint = Blueprint()
+```
+
+At this point the blueprint is empty or the equivalent to a white paper house
+blueprint. We need to fill it with virtual elements which are equivalent to
+lines in a normal blueprint.
+
+A virtual element describes to construct a single tag in a dicom series. For
+instance, the series description should probably indicate that this image was
+produces by your pipeline and the tag should be set in all images of the dicom
+series. This is done with a `StaticElement`, because we know what should be in
+the tag before our pipeline is even running.
+
+```Python
+# Code continued from earlier example
+from dicomnode.lib.dicom_factory import StaticElement
+
+blueprint.add_virtual_element(
+  StaticElement(0x0008103E, 'LO', 'My pipeline Series Description')
+)
+```
+The arguments are:
+
+* The tag - that should be filled in the dicom series
+* The VR - of the tag
+* The Value - That should be filled in the tag.
+
+#### A Virtual Tag Round tour
+
+The rest of this section will is dedicated to the various types of
+`VirtualElements`. These are the building blocks of a blueprint and should be
+used to fill out your blueprint. Note that you should be look out for similar
+patterns to determine which virtual element you should use.
+
+##### Series Element
+
+With the series description we were lucky because we knew the value beforehand,
+but for some tags we don't. for instance Series Instance UID. For this we need
+a function to produce the value, which then will be shared among all the images
+of the series.
+
+```Python
+
+from dicomnode.lib.dicom_factory import SeriesElement
+from dicomnode.lib.dicom import gen_uid # Generates a UID
+
+blueprint.add_virtual_element(
+  SeriesElement(0x00200000E, 'UI' gen_uid)
+)
+```
+
+##### Copy Element
+
+In the case where you are not fabricating data, you have some input data, which
+is one or more dicom series. You often want to pull values from the that
+series. In that case you would use a `CopyElement`
+
+
+```Python
+
+from dicomnode.lib.dicom_factory import CopyElement
+
+blueprint.add_virtual_element(
+  CopyElement(0x00200010) # Study UID
+)
+```
+
+However sometimes your dicom input pictures many not have this tag available
+and you need to decide if you should continue or abort. By default you'll abort
+but you can add the `optional` key word if you wish to continue.
+
+
+```Python
+
+from dicomnode.lib.dicom_factory import CopyElement
+
+blueprint.add_virtual_element(
+  CopyElement(0x00081030, optional=True) # Study UID
+)
+```
+
+##### Discard Element
+
+Discard elements are element indicating that the element should be discarded.
+To understand why this tag is relevant. Think about all the tags in the input
+dicom series. If a tag isn't present in the Blueprint, how should you proceed?
+
+By default there's two option either copy or discard the missing element. In
+the case you default to copy, but there some tags you know shouldn't be copied.
+You need a discard element to express that wish.
+
+##### FunctionalElement
+
+So far all virtual element produces a value that is shared among the series.
+To get a different value per slice you need to use a functional element.
+
+This function are given a `InstanceEnvironment` as argument which is a
+data class in `dicomnode.lib.dicom_factory`:
+
+```python
+from dicomnode.lib.dicom_factory import FunctionalElement
+
+@dataclass
+class InstanceEnvironment:
+  instance_number: int
+  header_dataset: Optional[Dataset] = None
+  image: Optional[Any] = None # Unmodified image
+  factory: Optional['DicomFactory'] = None
+  intercept: Optional[float] = None
+  slope: Optional[float] = None
+  scaled_image: Optional[Any] = None
+  total_images: Optional[int] = None
+
+def my_function(instance_environment: InstanceEnvironment) -> ...
+  return ...
+
+blueprint.add_virtual_element(FunctionalElement(tag, VR, my_function))
+```
+
+
+##### InstanceCopyElement
+
+Not all dicom tags are the same along the series, and in the case that you need
+to copy the value of a varying tag. You need to use an InstanceCopyElement.
+**A requirement to using InstanceCopyElement is that the original series has**
+**the InstanceNumber(0020,0013) tag filled!**
+Otherwise the element is similar to a CopyElement
+
+### Factories & Default blueprints
+
+So a blueprint is just the idea of a series and you need something to produce
+the series whenever the pipeline is running, this is the purpose of a
+`DicomFactory`. This is a base class which should be specialized to the input
+data. So for instance the `NumpyFactory` is dicom factory witch creates dicom
+series from a numpy array.
+
+These Factories have a default blueprint, which you should be included your
+blueprint. Either by starting out from the blueprint or combining the
+blueprints:
+
+```python
+
+# Note this code doesn't work because DicomFactory is an abstract class
+dicom_factory = DicomFactory()
+# Method 1
+blueprint_1 = dicom_factory.get_default_blueprint()
+... # fill with tags
+
+# Method 2
+blueprint_2 = Blueprint()
+... # fill with tags
+
+blueprint_2 += dicom_factory.get_default_blueprint()
+```
+
+## Building a dicom series in a pipeline
+
+At run time you'll get an intermediate data structure called a `SeriesHeader`.
+Which contains all of the shared information of the input dicom series. This is
+what you'll use to construct the out dicom series.
 
 With the data flow seen can be seen below:
 
 ![Image](./Images/blueprint.drawio.svg)
 
-## Definitions
+To implement a dicom factory and blueprint in a pipeline you need to overwrite
+some tags in the `AbstractPipeline` similar to how is done in:
+[create a pipeline](./create_a_pipeline.md).
 
-* `Blueprint` - A static blueprint for a dicom series
-* `A parent dicom series` - A dicom series, which we want to create a derived series from.
-* `SeriesHeader` - A header for an image, without the image.
-* `Image Data` - Data of some kind, without a dicom header
-* `A new dicom series` - The series you want to create.
-
-All of the actual building is done by a  `DicomFactory`. You need to specialize this factory to handle different types image data.
-
-For instance the `NumpyFactory` converts images represented by a numpy array back to dicom series.
-
-## Building a Blueprint
-
-A blueprint is a collection of tags and some methodology associated with said tag. Which this library represent as a virtual element also found in `dicomnode.lib.dicom_factory`.
-
-### Virtual Elements
-
-By default a virtual element is shared among the entire series, like Patient Name and other such attributes.
-
-The library provides the following build in virtual elements:
-
-* AttributeElement - This reads an attribute from the dicom factory
-* CopyElement - This reads an value from a dataset in the parent series and copies it to all elements in the new series.
-* DiscardElement - This ensures that an element from the parent series is not present in the new Series.
-* SeriesElement - An element which evaluates a function and shares that value with all images in the new series.
-* StaticElement - An element with a predefined value.
-
-### Instanced Virtual Elements
-
-Some tags are not shared in the series like SOPInstanceUID or ImagePositionPatient, and for these tags the library provides the following `InstanceVirtualElements`:
-
-* `FunctionalElement` - A function is evaluated
-* `InstanceCopyElement` - Each value from the parent series is and passed into the new series by InstanceNumber. This element requires that you produce fewer images than the parent series contains as otherwise there would be no value to copy.
-
-Each of the `InstanceVirtualElements` are evaluated using a `InstanceVirtualEnvironment` which contains most information the `InstanceVirtualElements` needs to produce a dicom DataElement.
-
-
-### An Example and Blueprint arithmetic
-
-As an example you can see a simple blueprint, which copies the patient name and sets the series description to "Blueprint Example"
-
-```python
-from dicomnode.lib.dicom_factory import Blueprint, CopyElement, StaticElement
-
-my_blueprint = Blueprint([
-  StaticElement(0x0008103E, 'LO', "Blueprint Example"),
-  CopyElement(0x00100010),
-])
-```
-
-Now a dicom image can easily contain hundreds of tags, so the library contains some pre-build blueprints that concatenate into a bigger blueprint, for instance if you need to add the SOP common module in the new series.
-
-```python
-from dicomnode.lib.dicom_factory import SOP_common_blueprint
-
-new_blueprint = my_blueprint + SOP_common_blueprint
-```
-
-Note that unlike the regular `+` this is not an commutative operation. I.E for some blueprints: `blueprint_1 + blueprint_2 != blueprint_2 + blueprint_1`
-
-Namely this occur when both blueprint contain the same tag, at which point the second arguments tags are dominant.
-
-You can also overwrite tags like a dictionary
-
-```python
-from pydicom.uid import SecondaryCaptureImageStorage
-
-new_blueprint = StaticElement(0x00080016, 'UI', SecondaryCaptureImageStorage)
-```
-
-Ultimately the build-in blueprints are default values and may not be right for your project. Use them as baselines and overwrite them.
-
-### Filling Strategy
-
-A question arises about what to do with tags in the parent series that is not in `Blueprint`, here the `DicomFactory` relies on it's filling strategy, which is just an enum, providing the desired execution path.
-
-The options are:
-
-* `Discard` - The unknown tag is discarded in the new series
-* `Copy` - A representative or pivot is randomly selected from the parent series and copied to the new series
-
-## Building Series in a pipeline
-
-To implement this in a dicomnode you need to overwrite some tags in the `AbstractPipeline` similar to how is done in [create a pipeline](./create_a_pipeline.md).
 
 You need to fill the attributes:
 
-* `dicom_factory: Optional[DicomFactory]` - This is the factory, that is used to create the series header. Note that this object is shared with all threads.
-* `header_blueprint: Optional[Blueprint]` - Blueprint to construct series header from.
+* `dicom_factory: Optional[DicomFactory]` - This is the factory, that is used
+to create the series header. Note that this object is shared with all threads.
+* `header_blueprint: Optional[Blueprint]` - Blueprint to construct series
+header from.
 
 Futhermore there's two Optional Attributes.
 
-* `filling_strategy: FillingStrategy` - FillingStrategy to be used in `SeriesHeader` Creation, defaults to `Discard`
-* `parent_input: Optional[Str]` - Specifies the input to be used as parent, must equal a key in the `input` attribute. If unspecified a random input series is used.
+* `filling_strategy: FillingStrategy` - FillingStrategy to be used in
+`SeriesHeader` Creation, defaults to `Discard`
+* `parent_input: Optional[Str]` - Specifies the input series to be used as
+parent, must equal a key in the `input` attribute. If unspecified a random
+input series is used.
 
-If you have filled these attributes a `SeriesHeader` will be produced and become the `header` attribute of the `InputContainer` in the process function
+If you have filled these attributes in the node, then in the process function
+the `InputContainer` will have an `header` attribute with a `SeriesHeader` that
+you can pass to your `DicomFactory` along with image data to produce a new
+dicom series.
 
-### Example
-
-
+## Example
 
 ```python
 from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, SeriesHeader ...
@@ -129,15 +225,23 @@ from dicomnode.server.nodes import AbstractPipeline
 
 class MyFactory(DicomFactory):
   def build_from_header(series_header: SeriesHeader, image: Any) -> List[Dataset]
-  ...
+    ...
+
+  def get_default_blueprint(self):
+    return Blueprint([
+      ...
+    ])
+
+factory = MyFactory()
 
 blueprint = Blueprint([
   ...
-])
+]) + factory.get_default_blueprint()
+
 
 class MyPipeline(AbstractPipeline):
   ...
-  dicom_factory = MyFactory()
+  dicom_factory = factory
   header_blueprint = blueprint
 
   def process(self, input_container)

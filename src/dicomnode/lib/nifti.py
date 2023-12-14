@@ -72,7 +72,7 @@ class NiftiGrinder(Grinder):
 
 class NiftiFactory(NumpyFactory):
   def build_from_header(self, header: SeriesHeader, image: Nifti1Image) -> List[Dataset]:
-    """Builds a dicom serie from a nifti image and a header
+    """Builds a dicom series from a nifti image and a header
 
     Args:
       header (dicomnode.lib.dicom_factory.SeriesHeader): The container for header information

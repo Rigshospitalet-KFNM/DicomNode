@@ -389,8 +389,11 @@ class DicomFactory(ABC):
   """
 
   def __init__(self) -> None:
-
     self.series_description: str = "Unnamed Pipeline post processing "
+
+
+  def get_default_blueprint(self) -> Blueprint:
+    return Blueprint()
 
   def make_series_header(self,
                   pivot_list: List[Dataset],
