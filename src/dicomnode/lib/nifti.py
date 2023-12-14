@@ -35,7 +35,7 @@ logger = get_logger()
 
 class NiftiGrinder(Grinder):
   INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need \
-    define a valid Path for output_directory"
+ define a valid Path for output_directory"
 
   def __init__(self, output_directory: Optional[Path] = None, reorient_nifti: bool=False) -> None:
 

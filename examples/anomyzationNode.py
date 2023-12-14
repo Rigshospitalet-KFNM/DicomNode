@@ -7,10 +7,14 @@ from dicomnode.server.grinders import DicomTreeGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.output import FileOutput
 
-from pydicom import Dataset
 from pathlib import Path
-from typing import List, Any, Iterator, Callable, Iterable, Dict, Optional, Union
+from typing import List, Optional, Union
+
+# Assume you are unix
+output_directory = Path("/tmp/anno_node")
+output_directory.mkdir(exist_ok=True)
 
 INPUT_ARG = "dataset"
 
@@ -50,7 +54,7 @@ class AnonymizationPipeline(AbstractPipeline):
   # Endpoint configuration
   endpoints: List[Address] = [Address('localhost', 4321, 'STORESCP')]
 
-  def process(self, input_data: InputContainer) -> Iterable[Dataset]:
+  def process(self, input_data: InputContainer) -> FileOutput:
     DT_untyped = input_data[INPUT_ARG]
     if not isinstance(DT_untyped, DicomTree): # This is for satisfying the type checker
       self.logger.critical("Somehow the dicom tree grinder, didn't return a dicomtree")
@@ -59,7 +63,9 @@ class AnonymizationPipeline(AbstractPipeline):
     IM = IdentityMapping(prefix_size=self.prefix_size)
     IM.fill_from_DicomTree(DT)
     DT.map(anonymize_dicom_tree(IM, self.BASE_NAME))
-    return DT
+
+
+    return FileOutput([(output_directory, DT)])
 
   # AnonymizationPipeline definition done
 
