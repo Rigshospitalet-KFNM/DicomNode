@@ -13,8 +13,7 @@ from random import randint
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
 
 # Third Party Library
-import numpy
-from pydicom import DataElement, Dataset
+from pydicom import DataElement, Dataset, Sequence
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
@@ -36,7 +35,6 @@ PRIVATIZATION_VERSION = 1
 class Reserved_Tags(Enum):
   PRIVATE_TAG_NAMES = 0xFE
   PRIVATE_TAG_VRS = 0xFF
-
 
 class VirtualElement(ABC):
   """Represents an element in a blueprint.
@@ -79,6 +77,9 @@ class VirtualElement(ABC):
       logger.warning(f"Virtual Element name is being truncated from {name} to {name[64:]}")
     self.name = name[64:]
 
+  # This function why is this associated with this and not just a free function?
+  # There's also an argument to move this into the dicom factory because then
+  # A user can decide to superclass the method.
   def get_pivot(self, datasets: Iterable[Dataset]) -> Optional[Dataset]:
     dataset = None
     for _dataset in datasets:
@@ -190,6 +191,40 @@ class InstanceVirtualElement(VirtualElement):
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     raise NotImplemented
 
+class SequenceElement(InstanceVirtualElement):
+  def __init__(self,
+               tag: Union[BaseTag,str, int, Tuple[int, int]],
+               sequence_blueprint: 'Blueprint',
+               name: Optional[str] = None) -> None:
+    super().__init__(tag, 'SQ', name)
+
+    self._blueprint = sequence_blueprint
+    self._partial_initialized_sequence: Optional[List[
+      Union['InstanceVirtualElement', DataElement]]] = None
+
+  def corporealialize(self,
+                      factory: 'DicomFactory',
+                      parent_datasets: Iterable[Dataset]) -> 'SequenceElement':
+    self._partial_initialized_sequence = []
+    for virtual_element in self._blueprint:
+      corporealialize_value = virtual_element.corporealialize(factory, parent_datasets)
+      if corporealialize_value is not None:
+        self._partial_initialized_sequence.append(corporealialize_value)
+    return self
+
+  def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
+    if self._partial_initialized_sequence is None:
+      logger.error("You are attempting to produce from an uninitialized sequence element")
+      raise Exception
+    sequence_dataset = []
+    for partial_initialized_data_element in self._partial_initialized_sequence:
+      if isinstance(partial_initialized_data_element, DataElement):
+        sequence_dataset.append(partial_initialized_data_element)
+      else:
+        sequence_dataset.append(partial_initialized_data_element.produce(instance_environment))
+
+    return DataElement(self.tag, 'SQ', Sequence(sequence_dataset))
+
 
 class FunctionalElement(InstanceVirtualElement):
   """Abstract tag. This class represents a tag, that will be
@@ -208,10 +243,7 @@ class FunctionalElement(InstanceVirtualElement):
     return self
 
   def produce(self, caller_args: InstanceEnvironment) -> Optional[DataElement]:
-    value = self.func(caller_args)
-    if value is None:
-      return None
-    return DataElement(self.tag, self.VR, value)
+    return DataElement(self.tag, self.VR, self.func(caller_args))
 
 
 class InstanceCopyElement(InstanceVirtualElement):
@@ -228,7 +260,6 @@ class InstanceCopyElement(InstanceVirtualElement):
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     return DataElement(self.tag, self.VR, self.__instances[instance_environment.instance_number])
-
 
 class Blueprint():
   """Blueprint for a dicom series. A blueprint contains no information on a specific series.
