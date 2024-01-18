@@ -4,10 +4,9 @@ import os
 
 from pathlib import Path
 
-from dicomnode.server.grinders import ManyGrinder, TagGrinder, NumpyGrinder
-from dicomnode.lib.dicom_factory import Blueprint, CopyElement, FillingStrategy, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
+from dicomnode.server.grinders import NumpyGrinder
+from dicomnode.lib.dicom_factory import Blueprint, FillingStrategy, StaticElement, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
 from dicomnode.lib.numpy_factory import NumpyFactory, image_pixel_blueprint
-
 
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import DynamicInput
@@ -21,14 +20,15 @@ DEFAULT_PATH = "/tmp/"
 OUTPUT_PATH = Path(os.environ.get("AVERAGE_NODE_OUTPUT_PATH", default=DEFAULT_PATH))
 
 INPUT_KW = "series"
+factory = NumpyFactory()
 
 blueprint: Blueprint = SOP_common_blueprint \
   + image_plane_blueprint \
   + image_pixel_blueprint \
-  + general_series_blueprint
+  + general_series_blueprint\
+  + factory.get_default_blueprint()
 
-factory = NumpyFactory()
-factory.series_description = "Averaged Image"
+blueprint.add_virtual_element(StaticElement(0x0008103E,'LO', "Averaged Image"))
 
 class SeriesInputs(DynamicInput):
   image_grinder = NumpyGrinder()

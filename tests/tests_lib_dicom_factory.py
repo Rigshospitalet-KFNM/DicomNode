@@ -1,4 +1,8 @@
+
+
 from datetime import datetime, date, time
+from logging import ERROR
+
 
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag
@@ -11,7 +15,7 @@ from dicomnode.lib.dicom import gen_uid
 
 from dicomnode.lib.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
-  InstanceEnvironment
+  InstanceEnvironment, SequenceElement
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
 
 class HeaderBlueprintTestCase(TestCase):
@@ -43,7 +47,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 1:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_id))
       if i == 2:
-        self.assertTrue(False)
+        self.assertTrue(False) # type: ignore
 
   def test_add(self):
     bluer_print = self.blueprint_1 + self.blueprint_2
@@ -56,7 +60,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 1:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_id))
       if i == 2:
-        self.assertTrue(False)
+        self.assertTrue(False) # type: ignore
 
     for i,virtual_element in enumerate(self.blueprint_2):
       if i == 0:
@@ -74,7 +78,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 2:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_sex))
       if i == 3:
-        self.assertTrue(False)
+        self.assertTrue(False) # type: ignore
 
   def test_iadd(self):
     blueprint = Blueprint([
@@ -95,7 +99,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 2:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_sex))
       if i == 3:
-        self.assertTrue(False)
+        self.assertTrue(False) # type: ignore
 
   def test_contains(self):
     self.assertTrue(0x00100010 in self.blueprint_1)
@@ -325,11 +329,41 @@ class DicomFactoryTestClass(TestCase):
 
   def test_overwrite_private_tag(self):
     blueprint = Blueprint()
-    blueprint.add_virtual_element(
-      StaticElement(0x00115000, 'IS', 124, name="name")
-    )
+    blueprint.add_virtual_element(StaticElement(0x00115000, 'IS', 124, name="name"))
 
     blueprint.add_virtual_element(
       StaticElement(0x00115000, 'LO', "A Test string", name="overwritten name")
     )
 
+  def test_attempt_write_reserved_tag(self):
+    blueprint = Blueprint()
+    with self.assertLogs('dicomnode', ERROR) as cm:
+      tag = StaticElement(0x00110050, 'IS', 124, name="name")
+      self.assertRaises(IncorrectlyConfigured,blueprint.add_virtual_element, tag)
+    self.assertIn('ERROR:dicomnode:Dicom node will automatically allocate private tag ranges', cm.output)
+
+    with self.assertLogs('dicomnode', ERROR) as cm:
+      tag = StaticElement(0x001150FE, 'IS', 124, name="name")
+      self.assertRaises(IncorrectlyConfigured,blueprint.add_virtual_element, tag)
+    self.assertIn('ERROR:dicomnode:You are trying to add a private tag, that have been reserved by Dicomnode', cm.output)
+
+    with self.assertLogs('dicomnode', ERROR) as cm:
+      tag = StaticElement(0x001150FF, 'IS', 124, name="name")
+      self.assertRaises(IncorrectlyConfigured,blueprint.add_virtual_element, tag)
+    self.assertIn('ERROR:dicomnode:You are trying to add a private tag, that have been reserved by Dicomnode', cm.output)
+
+  def test_build_a_private_Sequence(self):
+    blueprint = Blueprint()
+    sequence_blueprint = Blueprint()
+    sequence_sequence_blueprint = Blueprint()
+
+    blueprint.add_virtual_element(SequenceElement(0x00115000, [sequence_blueprint], "Sequence 1"))
+    sequence_blueprint.add_virtual_element(SequenceElement(0x00115000, [sequence_sequence_blueprint], "Sequence 2"))
+    sequence_sequence_blueprint.add_virtual_element(StaticElement(0x00135011,'LO', 'Sequence'))
+
+    dataset = Dataset()
+
+    print(self.factory.make_series_header([dataset], blueprint))
+    build_dataset = self.factory.build(dataset, blueprint)
+
+    print(build_dataset)

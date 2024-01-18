@@ -35,7 +35,7 @@ logger = get_logger()
 
 class NiftiGrinder(Grinder):
   INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need \
-    define a valid Path for output_directory"
+ define a valid Path for output_directory"
 
   def __init__(self, output_directory: Optional[Path] = None, reorient_nifti: bool=False) -> None:
 
@@ -71,12 +71,16 @@ class NiftiGrinder(Grinder):
     return return_dir['NII'] # Yeah your documentation is wrong, and you should feel real fucking bad
 
 class NiftiFactory(NumpyFactory):
-  def build_from_header(self, header: SeriesHeader, image: Nifti1Image) -> List[Dataset]:
-    """Builds a dicom serie from a nifti image and a header
+  def build_from_header(self,
+                        header: SeriesHeader,
+                        image: Nifti1Image,
+                        kwargs={}) -> List[Dataset]:
+    """Builds a dicom series from a nifti image and a header
 
     Args:
       header (dicomnode.lib.dicom_factory.SeriesHeader): The container for header information
       image (nibabel.Nifti1Image): Image to be converted into a dicom series.
+      kwargs (Dict[Any, Any]): Keyword arguments that is parsed to InstancedVirtualElement
 
     Returns:
       List[pydicom.Dataset]: Series of Dicom Datasets containing the input image
@@ -87,4 +91,4 @@ class NiftiFactory(NumpyFactory):
     # I have no idea why but a conversion is needed
     # I Need to check test this, and i wrote a util function for this.
     numpy_image = image.get_fdata()
-    return super().build_from_header(header, numpy_image)
+    return super().build_from_header(header, numpy_image, kwargs)
