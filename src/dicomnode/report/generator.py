@@ -89,15 +89,17 @@ class Report(Document):
       file_name: str,
       options = Options()
     ) -> None:
+    self.options = options
+    print(f"Options: {options}", f"Self.options: {self.options}")
     super().__init__(file_name, geometry_options={
-        'tmargin' : self.options.margin_top,
-        'lmargin' : self.options.margin_side
+        'tmargin' : options.margin_top,
+        'lmargin' : options.margin_side
     })
 
-    self.options = options
     self.file_name = file_name
-
-    if self.options.compiler == "default":
+    self.options = options
+    print(f"Options: {options}", f"Self.options: {self.options}")
+    if options.compiler == "default":
       if DICOMNODE_ENV_FONT_PATH in environ:
         self.load_font(environ[DICOMNODE_ENV_FONT_PATH])
       elif self.options.font is not None:
@@ -243,3 +245,5 @@ class Report(Document):
       if table.table_style in [TableStyle.BORDER, TableStyle.TOP_BOTTOM]:
         tab.add_hline()
 
+    def add_plot(self):
+      raise NotImplemented

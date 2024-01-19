@@ -7,6 +7,9 @@ class CouldNotCompleteDIMSEMessage(Exception):
 class InvalidRootDataDirectory(Exception):
   """creating a pipelineTree with invalid root data directory"""
 
+class BlueprintConstructionFailure(Exception):
+  """When you add a tag, that you're not allowed to"""
+
 class HeaderConstructionFailure(Exception):
   """When a DicomFactory fails to construct a header"""
 

@@ -115,13 +115,22 @@ class CMakeBuild(build_ext):
     if not build_temp.exists():
       build_temp.mkdir(parents=True)
 
+    try:
+      subprocess.run(
+        ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
+      )
+      subprocess.run(
+        ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
+      )
+    except:
+      print(f"failed to build {ext.name}")
 
-    subprocess.run(
-      ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
-    )
-    subprocess.run(
-      ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
-    )
+  def copy_extensions_to_source(self) -> None:
+    try:
+      return super().copy_extensions_to_source()
+    except Exception as E:
+      print(f"failed to build {E}")
+
 
 if __name__ == '__main__':
   extensions = [
@@ -129,9 +138,7 @@ if __name__ == '__main__':
   ]
 
   if shutil.which("nvcc"):
-    extensions.append(
-      CMakeExtension("dicomnode._cuda")
-    )
+    extensions.append(CMakeExtension("dicomnode._cuda"))
 
   setup(name='dicomnode',
     version='0.0.4.3',
@@ -144,7 +151,7 @@ if __name__ == '__main__':
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
-      'pydicom>=2.3.1',
+      'pydicom>=2.3.1,<3.0',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
       'typing_extensions>=4.4.0',
