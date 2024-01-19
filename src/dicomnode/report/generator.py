@@ -14,7 +14,7 @@ from shutil import which
 # Third party Packages
 from pydicom import Dataset
 from pylatex import Document, MiniPage, NoEscape, Package, Command, Head, Foot, \
-  PageStyle, StandAloneGraphic, Tabular as LatexTable
+  PageStyle, StandAloneGraphic, Tabular as LatexTable, LineBreak
 from pylatex.utils import bold
 
 # Dicomnode packages
@@ -89,25 +89,25 @@ class Report(Document):
       file_name: str,
       options = Options()
     ) -> None:
-    self.options = options
-    print(f"Options: {options}", f"Self.options: {self.options}")
+    #self.options = options
     super().__init__(file_name, geometry_options={
         'tmargin' : options.margin_top,
-        'lmargin' : options.margin_side
+        'lmargin' : options.margin_side,
+        "includeheadfoot" : True,
+        "head": "40pt"
     })
 
     self.file_name = file_name
-    self.options = options
-    print(f"Options: {options}", f"Self.options: {self.options}")
+    self.__options = options
     if options.compiler == "default":
       if DICOMNODE_ENV_FONT_PATH in environ:
         self.load_font(environ[DICOMNODE_ENV_FONT_PATH])
-      elif self.options.font is not None:
-        self.load_font(self.options.font)
+      elif self.__options.font is not None:
+        self.load_font(self.__options.font)
       else:
         self.compiler = "pdflatex"
     else:
-      self.compiler = self.options.compiler
+      self.compiler = self.__options.compiler
 
     if self.compiler not in compilers:
       raise InvalidLatexCompiler
@@ -153,20 +153,22 @@ class Report(Document):
     """
     header = PageStyle("header")
 
-    with header.create(Head('L')):
-      icon_path = document_header.icon_path
-      # Check if file exists
-      header.append(StandAloneGraphic(filename=icon_path,
-        image_options=NoEscape("width=120px")
-      ))
+    with header.create(Head('L')) as header_left:
+      with header_left.create(MiniPage(width=NoEscape(r"0.49\textwidth"))) as wrapper:
+        icon_path = document_header.icon_path
+        # Check if file exists
+        wrapper.append(StandAloneGraphic(filename=icon_path,
+          image_options=NoEscape("width=120pt")
+        ))
 
-    with header.create(Foot('L')):
-      header.append(f"{document_header.hospital_name}\n")
-      header.append(f"{document_header.department}\n")
-      header.append(f"{document_header.address}\n")
+    with header.create(Head('R')) as header_right:
+      with header_right.create(MiniPage(width=NoEscape("0.49\textwidth"), align='r')) as wrapper:
+        wrapper.append(f"{document_header.hospital_name}\n")
+        wrapper.append(f"{document_header.department}\n")
+        wrapper.append(f"{document_header.address}\n")
 
     self.preamble.append(header)
-    self.change_document_style("header")
+    #self.change_document_style("header")
 
   def add_danish_patient_header(self, patient_header: PatientHeader):
     """Adds a mini page with basic patient information in the danish language

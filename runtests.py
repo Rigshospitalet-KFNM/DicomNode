@@ -8,12 +8,13 @@ from unittest import TextTestRunner, TestSuite, TestLoader
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
-# DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing 
+# DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing
 from tests.helpers import testing_logs
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
+  parser.add_argument("test_regex", default="test", nargs="?")
   parser.add_argument("--verbose", type=int, default=1)
   parser.add_argument("-p", "--performance", action='store_true')
 
@@ -22,7 +23,7 @@ if __name__ == "__main__":
 
   runner = TextTestRunner()
   loader = TestLoader()
-  suite: TestSuite = loader.discover("tests")
+  suite: TestSuite = loader.discover("tests", pattern=f"*{args.test_regex}*.py")
   if args.performance:
     loader.testMethodPrefix = "performance"
     performance_tests = loader.discover("tests")

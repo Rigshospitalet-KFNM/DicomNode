@@ -4,8 +4,8 @@ dist/
 build/
 .coverage
 __pycache__/
+report_data/
 playground/
-src/dicomnode/tests/test_data/*
 *.oft
 .vscode/
 lcov.info
