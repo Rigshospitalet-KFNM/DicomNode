@@ -3,6 +3,7 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from os import environ
@@ -13,12 +14,13 @@ from shutil import which
 
 # Third party Packages
 from pydicom import Dataset
+from pylatex.base_classes import Container
 from pylatex import Document, MiniPage, NoEscape, Package, Command, Head, Foot, \
   PageStyle, StandAloneGraphic, Tabular as LatexTable, LineBreak
 from pylatex.utils import bold
 
 # Dicomnode packages
-from dicomnode.constants import DICOMNODE_ENV_FONT_PATH
+from dicomnode.constants import DICOMNODE_ENV_FONT
 from dicomnode.lib.exceptions import InvalidLatexCompiler, InvalidFont
 from dicomnode.lib.logging import get_logger
 
@@ -32,8 +34,19 @@ compilers: List[str] = [
 
 logger = get_logger()
 
+def add_line(container: Container, *args):
+  for arg in args:
+    container.append(arg)
+  container.append(LineBreak())
+
 @dataclass
-class PatientHeader:
+class LaTeXComponent(ABC):
+  @abstractmethod
+  def append_to(self, document: 'Report'):
+    raise NotImplemented #pragma: ignore
+
+@dataclass
+class PatientHeader(LaTeXComponent):
   patient_name: str
   CPR: str
   study: str
@@ -50,12 +63,49 @@ class PatientHeader:
       date=dicom.StudyDate.strftime("%d/%m/%Y")
     )
 
+  def append_to(self, document: 'Report'):
+    """Adds a mini page with basic patient information in the danish language
+
+    Args:
+        patient_header (PatientHeader): patient header to be added
+    """
+    with document.create(MiniPage(width=NoEscape(r"0.49\textwidth"), align='l')) as mini_page:
+      add_line(mini_page, "Navn: ", bold(self.patient_name))
+      add_line(mini_page, "CPR: ", bold(self.CPR))
+      add_line(mini_page, "Studie: ", bold(self.study))
+      add_line(mini_page, "Serie: ", bold(self.series))
+      add_line(mini_page, "Dato: ", bold(self.date))
+
 @dataclass
-class DocumentHeader:
+class DocumentHeader(LaTeXComponent):
   icon_path: str
   hospital_name: str
   department: str
   address: str
+
+  def append_to(self, document: 'Report'):
+    """Adds a standardized document header to a document
+
+    Args:
+        document (Document): Report that this document header is added to.
+    """
+    header = PageStyle("header", header_thickness='0.5')
+
+    with header.create(Head('L')) as header_left:
+      with header_left.create(MiniPage(width=NoEscape(r"0.49\textwidth"))) as wrapper:
+        icon_path = self.icon_path
+        wrapper.append(StandAloneGraphic(filename=icon_path,
+          image_options=NoEscape("width=120pt")
+        ))
+
+    with header.create(Head('R')) as header_right:
+      with header_right.create(MiniPage(width=NoEscape(r"0.49\textwidth"), pos='r', align='r')) as wrapper:
+        add_line(wrapper, self.hospital_name)
+        add_line(wrapper, self.department)
+        add_line(wrapper, self.address)
+
+    document.preamble.append(header)
+    document.change_document_style("header")
 
 
 @dataclass
@@ -76,6 +126,7 @@ class Table:
   Alignment: List[str] = field(default_factory=list)
   Rows: List[List[str]] = field(default_factory=list)
 
+
 class Report(Document):
   @dataclass
   class Options:
@@ -83,6 +134,12 @@ class Report(Document):
     margin_side: str = "2cm"
     compiler: str = "default"
     font: Optional[str] = None
+
+  def append(self, other):
+    if isinstance(other, LaTeXComponent):
+      other.append_to(self)
+    else:
+      super().append(other)
 
   def __init__(
       self,
@@ -100,8 +157,8 @@ class Report(Document):
     self.file_name = file_name
     self.__options = options
     if options.compiler == "default":
-      if DICOMNODE_ENV_FONT_PATH in environ:
-        self.load_font(environ[DICOMNODE_ENV_FONT_PATH])
+      if DICOMNODE_ENV_FONT in environ:
+        self.load_font(environ[DICOMNODE_ENV_FONT])
       elif self.__options.font is not None:
         self.load_font(self.__options.font)
       else:
@@ -122,7 +179,7 @@ class Report(Document):
       raise InvalidLatexCompiler
 
 
-  def load_font(self, font_path_str: str) -> None:
+  def load_font(self, font: str) -> None:
     """Loads a font into the document
 
     Args:
@@ -132,69 +189,11 @@ class Report(Document):
         InvalidFont: When font is not a oft or tff font
         FileNotFoundError: when font is not found
     """
-    if not (font_path_str.lower().endswith('.oft') or font_path_str.lower().endswith('.ttf')):
-      raise InvalidFont
-
-    font_path = Path(font_path_str)
-
-    if not font_path.exists():
-      logger.error("Font file not found")
-      raise FileNotFoundError()
 
     self.compiler = "xelatex"
     self.packages.append(Package("fontspec"))
-    self.preamble.append(Command("setmainfont",NoEscape(rf"{font_path_str}")))
+    self.preamble.append(Command("setmainfont", NoEscape(rf"{font}"), options=[]))
 
-  def add_document_header(self, document_header: DocumentHeader):
-    """Adds a standardized document header to a document
-
-    Args:
-        document_header (DocumentHeader): header to be added
-    """
-    header = PageStyle("header")
-
-    with header.create(Head('L')) as header_left:
-      with header_left.create(MiniPage(width=NoEscape(r"0.49\textwidth"))) as wrapper:
-        icon_path = document_header.icon_path
-        # Check if file exists
-        wrapper.append(StandAloneGraphic(filename=icon_path,
-          image_options=NoEscape("width=120pt")
-        ))
-
-    with header.create(Head('R')) as header_right:
-      with header_right.create(MiniPage(width=NoEscape("0.49\textwidth"), align='r')) as wrapper:
-        wrapper.append(f"{document_header.hospital_name}\n")
-        wrapper.append(f"{document_header.department}\n")
-        wrapper.append(f"{document_header.address}\n")
-
-    self.preamble.append(header)
-    #self.change_document_style("header")
-
-  def add_danish_patient_header(self, patient_header: PatientHeader):
-    """Adds a mini page with basic patient information in the danish language
-
-    Args:
-        patient_header (PatientHeader): patient header to be added
-    """
-    with self.create(MiniPage(width=NoEscape(r"0.47\textwidth"))):
-      self.append(f"Navn: {bold(patient_header.patient_name)}\n")
-      self.append(f"CPR: {bold(patient_header.CPR)}\n")
-      self.append(f"Studie: {bold(patient_header.study)}\n")
-      self.append(f"Serie: {bold(patient_header.series)}\n")
-      self.append(f"Dato: {bold(patient_header.date)}\n")
-
-  def add_patient_header(self, patient_header: PatientHeader):
-    """Adds a mini page with basic patient information
-
-    Args:
-        patient_header (PatientHeader): patient header to be added
-    """
-    with self.create(MiniPage(width=NoEscape(r"0.47\textwidth"))):
-      self.append(f"Name: {bold(patient_header.patient_name)}\n")
-      self.append(f"ID: {bold(patient_header.CPR)}\n")
-      self.append(f"Study: {bold(patient_header.study)}\n")
-      self.append(f"Series: {bold(patient_header.series)}\n")
-      self.append(f"Date: {bold(patient_header.date)}\n")
 
   def add_conclusion(self, conclusion: Conclusion):
     """_summary_

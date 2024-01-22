@@ -29,7 +29,7 @@ class GeneratorTestCase(TestCase):
   def test_report_header(self):
     dataset = Dataset()
 
-    dataset.PatientName = "Familiy Name^Test name"
+    dataset.PatientName = r"Familiy Name^Test name"
     dataset.PatientID = "XXXXXX-XXXX"
     dataset.StudyDescription = "Study Test"
     dataset.SeriesDescription = "Series Test"
@@ -48,13 +48,14 @@ class GeneratorTestCase(TestCase):
     test_header_doc = f"{library_paths.report_directory}/test_doc"
 
     report = generator.Report(test_header_doc)
-    report.add_document_header(document_header) # This is a problematic design
-    report.add_danish_patient_header(patient_header)
+    report.append(document_header)
+    report.append(patient_header)
     report.generate_tex()
 
     with open(f"{test_header_doc}.tex",'r') as fp:
       raw_tex_content = fp.read()
       print(raw_tex_content)
 
-    report.generate_pdf()
+    report.generate_pdf(compiler='xelatex')
+
 
