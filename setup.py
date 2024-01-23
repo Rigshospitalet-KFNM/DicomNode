@@ -157,10 +157,11 @@ if __name__ == '__main__':
       'typing_extensions>=4.4.0',
       'pylatex[matrices, matplotlib]',
       'pybind11>=2.10.3',
+      "nibabel",
+      "dicom2nifti"
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],
-     "nifti" : ["nibabel", "dicom2nifti"],
     },
     python_requires='>=3.9.1',
     entry_points={

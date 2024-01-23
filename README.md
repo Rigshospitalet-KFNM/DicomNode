@@ -18,6 +18,19 @@ Using apt:
 To install this library
 > `pip install git+https://github.com/Rigshospitalet-KFNM/DicomNode.git`
 
+### Reports
+
+The generated reports use Latex to compile pdf reports. This is done using
+defaults for pylatex which rely on installed latex compilers.
+
+To install compilers
+
+Using apt:
+> `sudo apt install texlive`
+
+If you are using custom fonts:
+
+> `sudo apt install texlive-xetex`
 
 ## Toolkit Usage
 

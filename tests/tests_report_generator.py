@@ -1,6 +1,7 @@
 """Test cases for generating latex report
 
 In general the test case will be checked on the generated LaTeX code.
+Test results can be found in /tmp/dicomnode
 """
 
 # Python3 Standard Library imports
@@ -9,11 +10,15 @@ from pathlib import Path
 from unittest import TestCase
 
 # Third party imports
+import nibabel
 from pydicom import Dataset
 
 # Dicomnode Imports
 from dicomnode import library_paths
 from dicomnode.report import generator
+from dicomnode.report.plot import TriplePlot
+
+nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
 
 class GeneratorTestCase(TestCase):
   def test_empty_report(self):
@@ -46,10 +51,13 @@ class GeneratorTestCase(TestCase):
     )
 
     test_header_doc = f"{library_paths.report_directory}/test_doc"
+    triple_plot = TriplePlot(f"{library_paths.figure_directory}/report_figure.png", nifti_image)
 
     report = generator.Report(test_header_doc)
     report.append(document_header)
     report.append(patient_header)
+    report.append(triple_plot)
+
     report.generate_tex()
 
     with open(f"{test_header_doc}.tex",'r') as fp:
