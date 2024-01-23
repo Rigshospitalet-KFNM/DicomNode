@@ -89,7 +89,7 @@ class DocumentHeader(LaTeXComponent):
     Args:
         document (Document): Report that this document header is added to.
     """
-    header = PageStyle("header", header_thickness='0.5')
+    header = PageStyle("header", header_thickness=1)
 
     with header.create(Head('L')) as header_left:
       with header_left.create(MiniPage(width=NoEscape(r"0.49\textwidth"))) as wrapper:
