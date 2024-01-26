@@ -5,11 +5,7 @@ and get the version
 from os import environ
 from pathlib import Path
 
-from . import lib
-from . import tools
-from . import server
 from . import constants
-from . import report
 
 __version__ = constants.DICOMNODE_VERSION # This is gonna be annoying
 __author__ = "Christoffer Vilstrup Jensen"
@@ -77,3 +73,9 @@ class _LibraryPaths:
       path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
 
 library_paths = _LibraryPaths()
+
+from . import lib
+from . import tools
+from . import server
+
+from . import report
