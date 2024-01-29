@@ -17,3 +17,4 @@ general help on writing maintainable programs.
     configuration_overview
     create_a_pipeline
     create_a_dicom_series
+    building_a_report

@@ -1,5 +1,6 @@
 # Python standard Library
 from dataclasses import dataclass, field
+from typing import List, Union
 
 # Third party packages
 from pydicom import Dataset
@@ -13,7 +14,7 @@ from dicomnode.report.base_classes import LaTeXComponent
 @dataclass
 class ReportHeader(LaTeXComponent):
   icon_path: str
-  lines : field(default_factory=list)
+  lines: List[Union[str, StandAloneGraphic, LaTeXComponent]] = field(default_factory=list)
 
   def append_to(self, document: 'report.Report'):
     """Adds a standardized document header to a document

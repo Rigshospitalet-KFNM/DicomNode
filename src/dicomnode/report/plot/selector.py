@@ -1,5 +1,5 @@
 # Python Standard Library
-from typing import Sequence
+from typing import Sequence, Union
 
 # Third party Packages
 import numpy
@@ -8,7 +8,7 @@ import numpy
 from dicomnode.report.base_classes import Selector
 
 class PercentageSelector(Selector):
-  def __init__(self, percentage = 50):
+  def __init__(self, percentage: Union[float, int] = 50):
     super().__init__()
     if isinstance(percentage, int):
       self.percentage = percentage / 100
@@ -27,7 +27,7 @@ class AverageSelector(Selector):
 
     for index, image in enumerate(images):
       image_average = numpy.mean(image)
-      if pivot_average < image_average:
+      if pivot_average < image_average: # type: ignore # Yeah this warning is fucking stupid
         pivot = image
         pivot_index = index
         pivot_average = image_average

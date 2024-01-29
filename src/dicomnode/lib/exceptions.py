@@ -39,3 +39,6 @@ class InvalidFont(Exception):
 
 class InvalidPynetdicomEvent(Exception):
   """When a pynetdicom event is belongs to an unexcepted type"""
+
+class MissingNiftiImage(Exception):
+  """When a nibabel Nifti image doesn't contain an image"""

@@ -78,9 +78,12 @@ class Plot(LaTeXComponent):
         val = self + val
       return val
 
-  def __init__(self, file_path = None) -> None:
+  def __init__(self, figure: Optional[Figure] = None, file_path = None) -> None:
     self._file_path = file_path
-    self._figure = Figure()
+    if figure is None:
+      self._figure = Figure()
+    else:
+      self._figure = figure
 
   @property
   def figure(self):
@@ -89,9 +92,9 @@ class Plot(LaTeXComponent):
   @property
   def file_path(self) -> Path:
     if self._file_path is None:
-      self._file_path = Path(library_paths.figure_directory / (self.__class__.__name__ + str(uuid4())) + '.png')
-    if isinstance(self._file_path, Path):
-      self._file_path = Path(self.file_path)
+      self._file_path = Path(library_paths.figure_directory / (self.__class__.__name__ + str(uuid4()) + '.png'))
+    elif not isinstance(self._file_path, Path):
+      self._file_path = Path(self._file_path)
     return self._file_path
 
   def append_to(self, document: Report):

@@ -8,6 +8,7 @@ import platform as _platform
 from shutil import which as _which
 
 # Third party packages
+from pydicom import Dataset
 from pylatex import Command as _Command, Document as _Document, LineBreak as _LineBreak, NoEscape as _NoEscape, Package as _Package
 from pylatex.base_classes import Container as _Container
 
@@ -70,15 +71,15 @@ class Report(_Document):
     if options.compiler == base_classes.LaTeXCompilers.DEFAULT:
       if _DICOMNODE_ENV_FONT in _environ:
         # load_font sets self.compiler
-        self.__load_font(_environ[_DICOMNODE_ENV_FONT])
+        self.__load_font(_environ[_DICOMNODE_ENV_FONT]) # pragma: no cover
       elif self.__options.font is not None:
-        self.__load_font(self.__options.font)
+        self.__load_font(self.__options.font) # pragma: no cover
       else:
-        self.__compiler = base_classes.LaTeXCompilers.PDFLATEX
+        self.__compiler = base_classes.LaTeXCompilers.PDFLATEX # pragma: no cover
     else:
-      self.__compiler = self.__options.compiler
+      self.__compiler = self.__options.compiler # pragma: no cover
 
-    if _which(self.__compiler.value) is None:
+    if _which(self.__compiler.value) is None: # pragma: no cover
       logger.error(f"{self.__compiler} is not found in PATH, Either install it or update your PATH environment variable")
       if _platform.system() == 'Linux':
         logger.error("Dependant on your Linux distribution you can install the needed compiler with:")
@@ -90,7 +91,12 @@ class Report(_Document):
     logger = _get_logger()
     logger.info(f"Calling with compiler: {self.__compiler.value}")
     # Note that the super class will read from class
-    return super().generate_pdf(filepath, clean=clean, clean_tex=clean_tex, compiler=self.__compiler.value, compiler_args=compiler_args, silent=silent)
+    return super().generate_pdf(filepath,
+                                clean=clean,
+                                clean_tex=clean_tex,
+                                compiler=self.__compiler.value,
+                                compiler_args=compiler_args,
+                                silent=silent)
 
   def __load_font(self, font: str) -> None:
     """Loads a font into the document
@@ -102,14 +108,14 @@ class Report(_Document):
         InvalidFont: When font is not a oft or tff font
         FileNotFoundError: when font is not found
     """
-
-    self.__compiler = base_classes.LaTeXCompilers.XELATEX
-    self.packages.append(_Package("fontspec", options=[_NoEscape("no-math")]))
-    self.packages.append(_Package("mathspec"))
-    self.preamble.append(_Command("setmainfont", _NoEscape(rf"{font}"), options=[]))
-    self.preamble.append(_Command("setsansfont", _NoEscape(rf"{font}"), options=[]))
-    self.preamble.append(_Command("setmonofont", _NoEscape(rf"{font}"), options=[]))
-    self.preamble.append(_Command("setmathfont", _NoEscape(rf"{font}"), options=[]))
+    # Note this function is not covered as it's dependant on environment
+    self.__compiler = base_classes.LaTeXCompilers.XELATEX # pragma: no cover
+    self.packages.append(_Package("fontspec", options=[_NoEscape("no-math")])) # pragma: no cover
+    self.packages.append(_Package("mathspec")) # pragma: no cover
+    self.preamble.append(_Command("setmainfont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
+    self.preamble.append(_Command("setsansfont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
+    self.preamble.append(_Command("setmonofont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
+    self.preamble.append(_Command("setmathfont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
 
 # Dicomnode packages
 from . import plot

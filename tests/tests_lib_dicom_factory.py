@@ -1,22 +1,23 @@
+__author__ = "Christoffer Vilstrup Jensen"
 
-
+# Python Standard Library
 from datetime import datetime, date, time
 from logging import ERROR
 
-
+# Third Party Modules
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag
 from pydicom.uid import SecondaryCaptureImageStorage
 from typing import Any, List
 from unittest import TestCase
 
+# Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.dicom import gen_uid
-
 from dicomnode.lib.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
   InstanceEnvironment, SequenceElement
-from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured, HeaderConstructionFailure
 
 class HeaderBlueprintTestCase(TestCase):
   def setUp(self) -> None:
@@ -47,7 +48,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 1:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_id))
       if i == 2:
-        self.assertTrue(False) # type: ignore
+        self.assertTrue(False) # pragma: no cover
 
   def test_add(self):
     bluer_print = self.blueprint_1 + self.blueprint_2
@@ -60,7 +61,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 1:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_id))
       if i == 2:
-        self.assertTrue(False) # type: ignore
+        self.assertTrue(False) # pragma: no cover
 
     for i,virtual_element in enumerate(self.blueprint_2):
       if i == 0:
@@ -68,7 +69,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 1:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_sex))
       if i == 2:
-        self.assertTrue(False)
+        self.assertTrue(False) # pragma: no cover
 
     for i,virtual_element in enumerate(bluer_print):
       if i == 0:
@@ -78,7 +79,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 2:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_sex))
       if i == 3:
-        self.assertTrue(False) # type: ignore
+        self.assertTrue(False) # pragma: no cover
 
   def test_iadd(self):
     blueprint = Blueprint([
@@ -99,7 +100,7 @@ class HeaderBlueprintTestCase(TestCase):
       if i == 2:
         self.assertEqual(id(virtual_element), id(self.virtual_patient_sex))
       if i == 3:
-        self.assertTrue(False) # type: ignore
+        self.assertTrue(False) # pragma: no cover
 
   def test_contains(self):
     self.assertTrue(0x00100010 in self.blueprint_1)
@@ -166,7 +167,7 @@ class HeaderTestCase(TestCase):
       if i == 0:
         self.assertEqual(id(self.de_1), id(tag))
       else:
-        self.assertTrue(False)
+        self.assertTrue(False) # pragma: no cover
 
   def test_header_InvalidTagType(self):
     self.assertRaises(InvalidTagType, self.header.add_tag,StaticElement(0x00100010, 'PN', 'Face^Mace^To'))
@@ -176,6 +177,14 @@ class HeaderTestCase(TestCase):
 
   def test_header_set_element(self):
     self.header[0x00100010] = self.de_1
+
+  def test_virtual_name_truncated_name(self):
+    CopyElement(0x10110011, name="a" * 65)
+
+  def test_static_element_string(self):
+    self.assertEqual(str(StaticElement(0x00100010, 'PN', 'Test Name')), 
+                     "<StaticElement: (0010, 0010) PN Test Name>")
+
 
 class testFactory(DicomFactory):
   def build_from_header(self, header: SeriesHeader, image: Any) -> List[Dataset]:
@@ -362,8 +371,53 @@ class DicomFactoryTestClass(TestCase):
     sequence_sequence_blueprint.add_virtual_element(StaticElement(0x00135011,'LO', 'Sequence'))
 
     dataset = Dataset()
-
-    print(self.factory.make_series_header([dataset], blueprint))
     build_dataset = self.factory.build(dataset, blueprint)
 
-    print(build_dataset)
+  def test_corporealialize_into_nothing(self):
+    ce = CopyElement(0x00100010)
+    self.assertRaises(ValueError, ce.corporealialize, self.factory, [])
+
+  def test_header_string(self):
+    datasets = []
+
+    for dataset_index in reversed(range(1,11,1)):
+      dataset = Dataset()
+      dataset.InstanceNumber = dataset_index
+      dataset.ImagePositionPatient = [0,0,dataset_index - 1]
+      datasets.append(dataset)
+
+    blueprint = Blueprint([
+      FunctionalElement(0x00200013, 'IS', _add_InstanceNumber),
+      InstanceCopyElement(0x00200032, 'DS')
+    ])
+
+    header = self.factory.make_series_header(datasets, blueprint)
+    self.assertEqual(str(header), "SeriesHeader with 2 tags:\n    Tag: (0020, 0013) - FunctionalElement\n    Tag: (0020, 0032) - InstanceCopyElement\n")
+
+  def test_get_default_blueprint(self):
+    self.assertIsInstance(self.factory.get_default_blueprint(), Blueprint)
+
+  def test_get_series_header_empty_series(self):
+    self.assertRaises(ValueError, self.factory.make_series_header, [], self.factory.get_default_blueprint())
+
+  def test_make_series_header_fails_to_copy(self):
+    dataset = Dataset()
+    #dataset.PatientName = "TestName"
+
+    blueprint = Blueprint()
+    blueprint.add_virtual_element(CopyElement(0x00100010))
+
+    self.assertRaises(HeaderConstructionFailure,self.factory.make_series_header, [dataset], blueprint)
+
+  def test_factory_build_with_copy(self):
+    dataset = Dataset()
+    dataset.PatientName = "TestName"
+    dataset.PatientID = "12345678"
+
+    blueprint = Blueprint()
+    blueprint.add_virtual_element(CopyElement(0x00100010))
+
+    build_dataset = self.factory.build(dataset, blueprint, filling_strategy=FillingStrategy.COPY)
+    self.assertIn(0x00100010, build_dataset)
+    self.assertIn(0x00100020, build_dataset)
+

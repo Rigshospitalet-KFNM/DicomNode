@@ -22,6 +22,7 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
+from dicomnode.report import Report
 
 logger = get_logger()
 
@@ -111,8 +112,8 @@ class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
   original dataset, Throws an error is element is missing"""
 
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], Optional: bool = False) -> None:
-    self.tag: BaseTag = Tag(tag)
+  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], Optional: bool = False, name: Optional[str] = None) -> None:
+    super().__init__(tag, '', name)
     self.Optional = Optional
 
   def corporealialize(self, _factory: 'DicomFactory', datasets: Iterable[Dataset]) -> Optional[DataElement]:
@@ -148,6 +149,9 @@ class StaticElement(VirtualElement, Generic[T]):
 
   def corporealialize(self, _factory: 'DicomFactory', _datasets: Iterable[Dataset]) -> DataElement:
     return DataElement(self.tag, self.VR, self.value)
+
+  def __str__(self):
+    return f"<StaticElement: {self.tag} {self.VR} {self.value}>"
 
 class SeriesElement(VirtualElement):
   """This virtual element is instantiated when the header is created
@@ -191,7 +195,7 @@ class InstanceVirtualElement(VirtualElement):
   """Represents a virtual element, that is unique per image slice"""
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    raise NotImplemented # type: ignore
+    raise NotImplemented # pragma: no cover
 
 class SequenceElement(InstanceVirtualElement):
   def __init__(self,
@@ -330,7 +334,7 @@ class Blueprint():
         raise IncorrectlyConfigured
       group_id = (tag & 0xFFFF0000) + ((tag >> 8) & 0xFF)
       tag_group = tag & 0xFFFFFF00
-      index = len(list(self._dict.irange(tag_group, tag)))
+      index = len(list(self._dict.irange(tag_group, tag))) - 1
       tag_name = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
       tag_VR = tag_group + Reserved_Tags.PRIVATE_TAG_VRS.value
 
@@ -520,6 +524,9 @@ class DicomFactory(ABC):
       if de is not None:
         dataset.add(de)
     return dataset
+  
+  def encode_pdf(self, report: Report):
+    pass
 
 ###### Header function ######
 

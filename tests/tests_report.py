@@ -6,7 +6,6 @@ Test results can be found in /tmp/dicomnode
 
 # Python3 Standard Library imports
 from datetime import datetime as DateTime
-from pathlib import Path
 from unittest import TestCase
 
 # Third party imports
@@ -16,7 +15,7 @@ from pydicom import Dataset
 # Dicomnode Imports
 from dicomnode import library_paths
 from dicomnode.report import Report
-from dicomnode.report.latex_components import PatientInformation, ReportHeader
+from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 
 from dicomnode.report.plot.triple_plot import TriplePlot
 
@@ -41,31 +40,33 @@ class GeneratorTestCase(TestCase):
     dataset.StudyDescription = "Study Test"
     dataset.SeriesDescription = "Series Test"
     dataset.StudyDate = DateTime(2020,1,23)
+    dataset.InstitutionalDepartmentName = "Department"
+    dataset.InstitutionName = "Hospital"
+    dataset.InstitutionAddress = "Department address"
 
     patient_header = PatientInformation.from_dicom(dataset)
 
 
-    document_header = ReportHeader(
+    document_header = ReportHeader.from_dicom(
       icon_path=f"{library_paths.report_data_directory}/report_image.png",
-      lines=["test_hospital", "test department", "Test address"]
+      dataset=dataset
     )
 
     test_header_doc = f"{library_paths.report_directory}/test_doc"
     triple_plot_options = TriplePlot.Options(file_path=f"{library_paths.figure_directory}/report_figure.png")
-
     triple_plot = TriplePlot(nifti_image, triple_plot_options)
+
+    table = Table(Table.TableStyle.FULL, Alignment=['l', 'c', 'r'], Rows=[
+      ["Hello", "World", "I should put a grafic in here"],
+      ["Hello", "World", "I should put a grafic in here"],
+    ])
 
     report = Report(test_header_doc)
     report.append(document_header)
     report.append(patient_header)
     report.append(triple_plot)
-
-    report.generate_tex()
-
-    with open(f"{test_header_doc}.tex",'r') as fp:
-      raw_tex_content = fp.read()
-      print(raw_tex_content)
-
+    report.append(table)
+    #report.generate_tex()
     report.generate_pdf()
 
 

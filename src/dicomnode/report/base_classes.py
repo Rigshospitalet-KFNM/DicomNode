@@ -30,7 +30,7 @@ class LaTeXComponent(ABC):
 
   @classmethod
   def from_dicom(cls):
-    raise NotImplemented
+    raise NotImplemented # pragma: no cover
 
 class Selector(ABC):
   def __init__(self):
