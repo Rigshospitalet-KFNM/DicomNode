@@ -66,7 +66,11 @@ class GeneratorTestCase(TestCase):
     report.append(patient_header)
     report.append(triple_plot)
     report.append(table)
-    #report.generate_tex()
+    report.generate_tex()
+
+    with open(report.file_name + '.tex') as fp:
+      print(fp.read())
+
     report.generate_pdf()
 
 

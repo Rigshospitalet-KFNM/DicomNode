@@ -7,11 +7,12 @@ from dataclasses import dataclass
 
 # Third party Packages
 from pydicom import Dataset
-from pylatex import MiniPage, NoEscape
+from pylatex import MiniPage, NoEscape, Package
 from pylatex.utils import bold
 
 # Dicomnode Packages
-from dicomnode import report
+from dicomnode.report import Report, add_line
+from dicomnode.report.pylatex_extensions.framed import Framed
 from dicomnode.report.base_classes import LaTeXComponent
 
 @dataclass
@@ -32,15 +33,18 @@ class PatientInformation(LaTeXComponent):
       date=dicom.StudyDate.strftime("%d/%m/%Y")
     )
 
-  def append_to(self, document: 'report.Report'):
+  def append_to(self, report: Report):
     """Adds a mini page with basic patient information in the danish language
 
     Args:
         patient_header (PatientHeader): patient header to be added
     """
-    with document.create(MiniPage(width=NoEscape(r"0.49\textwidth"), align='l')) as mini_page:
-      report.add_line(mini_page, "Navn: ", bold(self.patient_name))
-      report.add_line(mini_page, "CPR: ", bold(self.CPR))
-      report.add_line(mini_page, "Studie: ", bold(self.study))
-      report.add_line(mini_page, "Serie: ", bold(self.series))
-      report.add_line(mini_page, "Dato: ", bold(self.date))
+
+
+    with report.create(Framed()) as frame:
+      with frame.create(MiniPage(width=NoEscape(r"0.49\textwidth"), align='l')) as mini_page:
+        add_line(mini_page, "Navn: ", bold(self.patient_name))
+        add_line(mini_page, "CPR: ", bold(self.CPR))
+        add_line(mini_page, "Studie: ", bold(self.study))
+        add_line(mini_page, "Serie: ", bold(self.series))
+        add_line(mini_page, "Dato: ", bold(self.date))

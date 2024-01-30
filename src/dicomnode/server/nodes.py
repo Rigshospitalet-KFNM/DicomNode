@@ -417,7 +417,6 @@ class AbstractPipeline():
     """
     self.logger.info(f"Processing {patient_id}")
     try:
-
       result = self.process(patient_input_container)
     except Exception as exception:
       log_traceback(self.logger, exception, "processing")
@@ -612,7 +611,6 @@ class AbstractQueuedPipeline(AbstractPipeline):
     return super().close()
 
 
-
 class AbstractThreadedPipeline(AbstractPipeline):
   """Pipeline that creates threads to handle storing,
   """
@@ -628,7 +626,7 @@ class AbstractThreadedPipeline(AbstractPipeline):
     return 0x0000
 
   def join_threads(self, assoc_name:Optional[int] = None) -> None:
-    """_summary_
+    """closes all storing threads
 
     Args:
         assoc_name (Optional[int], optional): _description_. Defaults to None.

@@ -1,11 +1,20 @@
 # Building a report
 
+## Disclaimer
+
+Most of these code example will not work out of the box and might require you
+to extract various values.
+
 ## Motivation
 
 Dicomnode uses pyLaTeX and therefore LaTex as the underlying engine for its
 report generation. This grants the freedoms that the user can make any report
 that they desire, while at the same time open the window for standardization
 with build in components.
+
+Note that PyLaTeX and this library have very philosophies about each of its
+classes. PyLaTeX maps each of the it's classes to LaTeX commands/environments
+while dicomnode uses it classes to be blueprints.
 
 ## Starting point
 
@@ -26,7 +35,7 @@ class MyPipeline(AbstractPipeline):
 
     # Factory
     modeled_datasets = self.dicom_factory.build_from_header(input_data.header, blueprint)
-    encoded_report = self.dicom_factory.encode_pdf(report)
+    encoded_report = self.dicom_factory.encode_pdf(report, modeled_datasets)
 
     return DicomOutput([(PACS_ADDRESS, modeled_dataset), (PACS_ADDRESS, encoded_report)])
 ```
@@ -61,25 +70,37 @@ which leads to some bugs witch is dependant on the environment.
 
 The next thing is that files needs a directory to be in. Dicomnode have a
 couple of paths that is needed. These paths can be controlled with Environment
-variables.
+variables and stored in the `dicomnode.library_paths`.
 
-* working_directory
-* report_directory
-* report_data_directory
-* figure_directory
+* (Python Attribute) - (Environment variable) - (default)
+* processing_directory - DICOMNODE_ENV_PROCESSING_PATH - /tmp/dicomnode/
+* report_directory - DICOMNODE_ENV_REPORT_PATH - /tmp/dicomnode/report
+* report_data_directory - DICOMNODE_ENV_REPORT_DATA_PATH - /tmp/dicomnode/report_data
+* figure_directory - DICOMNODE_ENV_FIGURE_PATH - /tmp/dicomnode/figures
+
+The processing directory is the directory that a dicomnode uses a root for
+relative paths. I recommend this directory is clean as this can make it
+explicit which files are needed, and therefore make it easier to deploy the
+node in a different environment.
+
+The Report directory is the directory that reports could be compiled to.
+Note that LaTeX produces several auxiliary files for compilation. PyLaTex
+cleans these files up after a successful compilation, but leaves them if a
+compilation have failed.
+
+The Report data directory is a directory you can place files needed for report
+compilation. Examples are .sty files or static images.
+
+The figure directory is a directory intended to put your matplotlib figures in.
 
 ### What Dicomnode does for you
 
-So you could just use PyLaTeX yourself or some other package to produce the pdf
-document, however there's value in standardization. So I recommend using the
-library components over rolling your own.
+Dicomnode provides: A Report base class, some build in plots and components
+that you can use or can inspire you to write your own components.
 
-The second thing is that DIMSE cannot handle raw pdf or tex files, they need to
-be encoded into a dicom object before it can be send. This is what the
-`encode_pdf` method does for you. Note that you might need to update some
-information
-
-
+Dicom transfer mechanism (DIMSE) cannot handle raw pdf or tex files, they need
+to be encoded into a dicom object before it can be send. This is what the
+`encode_pdf` method does for you.
 
 ## Dicomnode Report generation
 
@@ -89,17 +110,36 @@ recommend building a report.
 ### Report
 
 So to start with we need the root object that we use to contain all the other
-objects.
+objects. For this we use the document, we can add content to it by using the
+append method or the create method.
 
 ```Python
+from pylatex import Section, MiniPage
 
 from dicomnode.report import Report
 
 # Rest of the pipeline
 
 def generate_report(images, input_data):
-  report = Report(f'{}')
+  # Notice lack of file extension as the libraries handle thi
+  report = Report(f'{PatientID}')
+
+  report.append(Section('This is the first section')) # The first method
+
+  with report.create(MiniPage()) as mini_page:
+    ... # Fill the mini page with content
+
+  ... # Rest of Report generation
+
+  return report
 ```
 
+### Patient Information
+
+This component displays relevant patient information
+
+### Report Header
+
+### Table
 
 

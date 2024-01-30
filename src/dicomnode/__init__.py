@@ -56,12 +56,12 @@ class _LibraryPaths:
   def update_paths(self):
     """_summary_
     """
-    self.__set_directory_path('_working_directory', constants.DICOMNODE_ENV_WORKING_PATH, constants.DEFAULT_WORKING_DIRECTORY)
-    self.__set_directory_path('_report_directory', constants.DICOMNODE_ENV_REPORT_PATH, constants.DEFAULT_REPORTS_DIRECTORY)
-    self.__set_directory_path('_report_data_directory', constants.DICOMNODE_ENV_REPORT_DATA_PATH, constants.DEFAULT_REPORT_DATA_DIRECTORY)
-    self.__set_directory_path('_figure_directory', constants.DICOMNODE_ENV_FIGURE_PATH, constants.DEFAULT_FIGURE_DIRECTORY)
+    self.set_directory_path('_processing_directory', constants.DICOMNODE_ENV_PROCESSING_PATH, constants.DEFAULT_PROCESSING_DIRECTORY)
+    self.set_directory_path('_report_directory', constants.DICOMNODE_ENV_REPORT_PATH, constants.DEFAULT_REPORTS_DIRECTORY)
+    self.set_directory_path('_report_data_directory', constants.DICOMNODE_ENV_REPORT_DATA_PATH, constants.DEFAULT_REPORT_DATA_DIRECTORY)
+    self.set_directory_path('_figure_directory', constants.DICOMNODE_ENV_FIGURE_PATH, constants.DEFAULT_FIGURE_DIRECTORY)
 
-  def __set_directory_path(self, key: str, environment_key, default):
+  def set_directory_path(self, key: str, environment_key, default):
     if environment_key in environ:
       path = Path(environ[environment_key])
       setattr(self, key, path)
@@ -77,5 +77,4 @@ library_paths = _LibraryPaths()
 from . import lib
 from . import tools
 from . import server
-
 from . import report

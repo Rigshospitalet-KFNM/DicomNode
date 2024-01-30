@@ -8,12 +8,14 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 from inspect import getfullargspec
+from pathlib import Path
 from pprint import pformat
 from random import randint
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
 
 # Third Party Library
 from pydicom import DataElement, Dataset, Sequence
+from pydicom.uid import EncapsulatedPDFStorage
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
@@ -33,6 +35,13 @@ class FillingStrategy(Enum):
   COPY = 1
 
 PRIVATIZATION_VERSION = 1
+
+def get_pivot(datasets: Iterable[Dataset]) -> Optional[Dataset]:
+  dataset = None
+  for _dataset in datasets:
+    dataset = _dataset
+    break
+  return dataset
 
 class Reserved_Tags(Enum):
   PRIVATE_TAG_NAMES = 0xFE
@@ -79,16 +88,6 @@ class VirtualElement(ABC):
       logger.warning(f"Virtual Element name is being truncated from {name} to {name[64:]}")
     self.name = name[64:]
 
-  # This function why is this associated with this and not just a free function?
-  # There's also an argument to move this into the dicom factory because then
-  # A user can decide to superclass the method.
-  def get_pivot(self, datasets: Iterable[Dataset]) -> Optional[Dataset]:
-    dataset = None
-    for _dataset in datasets:
-      dataset = _dataset
-      break
-    return dataset
-
   @abstractmethod
   def corporealialize(self,
                       factory: 'DicomFactory',
@@ -117,7 +116,7 @@ class CopyElement(VirtualElement):
     self.Optional = Optional
 
   def corporealialize(self, _factory: 'DicomFactory', datasets: Iterable[Dataset]) -> Optional[DataElement]:
-    dataset = self.get_pivot(datasets)
+    dataset = get_pivot(datasets)
     if dataset is None:
       error_message = f"Cannot copy nothing at tag:{self.tag}"
       raise ValueError(error_message)
@@ -166,7 +165,7 @@ class SeriesElement(VirtualElement):
     self.require_dataset: bool = len(getfullargspec(func).args) == 1
 
   def corporealialize(self, _: 'DicomFactory', datasets: Iterable[Dataset]) -> DataElement:
-    dataset = self.get_pivot(datasets)
+    dataset = get_pivot(datasets)
     if self.require_dataset:
       # The '# type: ignores' here is because the type checker assumes func
       # is an instance based function, when it is dynamic assigned function
@@ -385,6 +384,49 @@ class Blueprint():
 
     return True
 
+###### Header function ######
+
+def _add_InstanceNumber(caller_args: InstanceEnvironment):
+  # iterator is Zero indexed while, instance number is 1 indexed
+  # This function assumes that the factory is aware of this
+  return caller_args.instance_number
+
+def _add_UID_tag(_: InstanceEnvironment):
+  return gen_uid()
+
+def _get_today(_: InstanceEnvironment) -> date:
+  return date.today()
+
+def _get_time(_: InstanceEnvironment) -> time:
+  return datetime.now().time()
+
+def _get_now_datetime(_: InstanceEnvironment) -> datetime:
+  return datetime.now()
+
+def _get_random_number(_:InstanceEnvironment) -> int:
+  return randint(1, 2147483646)
+
+###### 
+
+default_report_blueprint = Blueprint([
+  CopyElement(0x00080020, Optional=True), # Study Date
+  FunctionalElement(0x00080023, 'DA', _get_today), #ContentDate
+  FunctionalElement(0x0008002A, 'DT', _get_now_datetime), # AcquisitionDateTime
+  FunctionalElement(0x00080033, 'TM', _get_time), #ContentTime
+  CopyElement(0x00080030, Optional=True), # Study Time
+  CopyElement(0x00080050), # AccessionNumber
+  StaticElement(0x00080060, 'CS', 'DOC'), # Modality
+  StaticElement(0x00080064, 'CS', 'WSD'), # ConversionType
+  CopyElement(0x00081030), # StudyDescription
+  CopyElement(0x00101010, Optional=True), #PatientAge
+  CopyElement(0x00101020, Optional=True), #PatientSize
+  CopyElement(0x00101030, Optional=True), #PatientWeight
+  CopyElement(0x0020000D), # StudyInstanceUID
+  CopyElement(0x00200010, Optional=True), # StudyID
+  StaticElement(0x00200012, 'IS', 1), # InstanceNumber
+  SeriesElement(0x0020000E, 'UI', _add_UID_tag), # SeriesInstanceUID
+  StaticElement(0x00280301, 'CS', 'NO'),  # BurnedInAnnotation
+])
 
 
 class SeriesHeader():
@@ -426,6 +468,7 @@ class SeriesHeader():
       message += f"    Tag: {tag.tag} - {tag.__class__.__name__}\n"
 
     return message
+
 
 class DicomFactory(ABC):
   """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
@@ -496,13 +539,14 @@ class DicomFactory(ABC):
             kwargs: Dict[Any, Any] = {}) -> Dataset:
     """Builds a singular dataset from blueprint and pivot dataset
 
-    Intended to be used to construct message datasets
+    Intended to be used to singular such as messages or report datasets
 
     Args:
         pivot (Dataset): Dataset the blueprint will use to extract data from
         blueprint (Blueprint): Determines what data will be in the newly construct dataset
-        filling_strategy (FillingStrategy, optional): strategy to handle tags in the dataset,
-        but in the blueprint. Defaults to FillingStrategy.DISCARD,
+        filling_strategy (FillingStrategy, optional): Strategy to handle tags
+        that in the dataset, but in not the blueprint. Discards ignores the
+        tag, while copies the un-annotated tag.  Defaults to FillingStrategy.DISCARD,
         and for most dataset this is the sensible option
 
     Returns:
@@ -524,28 +568,79 @@ class DicomFactory(ABC):
       if de is not None:
         dataset.add(de)
     return dataset
-  
-  def encode_pdf(self, report: Report):
-    pass
 
-###### Header function ######
+  def encode_pdf(self,
+                 report: Union[Report, Path, str],
+                 datasets: Iterable[Dataset],
+                 report_blueprint = default_report_blueprint,
+                 filling_strategy = FillingStrategy.DISCARD,
+                 kwargs: Dict[Any, Any] = {}) -> Dataset:
+    """Encodes a pdf file to a dicom file such that it can be transported with
+    the Dicom protocol
 
-def _add_InstanceNumber(caller_args: InstanceEnvironment):
-  # iterator is Zero indexed while, instance number is 1 indexed
-  # This function assumes that the factory is aware of this
-  return caller_args.instance_number
+    Args:
+        report (Union[Report, Path, str]): The report or a path to the PDF to be
+        encoded
+        datasets (Iterable[Dataset]): The datasets that have been used to
+        generate this report
+        report_blueprint (Blueprint, optional): The dicomnode.Blueprint for
+        the generated report. The Blueprint should not include the tags:
+          EncapsulatedDocument, EncapsulatedDocumentLength, SourceInstanceSequence
+        Defaults to default_report_blueprint.
+        filling_strategy (dicomnode.FillingStrategy, optional): Filling
+        strategy for the underlying build command. For more detailed docs look
+        at the build method. Defaults to FillingStrategy.DISCARD.
+        kwargs (Dict[Any, Any], optional): Extra kwargs for underlying build
+        command. Defaults to {}.
 
-def _add_SOPInstanceUID(_):
-  return gen_uid()
+    Returns:
+        Dataset: An EncapsulatedPDFStorage encoded Dicom Dataset with the input
+        report
+    """
+    # Getting the PDF data
+    if isinstance(report, Report):
+      report.generate_pdf()
+      report_file_path = Path(report.file_name + '.pdf')
 
-def _get_today(_) -> date:
-  return date.today()
+    elif isinstance(report, str):
+      if not report.endswith('.pdf'):
+        logger.error("Passed a none pdf file to encoding")
+      report_file_path = Path(report)
+    else:
+      report_file_path = report
 
-def _get_time(_) -> time:
-  return datetime.now().time()
+    with open(report_file_path, 'rb') as fp:
+      document_bytes = fp.read()
 
-def _get_random_number(_) -> int:
-  return randint(1, 2147483646)
+    pivot = get_pivot(datasets)
+    report_dataset = self.build(pivot, report_blueprint, filling_strategy, kwargs)
+
+    if 'EncapsulatedDocument' not in report_dataset:
+      report_dataset.EncapsulatedDocument = document_bytes
+      report_dataset.EncapsulatedDocumentLength = len(document_bytes)
+    else:
+      logger.warning("report dataset already have a encoded PDF document from build phase")
+
+    if 'SOPClassUID' not in report_dataset:
+      report_dataset.SOPClassUID = EncapsulatedPDFStorage
+    if 'Modality' not in report_dataset:
+      report_dataset.Modality = "DOC"
+    if 'CoversionTypeAttribute' not in report_dataset:
+      report_dataset.ConversionTypeAttribute = "WSD"
+    if 'MIMETypeOfEncapsulatedDocument' not in report_dataset:
+      report_dataset.MIMETypeOfEncapsulatedDocument = "application/pdf"
+    if 'SourceInstanceSequence' not in report_dataset:
+      sequence = []
+      for reference_dataset in datasets:
+        if 'SOPClassUID' in reference_dataset and 'SOPInstanceUID' in reference_dataset:
+           sequence_dataset = Dataset()
+           sequence_dataset.ReferencedSOPClassUID = reference_dataset.SOPClassUID
+           sequence_dataset.ReferenceSOPInstanceUID = reference_dataset.SOPInstanceUID
+           sequence.append(sequence_dataset)
+      report_dataset.SourceInstanceSequence = Sequence(sequence)
+
+    return report_dataset
+
 
 ###### Header Tag Lists ######
 patient_blueprint = Blueprint([
@@ -579,11 +674,13 @@ general_equipment_blueprint = Blueprint([
   CopyElement(0x00081090, Optional=True), # Manufacturer's Model Name
 ])
 
+
 general_image_blueprint = Blueprint([
   StaticElement(0x00080008, 'CS', ['DERIVED', 'PRIMARY']), # Image Type # write a test for this
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber), # InstanceNumber
 
 ])
+
 
 # One might argue the optionality of these tags
 image_plane_blueprint = Blueprint([
@@ -593,6 +690,7 @@ image_plane_blueprint = Blueprint([
   #InstanceCopyElement(0x00201041, 'DS'), # Slice Location
   CopyElement(0x00280030),               # Pixel Spacing
 ])
+
 
 ct_image_blueprint = Blueprint([
   CopyElement(0x00080008, Optional=True), # Image Type
@@ -615,8 +713,6 @@ ct_image_blueprint = Blueprint([
   CopyElement(0x00181210, Optional=True), # Convolution Kernel
   CopyElement(0x00189305, Optional=True), # Revolution Time
 ])
-
-
 
 
 patient_study_blueprint = Blueprint([
@@ -642,7 +738,7 @@ general_series_blueprint = Blueprint([
 
 SOP_common_blueprint: Blueprint = Blueprint([
   CopyElement(0x00080016),                                  # SOPClassUID, you might need to change this
-  FunctionalElement(0x00080018, 'UI', _add_SOPInstanceUID), # SOPInstanceUID
+  FunctionalElement(0x00080018, 'UI', _add_UID_tag), # SOPInstanceUID
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
 ])
 

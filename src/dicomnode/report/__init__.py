@@ -18,6 +18,7 @@ from dicomnode.lib.logging import get_logger as _get_logger
 from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompiler
 
 from . import base_classes
+from . import pylatex_extensions
 
 
 def add_line(container: _Container, *args):

@@ -137,8 +137,11 @@ class SubClass(SuperClass):
 sub method
 ```
 
-So this how this library works, it is essentially a ready made pipeline with the exception of a function for processing the image, which you are intended to overwrite with your own implementation.
+This library utilized inheritance to provide some "templates" for user of the
+library to fill out. 
 This also deals with problem of users with very specific requirements, by allowing them to overwrite the part they want changed. So if you want to change something you can probably overwrite it and pass it in as an option.
+
+Note that it's generally frowned upon to create long inheritance chains.
 
 #### Naming Conventions in python
 
