@@ -44,6 +44,23 @@ The generated report is a placeholder. (Although I highly recommend that you try
 and keep the process function at a high level like the example.) In this
 tutorial we explore the content of that function.
 
+### A general outline
+
+With this top level view you should consider the report generation in the
+following steps:
+
+1. Data generation (Most of the normal pipeline)
+2. Data Extraction: Not all data might be needed. Isolate the data you need to
+generate all reports possible, and pass it to a new environment (read a
+function call)
+3. Create the report section wise, ie: Create the header, create information
+about the patient, print some picture... etc. etc.
+4. (C) If you have some conditional content, ie: if you should display
+different information based on the extracted data, then extract out to its own
+function and be clear try to specify the different types of reports generated
+using an enum. This will help other understand your code better.
+5. Return the report, encode it to dicom using the dicom factory.
+
 ## The PyLaTeX pipeline
 
 As dicomnode is build on top of PyLaTeX it is necessary to understand how that
@@ -107,7 +124,9 @@ to be encoded into a dicom object before it can be send. This is what the
 So this section is a exploration build in components and the way I would
 recommend building a report.
 
-### Report
+### Build-in components
+
+#### Report
 
 So to start with we need the root object that we use to contain all the other
 objects. For this we use the document, we can add content to it by using the
@@ -121,7 +140,7 @@ from dicomnode.report import Report
 # Rest of the pipeline
 
 def generate_report(images, input_data):
-  # Notice lack of file extension as the libraries handle thi
+  # Notice lack of file extension as the libraries handle this
   report = Report(f'{PatientID}')
 
   report.append(Section('This is the first section')) # The first method
@@ -134,12 +153,38 @@ def generate_report(images, input_data):
   return report
 ```
 
-### Patient Information
+#### Patient Information
 
 This component displays relevant patient information
 
-### Report Header
+#### Report Header
 
-### Table
+#### Table
 
+#### Plot
 
+##### Anatomical Plot
+
+##### Triple Plot
+
+### Rolling your own
+
+Naturally these components might not be exactly what you want. I highly suggest
+that you create "Blueprints" similar to `ReportHeader`, `PatientInformation`
+
+I suggest that you implement them as subclasses of
+`dicomnode.report.base_classes.LaTeXComponent`. This required you to implement
+2 methods:
+
+1. `append_to` - This method add the content the blueprint to the report
+2. `from dicom` - This construct an instance of your blueprint from a dicom
+picture or series.
+
+Note that the main idea is that the blueprint understand what should be added
+to the report, while the report is ignorant of the implementation of the
+blueprint.
+
+#### Create new PyLaTeX primitives.
+
+PyLaTeX as library also provide some out the box components such as the
+minipage Component. This is an 

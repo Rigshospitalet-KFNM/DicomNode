@@ -19,7 +19,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter, LinearLocator
-from pylatex import StandAloneGraphic, MiniPage, NoEscape
+from pylatex import StandAloneGraphic, MiniPage, NoEscape, LineBreak
 
 # Dicomnode packages
 from dicomnode import library_paths
@@ -29,7 +29,7 @@ from dicomnode.report.base_classes import LaTeXComponent, Selector
 from dicomnode.report.plot.selector import PercentageSelector
 
 def rotate_image_90(image: ndarray):
-  return numpy.rot90(image)
+  return numpy.rot90(image, 3)
 
 class Plot(LaTeXComponent):
   # Enums
@@ -99,9 +99,9 @@ class Plot(LaTeXComponent):
 
   def append_to(self, document: Report):
     self.save()
+    document.append(StandAloneGraphic(filename=self.file_path))
+    document.append(LineBreak())
 
-    with document.create(MiniPage(width=NoEscape(r"\textwidth"))) as mini_page:
-      mini_page.append(StandAloneGraphic(filename=self.file_path))
 
   def save(self):
     self._figure.savefig(self.file_path)

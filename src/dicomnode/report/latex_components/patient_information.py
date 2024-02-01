@@ -7,13 +7,13 @@ from dataclasses import dataclass
 
 # Third party Packages
 from pydicom import Dataset
-from pylatex import MiniPage, NoEscape, Package
+from pylatex import MiniPage, NoEscape, Package, MdFramed, HFill
 from pylatex.utils import bold
 
 # Dicomnode Packages
 from dicomnode.report import Report, add_line
-from dicomnode.report.pylatex_extensions.framed import Framed
 from dicomnode.report.base_classes import LaTeXComponent
+from dicomnode.report.pylatex_extensions.framed import DicomFrame
 
 @dataclass
 class PatientInformation(LaTeXComponent):
@@ -41,10 +41,11 @@ class PatientInformation(LaTeXComponent):
     """
 
 
-    with report.create(Framed()) as frame:
-      with frame.create(MiniPage(width=NoEscape(r"0.49\textwidth"), align='l')) as mini_page:
-        add_line(mini_page, "Navn: ", bold(self.patient_name))
-        add_line(mini_page, "CPR: ", bold(self.CPR))
-        add_line(mini_page, "Studie: ", bold(self.study))
-        add_line(mini_page, "Serie: ", bold(self.series))
-        add_line(mini_page, "Dato: ", bold(self.date))
+    with report.create(DicomFrame()) as frame:
+      add_line(frame, "Navn: ", HFill(), bold(self.patient_name))
+      add_line(frame, "CPR: ", HFill(), bold(self.CPR))
+      add_line(frame, "Studie: ", HFill(), bold(self.study))
+      add_line(frame, "Serie: ", HFill(), bold(self.series))
+      frame.append('Dato: ')
+      frame.append(HFill())
+      frame.append(bold(self.date))

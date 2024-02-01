@@ -34,6 +34,7 @@ class Table(LaTeXComponent):
         table (Table): _description_
     """
     tabularx_package = Package('tabularx')
+    array_package = Package('array')
     if tabularx_package not in report.packages:
       report.packages.append(tabularx_package)
 
