@@ -18,7 +18,6 @@ from dicomnode.lib.logging import get_logger as _get_logger
 from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompiler
 
 from . import base_classes
-from . import pylatex_extensions
 
 
 def add_line(container: _Container, *args):
@@ -67,15 +66,20 @@ class Report(_Document):
     })
     logger = _get_logger()
 
+
+    self._loaded_preambles = set()
+
     self.file_name = file_name
     self.__options = options
     if options.compiler == base_classes.LaTeXCompilers.DEFAULT:
-      if _DICOMNODE_ENV_FONT in _environ:
+
+      # These covers are environment dependant and does therefore not suit well to test coverage :(
+      if _DICOMNODE_ENV_FONT in _environ: # pragma: no cover
         # load_font sets self.compiler
-        self.__load_font(_environ[_DICOMNODE_ENV_FONT]) # pragma: no cover
-      elif self.__options.font is not None:
-        self.__load_font(self.__options.font) # pragma: no cover
-      else:
+        self.__load_font(_environ[_DICOMNODE_ENV_FONT])
+      elif self.__options.font is not None:  # pragma: no cover
+        self.__load_font(self.__options.font)
+      else: # pragma: no cover
         self.__compiler = base_classes.LaTeXCompilers.PDFLATEX # pragma: no cover
     else:
       self.__compiler = self.__options.compiler # pragma: no cover
@@ -118,5 +122,10 @@ class Report(_Document):
     self.preamble.append(_Command("setmonofont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
     self.preamble.append(_Command("setmathfont", _NoEscape(rf"{font}"), options=[])) # pragma: no cover
 
+  @property
+  def loaded_preambles(self):
+    return self._loaded_preambles
+
 # Dicomnode packages
 from . import plot
+from . import pylatex_extensions

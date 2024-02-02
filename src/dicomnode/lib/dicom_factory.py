@@ -36,7 +36,9 @@ class FillingStrategy(Enum):
 
 PRIVATIZATION_VERSION = 1
 
-def get_pivot(datasets: Iterable[Dataset]) -> Optional[Dataset]:
+def get_pivot(datasets: Union[Dataset,Iterable[Dataset]]) -> Optional[Dataset]:
+  if isinstance(datasets, Dataset):
+    return datasets
   dataset = None
   for _dataset in datasets:
     dataset = _dataset
@@ -83,10 +85,11 @@ class VirtualElement(ABC):
     self.tag = tag
     self.VR = VR
     if name is None:
-      name = DataElement(tag, VR, None).name
-    if 64 < len(name):
+      self.name = DataElement(tag, VR, None).name
+    elif 64 < len(name):
       logger.warning(f"Virtual Element name is being truncated from {name} to {name[64:]}")
-    self.name = name[64:]
+    else:
+      self.name = name[64:]
 
   @abstractmethod
   def corporealialize(self,
@@ -127,7 +130,7 @@ class CopyElement(VirtualElement):
       if self.Optional:
         return None
       else:
-        raise KeyError(f"{self.tag} not found in Header Parent Dataset")
+        raise KeyError(f"{self.tag} - {self.name}: not found in Header Parent Dataset")
 
 
 class DiscardElement(VirtualElement):
@@ -625,8 +628,8 @@ class DicomFactory(ABC):
       report_dataset.SOPClassUID = EncapsulatedPDFStorage
     if 'Modality' not in report_dataset:
       report_dataset.Modality = "DOC"
-    if 'CoversionTypeAttribute' not in report_dataset:
-      report_dataset.ConversionTypeAttribute = "WSD"
+    if 'ConversionType' not in report_dataset:
+      report_dataset.ConversionType = "WSD"
     if 'MIMETypeOfEncapsulatedDocument' not in report_dataset:
       report_dataset.MIMETypeOfEncapsulatedDocument = "application/pdf"
     if 'SourceInstanceSequence' not in report_dataset:
@@ -635,7 +638,7 @@ class DicomFactory(ABC):
         if 'SOPClassUID' in reference_dataset and 'SOPInstanceUID' in reference_dataset:
            sequence_dataset = Dataset()
            sequence_dataset.ReferencedSOPClassUID = reference_dataset.SOPClassUID
-           sequence_dataset.ReferenceSOPInstanceUID = reference_dataset.SOPInstanceUID
+           sequence_dataset.ReferencedSOPInstanceUID = reference_dataset.SOPInstanceUID
            sequence.append(sequence_dataset)
       report_dataset.SourceInstanceSequence = Sequence(sequence)
 
