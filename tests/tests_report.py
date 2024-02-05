@@ -19,7 +19,7 @@ from dicomnode.lib.io import save_dicom
 from dicomnode.lib.dicom import generate_uid, make_meta
 from dicomnode.lib.numpy_factory import NumpyFactory # Need this class because Dicom Factory is an abstract class
 from dicomnode.report import Report
-from dicomnode.report.pylatex_extensions.framed import DicomFrame
+from dicomnode.report.latex_components.framed import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 
 from dicomnode.report.plot.triple_plot import TriplePlot

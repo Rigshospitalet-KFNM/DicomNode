@@ -19,7 +19,7 @@ class Table(LaTeXComponent):
     FULL = 1
     BORDER = 2
     TOP_BOTTOM = 3
-    none = 4
+    NONE = 4
 
 
   table_style: TableStyle

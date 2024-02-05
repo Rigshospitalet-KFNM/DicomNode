@@ -11,9 +11,10 @@ from pylatex import MiniPage, NoEscape, Package, MdFramed, HFill
 from pylatex.utils import bold
 
 # Dicomnode Packages
+from dicomnode.lib.dicom import format_from_patient_name
 from dicomnode.report import Report, add_line
 from dicomnode.report.base_classes import LaTeXComponent
-from dicomnode.report.pylatex_extensions.framed import DicomFrame
+from dicomnode.report.latex_components.framed import DicomFrame
 
 @dataclass
 class PatientInformation(LaTeXComponent):
@@ -21,7 +22,7 @@ class PatientInformation(LaTeXComponent):
   CPR: str
   study: str
   series: str
-  date: str # Note this is not a date that is intended for calculation, but display
+  date: str # Note this is not a date that is intended for display, not calculation
 
   @classmethod
   def from_dicom(cls, dicom: Dataset) -> 'PatientInformation':
@@ -39,10 +40,8 @@ class PatientInformation(LaTeXComponent):
     Args:
         patient_header (PatientHeader): patient header to be added
     """
-
-
     with report.create(DicomFrame()) as frame:
-      add_line(frame, "Navn: ", HFill(), bold(self.patient_name))
+      add_line(frame, "Navn: ", HFill(), bold(format_from_patient_name(self.patient_name)))
       add_line(frame, "CPR: ", HFill(), bold(self.CPR))
       add_line(frame, "Studie: ", HFill(), bold(self.study))
       add_line(frame, "Serie: ", HFill(), bold(self.series))

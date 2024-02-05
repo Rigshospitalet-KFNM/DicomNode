@@ -3,6 +3,7 @@ to use these components rather than writing your own components for
 standarization purposes
   """
 
+from .framed import DicomFrame
 from .patient_information import PatientInformation
 from .table import Table
 from .report_header import ReportHeader

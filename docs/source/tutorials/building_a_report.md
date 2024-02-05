@@ -34,10 +34,12 @@ class MyPipeline(AbstractPipeline):
     report = generate_report(modeled_images, input_data)
 
     # Factory
-    modeled_datasets = self.dicom_factory.build_from_header(input_data.header, blueprint)
+    modeled_datasets = self.dicom_factory.build_from_header(input_data.header,
+                                                            blueprint)
     encoded_report = self.dicom_factory.encode_pdf(report, modeled_datasets)
 
-    return DicomOutput([(PACS_ADDRESS, modeled_dataset), (PACS_ADDRESS, encoded_report)])
+    return DicomOutput([(PACS_ADDRESS, modeled_dataset), (PACS_ADDRESS,
+                                                          encoded_report)])
 ```
 
 The generated report is a placeholder. (Although I highly recommend that you try
@@ -155,17 +157,56 @@ def generate_report(images, input_data):
 
 #### Patient Information
 
-This component displays relevant patient information
+This component displays relevant patient information i a framed box:
+
+* Patient Name
+* Patient ID
+* Study Name
+* Series Name
+* Study Date
 
 #### Report Header
 
+This add a header to the study with information about the hospital and the
+performing department. It includes a icon which I recommend you place as a
+static image in the `report_data` directory
+
 #### Table
 
-#### Plot
+This is a table with a few build in styles. I can also recommend PyLatex's
+Tabular and Tabularx are recommended alternatives.
+
+#### Plot & Plots
+
+Dicomnode also includes some standardization for plots, which is build on top
+of `matplotlib`. The relevant base class is `dicomnode.report.plot.Plot` which
+is responsible for saving your image and appending it the report.
+
+Now the library assumes that you wish to plot from a three dimensional volume
+which poses natural problems unless you have some really cool paper. There's
+three ways you can traverse an volume:
+
+* Corornal - From front to back
+* Sagittal - From side to side
+* Transverse - From top to bottom
+
+which is encapsulated in the `Plot.AnatomicalPlane` enum, which you can use to
+create a `Plot.PlaneImages` sequence which takes a plane as argument and allows
+you to transverse through the volume. Because you are limited to 2 dimensions,
+you need to select an image from the volume, which is done by:
+`Dicomnode.report.base_classes.Selector`. A selector is just a glorified
+function which select an image (or range of images). Finally you might wish to
+apply some transformation function.
 
 ##### Anatomical Plot
 
+This is the "base plot" of dicomnode, it and other plots of Dicomnode can be
+configured by passing a `<PlotType>.Options` in its constructor. It displays a
+single slice
+
 ##### Triple Plot
+
+This is just 3 Anatomical plots next to each other.
 
 ### Rolling your own
 
@@ -187,4 +228,180 @@ blueprint.
 #### Create new PyLaTeX primitives.
 
 PyLaTeX as library also provide some out the box components such as the
-minipage Component. This is an 
+minipage Component. Lets grab an example:
+```python
+mini_page = MiniPage(width=r"0.8\textwidth")
+mini_page.append("Bla bla bla")
+```
+
+Becomes the equivalent latex code:
+
+```latex
+\begin{minipage}{0.8\text}%
+bla bla bla%
+\end{minipage}%
+```
+
+Lets work backwards how this code was generated:
+
+1. the `\begin` and `\end` is generated because mini page inherits from
+`pylatex.base_classes.Environment` which specifies that should included.
+2. The mini_page has the class name "MiniPage". When you apply the lower
+function, you get the posted `minipage`. This is because the MiniPage class
+doesn't have the defined the constant `_latex_name`. If that is undefined it
+will take and use the name of the class.
+3. Then because the mini page contains content, the content get recursively
+added.
+
+Now some components requires packages for instance the `framed` component a
+package. If you create a `pylatex.Package` for framed so the python code:
+
+```python
+frame = Framed()
+Framed.append("content")
+```
+
+Becomes the LaTeX:
+
+```latex
+\usepackage{framed}
+
+... % Rest of the Document before framed
+
+\begin{framed}
+content
+\end{framed}
+
+... % Rest of the Document after framed
+```
+
+Sometimes you might want more header commands for instance if you have custom
+environments or commands. Sadly you are going to need a tad more foot work to
+make this work.
+
+For this example lets look at
+`dicomnode.src.report.latex_components.DicomFrame` which is such a case. It is
+a box which wraps content, however different than framed and mdframe is that
+it only wraps content length not the entire line.
+
+This is achieved with the following latex code:
+
+```latex
+% Header code
+% Packages
+\usepackage{mdframed}
+\usepackage{xcolor}
+\usepackage{color}
+\usepackage{varwidth}
+\usepackage{environ}
+\usepackage{calc}
+
+% Custom
+\definecolor{navy}{HTML}{0000AA}
+\newlength{\frameTweak}%
+\mdfdefinestyle{FrameStyle}{%
+    linecolor=navy,
+    outerlinewidth=5pt,
+    innertopmargin=5pt,
+    innerbottommargin=5pt,
+    innerrightmargin=5pt,
+    innerleftmargin=5pt,
+    leftmargin = 5pt,
+    rightmargin = 5pt
+}
+
+\NewEnviron{prettyFrame}[1][]{%
+        \setlength{\frameTweak}{\dimexpr%
+        +\mdflength{innerleftmargin}%
+        +\mdflength{innerrightmargin}%
+        +\mdflength{leftmargin}%
+        +\mdflength{rightmargin}%
+        }%
+    \savebox0{%
+        \begin{varwidth}{\dimexpr\linewidth-\frameTweak\relax}%
+            \BODY%
+        \end{varwidth}%
+    }%
+    \begin{mdframed}[style=FrameStyle,backgroundcolor=white,userdefinedwidth=\dimexpr\wd0+\frameTweak\relax, #1]%
+        \usebox0%
+    \end{mdframed}%
+}%
+
+% Rest of the document header and so forth
+
+\begin{dicomframe}
+  ...
+\end{dicomframe}
+
+% Rest of the document
+```
+
+The way I solved this is by creating a nested class wrapped by the class:
+
+```Python
+class DicomFrame(LaTeXComponent):
+  class DicomFrame(Environment):
+    packages = []
+
+  def __init__(self):
+    super().__init__()
+    self._inner = self.DicomFrame
+
+  def append_to(self, document: Report):
+    if not self.__class__.__name__ in document.loaded_preambles:
+      # Load The preamble
+      self.__load_preamble(document.preamble)
+      document.loaded_preambles.add(self.__class__.__name__)
+    document.append(self._inner)
+
+```
+
+The inner class is a `PyLaTeXObject` from `PyLaTeX` and is what gets appended
+to the document. The document class contains a set `loaded_preambles` which
+contains the name of all classes which have the loaded preambles. This prevents
+the preamble from being loaded twice, and prevent namespace collisions. The
+`__load_preamble` function appends the desired content to the preamble. Finally
+you should add the following code to the class to make it behave more like a
+`PyLaTeXObject`:
+
+```python
+from contextlib import contextmanager
+
+... # Class definition from above
+
+  def append(self, other):
+    self._inner.append(other)
+
+  @property
+  def data(self):
+    return self._inner.data
+
+  @data.setter
+  def data_set(self, other):
+    self._inner.data = other
+
+  @contextmanager
+  def create(self, child):
+    """Add a LaTeX object to current container, context-manager style.
+
+        Args
+        ----
+        child: `~.Container`
+            An object to be added to the current container
+      """
+
+    prev_data = self.data
+    print(type(self), dir(self))
+    self.data_set = child.data  # This way append works appends to the child
+
+    yield child  # allows with ... as to be used as well
+
+    self.data_set = prev_data
+    self.append(child)
+```
+
+#### Building your own plots
+
+If you wish to build your plots, you can build a `matplotlib.figure.Figure` and
+pass it to `dicomnode.report.plot.Plot`, at which point it will place your
+figure.

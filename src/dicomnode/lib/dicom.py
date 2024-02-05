@@ -201,3 +201,33 @@ def extrapolate_image_position_patient_dataset(dataset: Dataset, slices: int) ->
     dataset.InstanceNumber,
     slices
   )
+
+def format_from_patient_name(patient_name: str) -> str:
+  """Formats the dicom encoded patient name into a human displayable name
+
+  Args:
+      patient_name (str): A string with one or more ^ denominating different
+      parts of the name
+
+  Returns:
+      A string without any ^ in, so not for storing in Dicom objects
+  """
+
+  split_name = patient_name.split('^')
+
+  if(len(split_name) == 1):
+    # Probbally a test name
+    return patient_name
+  if(len(split_name) == 2):
+    first_name, last_name = split_name
+    return f"{first_name.capitalize()} {last_name.capitalize()}"
+  if(len(split_name) == 3):
+    first_name, last_name, middle_name = split_name
+    return f"{first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()}"
+  if(len(split_name) == 4):
+    first_name, last_name, middle_name, prefix = split_name
+    return f"{prefix} {first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()}"
+  if(len(split_name) == 5):
+    first_name, last_name, middle_name, prefix, suffix = split_name
+    return f"{prefix} {first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()} {suffix}"
+  raise ValueError("A Patient name can only contain 5 ^'s")
