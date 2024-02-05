@@ -92,10 +92,10 @@ couple of paths that is needed. These paths can be controlled with Environment
 variables and stored in the `dicomnode.library_paths`.
 
 * (Python Attribute) - (Environment variable) - (default)
-* processing_directory - DICOMNODE_ENV_PROCESSING_PATH - /tmp/dicomnode/
-* report_directory - DICOMNODE_ENV_REPORT_PATH - /tmp/dicomnode/report
-* report_data_directory - DICOMNODE_ENV_REPORT_DATA_PATH - /tmp/dicomnode/report_data
-* figure_directory - DICOMNODE_ENV_FIGURE_PATH - /tmp/dicomnode/figures
+* `processing_directory` - **DICOMNODE_ENV_PROCESSING_PATH** - */tmp/dicomnode/*
+* `report_directory` - **DICOMNODE_ENV_REPORT_PATH** - */tmp/dicomnode/report*
+* `report_data_directory` - **DICOMNODE_ENV_REPORT_DATA_PATH** - */tmp/dicomnode/report_data*
+* `figure_directory` - **DICOMNODE_ENV_FIGURE_PATH** - */tmp/dicomnode/figures*
 
 The processing directory is the directory that a dicomnode uses a root for
 relative paths. I recommend this directory is clean as this can make it
@@ -237,7 +237,7 @@ mini_page.append("Bla bla bla")
 Becomes the equivalent latex code:
 
 ```latex
-\begin{minipage}{0.8\text}%
+\begin{minipage}{0.8\textwidth}%
 bla bla bla%
 \end{minipage}%
 ```
@@ -404,4 +404,4 @@ from contextlib import contextmanager
 
 If you wish to build your plots, you can build a `matplotlib.figure.Figure` and
 pass it to `dicomnode.report.plot.Plot`, at which point it will place your
-figure.
+figure in the report.
