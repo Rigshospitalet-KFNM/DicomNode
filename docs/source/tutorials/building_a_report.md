@@ -391,7 +391,6 @@ from contextlib import contextmanager
       """
 
     prev_data = self.data
-    print(type(self), dir(self))
     self.data_set = child.data  # This way append works appends to the child
 
     yield child  # allows with ... as to be used as well

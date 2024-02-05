@@ -14,7 +14,7 @@ from pylatex.utils import bold
 from dicomnode.lib.dicom import format_from_patient_name
 from dicomnode.report import Report, add_line
 from dicomnode.report.base_classes import LaTeXComponent
-from dicomnode.report.latex_components.framed import DicomFrame
+from dicomnode.report.latex_components.dicom_frame import DicomFrame
 
 @dataclass
 class PatientInformation(LaTeXComponent):
