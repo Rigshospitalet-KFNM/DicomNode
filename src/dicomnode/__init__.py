@@ -74,7 +74,7 @@ class _LibraryPaths:
 
 library_paths = _LibraryPaths()
 
+from . import report
 from . import lib
 from . import tools
 from . import server
-from . import report

@@ -19,7 +19,6 @@ from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompil
 
 from . import base_classes
 
-
 def add_line(container: _Container, *args):
   for arg in args:
     container.append(arg)
@@ -127,5 +126,5 @@ class Report(_Document):
     return self._loaded_preambles
 
 # Dicomnode packages
+from . import latex_components
 from . import plot
-from . import pylatex_extensions

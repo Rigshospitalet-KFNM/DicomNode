@@ -24,7 +24,7 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
-from dicomnode.report import Report
+from dicomnode import report
 
 logger = get_logger()
 
@@ -573,7 +573,7 @@ class DicomFactory(ABC):
     return dataset
 
   def encode_pdf(self,
-                 report: Union[Report, Path, str],
+                 report: Union['report.Report', Path, str],
                  datasets: Iterable[Dataset],
                  report_blueprint = default_report_blueprint,
                  filling_strategy = FillingStrategy.DISCARD,
@@ -601,7 +601,7 @@ class DicomFactory(ABC):
         report
     """
     # Getting the PDF data
-    if isinstance(report, Report):
+    if isinstance(report, 'report.Report'):
       report.generate_pdf()
       report_file_path = Path(report.file_name + '.pdf')
 
