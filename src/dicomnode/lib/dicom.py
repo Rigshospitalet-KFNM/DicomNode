@@ -10,6 +10,7 @@ import numpy
 from pydicom import Dataset, DataElement
 from pydicom.tag import BaseTag
 from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBigEndian, ExplicitVRLittleEndian
+from pydicom.valuerep import PersonName
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
@@ -79,9 +80,6 @@ def reader_function_version_1(dataset: Dataset, data_element: DataElement):
     PRIVATE_TAG_NAMES = 0xFD
     PRIVATE_TAG_VRS = 0xFE
     PRIVATE_TAG_VM = 0xFF
-
-  
-  
 
 
 __reader_functions = {
@@ -202,7 +200,7 @@ def extrapolate_image_position_patient_dataset(dataset: Dataset, slices: int) ->
     slices
   )
 
-def format_from_patient_name(patient_name: str) -> str:
+def format_from_patient_name_str(patient_name: str) -> str:
   """Formats the dicom encoded patient name into a human displayable name
 
   Args:
@@ -217,17 +215,32 @@ def format_from_patient_name(patient_name: str) -> str:
 
   if(len(split_name) == 1):
     # Probbally a test name
-    return patient_name
+    return patient_name.capitalize().strip()
   if(len(split_name) == 2):
-    first_name, last_name = split_name
-    return f"{first_name.capitalize()} {last_name.capitalize()}"
+    family_name, given_name,= split_name
+    return f"{given_name.capitalize()} {family_name.capitalize()}".strip()
   if(len(split_name) == 3):
-    first_name, last_name, middle_name = split_name
-    return f"{first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()}"
+    family_name, given_name, middle_name = split_name
+    return f"{given_name.capitalize()} {middle_name.capitalize()} {family_name.capitalize()}".strip()
   if(len(split_name) == 4):
-    first_name, last_name, middle_name, prefix = split_name
-    return f"{prefix} {first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()}"
+    family_name, given_name, middle_name, prefix = split_name
+    return f"{prefix} {given_name.capitalize()} {middle_name.capitalize()} {family_name.capitalize()}".strip()
   if(len(split_name) == 5):
-    first_name, last_name, middle_name, prefix, suffix = split_name
-    return f"{prefix} {first_name.capitalize()} {middle_name.capitalize()} {last_name.capitalize()} {suffix}"
+    family_name, given_name, middle_name, prefix, suffix = split_name
+    return f"{prefix} {given_name.capitalize()} {middle_name.capitalize()} {family_name.capitalize()} {suffix}".strip()
   raise ValueError("A Patient name can only contain 5 ^'s")
+
+def format_from_patient_name(person_name: PersonName) -> str:
+  return_str = ""
+  if person_name.name_prefix:
+    return_str += f"{person_name.name_prefix} "
+  if person_name.given_name:
+    return_str += f"{person_name.given_name.capitalize()} "
+  if person_name.middle_name:
+    return_str += f"{person_name.middle_name.capitalize()} "
+  if person_name.family_name:
+    return_str += f"{person_name.family_name.capitalize()} "
+  if person_name.name_suffix:
+    return_str += f"{person_name.name_suffix}"
+
+  return return_str.strip()

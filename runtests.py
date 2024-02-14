@@ -1,9 +1,8 @@
+# Python Standard Library
 import argparse
-
 import os
 import shutil
 from pathlib import Path
-
 from unittest import TextTestRunner, TestSuite, TestLoader
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
@@ -21,7 +20,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
   testing_logs()
 
-  runner = TextTestRunner()
+  runner = TextTestRunner(verbosity=args.verbose)
   loader = TestLoader()
   suite: TestSuite = loader.discover("tests", pattern=f"*{args.test_regex}*.py")
   if args.performance:
@@ -35,6 +34,8 @@ if __name__ == "__main__":
     shutil.rmtree(TESTING_TEMPORARY_DIRECTORY) #pragma: no cover
   os.mkdir(TESTING_TEMPORARY_DIRECTORY, mode=0o777)
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
-  runner.run(suite)
+  result = runner.run(suite)
   os.chdir(cwd)
   shutil.rmtree(TESTING_TEMPORARY_DIRECTORY)
+
+  exit(len(result.errors) != 0)

@@ -1,9 +1,14 @@
+# Python Standard library
 from unittest import TestCase
 
+# Thrid party packages
 from pydicom import Dataset
-
 from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian, CTImageStorage
-from dicomnode.lib.dicom import get_tag, make_meta, gen_uid, extrapolate_image_position_patient, extrapolate_image_position_patient_dataset
+from pydicom.valuerep import PersonName
+
+# Dicomnode packages
+from dicomnode.lib.dicom import get_tag, make_meta, gen_uid, extrapolate_image_position_patient,\
+  extrapolate_image_position_patient_dataset, format_from_patient_name_str, format_from_patient_name
 from dicomnode.lib.exceptions import InvalidDataset
 
 class DicomTestCase(TestCase):
@@ -287,3 +292,27 @@ class DicomTestCase(TestCase):
     slices = 10
 
     self.assertRaises(InvalidDataset, extrapolate_image_position_patient_dataset, dataset, slices)
+
+  def test_formatted_person_names(self):
+    pn_1 = PersonName.from_named_components(family_name="FamilyName")
+    pn_2 = PersonName.from_named_components(family_name="FamilyName",
+                                            given_name="GivenName")
+    pn_3 = PersonName.from_named_components(family_name="FamilyName",
+                                            given_name="GivenName",
+                                            middle_name="MiddleName")
+    pn_4 = PersonName.from_named_components(family_name="FamilyName",
+                                            given_name="GivenName",
+                                            middle_name="MiddleName",
+                                            name_prefix="Prefix")
+    pn_5 = PersonName.from_named_components(family_name="FamilyName",
+                                            given_name="GivenName",
+                                            middle_name="MiddleName",
+                                            name_prefix="Prefix",
+                                            name_suffix="Suffix")
+
+
+    self.assertEqual(format_from_patient_name(pn_1), format_from_patient_name_str(str(pn_1)))
+    self.assertEqual(format_from_patient_name(pn_2), format_from_patient_name_str(str(pn_2)))
+    self.assertEqual(format_from_patient_name(pn_3), format_from_patient_name_str(str(pn_3)))
+    self.assertEqual(format_from_patient_name(pn_4), format_from_patient_name_str(str(pn_4)))
+    self.assertEqual(format_from_patient_name(pn_5), format_from_patient_name_str(str(pn_5)))

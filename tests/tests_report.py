@@ -6,7 +6,8 @@ Test results can be found in /tmp/dicomnode
 
 # Python3 Standard Library imports
 from datetime import datetime as DateTime
-from unittest import TestCase
+from pathlib import Path
+from unittest import TestCase, skipIf
 
 # Third party imports
 import nibabel
@@ -24,7 +25,13 @@ from dicomnode.report.latex_components import PatientInformation, ReportHeader, 
 
 from dicomnode.report.plot.triple_plot import TriplePlot
 
-nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
+nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz')
+figure_image_path = Path(f"{library_paths.report_data_directory}/report_image.png")
+
+if nifti_path.exists():
+  nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
+else:
+  nifti_image = None
 
 class GeneratorTestCase(TestCase):
   def test_empty_report(self):
@@ -37,6 +44,7 @@ class GeneratorTestCase(TestCase):
 
     # Assert once there's a stable interface
 
+  @skipIf(not nifti_path.exists() or not figure_image_path.exists(), "Needs an image to plot")
   def test_report(self):
     dataset = Dataset()
 
@@ -96,7 +104,5 @@ class GeneratorTestCase(TestCase):
     make_meta(encoded_report)
 
     save_dicom(library_paths.report_directory/'test_report.dcm', encoded_report)
-
-    print(encoded_report)
 
 

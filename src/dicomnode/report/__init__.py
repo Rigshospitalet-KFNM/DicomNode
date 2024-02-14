@@ -2,10 +2,11 @@
 
 # Python Standard packages
 from dataclasses import dataclass as _dataclass
-from typing import List as _List, Optional as _Optional, Type as _Type
+from importlib import import_module
 from os import environ as _environ
 import platform as _platform
 from shutil import which as _which
+from typing import List as _List, Optional as _Optional, Type as _Type
 
 # Third party packages
 from pydicom import Dataset
@@ -18,6 +19,8 @@ from dicomnode.lib.logging import get_logger as _get_logger
 from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompiler
 
 from . import base_classes
+
+
 
 def add_line(container: _Container, *args):
   for arg in args:
@@ -127,4 +130,23 @@ class Report(_Document):
 
 # Dicomnode packages
 from . import latex_components
-from . import plot
+
+__plot = None
+#from . import plot
+
+def __getattr__(name):
+  if name == 'plot':
+    global __plot
+    if __plot is None:
+      __plot = import_module('dicomnode.report.plot')
+    return __plot
+  raise AttributeError(f"module {__name__} has no attribute '{name}'")
+
+__all__ = [
+  'Report',
+  'latex_components',
+  'plot'
+]
+
+def __dir__():
+  return __all__

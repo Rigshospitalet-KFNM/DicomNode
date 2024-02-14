@@ -2,7 +2,8 @@
   """
 
 # Python standard Library
-from unittest import TestCase
+from pathlib import Path
+from unittest import TestCase, skipIf
 
 # Third party Packages
 from dicomnode import library_paths
@@ -15,15 +16,22 @@ from dicomnode.report.plot.triple_plot import TriplePlot
 # Initialization
 
 #nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_epi.nii.gz') # type: ignore
-nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
+
+nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz')
+if nifti_path.exists():
+  nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(nifti_path) # type: ignore
+else:
+  nifti_image = None
 
 class PlotTestCase(TestCase):
+  @skipIf(not nifti_path.exists(), "Needs nifti data to plot")
   def test_triple_plot(self):
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/triple_plot.png')
     tp = TriplePlot(nifti_image, options)
 
     tp.save()
 
+  @skipIf(not nifti_path.exists(), "Needs nifti data to plot")
   def test_triple_plot_different_selectors(self):
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/different_triple_plot.png',
                                  selector=(PercentageSelector(0.30), MaxSelector(), AverageSelector()))
