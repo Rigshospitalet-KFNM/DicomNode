@@ -164,11 +164,11 @@ class PipelineTestCase(TestCase):
     self.pipeline_tree.add_image(dataset_2)
 
     self.assertEqual(self.pipeline_tree.images, 2)
-    self.pipeline_tree.remove_patient(CPR_1)
+    self.pipeline_tree.clean_up_patient(CPR_1)
     self.assertEqual(self.pipeline_tree.images, 1)
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertIn(CPR_2, self.pipeline_tree.data)
-    self.pipeline_tree.remove_patient(CPR_2)
+    self.pipeline_tree.clean_up_patient(CPR_2)
     self.assertEqual(self.pipeline_tree.images, 0)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)
 
@@ -199,7 +199,7 @@ class PipelineTestCase(TestCase):
     self.pipeline_tree.add_image(dataset_2)
     self.pipeline_tree.add_image(dataset_3)
 
-    self.pipeline_tree.remove_patients([CPR_1, CPR_2])
+    self.pipeline_tree.clean_up_patients([CPR_1, CPR_2])
 
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)

@@ -12,7 +12,7 @@ from datetime import datetime
 from logging import Logger
 from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional, Type, Iterable
+from typing import Any, Dict, List, Optional, Type, Iterable, Set
 
 # Third Party Python Packages
 from pydicom import Dataset
@@ -356,8 +356,9 @@ class PipelineTree(ImageTreeInterface):
     # Args setup
     self.patient_identifier_tag: int = patient_identifier # Move this to options?
     self.tree_node_definition: Dict[str, Type[AbstractInput]] = pipelineArgs
-    #self.root_data_directory: Optional[Path] = options.data_directory
     self.options = options
+
+    self._locked_patients: Set[str] = set()
 
     #Logger Setup
     if self.options.logger is None:
@@ -385,6 +386,10 @@ class PipelineTree(ImageTreeInterface):
 
   def add_image(self, dicom : Dataset) -> int:
     key = self.get_patient_id(dicom)
+
+    if key in self._locked_patients:
+      self.logger.error("Attempting to add an image to a locked patient")
+      raise InvalidDataset()
 
     if key not in self:
       input_container_path: Optional[Path] = None
@@ -490,9 +495,9 @@ class PipelineTree(ImageTreeInterface):
       else:
         raise InvalidTreeNode #pragma: no cover
 
-    self.remove_patients(to_be_removed)
+    self.clean_up_patients(to_be_removed)
 
-  def remove_patients(self, patient_ids: Iterable[str]):
+  def clean_up_patients(self, patient_ids: Iterable[str]):
     """Removes many patients from the pipeline tree
 
     Args:
@@ -515,11 +520,14 @@ class PipelineTree(ImageTreeInterface):
       else:
         new_data_dict[patient_id] = patient_node
 
+    for patient_id in patient_ids:
+      self._locked_patients.discard(patient_id)
     self.images -= removed_images
     self.data = new_data_dict
+    self.logger.debug(f"Removed {removed_images} from {len(patient_ids)} Patients")
 
-  def remove_patient(self, patient_id: str) -> None:
-    """Removes a patient from the tree
+  def clean_up_patient(self, patient_id: str) -> None:
+    """Removes a patient from the tree, and removes any files stored under the patient
 
     Args:
         patient_id (str): identifier of the patient to be deleted
@@ -541,12 +549,14 @@ class PipelineTree(ImageTreeInterface):
       else:
         new_data_dict[patient_id_dict] = patient_node
 
+
     self.images -= removed_images
     self.data = new_data_dict
+    self._locked_patients.discard(patient_id)
     self.logger.debug(f"Removed {patient_id} and {removed_images} images from Pipeline")
 
-
-
+  def lock_patient(self, patient_id):
+    self._locked_patients.add(patient_id)
 
   def _get_patient_container_options(self, container_path: Optional[Path]) -> PatientNode.Options:
     """Creates the options for the underlying Patient Container

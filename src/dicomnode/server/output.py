@@ -80,9 +80,6 @@ class DicomOutput(PipelineOutput):
 class NoOutput(PipelineOutput):
   """This class represents, that the pipeline doesn't have any outputs
   useful when you test or you export your data in the process function call
-
-  Args:
-      PipelineOutput (_type_): _description_
   """
   output = []
   def __init__(self) -> None:
