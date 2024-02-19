@@ -27,7 +27,7 @@ Subpackages
 -----------
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    dicomnode.bin
    dicomnode.lib
