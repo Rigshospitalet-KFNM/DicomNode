@@ -408,7 +408,6 @@ def _get_now_datetime(_: InstanceEnvironment) -> datetime:
 def _get_random_number(_:InstanceEnvironment) -> int:
   return randint(1, 2147483646)
 
-###### 
 
 default_report_blueprint = Blueprint([
   CopyElement(0x00080020, Optional=True), # Study Date
@@ -535,8 +534,8 @@ class DicomFactory(ABC):
     raise NotImplementedError #pragma: no cover
 
   def build(self,
-            pivot: Dataset, 
-            blueprint: Blueprint, 
+            pivot: Dataset,
+            blueprint: Blueprint,
             filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
             kwargs: Dict[Any, Any] = {}) -> Dataset:
     """Builds a singular dataset from blueprint and pivot dataset
@@ -545,11 +544,17 @@ class DicomFactory(ABC):
 
     Args:
         pivot (Dataset): Dataset the blueprint will use to extract data from
-        blueprint (Blueprint): Determines what data will be in the newly construct dataset
+        blueprint (Blueprint): Determines what data will be in the newly
+                               constructed dataset
         filling_strategy (FillingStrategy, optional): Strategy to handle tags
-        that in the dataset, but in not the blueprint. Discards ignores the
-        tag, while copies the un-annotated tag.  Defaults to FillingStrategy.DISCARD,
-        and for most dataset this is the sensible option
+                                                      that in the dataset, but
+                                                      in not the blueprint.
+                                                      Discards ignores the tag,
+                                                      while copies the
+                                                      un-annotated tag. Defaults
+                                                      to FillingStrategy.DISCARD,
+                                                      and for most dataset this
+                                                      is the sensible option
 
     Returns:
         Dataset: The constructed dataset

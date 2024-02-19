@@ -13,10 +13,10 @@ __version__ = constants.DICOMNODE_VERSION # This is gonna be annoying
 __author__ = "Christoffer Vilstrup Jensen"
 
 def version() -> str:
-  """Gets the version
+  """Gets the version of the package
 
   Returns:
-      str: _description_
+      str: a string containing the version number separated by dots
   """
   return __version__
 

@@ -18,7 +18,8 @@ import os
 import sys
 sys.path.insert(0, '../../src/dicomnode')
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon', 'myst_parser']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage',
+              'sphinx.ext.napoleon', 'myst_parser']
 napoleon_include_private_with_doc = True
 
 templates_path = ['_templates']
@@ -29,5 +30,5 @@ language = 'english'
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'groundwork'
+html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']

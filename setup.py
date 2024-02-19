@@ -162,7 +162,9 @@ if __name__ == '__main__':
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],
+     "docs" : ["myst_parser", "sphinx-rtd-theme"],
     },
+
     python_requires='>=3.9.1',
     entry_points={
       'console_scripts': [
