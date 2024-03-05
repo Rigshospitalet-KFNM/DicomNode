@@ -1,11 +1,13 @@
-"""Init module mostly here to create a import tree. 
-and get the version
+"""Dicomnode is a library for transformation between dicom and other medical
+image formats, creating a dicom SCP with the intension of being post processing
+of dicom images, including AI models and kinetics modeling.
 """
 
 from importlib import import_module
 from os import environ
 from pathlib import Path
 
+from dicomnode.lib import utils as __utils # 
 
 from . import constants
 
@@ -25,9 +27,7 @@ class _LibraryPaths:
   """Class for holding various path used by the library.
 
   These are intended to be static for the lifetime of the program.
-  However 
   """
-
 
   # These are uninitialzed values
   _working_directory = Path('.')
@@ -76,6 +76,8 @@ class _LibraryPaths:
 
 library_paths = _LibraryPaths()
 
+__data_structures = None
+__dicom = None
 __lib = None
 __tools = None
 __server = None
@@ -103,10 +105,21 @@ def __getattr__(name):
     if __report is None:
       __report = import_module('dicomnode.report')
     return __report
+  if name == 'dicom':
+    global __dicom
+    if __dicom is None:
+      __dicom = import_module('dicomnode.dicom')
+    return __dicom
+  if name == 'data_structures':
+    global __data_structures
+    if __data_structures is None:
+      __data_structures = import_module('dicomnode.data_structures')
   raise AttributeError(f"module {__name__} has no attribute '{name}'")
 
 __all__ = (
   'constants',
+  'data_structures',
+  'dicom',
   'lib',
   'report',
   'server',

@@ -26,7 +26,7 @@ from pydicom import Dataset
 
 # Dicom node package
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.lib.image_tree import DicomTree
+from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.lib.logging import get_logger
 
 logger = get_logger()

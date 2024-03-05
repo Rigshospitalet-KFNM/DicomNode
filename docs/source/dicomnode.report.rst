@@ -4,18 +4,17 @@ dicomnode.report package
 Submodules
 ----------
 
-dicomnode.report.generator module
+dicomnode.report module
 ---------------------------------
 
 .. automodule:: dicomnode.report
    :members:
-   :undoc-members:
    :show-inheritance:
+   :no-index:
 
 dicomnode.report.plot module
 ----------------------------
 
 .. automodule:: dicomnode.report.plot
-   :members:
-   :undoc-members:
+   :members: 
    :show-inheritance:

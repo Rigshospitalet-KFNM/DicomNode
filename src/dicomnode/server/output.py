@@ -17,7 +17,7 @@ from pydicom import Dataset
 
 # Dicomnode Packages
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
-from dicomnode.lib.dimse import Address, send_images
+from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.logging import get_logger
 

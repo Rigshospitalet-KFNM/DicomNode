@@ -1,6 +1,4 @@
-"""Module for the patient header
-
-  """
+"""Module for the latex component patient header"""
 
 # Python Standard Library
 from dataclasses import dataclass
@@ -11,7 +9,7 @@ from pylatex import MiniPage, NoEscape, Package, MdFramed, HFill
 from pylatex.utils import bold
 
 # Dicomnode Packages
-from dicomnode.lib.dicom import format_from_patient_name
+from dicomnode.dicom import format_from_patient_name
 from dicomnode.report import Report, add_line
 from dicomnode.report.base_classes import LaTeXComponent
 from dicomnode.report.latex_components.dicom_frame import DicomFrame

@@ -13,8 +13,8 @@ from shutil import rmtree
 # Third party packages
 
 # Dicomnode packages
-from dicomnode.lib.anonymization import anonymize_dicom_tree, BASE_ANONYMIZED_PATIENT_NAME
-from dicomnode.lib.image_tree import DicomTree, IdentityMapping, _PPrefix
+from dicomnode.dicom.anonymization import anonymize_dicom_tree, BASE_ANONYMIZED_PATIENT_NAME
+from dicomnode.data_structures.image_tree import DicomTree, IdentityMapping, _PPrefix
 from dicomnode.lib.utils import str2bool
 
 def get_parser(subparser : _SubParsersAction):

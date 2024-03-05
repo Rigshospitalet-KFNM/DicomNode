@@ -1,6 +1,5 @@
 """Functions that doesn't have any strong home place
 
-Try and avoid putting functions in here
 """
 
 __author__ = "Christoffer Vilstrup Jensen"
@@ -16,11 +15,13 @@ try:
 except ImportError:
   UNIX = False
 
+from warnings import warn
+
 # Third party packages
 import numpy
-from pydicom import Dataset
 
 # Dicomnode Packages
+# This module is imported first, therefore DO NOT PLACE ANY DICOMNODE MODULES IN HERE
 
 # End of imports
 
@@ -98,7 +99,6 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
   and sadly you need to go deep in the pynetdicom library.
 
   Args:
-      
   """
   if UNIX and getuid() == root_uid:
     if logger is not None:
@@ -110,3 +110,7 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
         logger.info("Cannot drop privileges, not root UID")
       else:
         logger.info("Cannot drop privileges, Not on a unix system")
+
+
+def deprecation_message(deprecated_module_path, new_module_path) -> None:
+  warn(f"{deprecated_module_path} has been moved to {new_module_path}", DeprecationWarning)

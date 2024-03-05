@@ -30,6 +30,7 @@ DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
 # Remember this these need to less than 16 characters!
 # Be cause they are stored in a SH
 DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
-DICOMNODE_VERSION = "0.0.4"
 
+DICOMNODE_VERSION = "0.0.4"
+"""Version of the library"""
 

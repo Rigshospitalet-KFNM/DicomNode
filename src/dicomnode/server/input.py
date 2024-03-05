@@ -18,14 +18,14 @@ from pydicom import Dataset
 from pydicom.uid import UID
 
 # Dicomnode packages
-from dicomnode.lib.dimse import Address, send_move_thread
-from dicomnode.lib.dicom_factory import DicomFactory, Blueprint
+from dicomnode.data_structures.image_tree import ImageTreeInterface
+from dicomnode.dicom.dimse import Address, send_move_thread
+from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
+from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
-from dicomnode.lib.lazy_dataset import LazyDataset
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.grinders import Grinder, IdentityGrinder
-from dicomnode.lib.image_tree import ImageTreeInterface
 
 class AbstractInput(ImageTreeInterface, ABC):
   """Container for dicom sets fulfilling the validate image function.

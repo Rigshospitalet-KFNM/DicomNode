@@ -9,9 +9,9 @@ from pathlib import Path
 # Third party packages
 
 # Dicomnode packages
-from dicomnode.lib.dimse import send_images, Address
+from dicomnode.dicom.dimse import send_images, Address
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
-from dicomnode.lib.image_tree import StudyTree
+from dicomnode.data_structures.image_tree import StudyTree
 #from dicomnode.lib.io import load_private_tags_from_args
 from dicomnode.lib.utils import str2bool
 

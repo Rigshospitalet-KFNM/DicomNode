@@ -22,10 +22,10 @@ the blueprint more and more concrete until you had a house.
 
 This library is in the business of making dicom series, and there's many
 unknowns, but we start by making a blueprint of series, which is found in:
- `dicomnode.lib.dicom_factory`
+ `dicomnode.dicom.dicom_factory`
 
 ```Python
-from dicomnode.lib.dicom_factory import Blueprint
+from dicomnode.dicom.dicom_factory import Blueprint
 
 blueprint = Blueprint()
 ```
@@ -255,7 +255,7 @@ dicom series.
 ## Example
 
 ```python
-from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, SeriesHeader ...
+from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, SeriesHeader ...
 from dicomnode.server.nodes import AbstractPipeline
 
 class MyFactory(DicomFactory):

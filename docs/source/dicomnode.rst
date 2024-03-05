@@ -20,7 +20,6 @@ dicomnode.constants module
 
 .. automodule:: dicomnode.constants
    :members:
-   :undoc-members:
    :show-inheritance:
 
 Subpackages
@@ -30,6 +29,9 @@ Subpackages
    :maxdepth: 2
 
    dicomnode.bin
+   dicomnode.constants
+   dicomnode.dicom
+   dicomnode.datastructures
    dicomnode.lib
    dicomnode.report
    dicomnode.server

@@ -33,8 +33,8 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.lib.dicom_factory import Blueprint, DicomFactory, FillingStrategy
-from dicomnode.lib.dimse import Address
+from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, FillingStrategy
+from dicomnode.dicom.dimse import Address
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import log_traceback, set_logger
