@@ -411,16 +411,7 @@ class AbstractPipeline():
 
       self.logger.debug(f"Sufficient data for patient {patient_id}")
 
-      # Explanation for these if statements:
-      # 1. Can't make a directory in nothing
-      # 2. Just to make the type checker happy
-      # 3. If data and processing are equal, then clean up will be taken care
-      #    by _pipeline_processing instead of this temporary directory. Otherwise
-      #    You will have double clean up, which is confusing.
-
-      if self.processing_directory is not None\
-        or isinstance(self.processing_directory, ProcessingDirectoryOptions)\
-        or self.processing_directory == self.data_directory:
+      if self.processing_directory is not None:
         with TemporaryWorkingDirectory(self.processing_directory / str(patient_id)):
           self._pipeline_processing(patient_id, released_container, patient_input_container)
       else:

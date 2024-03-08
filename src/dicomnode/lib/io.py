@@ -3,15 +3,17 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
+from warnings import warn
 from argparse import Namespace
 from pathlib import Path
 import os
-from typing import Dict, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Tuple, Type, Union
 import shutil
 
 # Thrid party Packages
 import pydicom
 from pydicom import Dataset, Sequence
+from pydicom.errors import InvalidDicomError
 from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Pydicom have some fancy import stuff.
 
@@ -87,21 +89,70 @@ def apply_private_tags(
   return dataset
 
 
-def load_dicom(
-    dicomPath: Path,
-    private_tags: Optional[Dict[int, Tuple[str, str, str, str, str]]] = None
-  ):
-  return pydicom.dcmread(dicomPath)
+def load_dicom(dicom_path: Path) -> Dataset:
+  """Loads a single dicom image, doesn't parse private tags
+  To parse multiple dataset use load_dicoms
+
+  Args:
+      dicom_path (Path): Path to a dicom
+
+  Raises:
+      FileNotFoundError: when dicom_path doesn't exists
+      pydicom.errors.InvalidDicomError: Raised when a path doesn't point to a
+      dicom object
+
+  Returns:
+      Dataset, List[Dataset]]: _description_
+  """
+  if not dicom_path.exists():
+    raise FileNotFoundError("File doesn't exists")
+  if dicom_path.is_dir():
+    raise IsADirectoryError("Loading from a directory is not supported, use load_dicoms")
+
+  return pydicom.dcmread(dicom_path)
+
+def load_dicoms(dicom_path: Path) -> List[Dataset]:
+  if not dicom_path.exists():
+    raise FileNotFoundError
+  datasets = []
+  if dicom_path.is_file():
+    try:
+      dataset = pydicom.dcmread(dicom_path)
+      datasets.append(dataset)
+    except InvalidDicomError:
+      pass
+
+  if dicom_path.is_dir():
+    for path in dicom_path.glob('*'):
+      if path.is_dir() and not (path.name == '..' or path.name == ''):
+        dir_datasets = load_dicoms(path)
+        datasets += dir_datasets
+      else:
+        try:
+          dataset = pydicom.dcmread(path)
+          datasets.append(dataset)
+        except InvalidDicomError:
+          continue
+
+  def sorting_function(ds):
+    if 0x00200013 in ds:
+      return ds[0x00200013].value
+    return -1
+
+  datasets.sort(key=sorting_function)
+
+  return datasets
+
 
 def save_dicom(
-    dicomPath: Path,
+    dicom_path: Path,
     dicom: Dataset
   ):
-  dicomPath = dicomPath.absolute()
-  if not dicomPath.parent.exists():
-    dicomPath.parent.mkdir(parents=True)
+  dicom_path = dicom_path.absolute()
+  if not dicom_path.parent.exists():
+    dicom_path.parent.mkdir(parents=True)
 
-  dicom.save_as(dicomPath, write_like_original=False)
+  dicom.save_as(dicom_path, write_like_original=False)
 
 
 def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str, str, str, str]]:

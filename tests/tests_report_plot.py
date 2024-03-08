@@ -10,6 +10,7 @@ from dicomnode import library_paths
 import nibabel
 
 # Dicomnode Packages
+from dicomnode.lib.io import load_dicoms
 from dicomnode.report.plot.selector import AverageSelector, MaxSelector, PercentageSelector
 from dicomnode.report.plot.triple_plot import TriplePlot
 
@@ -17,7 +18,10 @@ from dicomnode.report.plot.triple_plot import TriplePlot
 
 #nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_epi.nii.gz') # type: ignore
 
+# Path to images
 nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz')
+ct_path = Path(f'{library_paths.report_data_directory}/CT')
+
 if nifti_path.exists():
   nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(nifti_path) # type: ignore
 else:
@@ -39,7 +43,15 @@ class PlotTestCase(TestCase):
 
     tp.save()
 
+  @skipIf(not ct_path.exists(), "Needs CT data")
+  def test_triple_plot_dicom_data(self):
+    datasets = load_dicoms(ct_path)
 
+    options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/ct_triple_plot.png',
+                                 selector=(PercentageSelector(0.30), MaxSelector(), AverageSelector()))
+    tp = TriplePlot(datasets, options)
+
+    tp.save()
 
 
 

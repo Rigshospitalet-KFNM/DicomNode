@@ -33,6 +33,51 @@ from dicomnode.server.grinders import Grinder
 
 logger = get_logger()
 
+
+
+
+def convert_to_nifti(dicom_array: List[Dataset], output_file, reorient):
+  dicom_array.sort(
+    key=lambda a: a[0x00200013].value
+  )
+
+
+  print("Dicom start")
+  dicom = dicom_array[0]
+  print(dicom[0x00180050])
+  print(dicom[0x00200032])
+  print(dicom[0x00200037])
+  print(dicom[0x00280030])
+
+  print("Dicom middle")
+  dicom = dicom_array[len(dicom_array) // 2]
+  print(dicom[0x00180050])
+  print(dicom[0x00200032])
+  print(dicom[0x00200037])
+  print(dicom[0x00280030])
+
+
+  print("Dicom end")
+  dicom = dicom_array[-1]
+  print(dicom[0x00180050])
+  print(dicom[0x00200032])
+  print(dicom[0x00200037])
+  print(dicom[0x00280030])
+
+
+
+  images =  dicom_array_to_nifti(dicom_array, output_file, reorient)['NII']
+
+  print(images.affine)
+
+  return images
+
+
+
+
+
+
+
 class NiftiGrinder(Grinder):
   INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need \
  define a valid Path for output_directory"

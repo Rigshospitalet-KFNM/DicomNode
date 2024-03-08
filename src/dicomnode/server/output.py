@@ -63,14 +63,17 @@ class DicomOutput(PipelineOutput):
 
   def __init__(self,
                output: List[Tuple[Address, Iterable[Dataset]]],
-               ae_title: str) -> None:
+               ae_title: str,
+              ) -> None:
     self.ae_title = ae_title
     super().__init__(output)
 
   def send(self) -> bool:
     success = True
     for address, datasets in self:
+      datasets_list = [dataset for dataset in datasets]
       try:
+        logger.info(f"Sending {len(datasets_list)} datasets to {address.ae_title}")
         send_images(self.ae_title, address, datasets)
       except CouldNotCompleteDIMSEMessage:
         logger.error(f"Could not send to images to {address.ae_title}")

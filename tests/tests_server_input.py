@@ -23,10 +23,10 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 # Dicomnode packages
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 
-from dicomnode.lib.dimse import Address
-from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.dicom_factory import Blueprint
-from dicomnode.lib.numpy_factory import NumpyFactory
+from dicomnode.dicom.dimse import Address
+from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.dicom.dicom_factory import Blueprint
+from dicomnode.dicom.numpy_factory import NumpyFactory
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured

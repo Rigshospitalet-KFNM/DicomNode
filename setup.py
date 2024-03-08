@@ -154,11 +154,12 @@ if __name__ == '__main__':
       'pydicom>=2.3.1,<3.0',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
-      'typing_extensions>=4.4.0',
+      'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
-      'pybind11>=2.10.3',
-      "nibabel",
-      "dicom2nifti"
+      'pybind11>=2.10.3,<3.0.0',
+      "nibabel>=5.1.0,<6.0.0",
+      "dicom2nifti>=2.4.8,<3.0.0",
+      "rt_utils>=1.2.7,<2.0.0"
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],

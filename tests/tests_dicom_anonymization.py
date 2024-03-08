@@ -6,9 +6,9 @@ from pydicom import Dataset, DataElement, Sequence
 from pydicom.valuerep import VR
 from pydicom.uid import MediaStorageDirectoryStorage
 
-from dicomnode.lib.anonymization import anonymize_dicom_tree, anonymize_dataset
-from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.image_tree import DicomTree, IdentityMapping
+from dicomnode.dicom.anonymization import anonymize_dicom_tree, anonymize_dataset
+from dicomnode.dicom import gen_uid
+from dicomnode.data_structures.image_tree import DicomTree, IdentityMapping
 
 class Lib_anonymization(TestCase):
   def setUp(self) -> None:

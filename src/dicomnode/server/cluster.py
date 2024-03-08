@@ -17,7 +17,6 @@ class Cluster:
   nodes: Optional[List[AbstractPipeline, Type[AbstractPipeline]]] = None
   _nodes: List[AbstractPipeline]
 
-
   read_queued_warning = False
 
   def __init_nodes(self, nodes: List[AbstractPipeline, AbstractQueuedPipeline]):

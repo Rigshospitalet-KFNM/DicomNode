@@ -1,16 +1,19 @@
 # Python Standard Library
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional, Union, Tuple, Dict
+from typing import Callable, List, Optional, Tuple, Union
 
 # Third party packages
 import numpy
 import nibabel
+from pydicom import Dataset
 from matplotlib.transforms import Affine2D
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import LinearLocator, FuncFormatter
 
 # Dicomnode packages
+from dicomnode import library_paths
+from dicomnode.dicom.nifti import convert_to_nifti
 from dicomnode.lib.exceptions import MissingNiftiImage
 from dicomnode.lib.logging import get_logger
 from dicomnode.report.base_classes import Selector
@@ -30,10 +33,10 @@ class TriplePlot(Plot):
     transform: Callable = rotate_image_90
 
   def __init__(self,
-               nifti_image: nibabel.nifti1.Nifti1Image,
+               images: Union[nibabel.nifti1.Nifti1Image, List[Dataset]],
                options = Options()) -> None:
     logger = get_logger()
-    super().__init__()
+    super().__init__(file_path=options.file_path)
     self.figure.set_figheight(6.0)
     self.figure.set_figwidth(15.0)
 
@@ -42,7 +45,10 @@ class TriplePlot(Plot):
     self.plot_2 = self._figure.add_subplot(grid_spec[1])
     self.plot_3 = self._figure.add_subplot(grid_spec[2])
 
-    image = nifti_image.get_fdata()
+    if isinstance(images, List):
+      images = convert_to_nifti(images, f'{library_paths.figure_directory}/test.nii', False)
+
+    image = images.get_fdata()
     if image is None: # pragma: no cover
       logger.error("The input image to the triple plot is missing in the nifti file.")
       raise MissingNiftiImage

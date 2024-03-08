@@ -71,8 +71,11 @@ def send_image(SCU_AE: str, address: Address, dicom_image: Dataset) -> Dataset:
 def send_images(SCU_AE: str,
                 address: Address,
                 dicom_images: Iterable[Dataset],
-                error_callback_func: Optional[Callable[[Address, Dataset, Dataset], None]] = None
+                error_callback_func: Optional[Callable[[Address, Dataset, Dataset], None]] = None,
+                logger=None
   ):
+  if logger is None:
+    logger = get_logger()
   ae = ApplicationEntity(ae_title=SCU_AE)
   contexts = set()
   for image in dicom_images:

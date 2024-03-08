@@ -3,6 +3,7 @@ dist/
 *.egg-info/
 build/
 .coverage
+coverage/
 __pycache__/
 report_data/
 playground/

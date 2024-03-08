@@ -36,4 +36,4 @@ if [ -d coverage ]; then
   mkdir -p coverage
 fi
 
-coverage-lcov --output_file_path coverage/lcov.info
+coverage lcov coverage/lcov.info

@@ -10,8 +10,8 @@ import numpy
 from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
-from dicomnode.lib.dicom import make_meta
-from dicomnode.lib.lazy_dataset import LazyDataset
+from dicomnode.dicom import make_meta
+from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.io import save_dicom, load_dicom
 
 from tests.helpers import generate_numpy_datasets

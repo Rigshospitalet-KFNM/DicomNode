@@ -17,8 +17,8 @@ from pydicom.uid import SecondaryCaptureImageStorage
 # Dicomnode Imports
 from dicomnode import library_paths
 from dicomnode.lib.io import save_dicom
-from dicomnode.lib.dicom import generate_uid, make_meta
-from dicomnode.lib.numpy_factory import NumpyFactory # Need this class because Dicom Factory is an abstract class
+from dicomnode.dicom import generate_uid, make_meta
+from dicomnode.dicom.numpy_factory import NumpyFactory # Need this class because Dicom Factory is an abstract class
 from dicomnode.report import Report
 from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table

@@ -20,12 +20,12 @@ from pynetdicom import debug_logger
 from pydicom import Dataset
 from pydicom.uid import RawDataStorage, ImplicitVRLittleEndian
 
-from dicomnode.lib.dicom import gen_uid, make_meta
-from dicomnode.lib.dimse import Address, send_image, send_images_thread
-from dicomnode.lib.dicom_factory import Blueprint, CopyElement, StaticElement
-from dicomnode.lib.numpy_factory import NumpyFactory
+from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.dicom.dimse import Address, send_image, send_images_thread
+from dicomnode.dicom.dicom_factory import Blueprint, CopyElement, StaticElement
+from dicomnode.dicom.numpy_factory import NumpyFactory
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
-from dicomnode.lib.image_tree import DicomTree
+from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput
 from dicomnode.server.nodes import AbstractPipeline, AbstractThreadedPipeline, AbstractQueuedPipeline
@@ -116,6 +116,21 @@ class FileStorageNode(AbstractPipeline):
     self.logger.info(log_message)
     return NoOutput()
 
+class StallingFileStorageNode(AbstractPipeline):
+  ae_title = TEST_AE_TITLE
+  input = {INPUT_KW : TestNeverValidatingInput }
+  require_calling_aet = [SENDER_AE_TITLE]
+  log_output = None
+  log_level: int = logging.DEBUG
+  disable_pynetdicom_logger: bool = True
+  root_data_directory = DICOM_STORAGE_PATH
+  processing_directory = PROCESSING_DIRECTORY
+
+  def process(self, input_data: InputContainer) -> PipelineOutput:
+    log_message =  f"process is called at cwd: {os.getcwd()}"
+    self.logger.info(log_message)
+    return NoOutput()
+
 class FaultyFilterNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : TestInput }
@@ -156,7 +171,8 @@ class ConcurrencyNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {INPUT_KW : ListInput }
   require_calling_aet = [SENDER_AE_TITLE]
-  log_level: int = logging.CRITICAL
+  log_level: int = logging.DEBUG
+  log_output = None
   images_processed: Optional[int] = None
   processing_directory = None
 
@@ -360,8 +376,7 @@ class FaultyNodeTestCase(TestCase):
       address = Address('localhost', self.test_port, TEST_AE_TITLE)
       response = send_image(SENDER_AE_TITLE, address, DEFAULT_DATASET)
       self.assertEqual(response.Status, 0x0000)
-    self.assertIn("CRITICAL:dicomnode:processing", cm.output)
-    self.assertIn("CRITICAL:dicomnode:Encountered exception: Exception", cm.output)
+    self.assertIn("CRITICAL:dicomnode:Exception in user Processing", cm.output)
 
 
 class FileStorageTestCase(TestCase):
@@ -376,25 +391,7 @@ class FileStorageTestCase(TestCase):
     while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005) #pragma: no cover
 
-    #pprint([t for t in threading.enumerate()])
     self.node.close()
-
-  @bench
-  def performance_send_fs(self):
-    address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
-
-    images_1.map(personify(
-      tags=[
-        (0x00100010, "PN", "Odd Haugen Test"),
-        (0x00100040, "CS", "M")
-      ]
-    ))
-
-    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
-    ret_1 = thread_1.join()
-    self.assertEqual(ret_1, 0)
-    self.assertEqual(self.node.data_state.images,50) # type: ignore
 
   def test_send_concurrently_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
@@ -435,6 +432,40 @@ class FileStorageTestCase(TestCase):
     self.assertEqual(ret_1, 0)
     self.assertEqual(ret_2, 0)
     self.assertEqual(self.node.data_state.images, 0)
+
+class StallingFileStorageTestCase(TestCase):
+  def setUp(self):
+    DICOM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+    self.node = StallingFileStorageNode()
+    self.test_port = randint(1025,65535)
+    self.node.port = self.test_port
+    self.node.open(blocking=False)
+
+  def tearDown(self) -> None:
+    while self.node.dicom_application_entry.active_associations != []:
+      sleep(0.005) #pragma: no cover
+
+    #pprint([t for t in threading.enumerate()])
+    self.node.close()
+
+  @bench
+  def performance_send_fs(self):
+    address = Address('localhost', self.test_port, TEST_AE_TITLE)
+    images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
+
+    images_1.map(personify(
+      tags=[
+        (0x00100010, "PN", "Odd Haugen Test"),
+        (0x00100040, "CS", "M")
+      ]
+    ))
+
+    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+
+    ret_1 = thread_1.join()
+    self.assertEqual(ret_1, 0)
+    self.assertEqual(self.node.data_state.images,50) # type: ignore
+
 
 class SetupLessFileStorageTestCase(TestCase):
   """This test case is for testing the various current working directory changes
@@ -677,8 +708,7 @@ class FaultyQueueTestCase(TestCase):
 
     self.node.process_queue.join()
 
-    self.assertIn("CRITICAL:dicomnode:processing", cm.output)
-    self.assertIn("CRITICAL:dicomnode:Encountered exception: Exception", cm.output)
+    self.assertIn("CRITICAL:dicomnode:Exception in user Processing", cm.output)
 
     self.assertEqual(response.Status, 0x0000)
 

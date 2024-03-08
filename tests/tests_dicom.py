@@ -7,7 +7,7 @@ from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRL
 from pydicom.valuerep import PersonName
 
 # Dicomnode packages
-from dicomnode.lib.dicom import get_tag, make_meta, gen_uid, extrapolate_image_position_patient,\
+from dicomnode.dicom import get_tag, make_meta, gen_uid, extrapolate_image_position_patient,\
   extrapolate_image_position_patient_dataset, format_from_patient_name_str, format_from_patient_name
 from dicomnode.lib.exceptions import InvalidDataset
 

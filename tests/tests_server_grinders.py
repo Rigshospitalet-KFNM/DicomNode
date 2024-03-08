@@ -4,8 +4,8 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.lib.image_tree import DicomTree
-from dicomnode.lib.dicom import gen_uid, make_meta
+from dicomnode.data_structures.image_tree import DicomTree
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.server.grinders import IdentityGrinder, ListGrinder, DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder
 
 import numpy

@@ -13,8 +13,8 @@ from unittest import TestCase
 
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
-from dicomnode.lib.dicom import gen_uid
-from dicomnode.lib.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
+from dicomnode.dicom import gen_uid
+from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   general_series_blueprint, SeriesHeader, Blueprint, SeriesElement, StaticElement, SOP_common_blueprint, image_plane_blueprint, InstanceCopyElement, _add_InstanceNumber, \
   InstanceEnvironment, SequenceElement
 from dicomnode.lib.exceptions import InvalidTagType, IncorrectlyConfigured, HeaderConstructionFailure

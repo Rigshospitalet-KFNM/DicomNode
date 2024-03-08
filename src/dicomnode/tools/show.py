@@ -43,4 +43,4 @@ def entry_func(args : Namespace):
   """
   private_tags = load_private_tags_from_args(args)
   for dicomfile in args.dicomfile:
-    pprint(load_dicom(dicomfile, private_tags=private_tags))
+    pprint(load_dicom(dicomfile))

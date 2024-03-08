@@ -16,8 +16,8 @@ from pynetdicom import debug_logger
 # Dicomnode packages
 from dicomnode.lib.exceptions import InvalidQueryDataset, CouldNotCompleteDIMSEMessage
 from dicomnode.lib.logging import get_logger, DEBUG
-from dicomnode.lib.dicom import make_meta
-from dicomnode.lib.dimse import send_move, Address, QueryLevels
+from dicomnode.dicom import make_meta
+from dicomnode.dicom.dimse import send_move, Address, QueryLevels
 
 # Dicomnode tests helpers
 from tests.helpers import get_test_ae

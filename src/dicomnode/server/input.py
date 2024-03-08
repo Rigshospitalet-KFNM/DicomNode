@@ -85,7 +85,7 @@ class AbstractInput(ImageTreeInterface, ABC):
       if not self.path.exists():
         self.path.mkdir(exist_ok=True)
       for image_path in self.path.iterdir():
-        dcm = load_dicom(image_path, self._private_tags)
+        dcm = load_dicom(image_path)
         self.add_image(dcm)
 
 

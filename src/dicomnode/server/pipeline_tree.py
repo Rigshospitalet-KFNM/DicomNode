@@ -18,11 +18,11 @@ from typing import Any, Dict, List, Optional, Type, Iterable, Set
 from pydicom import Dataset
 
 # Dicomnode Library Packages
+from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.dicom.dimse import Address
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode, HeaderConstructionFailure)
-from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.lib.logging import log_traceback, get_logger
 from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
 

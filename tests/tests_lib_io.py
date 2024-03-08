@@ -1,12 +1,15 @@
 
-from asyncore import write
+# Python Standard library
 from unittest import TestCase
-from pydicom import Dataset, DataElement, Sequence
-from dicomnode.lib import io
 
+# Thrid party packages
+from pydicom import Dataset, DataElement, Sequence
 from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_sequence, write_data_element
 from pydicom.datadict import DicomDictionary, keyword_dict
+
+# Dicomnode packages
+from dicomnode.lib import io
 
 class lib_io_test_case(TestCase):
   test_tag = 0x13374269
