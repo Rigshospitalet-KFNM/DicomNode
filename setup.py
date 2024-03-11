@@ -2,6 +2,7 @@
 import os
 import sys
 import re
+import glob
 import subprocess
 from pathlib import Path
 import shutil
@@ -9,7 +10,10 @@ import shutil
 # Thrid party Tools
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
-from pybind11.setup_helpers import Pybind11Extension
+try:
+  from pybind11.setup_helpers import Pybind11Extension
+except ImportError:
+  from setuptools import Extension as Pybind11Extension
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -24,10 +28,9 @@ class CMakeExtension(Extension):
     super().__init__(name, sources=[])
     self.sourcedir = os.fspath(Path(sourcedir).resolve())
 
-
-
 class CMakeBuild(build_ext):
   def build_extension(self, ext: CMakeExtension) -> None:
+    print("build Extension is called!")
     # Must be in this form due to bug in .resolve() only fixed in Python 3.10+
     ext_fullpath = Path.cwd() / self.get_ext_fullpath(ext.name)  # type: ignore[no-untyped-call]
     extdir = ext_fullpath.parent.resolve()
@@ -122,6 +125,7 @@ class CMakeBuild(build_ext):
       subprocess.run(
         ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
       )
+      print("Build Successfully")
     except:
       print(f"failed to build {ext.name}")
 
@@ -129,16 +133,19 @@ class CMakeBuild(build_ext):
     try:
       return super().copy_extensions_to_source()
     except Exception as E:
-      print(f"failed to build {E}")
+      print(f"failed to copy! {E}")
 
 
 if __name__ == '__main__':
+  print("building from setup.py")
   extensions = [
     CMakeExtension("dicomnode._c")
   ]
 
   if shutil.which("nvcc"):
-    extensions.append(CMakeExtension("dicomnode._cuda"))
+    extensions.append(
+      CMakeExtension("dicomnode._cuda")
+    )
 
   setup(name='dicomnode',
     version='0.0.4.3',
@@ -146,14 +153,16 @@ if __name__ == '__main__':
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
     package_dir={"":"src"},
-    ext_modules=extensions,
+    zip_safe=False,
     cmdclass={"build_ext": CMakeBuild},
+    ext_modules=extensions,
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
       'pydicom>=2.3.1,<3.0',
       'pynetdicom>=2.0.2',
       'psutil>=5.9.2',
+      'pybind11[global]>=2.11.1,<3.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
       'pybind11>=2.10.3,<3.0.0',

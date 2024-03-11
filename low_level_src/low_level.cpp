@@ -16,15 +16,15 @@ struct buffer_info {
 };
 */
 
+namespace py = pybind11;
 
 
-
-pybind11::array_t<double> add_arrays(
-    pybind11::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>input1,
-    pybind11::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>input2
+py::array_t<double> add_arrays(
+    py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>input1,
+    py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>input2
   ){
-  pybind11::buffer_info buf_1 = input1.request();
-  pybind11::buffer_info buf_2 = input2.request();
+  py::buffer_info buf_1 = input1.request();
+  py::buffer_info buf_2 = input2.request();
 
   if (buf_1.ndim != 1 || buf_2.ndim != 1)
     throw std::runtime_error("Number of dimensions must be one");
@@ -34,7 +34,7 @@ pybind11::array_t<double> add_arrays(
 
   auto result = pybind11::array_t<double>(buf_1.size);
 
-  pybind11::buffer_info buf_3 = result.request();
+  py::buffer_info buf_3 = result.request();
 
   double *ptr1 = static_cast<double *>(buf_1.ptr);
   double *ptr2 = static_cast<double *>(buf_2.ptr);
@@ -50,7 +50,7 @@ PYBIND11_MODULE(_c, m){
   m.doc() = "pybind11 example plugin";
   m.attr("__name__") = "dicomnode._c";
 
-  m.def("add_arrays", &add_arrays, pybind11::return_value_policy::move, "A function that adds two numpy arrays");
+  m.def("add_arrays", &add_arrays, py::return_value_policy::move, "A function that adds two numpy arrays");
 }
 
 #endif
