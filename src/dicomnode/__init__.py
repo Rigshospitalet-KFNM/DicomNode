@@ -90,6 +90,7 @@ __data_structures = None
 __dicom = None
 __lib = None
 __tools = None
+__performance = None
 __server = None
 __report = None
 
@@ -100,34 +101,49 @@ def __getattr__(name):
     if __lib is None:
       __lib = import_module('dicomnode.lib')
     return __lib
+
   if name == 'tools':
     global __tools
     if __tools is None:
       __tools = import_module('dicomnode.tools')
     return __tools
+
   if name == 'server':
     global __server
     if __server is None:
       __server = import_module('dicomnode.server')
     return __server
+
   if name == 'report':
     global __report
     if __report is None:
       __report = import_module('dicomnode.report')
     return __report
+
   if name == 'dicom':
     global __dicom
     if __dicom is None:
       __dicom = import_module('dicomnode.dicom')
     return __dicom
+
   if name == 'data_structures':
     global __data_structures
     if __data_structures is None:
       __data_structures = import_module('dicomnode.data_structures')
+    return __data_structures
+
+  if name == 'performance':
+    global __performance
+    if __performance is None:
+      __performance = import_module('dicomnode.performance')
+    return __performance
+
   raise AttributeError(f"module {__name__} has no attribute '{name}'")
+
 
 __all__ = (
   'constants',
+  'performance',
   'data_structures',
   'dicom',
   'lib',

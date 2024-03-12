@@ -11,7 +11,6 @@ playground/
 .vscode/
 lcov.info
 *.austin
-performance/
 *.so
 cspell.json
 tests_report_pe2i_report.py

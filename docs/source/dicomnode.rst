@@ -20,6 +20,7 @@ dicomnode.constants module
 
 .. automodule:: dicomnode.constants
    :members:
+   :undoc-members:
    :show-inheritance:
 
 Subpackages
