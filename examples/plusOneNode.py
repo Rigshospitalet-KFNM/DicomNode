@@ -7,13 +7,12 @@ from numpy import ndarray
 
 import logging
 
-
 from os import environ
 
-from dicomnode.lib.dimse import Address
-from dicomnode.lib.numpy_factory import NumpyFactory, CTImageStorage_NumpyBlueprint
+from dicomnode.dicom.dimse import Address
+from dicomnode.dicom.numpy_factory import NumpyFactory, CTImageStorage_NumpyBlueprint
 from dicomnode.server.grinders import NumpyGrinder
-from dicomnode.lib.sop_mapping import CTImageStorage_required_tags
+from dicomnode.dicom.sop_mapping import CTImageStorage_required_tags
 
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline

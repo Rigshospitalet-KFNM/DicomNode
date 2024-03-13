@@ -4,3 +4,16 @@ requires = ["setuptools>42","wheel", "pybind11>=2.11.1", "cmake>=3.28"]
 build-backend = "setuptools.build_meta"
 
 #name = dicomnode
+
+
+[tool.coverage.run]
+
+[tool.coverage.report]
+show-missing=true
+skip-covered=true
+omit = [
+  "tests/*"
+]
+
+[tool.coverage.lcov]
+output="coverage/coverage.lcov"

@@ -91,10 +91,10 @@ __global__ void kernel_3D_mirror_Z(T* data_in,
 
 template<typename T>
 __global__ void kernel_3D_mirror_XY(T* data_in,
-                                   T* data_out,
-                                   uint32_t x_dim,
-                                   uint32_t y_dim,
-                                   uint32_t z_dim){
+                                    T* data_out,
+                                    uint32_t x_dim,
+                                    uint32_t y_dim,
+                                    uint32_t z_dim){
   uint32_t global_index = blockDim.x * blockIdx.x + threadIdx.x;
   uint32_t x_in = global_index % x_dim;
   uint32_t y_in = global_index / x_dim % y_dim;
@@ -132,12 +132,13 @@ __global__ void kernel_3D_mirror_XZ(T* data_in,
       data_in[index3D(x_in, y_in, z_in, x_dim, y_dim, z_dim)];
   }
 }
+
 template<typename T>
 __global__ void kernel_3D_mirror_YZ(T* data_in,
-                                   T* data_out,
-                                   uint32_t x_dim,
-                                   uint32_t y_dim,
-                                   uint32_t z_dim){
+                                    T* data_out,
+                                    uint32_t x_dim,
+                                    uint32_t y_dim,
+                                    uint32_t z_dim){
   uint32_t global_index = blockDim.x * blockIdx.x + threadIdx.x;
   uint32_t x_in = global_index % x_dim;
   uint32_t y_in = global_index / x_dim % y_dim;
@@ -153,12 +154,13 @@ __global__ void kernel_3D_mirror_YZ(T* data_in,
       data_in[index3D(x_in, y_in, z_in, x_dim, y_dim, z_dim)];
   }
 }
+
 template<typename T>
 __global__ void kernel_3D_mirror_XYZ(T* data_in,
-                                   T* data_out,
-                                   uint32_t x_dim,
-                                   uint32_t y_dim,
-                                   uint32_t z_dim){
+                                     T* data_out,
+                                     uint32_t x_dim,
+                                     uint32_t y_dim,
+                                     uint32_t z_dim){
   uint32_t global_index = blockDim.x * blockIdx.x + threadIdx.x;
   uint32_t x_in = global_index % x_dim;
   uint32_t y_in = global_index / x_dim % y_dim;
@@ -175,15 +177,13 @@ __global__ void kernel_3D_mirror_XYZ(T* data_in,
   }
 }
 
-
 // py::array::c_style | py::array::forcecast ensures that the array is a dense
 // C style array, I should consider overloading to F style as it's just indexing
 // And the depth is O(1)
-
 template<typename T, void (*kernel)(T*, T*, uint32_t, uint32_t, uint32_t)>
-int mirror(pybind11::array_t<T, pybind11::array::c_style
-                              | pybind11::array::forcecast> arr){
-  auto arr_buffer = arr.request();
+int map3D(pybind11::array_t<T, pybind11::array::c_style
+                             | pybind11::array::forcecast> arr){
+  pybind11::buffer_info arr_buffer = arr.request(true);
   uint64_t buffer_size = arr_buffer.size * sizeof(T);
 
   if(arr_buffer.ndim != 3){
@@ -196,23 +196,17 @@ int mirror(pybind11::array_t<T, pybind11::array::c_style
   // Device points
   T* dev_in;
   T* dev_out;
-  // Macro this away
-  error = cudaMalloc(&dev_in, buffer_size);
+  // We allocate once, and index into dev_in to place dev_in
+  error = cudaMalloc(&dev_in, 2 * buffer_size);
   if(error != cudaSuccess){
     return (int)error;
   }
 
+  // why allocate twice, when you can allocate once?
+  dev_out = dev_in + arr_buffer.size;
 
   error = cudaMemcpy(dev_in, arr_buffer.ptr, buffer_size,
                      cudaMemcpyHostToDevice);
-  if(error != cudaSuccess){
-    cudaFree(dev_in);
-    return (int)error;
-  }
-
-
-
-  error = cudaMalloc(&dev_out, buffer_size);
   if(error != cudaSuccess){
     cudaFree(dev_in);
     return (int)error;
@@ -227,19 +221,15 @@ int mirror(pybind11::array_t<T, pybind11::array::c_style
                 ? threads / threads_per_block
                 : threads / threads_per_block + 1;
 
-  // I was unable to place the kernel as a template param
-
-    kernel<<<blocks,threads_per_block>>>(dev_in,
-                                                     dev_out,
-                                                     arr_buffer.shape[2],
-                                                     arr_buffer.shape[1],
-                                                     arr_buffer.shape[0]);
-
+  kernel<<<blocks,threads_per_block>>>(dev_in,
+                                       dev_out,
+                                       arr_buffer.shape[2],
+                                       arr_buffer.shape[1],
+                                       arr_buffer.shape[0]);
 
   error = cudaGetLastError();
   if(error != cudaSuccess){
     cudaFree(dev_in);
-    cudaFree(dev_out);
     return (int)error;
   }
 
@@ -248,7 +238,6 @@ int mirror(pybind11::array_t<T, pybind11::array::c_style
 
   // I assume you can always free, this might be wrong
   cudaFree(dev_in);
-  cudaFree(dev_out);
 
   return (int)error;
 }
@@ -270,83 +259,82 @@ void apply_mirror_module(pybind11::module& m){
   const char* mirror_yz_doc = "Mirror as 3D volume along the Y axis and the Z axis";
   const char* mirror_xyz_doc = "Mirror as 3D volume along the X,Y,Z axis";
 
-  m.def(mirror_x_name, &mirror<double  , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<float   , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<int8_t  , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<int16_t , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<int32_t , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<int64_t , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<uint8_t , kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<uint16_t, kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<uint32_t, kernel_3D_mirror_X>, mirror_x_doc);
-  m.def(mirror_x_name, &mirror<uint64_t, kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<double  , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<float   , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<int8_t  , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<int16_t , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<int32_t , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<int64_t , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<uint8_t , kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<uint16_t, kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<uint32_t, kernel_3D_mirror_X>, mirror_x_doc);
+  m.def(mirror_x_name, &map3D<uint64_t, kernel_3D_mirror_X>, mirror_x_doc);
 
-  m.def(mirror_y_name, &mirror<double  , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<float   , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<int8_t  , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<int16_t , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<int32_t , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<int64_t , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<uint8_t , kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<uint16_t, kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<uint32_t, kernel_3D_mirror_Y>, mirror_y_doc);
-  m.def(mirror_y_name, &mirror<uint64_t, kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<double  , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<float   , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<int8_t  , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<int16_t , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<int32_t , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<int64_t , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<uint8_t , kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<uint16_t, kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<uint32_t, kernel_3D_mirror_Y>, mirror_y_doc);
+  m.def(mirror_y_name, &map3D<uint64_t, kernel_3D_mirror_Y>, mirror_y_doc);
 
-  m.def(mirror_z_name, &mirror<double  , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<float   , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<int8_t  , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<int16_t , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<int32_t , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<int64_t , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<uint8_t , kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<uint16_t, kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<uint32_t, kernel_3D_mirror_Z>, mirror_z_doc);
-  m.def(mirror_z_name, &mirror<uint64_t, kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<double  , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<float   , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<int8_t  , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<int16_t , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<int32_t , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<int64_t , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<uint8_t , kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<uint16_t, kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<uint32_t, kernel_3D_mirror_Z>, mirror_z_doc);
+  m.def(mirror_z_name, &map3D<uint64_t, kernel_3D_mirror_Z>, mirror_z_doc);
 
-  m.def(mirror_xy_name, &mirror<double  , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<float   , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<int8_t  , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<int16_t , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<int32_t , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<int64_t , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<uint8_t , kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<uint16_t, kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<uint32_t, kernel_3D_mirror_XY>, mirror_xy_doc);
-  m.def(mirror_xy_name, &mirror<uint64_t, kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<double  , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<float   , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<int8_t  , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<int16_t , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<int32_t , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<int64_t , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<uint8_t , kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<uint16_t, kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<uint32_t, kernel_3D_mirror_XY>, mirror_xy_doc);
+  m.def(mirror_xy_name, &map3D<uint64_t, kernel_3D_mirror_XY>, mirror_xy_doc);
 
-  m.def(mirror_xz_name, &mirror<double  , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<float   , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<int8_t  , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<int16_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<int32_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<int64_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<uint8_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<uint16_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<uint32_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
-  m.def(mirror_xz_name, &mirror<uint64_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<double  , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<float   , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<int8_t  , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<int16_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<int32_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<int64_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<uint8_t , kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<uint16_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<uint32_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
+  m.def(mirror_xz_name, &map3D<uint64_t, kernel_3D_mirror_XZ>, mirror_xz_doc);
 
-  m.def(mirror_yz_name, &mirror<double  , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<float   , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<int8_t  , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<int16_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<int32_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<int64_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<uint8_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<uint16_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<uint32_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
-  m.def(mirror_yz_name, &mirror<uint64_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<double  , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<float   , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<int8_t  , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<int16_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<int32_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<int64_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<uint8_t , kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<uint16_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<uint32_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
+  m.def(mirror_yz_name, &map3D<uint64_t, kernel_3D_mirror_YZ>, mirror_yz_doc);
 
-  m.def(mirror_xyz_name, &mirror<double  , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<float   , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<int8_t  , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<int16_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<int32_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<int64_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<uint8_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<uint16_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<uint32_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-  m.def(mirror_xyz_name, &mirror<uint64_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
-
+  m.def(mirror_xyz_name, &map3D<double  , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<float   , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<int8_t  , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<int16_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<int32_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<int64_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<uint8_t , kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<uint16_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<uint32_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
+  m.def(mirror_xyz_name, &map3D<uint64_t, kernel_3D_mirror_XYZ>, mirror_xyz_doc);
 }
 
 #endif

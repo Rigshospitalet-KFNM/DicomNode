@@ -1,6 +1,6 @@
 """Modules related to creating a data processing pipeline or a dicomnode"""
-from .. import dicom as __dicom # This is ensure correct loading
 from .. import lib as __lib # This is ensure correct loading
+from .. import dicom as __dicom # This is ensure correct loading
 
 from . import factories
 from . import grinders

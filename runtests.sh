@@ -30,10 +30,10 @@ fi
 export DICOMNODE_ENV_REPORT_DATA_PATH="$current_directory/report_data/"
 
 coverage run runtests.py $@
-coverage report --show-missing --omit=/lib/tests/*,tests/*,runtests.py,venv/* --skip-covered
+coverage report --omit=tests/*
 
 if [ -d coverage ]; then
   mkdir -p coverage
 fi
 
-coverage lcov coverage/lcov.info
+coverage lcov

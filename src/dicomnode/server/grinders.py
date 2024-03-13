@@ -93,8 +93,8 @@ class TagGrinder(Grinder):
     self.optional = optional
     self.tag_list:List[int] = tag_list
 
-  def __call__(self, image_generator: Iterable[Dataset]):
-    value_list: List[Tuple[int, Any]] = []
+  def __call__(self, image_generator: Iterable[Dataset]) -> Dict[int, Any]:
+    value_dict = {}
     pivot: Optional[Dataset] = None
     for dataset in image_generator:
       pivot = dataset # assume the tags are shared
@@ -104,11 +104,11 @@ class TagGrinder(Grinder):
 
     for tag in self.tag_list:
       if tag in pivot:
-        value_list.append((tag, pivot[tag].value))
+        value_dict[tag] = pivot[tag].value
       elif not self.optional:
         raise InvalidDataset
 
-    return value_list
+    return value_dict
 
 
 class ManyGrinder(Grinder):

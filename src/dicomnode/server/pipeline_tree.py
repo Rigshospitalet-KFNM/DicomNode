@@ -21,6 +21,7 @@ from pydicom import Dataset
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.dicom.dimse import Address
+from dicomnode.dicom.series import Series
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
                                       InvalidTreeNode, HeaderConstructionFailure)
 from dicomnode.lib.logging import log_traceback, get_logger
@@ -33,9 +34,12 @@ class InputContainer:
 
   def __init__(self,
                data: Dict[str, Any],
+               datasets: Dict[str, Iterable[Dataset]] = {},
                header: Optional[SeriesHeader] = None,
-               paths: Optional[Dict[str, Path]] = None) -> None:
+               paths: Optional[Dict[str, Path]] = None,
+               ) -> None:
     self.__data = data
+    self.datasets = datasets
     self.header = header
     self.paths  = paths
 
@@ -52,7 +56,6 @@ class PatientNode(ImageTreeInterface):
 
   This class is responsible for:
     - Determine if there's sufficient data to run the pipeline processing
-    - Initializing a SeriesHeader
     - Creating InputContainer
   """
   #In most cases, each subnode is also a leaf.
@@ -61,7 +64,6 @@ class PatientNode(ImageTreeInterface):
   class Options:
     InputContainerType: Type[InputContainer] = InputContainer
     "Type that this node should return from a extract_input_container call"
-
 
     container_path: Optional[Path] = None
     """Path to permanent storage
@@ -78,41 +80,25 @@ class PatientNode(ImageTreeInterface):
     Injected Into AbstractInputs
     """
 
-    # Dicom Header creation
-    factory: Optional[DicomFactory] = None
-    """Factory that should produce the series header, if None produce
-    no Series header
-    Injected Into AbstractInputs
-    """
-    header_blueprint: Optional[Blueprint] = None
-    """The blueprint that the series header should be created from,
-    if None no SeriesHeader will produced.
-    Injected Into AbstractInputs
-    """
-    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
-    """Strategy that DicomFactory will follow, when creating SeriesHeader
-    Injected Into AbstractInputs
-    """
     parent_input: Optional[str] = None
     """The input that will be used as parent input in header creation,
     if None an arbitrary input is used.
     Injected Into AbstractInputs"""
-    """Options for a patient node
-    """
+
+
     ae_title: Optional[str] = None
     container_path: Optional[Path] = None
-    factory: Optional[DicomFactory] = None
+
     lazy: bool = False
+
     logger: Optional[Logger] = None
-    header_blueprint: Optional[Blueprint] = None
-    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
+
     input_container_type: Type[InputContainer] = InputContainer
-    pivot_input: Optional[str] = None
+
 
 
   def __init__(self,
                args: Dict[str, Type[AbstractInput]],
-               pivot: Optional[Dataset] = None, # See lazyness
                options: Options = Options(),
     ) -> None:
     super().__init__()
@@ -131,7 +117,6 @@ class PatientNode(ImageTreeInterface):
 
       input_options = self._get_input_options(dicomnode_input=dicomnode_input_type,
                                               input_path=input_path)
-
       self.data[arg_name] = dicomnode_input_type(options=input_options)
 
     # logger
@@ -139,32 +124,6 @@ class PatientNode(ImageTreeInterface):
       self.logger = self.options.logger
     else:
       self.logger = get_logger()
-
-  # Helper function that must be class functions as name mangling fucks them up
-  # if they were just private module functions
-  def _type_check_list(self,
-                        dicom_list: List[Dataset],
-                        maybe_dicom_iterator: Iterable[Any]) -> None:
-    for maybe_dicom in maybe_dicom_iterator:
-      if isinstance(maybe_dicom, Dataset):
-        dicom_list.append(maybe_dicom)
-      else:
-        raise InvalidTreeNode #pragma: no cover
-
-  def __extract_pivot_list(self,abstract_input: AbstractInput) -> List[Dataset]:
-    return_list: List[Dataset] = []
-    if isinstance(abstract_input, DynamicInput):
-      for dynamic_leaf in abstract_input.data.values():
-        if isinstance(dynamic_leaf, DynamicLeaf):
-          self._type_check_list(return_list, dynamic_leaf)
-        else:
-          raise InvalidTreeNode # pragma: no cover
-        break
-    else:
-      self._type_check_list(return_list, abstract_input)
-
-    return return_list
-
 
   def clean_up(self) -> int:
     """This function cleans up the patient node and owned all inputs
@@ -201,17 +160,17 @@ class PatientNode(ImageTreeInterface):
         InputContainer: _description_
     """
     data_directory: Dict[str, Any] = {}
+    series = {}
 
-    path_directory: Optional[Dict[str, Path]]
-    if self.options.container_path is None:
-      path_directory = None
-    else:
+    path_directory: Optional[Dict[str, Path]] = None
+    if self.options.container_path is not None:
       path_directory = {}
 
     for arg_name, dicomnode_input in self.data.items():
       if isinstance(dicomnode_input, AbstractInput):
         self.logger.debug(f"Extracting input from {dicomnode_input.__class__.__name__}")
         data_directory[arg_name] = dicomnode_input.get_data()
+        series[arg_name] = dicomnode_input.get_datasets()
         if path_directory is not None and dicomnode_input.path is not None:
           path_directory[arg_name] = dicomnode_input.path
       else:
@@ -219,40 +178,9 @@ class PatientNode(ImageTreeInterface):
 
     self.logger.debug("Extracted data from all inputs")
 
-    if self.options.factory is not None and self.options.header_blueprint is not None:
-      pivot_list: List[Dataset] = []
-
-      if self.options.parent_input is not None:
-        pivot_input= self.data[self.options.parent_input]
-        if isinstance(pivot_input, AbstractInput):
-          pivot_list = self.__extract_pivot_list(pivot_input)
-        else:
-          raise InvalidTreeNode # pragma: no cover
-      else:
-        for pivot_input in self.data.values():
-          if isinstance(pivot_input, AbstractInput):
-            pivot_list = self.__extract_pivot_list(pivot_input)
-          else:
-            raise InvalidTreeNode # pragma: no cover
-          break
-
-      try:
-        header = self.options.factory.make_series_header(
-          pivot_list, self.options.header_blueprint, self.options.filling_strategy
-        )
-      except HeaderConstructionFailure as exception:
-        log_traceback(self.logger, exception, header_message="Failed to construct header")
-        raise exception
-      self.logger.debug("Successfully Constructed Header")
-
-    else:
-      self.logger.debug(f"Not Constructing header\nFactory is None: \
-                        {self.options.factory is None}\nBlueprint is None: \
-                        {self.options.header_blueprint is None}")
-
-      header = None
-
-    input_container = self.options.input_container_type(data_directory, header, path_directory)
+    input_container = self.options.input_container_type(data_directory,
+                                                        series,
+                                                        path_directory)
 
     return input_container
 

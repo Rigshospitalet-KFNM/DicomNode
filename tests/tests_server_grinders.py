@@ -314,15 +314,18 @@ class GrinderTests(TestCase):
 
     grinder = TagGrinder([0x00100020, 0x00101020,0x00101030])
 
-    tag_list = grinder([dataset])
+    tag_dict = grinder([dataset])
 
-    self.assertIn((0x00100020, patient_id), tag_list)
-    self.assertIn((0x00101020, patient_height), tag_list)
-    self.assertIn((0x00101030, patient_weight), tag_list)
+    self.assertIn(0x00100020, tag_dict)
+    self.assertEqual(patient_id, tag_dict[0x00100020])
+    self.assertIn(0x00101020, tag_dict)
+    self.assertEqual(patient_height, tag_dict[0x00101020])
+    self.assertIn(0x00101030, tag_dict)
+    self.assertEqual(patient_weight, tag_dict[0x00101030])
 
   def test_pivotless_tag_meta_grinder(self):
     grinder = TagGrinder([0x00100020, 0x00101020,0x00101030])
-    self.assertRaises(ValueError, grinder, [])
+    self.assertRaises(InvalidDataset, grinder, [])
 
   def test_invalid_dataset_tag_meta_grinder(self):
     patient_id = "12351"

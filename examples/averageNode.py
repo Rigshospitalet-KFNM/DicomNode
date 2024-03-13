@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 
 from dicomnode.server.grinders import NumpyGrinder
-from dicomnode.lib.dicom_factory import Blueprint, FillingStrategy, StaticElement, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
-from dicomnode.lib.numpy_factory import NumpyFactory, image_pixel_blueprint
+from dicomnode.dicom.dicom_factory import Blueprint, FillingStrategy, StaticElement, SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
+from dicomnode.dicom.numpy_factory import NumpyFactory, image_pixel_blueprint
 
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import DynamicInput

@@ -371,7 +371,7 @@ class DicomFactoryTestClass(TestCase):
     sequence_sequence_blueprint.add_virtual_element(StaticElement(0x00135011,'LO', 'Sequence'))
 
     dataset = Dataset()
-    build_dataset = self.factory.build(dataset, blueprint)
+    build_dataset = self.factory.build_instance(dataset, blueprint)
 
   def test_corporealialize_into_nothing(self):
     ce = CopyElement(0x00100010)
@@ -417,7 +417,7 @@ class DicomFactoryTestClass(TestCase):
     blueprint = Blueprint()
     blueprint.add_virtual_element(CopyElement(0x00100010))
 
-    build_dataset = self.factory.build(dataset, blueprint, filling_strategy=FillingStrategy.COPY)
+    build_dataset = self.factory.build_instance(dataset, blueprint, filling_strategy=FillingStrategy.COPY)
     self.assertIn(0x00100010, build_dataset)
     self.assertIn(0x00100020, build_dataset)
 

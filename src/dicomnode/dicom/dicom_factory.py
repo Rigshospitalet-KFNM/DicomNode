@@ -14,15 +14,17 @@ from random import randint
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
 
 # Third Party Library
+from numpy import ndarray
 from pydicom import DataElement, Dataset, Sequence
 from pydicom.uid import EncapsulatedPDFStorage
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
+from dicomnode.dicom import gen_uid
+from dicomnode.dicom.series import Series
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
-from dicomnode.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
 
 logger = get_logger()
@@ -471,69 +473,83 @@ class SeriesHeader():
     return message
 
 
-class DicomFactory(ABC):
+class DicomFactory():
   """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
 
   This is a base class, as factories are specialized per image input type
   """
 
+  # Default properties
+  default_bits_stored = 16
+
+  default_I_know_what_I_am_doing = False
+
+
   def __init__(self) -> None:
     self.series_description: str = "Unnamed Pipeline post processing "
 
+  def build_series(self,
+                   image: ndarray,
+                   blueprint: Blueprint,
+                   parent_series: Series,
+                   filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
+                   scaling = True,
+                   kwargs: Dict[Any, Any] = {}
+                   ) -> Series:
+    """Builds a dicom series from a series, from an image, blueprint, and series
 
-  def get_default_blueprint(self) -> Blueprint:
-    return Blueprint()
+    The following tags are always added:
+      (0028,0002) - Samples per Pixel
+      (0028,0004) - Photometric Interpretation
+      (0028,0010) - Rows
+      (0028,0011) - Columns
+      (0028,0100) - Bit Allocated
+      (0028,0101) - Bit Stored
+      (0028,0102) - High bit
+      (0028,0103) - Pixel Representation
+      (7FE0,0010) - Pixel Data
 
-  def make_series_header(self,
-                  pivot_list: List[Dataset],
-                  blueprint: Blueprint,
-                  filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
-    ) -> SeriesHeader:
-    """This function produces a header dataset based on an input datasets.
 
-    Note: There's a tutorial for creating Headers at:
-    https://github.com/Rigshospitalet-KFNM/DicomNode/tutorials/MakingHeaders.md
 
     Args:
-      pivot (Dataset): The dataset which the header will be produced from
+        image (ndarray): _description_
+        blueprint (Blueprint): _description_
+        parent_series (Series): _description_
+        filling_strategy (FillingStrategy, optional): _description_. Defaults to FillingStrategy.DISCARD.
+        kwargs (Dict[Any, Any], optional): _description_. Defaults to {}.
 
     Returns:
-      SeriesHeader: This object is a "header" for the series
+        Series: _description_
     """
-    failed_tags = []
-    header = SeriesHeader()
-    if len(pivot_list) == 0:
-      raise ValueError("Cannot create header without a pivot dataset")
-    pivot = pivot_list[0]
 
-    if filling_strategy == FillingStrategy.COPY:
-      for data_element in pivot:
-        if data_element.tag in blueprint:
-          pass # Will be added in
-        else:
-          header.add_tag(data_element)
-    for virtual_element in blueprint:
-      try:
-        de = virtual_element.corporealialize(self, pivot_list)
-        if de is not None:
-          header.add_tag(de)
-      except KeyError:
-        failed_tags.append(virtual_element.tag)
-    if len(failed_tags) != 0:
-      error_message = f"Pivot is missing: {pformat(failed_tags)}"
-      raise HeaderConstructionFailure(error_message)
+    # Dataset creation have been difficult to design
+    #
+    # Originally this was solved in a two step process, where the static data
+    # were produced first then the series was build secondly
+    #
+    # However this caused some really big problems with regards producing
+    # multiple series
+    #
+    # The ways that it's solved now is that most things are wrapped in a series
+    #
 
-    return header
+    if parent_series.datasets is None and not self.default_I_know_what_I_am_doing:
+      logger.warn("Parent series is constructed from a series that doesn't originate from dataset and therefore tags index will cause errors")
 
-  @abstractmethod
-  def build_from_header(self,
-                  header : SeriesHeader,
-                  image : Any,
-                  kwargs : Dict[Any, Any] = {}
-    ) -> List[Dataset]:
-    raise NotImplementedError #pragma: no cover
+    datasets = []
 
-  def build(self,
+    if len(image.shape) == 3:
+      for i, image_slice in enumerate(image):
+        dataset = Dataset()
+
+        datasets.append(dataset)
+
+
+
+
+    return Series.from_dicom(datasets)
+
+  def build_instance(self,
             pivot: Dataset,
             blueprint: Blueprint,
             filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
@@ -620,7 +636,7 @@ class DicomFactory(ABC):
       document_bytes = fp.read()
 
     pivot = get_pivot(datasets)
-    report_dataset = self.build(pivot, report_blueprint, filling_strategy, kwargs)
+    report_dataset = self.build_instance(pivot, report_blueprint, filling_strategy, kwargs)
 
     if 'EncapsulatedDocument' not in report_dataset:
       report_dataset.EncapsulatedDocument = document_bytes

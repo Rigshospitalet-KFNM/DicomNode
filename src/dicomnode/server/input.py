@@ -115,6 +115,9 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     return self.image_grinder(self)
 
+  def get_datasets(self) -> List[Dataset]:
+    return [dataset for dataset in self]
+
   def get_path(self, dicom: Dataset) -> Path:
     """Gets the path, where a dataset would be saved.
 
@@ -348,5 +351,5 @@ class HistoricAbstractInput(AbstractInput):
       self.logger.critical("Historic Inputs needs a AE Title of the SCU")
       raise IncorrectlyConfigured
 
-    message = self.options.factory.build(self.options.pivot,self.options.blueprint)
+    message = self.options.factory.build_instance(self.options.pivot,self.options.blueprint)
     send_move_thread(self.options.ae_title, self.options.address, message)

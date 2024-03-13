@@ -12,7 +12,7 @@ from pydicom import Dataset
 
 # Dicomnode Packages
 from dicomnode.lib.io import save_dicom
-from dicomnode.lib.dicom import make_meta
+from dicomnode.dicom import make_meta
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer

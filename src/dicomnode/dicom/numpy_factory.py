@@ -26,7 +26,6 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidTagType, Inva
 logger = get_logger()
 
 class NumpyFactory(DicomFactory):
-
   _unsigned_array_encoding: Dict[int, type] = {
     8 : numpy.uint8,
     16 : numpy.uint16,
