@@ -11,6 +11,7 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
+from re import Pattern
 from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
 
 # Third party packages
@@ -147,6 +148,11 @@ class AbstractInput(ImageTreeInterface, ABC):
 
     return self.path / image_name
 
+  def _validate_value(self, value, target):
+    if isinstance(target, Pattern):
+      return target.match(value) is not None
+    return value == target
+
   def validate_image(self, dicom: Dataset) -> bool:
     """Checks if an image belongs in the input
 
@@ -166,7 +172,7 @@ class AbstractInput(ImageTreeInterface, ABC):
       if required_tag not in dicom:
         self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
-      if dicom[required_tag].value != required_value:
+      if not self._validate_value(dicom[required_tag].value, required_value):
         self.logger.debug(f"required value {required_value}\
                            not match {dicom[required_tag]} in dicom")
         return False

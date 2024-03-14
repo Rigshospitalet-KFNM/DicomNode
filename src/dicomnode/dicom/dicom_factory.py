@@ -14,13 +14,14 @@ from random import randint
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
 
 # Third Party Library
-from numpy import ndarray
+from numpy import ndarray, zeros_like
 from pydicom import DataElement, Dataset, Sequence
 from pydicom.uid import EncapsulatedPDFStorage
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.series import Series
 from dicomnode.lib.exceptions import IncorrectlyConfigured
@@ -479,17 +480,20 @@ class DicomFactory():
   This is a base class, as factories are specialized per image input type
   """
 
+  class PixelRepresentation(Enum):
+    UNSIGNED = 0
+    TWOS_COMPLIMENT = 1
+
   # Default properties
   default_bits_stored = 16
+  default_bits_allocated = 15
+  default_pixel_representation = PixelRepresentation.UNSIGNED
 
   default_I_know_what_I_am_doing = False
-
-
-  def __init__(self) -> None:
-    self.series_description: str = "Unnamed Pipeline post processing "
+  """Value for disabling warning for likely errors"""
 
   def build_series(self,
-                   image: ndarray,
+                   image: ndarray[Tuple[int,int,int],Any],
                    blueprint: Blueprint,
                    parent_series: Series,
                    filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
@@ -508,8 +512,6 @@ class DicomFactory():
       (0028,0102) - High bit
       (0028,0103) - Pixel Representation
       (7FE0,0010) - Pixel Data
-
-
 
     Args:
         image (ndarray): _description_
@@ -532,17 +534,36 @@ class DicomFactory():
     #
     # The ways that it's solved now is that most things are wrapped in a series
     #
+    if not len(image.shape) == 3:
+      raise ValueError("Image must be a 3 dimensional image")
 
     if parent_series.datasets is None and not self.default_I_know_what_I_am_doing:
       logger.warn("Parent series is constructed from a series that doesn't originate from dataset and therefore tags index will cause errors")
 
+    can_copy_instances = parent_series.can_copy_into_image(image)
     datasets = []
 
-    if len(image.shape) == 3:
-      for i, image_slice in enumerate(image):
-        dataset = Dataset()
+    if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
+      stored_image_type = self._unsigned_array_encoding.get(self.default_bits_allocated,None)
+    elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
+      stored_image_type = self._signed_array_encoding.get(self.default_bits_allocated,None)
+    if stored_image_type is None:
+      raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
 
-        datasets.append(dataset)
+    if stored_image_type != image.dtype:
+      encoded_image, slope, intercept = self.scale_image(image,
+                                                         self.default_bits_stored,
+                                                         self.default_bits_allocated)
+    else:
+      encoded_image, slope, intercept = (image, 1, 0)
+
+
+    for i, image_slice in enumerate(image):
+      dataset = Dataset()
+
+
+
+      datasets.append(dataset)
 
 
 

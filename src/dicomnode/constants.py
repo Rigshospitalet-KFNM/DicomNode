@@ -1,6 +1,8 @@
-"""This module contains various constants used throughout the module,
-
+"""This module contains various constants used throughout the module
 """
+from typing import Dict
+
+from numpy import uint8, uint16, uint32, uint64, int8, int16, int32, int64
 from pydicom.uid import UID
 
 DICOMNODE_LOGGER_NAME = 'dicomnode'
@@ -41,3 +43,18 @@ DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
 DICOMNODE_VERSION = "0.0.4"
 """Version of the library"""
 
+
+
+UNSIGNED_ARRAY_ENCODING: Dict[int, type] = {
+  8 :  uint8,
+  16 : uint16,
+  32 : uint32,
+  64 : uint64,
+}
+
+SIGNED_ARRAY_ENCODING: Dict[int, type] = {
+  8 :  int8,
+  16 : int16,
+  32 : int32,
+  64 : int64,
+}
