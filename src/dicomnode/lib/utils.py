@@ -8,7 +8,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from argparse import ArgumentTypeError
 from threading import Thread
 from logging import Logger
-from typing import Any, Optional, Union
+from typing import Any, Optional, Tuple, Union
 try:
   from os import getuid, setuid
   UNIX = True
@@ -69,7 +69,7 @@ class ThreadWithReturnValue(Thread):
     Thread.join(self, *args)
     return self._return
 
-def colomn_to_row_major_order(input: numpy.ndarray) -> numpy.ndarray:
+def colomn_to_row_major_order(input: numpy.ndarray[Tuple[int,int,int], Any]) -> numpy.ndarray:
   """Converts an array from a Column major to row major
 
   See https://en.wikipedia.org/wiki/Row-_and_column-major_order

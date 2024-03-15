@@ -23,7 +23,7 @@ from sortedcontainers import SortedDict
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.dicom import gen_uid
-from dicomnode.dicom.series import Series
+from dicomnode.dicom.series import DicomSeries, fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
@@ -94,9 +94,7 @@ class VirtualElement(ABC):
       self.name = name[64:]
 
   @abstractmethod
-  def corporealialize(self,
-                      factory: 'DicomFactory',
-                      parent_datasets: Iterable[Dataset]
+  def corporealialize(self, datasets: Iterable[Dataset]
                       ) -> Optional[Union[DataElement,
                                           'InstanceVirtualElement']]:
     """Extracts data from the parent datasets and either produces a static
@@ -120,7 +118,7 @@ class CopyElement(VirtualElement):
     super().__init__(tag, '', name)
     self.Optional = Optional
 
-  def corporealialize(self, _factory: 'DicomFactory', datasets: Iterable[Dataset]) -> Optional[DataElement]:
+  def corporealialize(self, datasets: Iterable[Dataset]) -> Optional[DataElement]:
     dataset = get_pivot(datasets)
     if dataset is None:
       error_message = f"Cannot copy nothing at tag:{self.tag}"
@@ -139,7 +137,7 @@ class DiscardElement(VirtualElement):
   def __init__(self, tag) -> None:
     self.tag = tag
 
-  def corporealialize(self, _factory: 'DicomFactory', _dataset: Iterable[Dataset]) -> None:
+  def corporealialize(self, _datasets: Iterable[Dataset]) -> None:
     return None
 
 
@@ -151,7 +149,7 @@ class StaticElement(VirtualElement, Generic[T]):
     super().__init__(tag, VR, name=name)
     self.value: T = value
 
-  def corporealialize(self, _factory: 'DicomFactory', _datasets: Iterable[Dataset]) -> DataElement:
+  def corporealialize(self, _datasets: Iterable[Dataset]) -> DataElement:
     return DataElement(self.tag, self.VR, self.value)
 
   def __str__(self):
@@ -169,7 +167,7 @@ class SeriesElement(VirtualElement):
     self.func:  Union[Callable[[Dataset], Any], Callable[[],Any]] = func
     self.require_dataset: bool = len(getfullargspec(func).args) == 1
 
-  def corporealialize(self, _: 'DicomFactory', datasets: Iterable[Dataset]) -> DataElement:
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement:
     dataset = get_pivot(datasets)
     if self.require_dataset:
       # The '# type: ignores' here is because the type checker assumes func
@@ -489,17 +487,13 @@ class DicomFactory():
   default_bits_allocated = 15
   default_pixel_representation = PixelRepresentation.UNSIGNED
 
-  default_I_know_what_I_am_doing = False
-  """Value for disabling warning for likely errors"""
-
   def build_series(self,
                    image: ndarray[Tuple[int,int,int],Any],
                    blueprint: Blueprint,
-                   parent_series: Series,
+                   parent_series: DicomSeries,
                    filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
-                   scaling = True,
                    kwargs: Dict[Any, Any] = {}
-                   ) -> Series:
+                   ) -> DicomSeries:
     """Builds a dicom series from a series, from an image, blueprint, and series
 
     The following tags are always added:
@@ -537,38 +531,65 @@ class DicomFactory():
     if not len(image.shape) == 3:
       raise ValueError("Image must be a 3 dimensional image")
 
-    if parent_series.datasets is None and not self.default_I_know_what_I_am_doing:
-      logger.warn("Parent series is constructed from a series that doesn't originate from dataset and therefore tags index will cause errors")
-
     can_copy_instances = parent_series.can_copy_into_image(image)
     datasets = []
 
     if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
-      stored_image_type = self._unsigned_array_encoding.get(self.default_bits_allocated,None)
+      stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
     elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
-      stored_image_type = self._signed_array_encoding.get(self.default_bits_allocated,None)
+      raise NotImplemented("Signed encoding is not supported yet")
+      #stored_image_type = SIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
     if stored_image_type is None:
       raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
 
-    if stored_image_type != image.dtype:
-      encoded_image, slope, intercept = self.scale_image(image,
-                                                         self.default_bits_stored,
-                                                         self.default_bits_allocated)
-    else:
-      encoded_image, slope, intercept = (image, 1, 0)
-
 
     for i, image_slice in enumerate(image):
+      if stored_image_type != image.dtype:
+        encoded_image, slope, intercept = fit_image_into_unsigned_bit_range(image_slice,
+                                                                            self.default_bits_stored,
+                                                                            self.default_bits_allocated)
+        store_rescale = True
+      else:
+        encoded_image, slope, intercept = (image, 1, 0)
+        store_rescale = False
+
       dataset = Dataset()
 
+      dataset.SamplesPerPixel = 1
+      dataset.Columns = encoded_image.shape[0]
+      dataset.Rows = encoded_image.shape[1]
+      dataset.BitsAllocated = self.default_bits_allocated
+      dataset.BitsStored = self.default_bits_stored
+      dataset.HighBit = self.default_bits_stored - 1
+      dataset.SmallestImagePixelValue = encoded_image.min()
+      dataset.LargestImagePixelValue = encoded_image.max()
+      dataset.InstanceNumber = i + 1
+      dataset.PixelRepresentation = self.default_pixel_representation.value
 
+      if store_rescale:
+        dataset.RescaleSlope = slope
+        dataset.RescaleIntercept = intercept
+
+      dataset.PixelData = encoded_image
 
       datasets.append(dataset)
 
+    series = DicomSeries(datasets)
+
+    for virtual_tag in blueprint:
+      result = virtual_tag.corporealialize(parent_series.datasets)
+      if isinstance(result, DataElement):
+        series.set_shared_tag(virtual_tag.tag, result)
+      elif isinstance(result, InstanceVirtualElement):
+        individual_tags = [ result.produce()
+          for dataset in series.datasets
+        ]
+
+        series.set_individual_tag(virtual_tag.tag,
+                                  individual_tags)
 
 
-
-    return Series.from_dicom(datasets)
+    return series
 
   def build_instance(self,
             pivot: Dataset,

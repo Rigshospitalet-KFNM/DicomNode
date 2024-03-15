@@ -26,9 +26,6 @@ DICOMNODE_ENV_PROCESSING_PATH = "DICOMNODE_ENV_PROCESSING_PATH"
 DICOMNODE_ENV_REPORT_PATH = "DICOMNODE_ENV_REPORT_PATH"
 
 
-
-
-
 # UID graciously provided by Medical Connections
 # At https://www.medicalconnections.co.uk/FreeUID.html
 DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')

@@ -5,28 +5,106 @@ https://xkcd.com/927/
 """
 
 # Python standard library
+from functools import reduce
 from enum import Enum
 from typing import Any, List, Literal, Optional,  Tuple, TypeAlias
 
 # Third party packages
-from numpy import zeros_like, ndarray, dtype, float64
-from pydicom import Dataset
+from numpy import zeros_like, ndarray, dtype, float64, float32, empty
+from pydicom import Dataset, DataElement
+from pydicom.tag import BaseTag
 from nibabel import Nifti1Image
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
+from dicomnode.lib.exceptions import InvalidDataset
 
 AffineMatrix: TypeAlias = ndarray[Tuple[Literal[4], Literal[4]], dtype[float64]]
 
-def build_image_from_datasets():
-  pass
+def sortDatasets(dataset: Dataset):
+  """Sorting function for a collection of datasets. The order is determined by
+  the instance number
+
+  Args:
+      dataset (Dataset): _description_
+
+  Returns:
+      int: _description_
+  """
+  return dataset.InstanceNumber
+
+def shared_tag(datasets: List[Dataset], tag: BaseTag) -> bool:
+  """Determines if tag is shared, meaning that for all datasets the value of the
+  tag are equal. This is includes if the tag is missing, then that is considered
+  a shared tag
+
+  Args:
+      datasets (List[Dataset]): A collection of datasets for which the
+      "sharedness" is in question
+      tag (pydicom.tag.BaseTag): This is tag that you wish determine the
+      "sharedness" of
+
+  Raises:
+      ValueError: Raised when passed an empty list. Wrap it in a try catch block
+      if you have a strong opinion on the result.
+
+  Returns:
+      bool: True if the tag is shared, false if not
+  """
+  if len(datasets) == 0:
+    raise ValueError("Cannot determine if a tag is unique from an empty collection")
+
+  # This is many here because and is not a standard python function
+  def fun_and(x, y):
+    return x and y
+
+  pivot = datasets[0]
+  return reduce(fun_and,
+                [dataset.get(tag, None) == pivot.get(tag, None)
+                  for dataset in datasets],
+                True)
 
 
-def scale_image(
-                  image: ndarray,
-                  bits_stored = 16,
-                  bits_allocated = 16,
-                ) -> Tuple[ndarray, float, float]:
+def build_image_from_datasets(datasets: List[Dataset]):
+    pivot = datasets[0]
+    x_dim = pivot.Columns
+    y_dim = pivot.Rows
+    z_dim = len(datasets)
+    rescale = (0x00281052 in pivot and 0x00281053 in pivot)
+
+    if 0x7FE00008 in pivot:
+      dataType = float32
+    elif 0x7FE00009 in pivot:
+      dataType = float64
+    elif rescale:
+      dataType = float64
+    elif pivot.PixelRepresentation == 0:
+      dataType = UNSIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
+    else:
+      dataType = SIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
+
+    if dataType is None:
+      raise InvalidDataset
+
+    image_array: ndarray = empty((z_dim, y_dim, x_dim), dtype=dataType)
+
+    for i, dataset in enumerate(datasets):
+      image = dataset.pixel_array
+      if rescale:
+        image = image.astype(float64) * dataset.RescaleSlope + dataset.RescaleIntercept
+      image_array[i,:,:] = image
+
+    return image_array
+
+def build_affine_from_datasets(dataset: Dataset):
+  if 0x00200032 not in dataset or 0x00200037 in dataset:
+    return None
+
+
+def fit_image_into_unsigned_bit_range(image: ndarray,
+                                      bits_stored = 16,
+                                      bits_allocated = 16,
+                                     ) -> Tuple[ndarray, float, float]:
     target_datatype = UNSIGNED_ARRAY_ENCODING.get(bits_allocated, None)
     min_val = image.min()
     max_val = image.max()
@@ -42,7 +120,6 @@ def scale_image(
     new_image = ((image - intercept) / slope).astype(target_datatype)
 
     return new_image, slope, intercept
-
 
 
 class ReferenceSpace(Enum):
@@ -130,6 +207,8 @@ def detect_reference_space(affine: AffineMatrix) -> ReferenceSpace:
 SERIES_VARYING_TAGS = set([
   0x00080018, # SOPInstanceUID
   0x00200013, # InstanceNumber
+  0x00200032, # ImagePositionPatient
+  0x00201041, # SliceLocation
   0x00280106, # SmallestImagePixelValue
   0x00280106, # LargestImagePixelValue
   0x00281052, # RescaleIntercept
@@ -137,43 +216,51 @@ SERIES_VARYING_TAGS = set([
   0x73E00010, # PixelData
 ])
 """This is a list of tags that are assumed to be varying across a series
-Note that this is not a complete list. There's for instance dicom series where
-the slice length is difference per slice, however this library doesn't support
-this.
+Note that this is not a complete list.
+There is valid dicom series that have more varying tags than these, however this
+library doesn't support those.
 """
 
 class Series:
+  """Base class for a Collection of images, that together form a series or a
+  cubic volume that contains an tomographic image.
+
+  It's a
   """
 
-  Returns:
-      _type_: _description_
-  """
-
-  uid = None
-  datasets: Optional[List[Dataset]] = None
-  nifti: Optional[Nifti1Image] = None
-  image_data: Optional[ndarray] = None
+  image_data: ndarray
   affine: Optional[AffineMatrix] = None
-  reference_space = None
+  reference_space: Optional[ReferenceSpace] = None
 
   # Constructors
-  def __init__(self) -> None:
-    pass
+  def __init__(self,
+               image_data: ndarray[Tuple[int,int,int], Any],
+               affine:Optional[AffineMatrix]) -> None:
+    self.image_data = image_data
+    self.affine = affine
+    if self.affine is not None:
+      self.reference_space = detect_reference_space(self.affine)
 
-  @classmethod
-  def from_dicom(cls, datasets: List[Dataset]):
-    series = cls()
-    if 0 < len(datasets):
-      series.datasets = datasets
+class DicomSeries(Series):
+  pivot: Dataset
+  datasets: List[Dataset]
 
-    return series
+  def __init__(self, datasets: List[Dataset]) -> None:
+    if len(datasets) == 0:
+      raise ValueError("Cannot construct a dicom series from an empty list")
 
-  @classmethod
-  def from_nifti(cls, nifti: Nifti1Image):
-    series = cls()
-    series.nifti = nifti
+    self.datasets = datasets.sort(key=sortDatasets)
+    self.pivot = self.datasets[0]
 
-    return series
+    image = build_image_from_datasets(self.datasets)
+    # It's forbidden to call method on self, since the object have not been
+    # Constructed yet!
+    if shared_tag(datasets, 0x00180050):
+      affine = build_affine_from_datasets(self.pivot)
+    else:
+      affine = None
+
+    super().__init__(image, affine)
 
   def __getitem__(self, tag):
     if self.datasets is None:
@@ -181,25 +268,27 @@ class Series:
 
     if tag in SERIES_VARYING_TAGS:
       return [dataset.get(tag, None) for dataset in self.datasets]
-    return self.datasets[0].get(tag, None)
+    return self.pivot.get(tag, None)
+
+  def set_shared_tag(self, tag: BaseTag, value: DataElement):
+    for dataset in self.datasets:
+      dataset[tag] = value
+
+  def set_individual_tag(self, tag: BaseTag, values: List[DataElement]):
+    if len(values) == len(self.datasets):
+      raise ValueError("The amount of values doesn't match the amount datasets")
+    for dataset, value in zip(self.datasets, values):
+      dataset[tag] = value
 
   def can_copy_into_image(self, image:ndarray[Tuple[int,int,int],Any]) -> bool:
-    if self.datasets is None:
-      return False
     return image.shape[2] == len(self.datasets)
 
-  def generate_numpy(self) -> ndarray:
-    if self.image_data is not None:
-      return self.image_data
+  def shared_tag(self, tag) -> bool:
+    return shared_tag(self.datasets, tag)
 
-    if self.nifti is not None:
-      self.affine = self.nifti.affine
-      if self.affine is not None:
-        self.reference_space = detect_reference_space(self.affine)
-      self.image_data = self.nifti.get_fdata()
-      return self.image_data
+class NiftiSeries(Series):
+  def __init__(self, nifti: Nifti1Image) -> None:
+    self.nifti = nifti
+    image_data = self.nifti.get_fdata()
 
-    if 
-
-
-
+    super().__init__(image_data, self.nifti.affine)
