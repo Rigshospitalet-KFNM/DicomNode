@@ -20,7 +20,7 @@ from pydicom.uid import UID
 
 # Dicomnode packages
 from dicomnode.data_structures.image_tree import ImageTreeInterface
-from dicomnode.dicom.dimse import Address, send_move_thread
+from dicomnode.dicom.dimse import Address, send_move_thread, QueryLevels
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
@@ -60,7 +60,6 @@ class AbstractInput(ImageTreeInterface, ABC):
     ae_title: Optional[str] = None
     logger: Optional[Logger] = None
     data_directory: Optional[Path]  = None
-    factory: Optional[DicomFactory] = None
     lazy: bool = False
     "Indicate if the Abstract input should use "
 
@@ -306,7 +305,7 @@ class DynamicInput(AbstractInput):
     return ret_value
 
 
-class HistoricAbstractInput(AbstractInput):
+class HistoricAbstractInput(AbstractInput, ABC):
   """This input sends a DIMSE C-MOVE to location on creation
 
   An Example could be that your node receives a pet image, then this input can
@@ -320,42 +319,28 @@ class HistoricAbstractInput(AbstractInput):
       IncorrectlyConfigured: _description_
   """
 
-  @dataclass
-  class Options(AbstractInput.Options):
-    """Options for a HistoricAbstractInput
+  address: Address = None
+  query_level: QueryLevels = None
 
-    """
-    address: Optional[Address] = None
-    "The address that historic input should send the C-Move too on creation"
-    blueprint: Optional[Blueprint] = None
-    "The blue print for the C-Move message"
-    pivot: Optional[Dataset] = None
-    "The Dataset that is used with the blueprint to create the message"
-  options: Options
-
-  def __init__(self,
-               options: Options = Options()):
+  def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
+    self.send_historic_message = False # To do lock it
+    if self.address is None or self.query_level is None:
+      raise IncorrectlyConfigured("Historic datasets needs an Address and query level defined")
 
-    if self.options.pivot is None:
-      self.logger.critical("You forgot to parse the pivot to The Input")
-      raise IncorrectlyConfigured
+  @abstractmethod
+  def get_message_dataset(added_dataset: Dataset) -> Dataset:
+    raise NotImplemented # pragma: type ignore
 
-    if self.options.blueprint is None:
-      self.logger.critical("A C move blueprint is missing")
-      raise IncorrectlyConfigured
+  def add_image(self, dataset: Dataset) -> int:
+    images = super().add_image(dataset)
 
-    if self.options.address is None:
-      self.logger.critical("A target address is needed to send a C-Move to")
-      raise IncorrectlyConfigured
+    if not self.send_historic_message and 0 < images:
+      self.send_historic_message = True
+      message = self.get_message_dataset(dataset)
+      send_move_thread(
+        SCU_AE=self.options.ae_title,
+        address=self.address,
+        dataset=message,
+      )
 
-    if self.options.factory is None:
-      self.logger.critical("A Factory is needed to generate a C move message")
-      raise IncorrectlyConfigured
-
-    if self.options.ae_title is None:
-      self.logger.critical("Historic Inputs needs a AE Title of the SCU")
-      raise IncorrectlyConfigured
-
-    message = self.options.factory.build_instance(self.options.pivot,self.options.blueprint)
-    send_move_thread(self.options.ae_title, self.options.address, message)

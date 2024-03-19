@@ -19,13 +19,11 @@ from pydicom import Dataset
 
 # Dicomnode Library Packages
 from dicomnode.data_structures.image_tree import ImageTreeInterface
-from dicomnode.dicom.dicom_factory import DicomFactory, SeriesHeader, Blueprint, FillingStrategy
 from dicomnode.dicom.dimse import Address
-from dicomnode.dicom.series import Series
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
-                                      InvalidTreeNode, HeaderConstructionFailure)
+                                      InvalidTreeNode)
 from dicomnode.lib.logging import log_traceback, get_logger
-from dicomnode.server.input import AbstractInput, DynamicInput, DynamicLeaf
+from dicomnode.server.input import AbstractInput
 
 class InputContainer:
   """Simple container class for grinded input.
@@ -35,12 +33,10 @@ class InputContainer:
   def __init__(self,
                data: Dict[str, Any],
                datasets: Dict[str, Iterable[Dataset]] = {},
-               header: Optional[SeriesHeader] = None,
                paths: Optional[Dict[str, Path]] = None,
                ) -> None:
     self.__data = data
     self.datasets = datasets
-    self.header = header
     self.paths  = paths
 
   def __getitem__(self, key: str):
@@ -208,7 +204,6 @@ class PatientNode(ImageTreeInterface):
         ae_title=self.options.ae_title,
         data_directory = input_path,
         logger=self.options.logger,
-        factory = self.options.factory,
         lazy=self.options.lazy
       )
 
@@ -237,15 +232,6 @@ class PipelineTree(ImageTreeInterface):
 
     data_directory: Optional[Path] = None
     "Root directory for file storage"
-
-    factory: Optional[DicomFactory] = None
-    "DicomFactory for constructing Series Header"
-
-    filling_strategy: FillingStrategy = FillingStrategy.DISCARD
-    "Filling Strategy for 'factory'"
-
-    header_blueprint: Optional[Blueprint] = None
-    "Blueprint for factory to use"
 
     lazy: bool = False
     "If underlying inputs should use lazy datasets"
@@ -310,7 +296,7 @@ class PipelineTree(ImageTreeInterface):
 
       options = self._get_patient_container_options(patient_directory)
 
-      self[patient_directory.name] = PatientNode(self.tree_node_definition, None, options)
+      self[patient_directory.name] = PatientNode(self.tree_node_definition, options)
 
   def add_image(self, dicom : Dataset) -> int:
     key = self.get_patient_id(dicom)
@@ -325,7 +311,7 @@ class PipelineTree(ImageTreeInterface):
         input_container_path = self.options.data_directory / key
 
       options = self._get_patient_container_options(input_container_path)
-      self[key] = PatientNode(self.tree_node_definition, dicom, options)
+      self[key] = PatientNode(self.tree_node_definition, options)
 
     patient_node = self[key]
     if isinstance(patient_node, PatientNode):
@@ -500,10 +486,7 @@ class PipelineTree(ImageTreeInterface):
     return self.options.patient_container.Options(
         ae_title=self.options.ae_title,
         container_path=container_path,
-        factory=self.options.factory,
         logger=self.logger,
         lazy=self.options.lazy,
         input_container_type=self.options.input_container_type,
-        header_blueprint=self.options.header_blueprint,
-        filling_strategy=self.options.filling_strategy
       )

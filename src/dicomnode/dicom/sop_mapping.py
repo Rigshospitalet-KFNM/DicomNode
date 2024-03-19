@@ -10,6 +10,8 @@ from pydicom.uid import (UID, CTImageStorage, EncapsulatedPDFStorage,
                          MRImageStorage, NuclearMedicineImageStorage,
                          PositronEmissionTomographyImageStorage)
 
+
+
 CT_Image_required_tags: List[int] = [
   0x00080008, # ImageType
   0x00180060, # KVP

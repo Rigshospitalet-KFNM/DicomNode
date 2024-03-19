@@ -12,7 +12,6 @@ import shutil
 from sys import stdout
 from unittest import TestCase
 
-
 #Third Party libs
 
 import numpy
@@ -23,10 +22,9 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 # Dicomnode packages
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 
-from dicomnode.dicom.dimse import Address
+from dicomnode.dicom.dimse import Address, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.dicom.dicom_factory import Blueprint
-from dicomnode.dicom.numpy_factory import NumpyFactory
+from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
@@ -79,6 +77,14 @@ class HistoricInput(HistoricAbstractInput):
   required_values: Dict[int, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
+
+  address = Address('localhost', 51211, "ENDPOINT")
+  query_level = QueryLevels.PATIENT
+
+  def get_message_dataset(added_dataset: Dataset) -> Dataset:
+    ds = Dataset()
+
+    return ds
 
   def validate(self) -> bool:
     return True
@@ -209,41 +215,6 @@ class InputTestCase(TestCase):
     make_meta(dataset)
     self.assertRaises(IncorrectlyConfigured, input.add_image, dataset)
 
-  def test_historic_input_missing_pivot(self):
-    options = HistoricInput.Options()
-
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
-    self.assertIn("CRITICAL:dicomnode:You forgot to parse the pivot to The Input", cm.output)
-
-  def test_historic_input_missing_blueprint(self):
-    options = HistoricInput.Options(pivot=Dataset())
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
-    self.assertIn("CRITICAL:dicomnode:A C move blueprint is missing", cm.output)
-
-  def test_historic_input_missing_address(self):
-    options = HistoricInput.Options(pivot=Dataset(), blueprint = Blueprint([]))
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
-    self.assertIn("CRITICAL:dicomnode:A target address is needed to send a C-Move to", cm.output)
-
-  def test_historic_input_missing_factory(self):
-    options = HistoricInput.Options(pivot=Dataset(),
-                                    blueprint = Blueprint([]),
-                                    address = Address('localhost', 50001, "DUMMY"))
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
-    self.assertIn("CRITICAL:dicomnode:A Factory is needed to generate a C move message", cm.output)
-
-  def test_historic_input_missing_ae_title(self):
-    options = HistoricInput.Options(pivot=Dataset(),
-                                    blueprint = Blueprint([]),
-                                    address = Address('localhost', 50001, "DUMMY"),
-                                    factory=NumpyFactory())
-    with self.assertLogs("dicomnode", logging.CRITICAL) as cm:
-      self.assertRaises(IncorrectlyConfigured, HistoricInput, options)
-    self.assertIn("CRITICAL:dicomnode:Historic Inputs needs a AE Title of the SCU", cm.output)
 
   def test_dynamic_output(self):
     patient_ID = "2002112161"

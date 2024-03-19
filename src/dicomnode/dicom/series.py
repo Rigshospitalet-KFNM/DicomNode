@@ -249,7 +249,8 @@ class DicomSeries(Series):
     if len(datasets) == 0:
       raise ValueError("Cannot construct a dicom series from an empty list")
 
-    self.datasets = datasets.sort(key=sortDatasets)
+    datasets.sort(key=sortDatasets)
+    self.datasets = datasets
     self.pivot = self.datasets[0]
 
     image = build_image_from_datasets(self.datasets)

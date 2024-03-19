@@ -16,15 +16,15 @@ from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Opti
 # Third Party Library
 from numpy import ndarray, zeros_like
 from pydicom import DataElement, Dataset, Sequence
-from pydicom.uid import EncapsulatedPDFStorage
+from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-from dicomnode.dicom import gen_uid
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.series import DicomSeries, fit_image_into_unsigned_bit_range
-from dicomnode.lib.exceptions import IncorrectlyConfigured
+from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
 
@@ -184,14 +184,10 @@ class SeriesElement(VirtualElement):
 @dataclass(slots=True)
 class InstanceEnvironment:
   instance_number: int
+  factory: 'DicomFactory'
   kwargs : Dict[Any, Any] = field(default_factory=dict)
-  header_dataset: Optional[Dataset] = None
-  image: Optional[Any] = None # Unmodified image
-  factory: Optional['DicomFactory'] = None
-  intercept: Optional[float] = None
-  slope: Optional[float] = None
-  scaled_image: Optional[Any] = None
-  total_images: Optional[int] = None
+  instance_dataset: Optional[Dataset] = None
+  image: Optional[ndarray[Tuple[int,int,int], Any]] = None # Unmodified image
 
 class InstanceVirtualElement(VirtualElement):
   """Represents a virtual element, that is unique per image slice"""
@@ -211,13 +207,12 @@ class SequenceElement(InstanceVirtualElement):
       Union['InstanceVirtualElement', DataElement]]]] = None
 
   def corporealialize(self,
-                      factory: 'DicomFactory',
                       parent_datasets: Iterable[Dataset]) -> 'SequenceElement':
     self._partial_initialized_sequences = []
     for blueprint in self._blueprints:
       partial_initialized_sequence = []
       for virtual_element in blueprint:
-        corporealialize_value = virtual_element.corporealialize(factory, parent_datasets)
+        corporealialize_value = virtual_element.corporealialize(parent_datasets)
         if corporealialize_value is not None:
           partial_initialized_sequence.append(corporealialize_value)
       self._partial_initialized_sequences.append(partial_initialized_sequence)
@@ -253,9 +248,8 @@ class FunctionalElement(InstanceVirtualElement):
                name: Optional[str]= None) -> None:
     super().__init__(tag, VR, name=name)
     self.func = func
-    self.header_dataset: Optional[Dataset] = None
 
-  def corporealialize(self, _factory: 'DicomFactory', dataset: Dataset) -> 'FunctionalElement':
+  def corporealialize(self, datasets: Iterable[Dataset]) -> 'FunctionalElement':
     return self
 
   def produce(self, caller_args: InstanceEnvironment) -> Optional[DataElement]:
@@ -265,17 +259,22 @@ class FunctionalElement(InstanceVirtualElement):
 class InstanceCopyElement(InstanceVirtualElement):
   """This tag should be used to copy values from a series
   """
-  def corporealialize(self, factory: 'DicomFactory', datasets: Iterable[Dataset]) -> 'InstanceCopyElement':
-    for dataset in datasets:
-      self.__instances[dataset.InstanceNumber] = dataset[self.tag].value
+  def corporealialize(self, datasets: Iterable[Dataset]) -> 'InstanceCopyElement':
     return self
 
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int, int]], VR: str) -> None:
-    super().__init__(tag, VR)
-    self.__instances = {}
+  def __init__(self,
+               tag: Union[BaseTag, str, int, Tuple[int, int]],
+               VR: str,
+               name=None
+              ) -> None:
+    super().__init__(tag, VR, name=name)
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    return DataElement(self.tag, self.VR, self.__instances[instance_environment.instance_number])
+    if instance_environment.instance_dataset is None:
+      raise InvalidDataset
+
+    return instance_environment.instance_dataset.get(self.tag,
+                                                     DataElement(self.tag, self.VR, None))
 
 class Blueprint():
   """Blueprint for a dicom series. A blueprint contains no information on a specific series.
@@ -387,91 +386,6 @@ class Blueprint():
 
     return True
 
-###### Header function ######
-
-def _add_InstanceNumber(caller_args: InstanceEnvironment):
-  # iterator is Zero indexed while, instance number is 1 indexed
-  # This function assumes that the factory is aware of this
-  return caller_args.instance_number
-
-def _add_UID_tag(_: InstanceEnvironment):
-  return gen_uid()
-
-def _get_today(_: InstanceEnvironment) -> date:
-  return date.today()
-
-def _get_time(_: InstanceEnvironment) -> time:
-  return datetime.now().time()
-
-def _get_now_datetime(_: InstanceEnvironment) -> datetime:
-  return datetime.now()
-
-def _get_random_number(_:InstanceEnvironment) -> int:
-  return randint(1, 2147483646)
-
-
-default_report_blueprint = Blueprint([
-  CopyElement(0x00080020, Optional=True), # Study Date
-  FunctionalElement(0x00080023, 'DA', _get_today), #ContentDate
-  FunctionalElement(0x0008002A, 'DT', _get_now_datetime), # AcquisitionDateTime
-  FunctionalElement(0x00080033, 'TM', _get_time), #ContentTime
-  CopyElement(0x00080030, Optional=True), # Study Time
-  CopyElement(0x00080050), # AccessionNumber
-  StaticElement(0x00080060, 'CS', 'DOC'), # Modality
-  StaticElement(0x00080064, 'CS', 'WSD'), # ConversionType
-  CopyElement(0x00081030), # StudyDescription
-  CopyElement(0x00101010, Optional=True), #PatientAge
-  CopyElement(0x00101020, Optional=True), #PatientSize
-  CopyElement(0x00101030, Optional=True), #PatientWeight
-  CopyElement(0x0020000D), # StudyInstanceUID
-  CopyElement(0x00200010, Optional=True), # StudyID
-  StaticElement(0x00200012, 'IS', 1), # InstanceNumber
-  SeriesElement(0x0020000E, 'UI', _add_UID_tag), # SeriesInstanceUID
-  StaticElement(0x00280301, 'CS', 'NO'),  # BurnedInAnnotation
-])
-
-
-class SeriesHeader():
-  """Instantiated blueprint for a specific dicom series
-
-  Can be used with raw image data to produce a dicom series
-  """
-  def __getitem__(self, key) -> Union[DataElement, InstanceVirtualElement]:
-    return self._blueprint[Tag(key)]
-
-  def __setitem__(self, key, value: Union[DataElement, InstanceVirtualElement]):
-    if key != value.tag:
-      raise ValueError("Tag mismatch")
-    self.add_tag(value)
-
-  def __contains__(self, key) -> bool:
-    return key in self._blueprint
-
-  def __init__(self,
-               blueprint: List[Union[DataElement, InstanceVirtualElement]] = [],
-               ) -> None:
-    self._blueprint: Dict[BaseTag,Union[DataElement, InstanceVirtualElement]] = {}
-    for tag in blueprint:
-      self.add_tag(tag)
-
-  def add_tag(self, tag: Union[DataElement, InstanceVirtualElement]) -> None:
-    if isinstance(tag, DataElement) or isinstance(tag, InstanceVirtualElement):
-      self._blueprint[tag.tag] = tag
-    else:
-      raise InvalidTagType("Attempting to add a non instantiable tag to a header")
-
-  def __iter__(self):
-    for element in self._blueprint.values():
-      yield element
-
-  def __str__(self) -> str:
-    message = f"SeriesHeader with {len(self._blueprint)} tags:\n"
-    for tag in self:
-      message += f"    Tag: {tag.tag} - {tag.__class__.__name__}\n"
-
-    return message
-
-
 class DicomFactory():
   """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
 
@@ -482,10 +396,65 @@ class DicomFactory():
     UNSIGNED = 0
     TWOS_COMPLIMENT = 1
 
-  # Default properties
-  default_bits_stored = 16
-  default_bits_allocated = 15
-  default_pixel_representation = PixelRepresentation.UNSIGNED
+  class PhotometricInterpretation(Enum):
+    MONOCHROME_WHITE = "MONOCHROME1"
+    """MONOCHROME1, the minimum sample value is intended to be displayed as
+    white
+    """
+    MONOCHROME_BLACK = "MONOCHROME2"
+    """MONOCHROME1, the minimum sample value is intended to be displayed as
+    black
+    """
+
+  def __init__(self) -> None:
+    # Default properties
+    self.default_bits_stored = 16
+    self.default_bits_allocated = 16
+    self.default_pixel_representation = DicomFactory.PixelRepresentation.UNSIGNED
+    self.default_photometric_interpretation = DicomFactory.PhotometricInterpretation.MONOCHROME_BLACK
+
+  def store_image_in_dataset(self, dataset: Dataset, image: ndarray[Tuple[int,int], Any]):
+    if len(image.shape) != 2:
+      raise ValueError("You can only store an 2D image using this function")
+
+    if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
+      stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
+    elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
+      raise NotImplemented("Signed encoding is not supported yet")
+      #stored_image_type = SIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
+    if stored_image_type is None:
+      raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
+
+    if stored_image_type != image.dtype:
+      encoded_image, slope, intercept = fit_image_into_unsigned_bit_range(image,
+                                                                          self.default_bits_stored,
+                                                                          self.default_bits_allocated)
+      store_rescale = True
+    else:
+      encoded_image, slope, intercept = (image, 1, 0)
+      store_rescale = False
+
+    if 0x00080016 not in dataset:
+      dataset.SOPClassUID = SecondaryCaptureImageStorage # Sets this temporary
+    make_meta(dataset)
+
+    dataset.SamplesPerPixel = 1
+    dataset.PhotometricInterpretation = self.default_photometric_interpretation.value
+    dataset.Columns = encoded_image.shape[0]
+    dataset.Rows = encoded_image.shape[1]
+    dataset.BitsAllocated = self.default_bits_allocated
+    dataset.BitsStored = self.default_bits_stored
+    dataset.HighBit = self.default_bits_stored - 1
+    dataset.SmallestImagePixelValue = int(encoded_image.min())
+    dataset.LargestImagePixelValue = int(encoded_image.max())
+    dataset.PixelRepresentation = self.default_pixel_representation.value
+
+    if store_rescale:
+      dataset.RescaleSlope = slope
+      dataset.RescaleIntercept = intercept
+
+    dataset.PixelData = encoded_image.tobytes()
+
 
   def build_series(self,
                    image: ndarray[Tuple[int,int,int],Any],
@@ -534,43 +503,10 @@ class DicomFactory():
     can_copy_instances = parent_series.can_copy_into_image(image)
     datasets = []
 
-    if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
-      stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
-    elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
-      raise NotImplemented("Signed encoding is not supported yet")
-      #stored_image_type = SIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
-    if stored_image_type is None:
-      raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
-
-
     for i, image_slice in enumerate(image):
-      if stored_image_type != image.dtype:
-        encoded_image, slope, intercept = fit_image_into_unsigned_bit_range(image_slice,
-                                                                            self.default_bits_stored,
-                                                                            self.default_bits_allocated)
-        store_rescale = True
-      else:
-        encoded_image, slope, intercept = (image, 1, 0)
-        store_rescale = False
-
       dataset = Dataset()
-
-      dataset.SamplesPerPixel = 1
-      dataset.Columns = encoded_image.shape[0]
-      dataset.Rows = encoded_image.shape[1]
-      dataset.BitsAllocated = self.default_bits_allocated
-      dataset.BitsStored = self.default_bits_stored
-      dataset.HighBit = self.default_bits_stored - 1
-      dataset.SmallestImagePixelValue = encoded_image.min()
-      dataset.LargestImagePixelValue = encoded_image.max()
+      self.store_image_in_dataset(dataset, image_slice)
       dataset.InstanceNumber = i + 1
-      dataset.PixelRepresentation = self.default_pixel_representation.value
-
-      if store_rescale:
-        dataset.RescaleSlope = slope
-        dataset.RescaleIntercept = intercept
-
-      dataset.PixelData = encoded_image
 
       datasets.append(dataset)
 
@@ -581,13 +517,35 @@ class DicomFactory():
       if isinstance(result, DataElement):
         series.set_shared_tag(virtual_tag.tag, result)
       elif isinstance(result, InstanceVirtualElement):
-        individual_tags = [ result.produce()
-          for dataset in series.datasets
+        if can_copy_instances:
+          envs = [
+            InstanceEnvironment(
+              instance_number=i,
+              factory=self,
+              kwargs=kwargs,
+              instance_dataset=dataset,
+              image=image,
+            ) for (i, dataset) in enumerate(parent_series.datasets)
+          ]
+        else:
+          envs = [
+            InstanceEnvironment(
+              instance_number=i,
+              factory=self,
+              kwargs=kwargs,
+              image=image,
+            ) for i in range(image.shape[2])
+          ]
+
+        data_elements = [
+          result.produce(env) for env in envs
         ]
 
         series.set_individual_tag(virtual_tag.tag,
-                                  individual_tags)
+                                  data_elements)
 
+    for dataset in series.datasets:
+      make_meta(dataset)
 
     return series
 
@@ -617,7 +575,7 @@ class DicomFactory():
     Returns:
         Dataset: The constructed dataset
     """
-    failed_tags = []
+
     dataset = Dataset()
     if filling_strategy == FillingStrategy.COPY:
       for data_element in pivot:
@@ -626,9 +584,9 @@ class DicomFactory():
         else:
           dataset.add(data_element)
     for virtual_element in blueprint:
-      de = virtual_element.corporealialize(self, [pivot])
+      de = virtual_element.corporealialize([pivot])
       if isinstance(de, InstanceVirtualElement):
-        args = InstanceEnvironment(1, kwargs=kwargs)
+        args = InstanceEnvironment(1, self, kwargs=kwargs)
         de = de.produce(args)
       if de is not None:
         dataset.add(de)
@@ -637,7 +595,7 @@ class DicomFactory():
   def encode_pdf(self,
                  report: Union['Report', Path, str],
                  datasets: Iterable[Dataset],
-                 report_blueprint = default_report_blueprint,
+                 report_blueprint: Blueprint,
                  filling_strategy = FillingStrategy.DISCARD,
                  kwargs: Dict[Any, Any] = {}) -> Dataset:
     """Encodes a pdf file to a dicom file such that it can be transported with
@@ -707,103 +665,4 @@ class DicomFactory():
     return report_dataset
 
 
-###### Header Tag Lists ######
-patient_blueprint = Blueprint([
-  CopyElement(0x00100010), # PatientName
-  CopyElement(0x00100020), # PatientID
-  CopyElement(0x00100021, Optional=True), # Issuer of Patient ID
-  CopyElement(0x00100030, Optional=True), # PatientsBirthDate
-  CopyElement(0x00100040), # PatientSex
-])
-
-frame_of_reference_blueprint = Blueprint([
-  CopyElement(0x00200052),
-  CopyElement(0x00201040)
-])
-
-general_study_blueprint = Blueprint([
-  CopyElement(0x00080020), # StudyDate
-  CopyElement(0x00080030), # StudyTime
-  CopyElement(0x00080050), # AccessionNumber
-  CopyElement(0x00081030, Optional=True), # StudyDescription
-  CopyElement(0x00200010, Optional=True), # StudyID
-  CopyElement(0x0020000D), # StudyInstanceUID
-])
-
-# You might argue that you should overwrite, since this is a synthetic image
-general_equipment_blueprint = Blueprint([
-  CopyElement(0x00080070, Optional=True), # Manufacturer
-  CopyElement(0x00080080, Optional=True), # Institution Name
-  CopyElement(0x00080081, Optional=True), # Institution Address
-  CopyElement(0x00081040, Optional=True), # Institution Department Name
-  CopyElement(0x00081090, Optional=True), # Manufacturer's Model Name
-])
-
-
-general_image_blueprint = Blueprint([
-  StaticElement(0x00080008, 'CS', ['DERIVED', 'PRIMARY']), # Image Type # write a test for this
-  FunctionalElement(0x00200013, 'IS', _add_InstanceNumber), # InstanceNumber
-
-])
-
-
-# One might argue the optionality of these tags
-image_plane_blueprint = Blueprint([
-  CopyElement(0x00180050),               # Slice thickness
-  InstanceCopyElement(0x00200032, 'DS'), # Image position
-  CopyElement(0x00200037),               # Image Orientation
-  #InstanceCopyElement(0x00201041, 'DS'), # Slice Location
-  CopyElement(0x00280030),               # Pixel Spacing
-])
-
-
-ct_image_blueprint = Blueprint([
-  CopyElement(0x00080008, Optional=True), # Image Type
-  CopyElement(0x00180022, Optional=True), # Scan Options
-  CopyElement(0x00180060, Optional=True), # KVP
-  CopyElement(0x00180090, Optional=True), # Data Collection Diameter
-  CopyElement(0x00181100, Optional=True), # Reconstruction Diameter
-  CopyElement(0x00181110, Optional=True), # Distance Source to Detector
-  CopyElement(0x00181111, Optional=True), # Distance Source to Patient
-  CopyElement(0x00181120, Optional=True), # Gantry / Detector Tilt
-  CopyElement(0x00181130, Optional=True), # Table Height
-  CopyElement(0x00181140, Optional=True), # Rotation Direction
-  CopyElement(0x00181150, Optional=True), # Exposure Time
-  CopyElement(0x00181151, Optional=True), # X-Ray Tube Current
-  CopyElement(0x00181152, Optional=True), # Exposure
-  CopyElement(0x00181153, Optional=True), # Exposure in µAs
-  CopyElement(0x00181160, Optional=True), # Filter Type
-  CopyElement(0x00181170, Optional=True), # Generator Power
-  CopyElement(0x00181190, Optional=True), # Focal Spots
-  CopyElement(0x00181210, Optional=True), # Convolution Kernel
-  CopyElement(0x00189305, Optional=True), # Revolution Time
-])
-
-
-patient_study_blueprint = Blueprint([
-  CopyElement(0x00101010, Optional=True), # PatientAge
-  CopyElement(0x00101020, Optional=True), # PatientSize
-  CopyElement(0x00101022, Optional=True), # PatientBodyMassIndex
-  CopyElement(0x00101030, Optional=True), # PatientWeight
-  CopyElement(0x001021A0, Optional=True), # SmokingStatus
-  CopyElement(0x001021C0, Optional=True), # PregnancyStatus
-])
-
-
-general_series_blueprint = Blueprint([
-  CopyElement(0x00080060), # Modality
-  SeriesElement(0x00080021, 'DA', _get_today),         # SeriesDate
-  SeriesElement(0x00080031, 'TM', _get_time),          # SeriesTime
-  SeriesElement(0x0020000E, 'UI', gen_uid),            # SeriesInstanceUID
-  SeriesElement(0x0008103E, 'LO', lambda: "Dicomnode pipeline output"), # SeriesDescription
-  SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
-  CopyElement(0x00081070, Optional=True),              # Operators' Name
-  CopyElement(0x00185100),                             # PatientPosition
-])
-
-SOP_common_blueprint: Blueprint = Blueprint([
-  CopyElement(0x00080016),                                  # SOPClassUID, you might need to change this
-  FunctionalElement(0x00080018, 'UI', _add_UID_tag), # SOPInstanceUID
-  FunctionalElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
-])
 

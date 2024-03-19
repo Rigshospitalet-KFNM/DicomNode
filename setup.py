@@ -7,13 +7,9 @@ import subprocess
 from pathlib import Path
 import shutil
 
-# Thrid party Tools
+# Third party Tools
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
-try:
-  from pybind11.setup_helpers import Pybind11Extension
-except ImportError:
-  from setuptools import Extension as Pybind11Extension
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -134,7 +130,6 @@ class CMakeBuild(build_ext):
       return super().copy_extensions_to_source()
     except Exception as E:
       print(f"failed to copy! {E}")
-
 
 if __name__ == '__main__':
   print("building from setup.py")

@@ -19,8 +19,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 # Dicomnode packages
 from dicomnode.lib.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
-from dicomnode.lib.dicom_factory import Blueprint, StaticElement, InstanceCopyElement, CopyElement
-from dicomnode.lib.numpy_factory import NumpyFactory
+from dicomnode.lib.dicom_factory import Blueprint, StaticElement, InstanceCopyElement, CopyElement, DicomFactory
 from dicomnode.server.grinders import Grinder
 from dicomnode.server.input import AbstractInput, DynamicInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
@@ -215,7 +214,7 @@ class PatientNodeTestCase(TestCase):
     self.PatientNode = PatientNode({
       'arg_1' : TestInput1,
       'arg_2' : TestInput2
-    }, None, self.options)
+    }, self.options)
 
   def tearDown(self) -> None:
     shutil.rmtree(self.path)
@@ -248,7 +247,7 @@ class PatientNodeTestCase(TestCase):
     with path.open(mode="w") as f:
       f.write("asdf")
     options = PatientNode.Options(container_path=path)
-    self.assertRaises(InvalidRootDataDirectory, PatientNode,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
+    self.assertRaises(InvalidRootDataDirectory, PatientNode,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, options)
     path.unlink(missing_ok=True)
 
   def test_IC_cleanup(self):
@@ -257,20 +256,12 @@ class PatientNodeTestCase(TestCase):
     options = PatientNode.Options(
       container_path=path
     )
-    input_container = PatientNode({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, None, options)
+    input_container = PatientNode({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, options)
     input_container.clean_up()
     self.assertFalse(path.exists())
 
   def test_header_creation(self):
-    blueprint = Blueprint([
-      StaticElement(0x00100010, 'PN', "Anon^Mus"),
-      CopyElement(0x00100020),
-    ])
-
-    options = PatientNode.Options(
-      header_blueprint=blueprint,
-      factory=NumpyFactory(),
-    )
+    options = PatientNode.Options()
 
     patient_node = PatientNode({
       'arg_1' : TestInput1
@@ -289,17 +280,8 @@ class PatientNodeTestCase(TestCase):
 
     input_container = patient_node.extract_input_container()
 
-    self.assertIsNotNone(input_container.header)
-
   def test_header_creation_with_pivot_input(self):
-    blueprint = Blueprint([
-      StaticElement(0x00100010, 'PN', "Anon^Mus"),
-      CopyElement(0x00100020),
-    ])
-
     options = PatientNode.Options(
-      header_blueprint=blueprint,
-      factory=NumpyFactory(),
       parent_input="arg_1"
     )
 
@@ -320,17 +302,8 @@ class PatientNodeTestCase(TestCase):
 
     input_container = patient_node.extract_input_container()
 
-    self.assertIsNotNone(input_container.header)
-
   def test_header_creation_with_dynamic_input(self):
-    blueprint = Blueprint([
-      StaticElement(0x00100010, 'PN', "Anon^Mus"),
-      CopyElement(0x00100020),
-    ])
-
     options = PatientNode.Options(
-      header_blueprint=blueprint,
-      factory=NumpyFactory(),
       parent_input="arg_1"
     )
 

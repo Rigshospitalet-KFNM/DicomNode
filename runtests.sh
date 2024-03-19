@@ -36,4 +36,4 @@ if [ -d coverage ]; then
   mkdir -p coverage
 fi
 
-coverage lcov
+coverage lcov -o coverage/coverage.lcov

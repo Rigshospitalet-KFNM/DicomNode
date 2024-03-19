@@ -247,9 +247,9 @@ def format_from_patient_name(person_name: PersonName) -> str:
 
 from ..data_structures import image_tree as __image_tree # to prevent circular imports
 from . import anonymization
+from . import blueprints
 from . import dicom_factory
 from . import dimse
 from . import lazy_dataset
 from . import nifti
-from . import numpy_factory
 from . import sop_mapping

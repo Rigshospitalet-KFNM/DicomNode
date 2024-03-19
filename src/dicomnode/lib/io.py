@@ -218,4 +218,5 @@ class TemporaryWorkingDirectory():
 
   def __exit__(self, exc_type: Type[Exception], exc_val: Exception, exc_tb):
     os.chdir(self.__cwd)
-    shutil.rmtree(self.temp_directory_path)
+    if self.temp_directory_path.exists():
+      shutil.rmtree(self.temp_directory_path)

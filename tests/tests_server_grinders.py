@@ -1,17 +1,23 @@
+# Python Standard Library
+import logging
+from pathlib import Path
+import shutil
 from unittest import TestCase, skipIf
 
+# Third Party Packages
+import numpy
 from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
-from dicomnode.lib.exceptions import InvalidDataset
+# Dicomnode Packages
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.data_structures.image_tree import DicomTree
-from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.server.grinders import IdentityGrinder, ListGrinder, DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder
+from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patient
+from dicomnode.server.grinders import IdentityGrinder, ListGrinder,\
+  DicomTreeGrinder, ManyGrinder, NumpyGrinder, TagGrinder, NiftiGrinder
 
-import numpy
-import logging
-
-from tests.helpers import generate_numpy_datasets
+# Test Helper functions
+from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
@@ -325,7 +331,7 @@ class GrinderTests(TestCase):
 
   def test_pivotless_tag_meta_grinder(self):
     grinder = TagGrinder([0x00100020, 0x00101020,0x00101030])
-    self.assertRaises(InvalidDataset, grinder, [])
+    self.assertRaises(ValueError, grinder, [])
 
   def test_invalid_dataset_tag_meta_grinder(self):
     patient_id = "12351"
@@ -338,3 +344,119 @@ class GrinderTests(TestCase):
     grinder = TagGrinder([0x00100020, 0x00101020,0x00101030], optional=False)
 
     self.assertRaises(InvalidDataset, grinder, [dataset])
+
+
+class NiftyGrinderTestCase(TestCase):
+  def test_invalid_configuration_for_grinder(self):
+    self.assertRaises(IncorrectlyConfigured, NiftiGrinder, None, True)
+
+  def test_nifti_grinder_MR_no_resampling(self):
+    grinder = NiftiGrinder(None, False)
+
+    slices = 50
+
+    image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+
+    slice_x = 2.0
+    slice_y = 2.0
+    slice_z = 2.0
+
+    rows = 300
+    cols = 400
+
+    datasets = [
+      ds for ds in generate_numpy_datasets(slices, Rows=rows,Cols=cols,)
+    ]
+    positions = extrapolate_image_position_patient(
+      slice_thickness=slice_z,
+      orientation=1,
+      initial_position=(0.0,0.0,0.0),
+      image_orientation=tuple(image_orientation),
+      image_number=1,
+      slices=slices
+    )
+
+    for dataset, position in zip(datasets, positions):
+      dataset.ImagePositionPatient = position
+      dataset.ImageOrientationPatient = image_orientation
+      dataset.Modality = 'MR'
+      dataset.PixelSpacing = [slice_x,slice_y]
+
+    res = grinder(datasets)
+
+    self.assertEqual(res.header.get_data_shape(), (cols, rows, slices)) #type: ignore
+
+    image_data = res.get_fdata()
+
+    self.assertTrue(image_data.flags["F_CONTIGUOUS"])
+    self.assertEqual(image_data.shape, (cols, rows, slices))
+
+  def test_nifti_grinder_MR_create_dir_and_resampling(self):
+    grinder_path = Path(TESTING_TEMPORARY_DIRECTORY) / "nifti_grinder-test"
+    if grinder_path.exists():
+      shutil.rmtree(grinder_path) # pragma: no cover
+
+    grinder = NiftiGrinder(grinder_path, True)
+
+    slices = 50
+
+    image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+
+    slice_x = 2.0
+    slice_y = 2.0
+    slice_z = 2.0
+
+    rows = 300
+    cols = 400
+
+    datasets = [
+      ds for ds in generate_numpy_datasets(slices, Rows=rows,Cols=cols,)
+    ]
+    positions = extrapolate_image_position_patient(
+      slice_thickness=slice_z,
+      orientation=1,
+      initial_position=(0.0,0.0,0.0),
+      image_orientation=tuple(image_orientation),
+      image_number=1,
+      slices=slices
+    )
+
+    for dataset, position in zip(datasets, positions):
+      dataset.ImagePositionPatient = position
+      dataset.ImageOrientationPatient = image_orientation
+      dataset.Modality = 'MR'
+      dataset.PixelSpacing = [slice_x,slice_y]
+
+    res = grinder(datasets)
+
+    self.assertEqual(res.header.get_data_shape(), (cols, rows, slices)) #type: ignore
+
+    image_data = res.get_fdata()
+
+    # WELL WELL WELL WE HAVE SOME IDIOT ALLOCATION
+    self.assertFalse(image_data.flags["F_CONTIGUOUS"])
+    self.assertTrue(image_data.flags["C_CONTIGUOUS"])
+    self.assertEqual(image_data.shape, (cols, rows, slices))
+
+  def test_nifti_grinder_CT(self):
+    grinder = NiftiGrinder()
+    slices = 50
+    image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+    datasets = [ ds for ds in generate_numpy_datasets(slices)]
+    positions = extrapolate_image_position_patient(
+      slice_thickness=1,
+      orientation=1,
+      initial_position=(0.0,0.0,0.0),
+      image_orientation=tuple(image_orientation),
+      image_number=1,
+      slices=slices
+    )
+
+    for dataset, position in zip(datasets, positions):
+      dataset.ImagePositionPatient = position
+      dataset.ImageOrientationPatient = image_orientation
+      dataset.Modality = 'CT'
+      dataset.PixelSpacing = [1.0,1.0]
+
+
+    res = grinder(datasets)

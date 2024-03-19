@@ -18,7 +18,8 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode import library_paths
 from dicomnode.lib.io import save_dicom
 from dicomnode.dicom import generate_uid, make_meta
-from dicomnode.dicom.numpy_factory import NumpyFactory # Need this class because Dicom Factory is an abstract class
+from dicomnode.dicom.blueprints import default_report_blueprint
+from dicomnode.dicom.dicom_factory import DicomFactory
 from dicomnode.report import Report
 from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
@@ -98,9 +99,9 @@ class GeneratorTestCase(TestCase):
       pass
 
     report.generate_pdf()
+    factory = DicomFactory()
 
-    factory = NumpyFactory()
-    encoded_report = factory.encode_pdf(report, [dataset])
+    encoded_report = factory.encode_pdf(report, [dataset], default_report_blueprint)
     make_meta(encoded_report)
 
     save_dicom(library_paths.report_directory/'test_report.dcm', encoded_report)

@@ -11,10 +11,27 @@ class InitTestCase(TestCase):
 
   def test_lazy_imports(self):
     self.assertIs(dicomnode.constants, import_module('dicomnode.constants'))
-    self.assertIs(dicomnode.lib, import_module('dicomnode.lib'))
-    self.assertIs(dicomnode.server, import_module('dicomnode.server'))
-    self.assertIs(dicomnode.report, import_module('dicomnode.report'))
-    self.assertIs(dicomnode.tools, import_module('dicomnode.tools'))
+    self.assertIs(dicomnode.lib, getattr(dicomnode, 'lib'))
+    self.assertIs(dicomnode.lib,       import_module('dicomnode.lib'))
+    self.assertIs(dicomnode.server,    import_module('dicomnode.server'))
+    self.assertIs(dicomnode.report,    import_module('dicomnode.report'))
+    self.assertIs(dicomnode.tools,     import_module('dicomnode.tools'))
+
+    self.assertRaises(AttributeError, getattr, dicomnode, 'NotAModule')
+
+  def test_dir(self):
+    self.assertEqual(dir(dicomnode),[
+      'constants',
+      'data_structures',
+      'dicom',
+      'lib',
+      'library_paths'
+      'performance',
+      'report',
+      'server',
+      'tools',
+      'version',
+    ])
 
 if __name__ == '__main__':
   main()

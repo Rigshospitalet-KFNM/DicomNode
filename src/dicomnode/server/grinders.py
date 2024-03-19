@@ -18,15 +18,19 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
 
 # Third party packages
 import numpy
+from nibabel import Nifti1Image
 from pydicom import Dataset
+from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicom node package
-from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.data_structures.image_tree import DicomTree
+from dicomnode.dicom.series import DicomSeries
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 
 logger = get_logger()
@@ -87,6 +91,16 @@ class DicomTreeGrinder(Grinder):
     """
     return DicomTree(image_generator)
 
+class SeriesGrinder(Grinder):
+  """A Grinder to convert the input dicom images to a series. This is very
+  useful situation where the input is a single series, as it very close to
+  combined tag and numpy grinder
+
+  Produces a dicomnode.dicom.series.DicomSeries Object
+
+  """
+  def __call__(self, image_generator: Iterable[Dataset]) -> Any:
+    return DicomSeries([ds for ds in image_generator])
 
 class TagGrinder(Grinder):
   def __init__(self, tag_list, optional=False) -> None:
@@ -208,3 +222,41 @@ class NumpyGrinder(Grinder):
       logger.error("Dataset contains a invalid value for Samples Per Pixel")
 
     raise InvalidDataset()
+
+
+class NiftiGrinder(Grinder):
+  INCORRECTLY_CONFIGURED_ERROR_MESSAGE = "To reorient a nifti you need \
+ define a valid Path for output_directory"
+
+  def __init__(self, output_directory: Optional[Path] = None, reorient_nifti: bool=False) -> None:
+
+    if reorient_nifti and output_directory is None:
+      logger.error(self.INCORRECTLY_CONFIGURED_ERROR_MESSAGE)
+      raise IncorrectlyConfigured
+    if output_directory is not None:
+      if not output_directory.exists():
+        output_directory.mkdir(parents=True, exist_ok=True)
+
+    self.output_directory = output_directory
+    self.reorient_nifti = reorient_nifti
+
+
+  def __call__(self, datasets: Iterable[Dataset]) -> Nifti1Image:
+    """
+    Creates a nifti dataset from a dicomnode.server.input.AbstractInput Superclass
+
+    Args:
+      datasets (Iterable[Dataset]): A Single dicom series to be converted
+
+    Returns:
+      Nifti1Image: Nifti image, note that it have NOT been saved to disk
+    """
+
+    lists_datasets = [ds for ds in datasets]
+    return_dir = dicom_array_to_nifti(
+        dicom_list=lists_datasets,
+        output_file=self.output_directory,
+        reorient_nifti=self.reorient_nifti
+      )
+
+    return return_dir['NII'] # Yeah your documentation is wrong, and you should feel real fucking bad

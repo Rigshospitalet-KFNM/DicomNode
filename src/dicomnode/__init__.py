@@ -71,7 +71,7 @@ class _LibraryPaths:
       path = Path(default)
       setattr(self, key, path)
 
-    if not path.exists():
+    if not path.exists(): # pragma: no cover
       path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
 
 library_paths = _LibraryPaths()
@@ -95,7 +95,7 @@ __server = None
 __report = None
 
 # See https://peps.python.org/pep-0562/ to understand the Voodoo magic going on here
-def __getattr__(name):
+def __getattr__(name):  #pragma: no cover
   if name == 'lib':
     global __lib
     if __lib is None:
@@ -104,35 +104,35 @@ def __getattr__(name):
 
   if name == 'tools':
     global __tools
-    if __tools is None:
+    if __tools is None: #pragma: no cover
       __tools = import_module('dicomnode.tools')
     return __tools
 
   if name == 'server':
     global __server
-    if __server is None:
+    if __server is None: #pragma: no cover
       __server = import_module('dicomnode.server')
     return __server
 
   if name == 'report':
     global __report
-    if __report is None:
+    if __report is None: #pragma: no cover
       __report = import_module('dicomnode.report')
     return __report
 
   if name == 'dicom':
     global __dicom
-    if __dicom is None:
+    if __dicom is None: #pragma: no cover
       __dicom = import_module('dicomnode.dicom')
     return __dicom
 
-  if name == 'data_structures':
+  if name == 'data_structures': #pragma: no cover
     global __data_structures
     if __data_structures is None:
       __data_structures = import_module('dicomnode.data_structures')
     return __data_structures
 
-  if name == 'performance':
+  if name == 'performance': #pragma: no cover
     global __performance
     if __performance is None:
       __performance = import_module('dicomnode.performance')
@@ -143,15 +143,15 @@ def __getattr__(name):
 
 __all__ = (
   'constants',
-  'performance',
   'data_structures',
   'dicom',
   'lib',
+  'library_paths'
+  'performance',
   'report',
   'server',
   'tools',
   'version',
-  'library_paths'
 )
 
 def __dir__():

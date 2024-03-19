@@ -61,9 +61,11 @@ class AbstractPipeline():
   """
 
   # Directory for file Processing
-  processing_directory: Union[ProcessingDirectoryOptions, Path, None] = ProcessingDirectoryOptions.USE_DATA_DIRECTORY
+  processing_directory: Optional[Path] = None
   """Base directory that the processing will take place in.
   The specific directory that will run is: `processing_directory/patient_ID`
+
+  DO NOT SET THIS EQUAL TO DATA DIRECTORY
   """
 
 
@@ -220,18 +222,12 @@ class AbstractPipeline():
       if not self.data_directory.exists():
         self.data_directory.mkdir(parents=True)
 
-    if isinstance(self.processing_directory, ProcessingDirectoryOptions):
-      if self.processing_directory == ProcessingDirectoryOptions.NO_PROCESSING_DIRECTORY:
-        self.processing_directory = None
-      if self.processing_directory == ProcessingDirectoryOptions.USE_DATA_DIRECTORY:
-        self.processing_directory = self.data_directory
+      if self.data_directory == self.processing_directory:
+        raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
     pipeline_tree_options = self.pipeline_tree_type.Options(
       ae_title=self.ae_title,
       data_directory=self.data_directory,
-      factory=self.dicom_factory,
-      filling_strategy=self.filling_strategy,
-      header_blueprint=self.header_blueprint,
       lazy=self.lazy_storage,
       input_container_type=self.input_container_type,
       patient_container=self.patient_container_type,
@@ -276,6 +272,39 @@ class AbstractPipeline():
   # Responsibility's:
   #  - handle_c_store_message - extracts information from event
   #  - control_c_store_function - main function responsible for calling correct functions
+  def handle_association_accepted(self, event: evt.Event):
+    """This is main handler for how the pynetdicom.AE should hanlde an
+    evt.EVT_ACCEPTED event. You should be careful in overwriting this method.
+
+    It creates a dataclass with all ness
+
+    If you require different functionality, consider first if it's possible to
+    extend the handler functions consume
+    """
+    self.logger.debug(f"Association with {event.assoc.requestor.ae_title}\
+                       - {event.assoc.requestor.address} Accepted")
+    association_accept_container = self._association_container_factory\
+                                       .build_association_accepted(event)
+
+    for association_type in association_accept_container.association_types:
+      handler = self._acceptation_handlers.get(association_type)
+      if handler is not None:
+        handler(self, association_accept_container)
+
+
+  def _consume_association_accept_store_association(
+      self, accepted_container: AcceptedContainer):
+    """This function initialized after a thread have connected
+    """
+    if accepted_container.association_ip is not None:
+      self._associations_responds_addresses[accepted_container.association_id] = Address(
+        accepted_container.association_ip,
+        self.default_response_port,
+        accepted_container.association_ae
+      )
+
+    self._updated_patients[accepted_container.association_id] = set()
+
 
   def handle_c_store(self, event: evt.Event) -> int:
     c_store_container = self._association_container_factory.build_association_c_store(event)
@@ -286,7 +315,7 @@ class AbstractPipeline():
   def consume_c_store_container(self, c_store_container: CStoreContainer) -> int:
     try:
       if not self.filter(c_store_container.dataset):
-        self.logger.warning("Dataset discarded")
+        self.logger.info("Node rejected dataset: Received Dataset did not pass filter")
         return 0xB006 # Element discarded
     except Exception as exception:
       log_traceback(self.logger, exception, "User defined function filter produced an exception")
@@ -312,48 +341,16 @@ class AbstractPipeline():
           self.data_state.add_image(c_store_container.dataset)
         # End of Critical Zone
       except InvalidDataset:
-        self.logger.info("Received dataset is not accepted by any inputs")
+        self.logger.info("Node rejected dataset: Received dataset is not accepted by any inputs")
         return 0xB006
       except Exception as exception:
-        log_traceback(self.logger, exception, "Adding Image")
+        log_traceback(self.logger, exception, "Adding Image to input produced an exception")
+        return 0xA801
     else:
-      self.logger.debug("Node: Received dataset, doesn't have patient Identifier tag")
+      self.logger.info("Node rejected dataset: Received dataset doesn't have patient Identifier tag")
       return 0xB007
 
     return 0x0000
-
-
-  def handle_association_accepted(self, event: evt.Event):
-    """This is main handler for how the pynetdicom.AE should hanlde an
-    evt.EVT_ACCEPTED event. You should be careful in overwriting this method.
-
-    It creates a dataclass with all ness
-
-    If you require different functionality, consider first if it's possible to
-    extend the handler functions consume
-    """
-    self.logger.debug(f"Association with {event.assoc.requestor.ae_title}\
-                       - {event.assoc.requestor.address} Accepted")
-    association_accept_container = self._association_container_factory\
-                                       .build_association_accepted(event)
-
-    for association_type in association_accept_container.association_types:
-      handler = self._acceptation_handlers.get(association_type)
-      if handler is not None:
-        handler(self, association_accept_container)
-
-  def _consume_association_accept_store_association(
-      self, accepted_container: AcceptedContainer):
-    """This function completes all the calculation nessesarry for
-    """
-    if accepted_container.association_ip is not None:
-      self._associations_responds_addresses[accepted_container.association_id] = Address(
-        accepted_container.association_ip,
-        self.default_response_port,
-        accepted_container.association_ae
-      )
-
-    self._updated_patients[accepted_container.association_id] = set()
 
   def handle_association_released(self, event: evt.Event):
     """This function is called whenever an association is released
@@ -387,8 +384,8 @@ class AbstractPipeline():
       with self._lock_key:
         if patient_id in self._patient_locks:
           threads, patient_lock = self._patient_locks[patient_id]
-        else:
-          self.logger.critical("Another thread deleted thread-set and Patient log") # pragma: no cover
+        else: # pragma: no cover
+          self.logger.critical("Another thread deleted thread-set and Patient log")
           self.logger.critical("This is a bug in the library, please report it") # pragma: no cover
           continue # pragma: no cover
         with patient_lock:
@@ -412,16 +409,16 @@ class AbstractPipeline():
       self.logger.debug(f"Sufficient data for patient {patient_id}")
 
       if self.processing_directory is not None:
-        with TemporaryWorkingDirectory(self.processing_directory / str(patient_id)):
+        with TemporaryWorkingDirectory(self.get_processing_directory(patient_id)):
           self._pipeline_processing(patient_id, released_container, patient_input_container)
       else:
-        self._pipeline_processing(patient_id, released_container,patient_input_container)
+        self._pipeline_processing(patient_id, released_container, patient_input_container)
     del self._updated_patients[released_container.association_id] # Removing updated Patients
 
   def _pipeline_processing(self,
                            patient_id: str,
                            released_container: ReleasedContainer,
-                           patient_input_container):
+                           patient_input_container: InputContainer):
     """Processes a patient through the pipeline and starts exporting it
 
     Args:
@@ -434,7 +431,7 @@ class AbstractPipeline():
     try:
       result = self.process(patient_input_container)
       if result is None:
-        self.logger.warning("You forgot to return a Dicom out object in the process function. If output is handled by process, return a NoOutput Object")
+        self.logger.warning("You forgot to return a PipelineOutput object in the process function. If output is handled by process, return a NoOutput Object")
         result = NoOutput()
     except Exception as exception:
       log_traceback(self.logger, exception, "Exception in user Processing")
@@ -564,6 +561,30 @@ class AbstractPipeline():
       (self.ip,self.port),
       block=blocking,
       evt_handlers=self.evt_handlers)
+
+  def get_processing_directory(self, identifier) -> Optional[Path]:
+    if self.processing_directory is None:
+      return None
+
+    if isinstance(identifier, Dataset):
+      return self.processing_directory / str(identifier[self.patient_identifier_tag].value)
+
+    if isinstance(identifier, str):
+      return self.processing_directory / identifier
+
+    raise TypeError("Unknown identifier type")
+
+  def get_storage_directory(self, identifier: Any) -> Optional[Path]:
+    if self.data_directory is None:
+      return None
+
+    if isinstance(identifier, Dataset):
+      return self.data_directory / str(identifier[self.patient_identifier_tag].value)
+
+    if isinstance(identifier, str):
+      return self.data_directory / identifier
+
+    raise TypeError("Unknown identifier type")
 
 
   ##### Handler Directories #####
