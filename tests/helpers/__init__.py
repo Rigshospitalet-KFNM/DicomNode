@@ -28,15 +28,9 @@ except KeyError:
   TESTING_TEMPORARY_DIRECTORY = "/tmp/dicomnode_tests"
 
 # Dicomnode
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
 from dicomnode.lib.logging import set_logger
 from dicomnode.lib.dicom import gen_uid, make_meta
-
-unsigned_array_encoding: Dict[int, Type[numpy.unsignedinteger]] = {
-  8 : numpy.uint8,
-  16 : numpy.uint16,
-  32 : numpy.uint32,
-  64 : numpy.uint64,
-}
 
 def generate_numpy_dataset(
     StudyUID: UID,
@@ -70,7 +64,7 @@ def generate_numpy_dataset(
   ds.BitsStored = bits
   ds.HighBit = bits - 1
 
-  dType = unsigned_array_encoding.get(ds.BitsAllocated)
+  dType = UNSIGNED_ARRAY_ENCODING.get(ds.BitsAllocated)
 
   if dType is None:
     raise ValueError

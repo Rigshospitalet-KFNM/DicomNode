@@ -90,7 +90,7 @@ __data_structures = None
 __dicom = None
 __lib = None
 __tools = None
-__performance = None
+__math = None
 __server = None
 __report = None
 
@@ -133,10 +133,10 @@ def __getattr__(name):  #pragma: no cover
     return __data_structures
 
   if name == 'performance': #pragma: no cover
-    global __performance
-    if __performance is None:
-      __performance = import_module('dicomnode.performance')
-    return __performance
+    global __math
+    if __math is None:
+      __math = import_module('dicomnode.math')
+    return __math
 
   raise AttributeError(f"module {__name__} has no attribute '{name}'")
 
@@ -147,7 +147,7 @@ __all__ = (
   'dicom',
   'lib',
   'library_paths'
-  'performance',
+  'math',
   'report',
   'server',
   'tools',

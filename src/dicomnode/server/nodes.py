@@ -35,6 +35,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, FillingStrategy
 from dicomnode.dicom.dimse import Address
+from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import log_traceback, set_logger
@@ -397,7 +398,7 @@ class AbstractPipeline():
               patient_input_container = self._get_input_container(patient_id, released_container)
               del self._patient_locks[patient_id]
             else:
-              self.logger.debug(f"Insufficient data for patient {patient_id}")
+              self.logger.info(f"Insufficient data for patient {patient_id}")
               continue
           else:
             thread_id = get_native_id()
@@ -438,10 +439,11 @@ class AbstractPipeline():
     else:
       self.logger.debug(f"Process {patient_id} Successful, Dispatching output!")
       if self._dispatch(result):
-        self.logger.debug("Dispatching Successful")
+        self.logger.info(f"Dispatched {patient_id} Successful")
+        # This also unlocks the patient
         self.data_state.clean_up_patient(patient_id)
       else:
-        self.logger.error("Unable to dispatch pipeline output")
+        self.logger.error(f"Unable to dispatch output for {patient_id}")
 
   def _dispatch(self, output: PipelineOutput) -> bool:
     """This function is responsible for triggering exporting of data and handling errors.
@@ -566,6 +568,14 @@ class AbstractPipeline():
     if self.processing_directory is None:
       return None
 
+    if isinstance(identifier, DicomSeries):
+      val = identifier[self.patient_identifier_tag]
+      if val is not None:
+        return self.processing_directory / str(val.value)
+      else:
+        return None
+
+
     if isinstance(identifier, Dataset):
       return self.processing_directory / str(identifier[self.patient_identifier_tag].value)
 
@@ -577,6 +587,13 @@ class AbstractPipeline():
   def get_storage_directory(self, identifier: Any) -> Optional[Path]:
     if self.data_directory is None:
       return None
+
+    if isinstance(identifier, DicomSeries):
+      val = identifier[self.patient_identifier_tag]
+      if val is not None:
+        return self.data_directory / str(val.value)
+      else:
+        return None
 
     if isinstance(identifier, Dataset):
       return self.data_directory / str(identifier[self.patient_identifier_tag].value)

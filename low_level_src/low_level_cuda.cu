@@ -20,7 +20,7 @@
 
 PYBIND11_MODULE(_cuda, m){
   m.doc() = "pybind11 example plugin";
-  m.attr("__name__") = "dicomnode.perromance._cuda";
+  m.attr("__name__") = "dicomnode.math._cuda";
 
   // mirror.cu
   apply_mirror_module(m);

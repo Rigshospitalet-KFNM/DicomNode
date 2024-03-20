@@ -28,7 +28,7 @@ from dicomnode.server.input import AbstractInput
 class InputContainer:
   """Simple container class for grinded input.
   """
-  responding_address: Optional[Address] = None
+  responding_address: Optional[Address]
 
   def __init__(self,
                data: Dict[str, Any],
@@ -38,6 +38,7 @@ class InputContainer:
     self.__data = data
     self.datasets = datasets
     self.paths  = paths
+    self.responding_address = None
 
   def __getitem__(self, key: str):
     if self.__data is None:

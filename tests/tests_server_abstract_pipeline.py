@@ -8,7 +8,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 import logging
 from pathlib import Path
 from sys import stdout
-
+from shutil import rmtree
 from typing import List, Dict, Any, Iterable, NoReturn, Optional, Tuple
 import threading
 from unittest import skip, TestCase
@@ -24,7 +24,8 @@ from dicomnode.dicom.dicom_factory import DicomFactory
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.output import PipelineOutput
+from dicomnode.server.grinders import SeriesGrinder
+from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.factories.association_container import CStoreContainer,\
   ReleasedContainer, AssociationTypes
@@ -58,13 +59,14 @@ class TestInput(AbstractInput):
     0x00100040 : 'M'
   }
 
+  image_grinder = SeriesGrinder()
+
   def validate(self) -> bool:
     data = self.get_datasets()
     if len(data):
       pivot = data[0]
 
-      print(pivot)
-      if 0x00100021 in pivot:
+      if 0x00110103 in pivot:
         return False
 
     return True
@@ -94,17 +96,21 @@ class TestPipeLine(AbstractPipeline):
         raise Exception
     return True
 
+  def process(self, input_container: InputContainer):
+    return NoOutput()
+
 
 class PipeLineTestCase(TestCase):
   def setUp(self) -> None:
     self.node = TestPipeLine()
     self.thread_id = threading.get_native_id()
 
-
   def tearDown(self) -> None:
-    pass
+    storage = self.node.get_storage_directory(TEST_CPR)
+    if storage.exists():
+      rmtree(storage)
 
-  def test_consume_c_s_missing_Patient_ID(self):
+  def test_consume_c_store_missing_Patient_ID(self):
     # Setup
     self.node._updated_patients[self.thread_id] = set()
     input_dataset = Dataset()
@@ -249,9 +255,11 @@ class PipeLineTestCase(TestCase):
 
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._consume_association_release_store_association(container)
-    for string in cm.output:
-      #print(string)
-      pass
+
+    log_process = f"INFO:dicomnode:Processing {TEST_CPR}"
+    log_dispatch = f"INFO:dicomnode:Dispatched {TEST_CPR} Successful"
+    self.assertIn(log_process, cm.output)
+    self.assertIn(log_dispatch, cm.output)
 
   def test_consume_release_container_not_enough_data(self):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
@@ -268,7 +276,7 @@ class PipeLineTestCase(TestCase):
       ds.PatientName = self.patient_name
       ds.PatientID = TEST_CPR
       ds.PatientSex = 'M'
-      ds.StudyDescription = "WHY U NO WORK"
+      ds.add_new(0x00110103, 'LO', "This works now?")
       return ds
 
     parent_series = DicomSeries([
@@ -287,9 +295,10 @@ class PipeLineTestCase(TestCase):
 
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._consume_association_release_store_association(container)
-    for string in cm.output:
-      #print(string)
-      pass
+
+    log = f"INFO:dicomnode:Insufficient data for patient {TEST_CPR}"
+    self.assertIn(log, cm.output)
+
 
   def test_consume_release_container_another_thread_leaving(self):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
@@ -303,7 +312,11 @@ class PipeLineTestCase(TestCase):
     info_uint16 = numpy.iinfo(numpy.uint16)
     def gen_dataset(i: int) -> Dataset:
       ds = Dataset()
-      factory.store_image_in_dataset(ds, numpy.random.randint(0,info_uint16.max, (11,12), numpy.uint16))
+      factory.store_image_in_dataset(ds, numpy.random.randint(0,
+                                                              info_uint16.max,
+                                                              (11,12),
+                                                              numpy.uint16)
+                                    )
       ds.InstanceNumber = i + 1
       ds.PatientName = self.patient_name
       ds.PatientID = TEST_CPR
@@ -326,9 +339,10 @@ class PipeLineTestCase(TestCase):
 
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._consume_association_release_store_association(container)
-    for string in cm.output:
-      #print(string)
-      pass
+
+    log = f'DEBUG:dicomnode:Thread: {self.thread_id} leaving {TEST_CPR}-container'
+    self.assertIn(log, cm.output)
+
 
   def test_dispatch(self):
     class DumbOutput(PipelineOutput):

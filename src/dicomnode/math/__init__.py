@@ -10,13 +10,19 @@ that for you.
   """
 
 # Python standard library
+from typing import Tuple
 
 # Third party packages
-import numpy
+from numpy import ndarray, zeros_like
 
-# Dicomnode
-from dicomnode.performance.performance_types  import CudaErrorEnum,\
-  CudaException, MirrorDirection
+# Imports
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
+from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
+
+
+# Module Imports
+from . import types
+
 
 # Cpp code
 from . import _c # type: ignore
@@ -28,7 +34,7 @@ try:
 except ImportError:
   CUDA = False
 
-def mirror_x(arr: numpy.ndarray, direction: MirrorDirection):
+def mirror(arr: ndarray, direction: MirrorDirection):
   if len(arr.shape) == 3:
     raise ValueError("Mirror is only supported for 3 dimensional volumes")
 
@@ -54,3 +60,14 @@ def mirror_x(arr: numpy.ndarray, direction: MirrorDirection):
       raise CudaException(error)
   else:
     pass
+
+from . import affine
+from . import image
+
+def __all__():
+  return [
+    affine,
+    image,
+    mirror,
+    types,
+  ]

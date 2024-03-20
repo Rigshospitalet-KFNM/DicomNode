@@ -228,10 +228,13 @@ the CT image and `input_container['PET']` would return the pet image.
 
 An `InputContainer` also may contain:
 
-* `header` - A `Dicomnode.dicom.dicom_factory.SeriesHeader` - which is an object
-useful for recreating dicom series and next subsection.
-* `response_address` - A `Dicomnode.dicom.dimse.Address` - which represent the
-last association to send picture to this patient.
+* `response_address`: `Optional[Dicomnode.dicom.dimse.Address]` - which
+represent the last association to send picture to this patient.
+* `datasets`: `Dict[str, Iterable[Datasets]]` - A dict of the dataset that were
+stored in the input at the time
+* `paths`: `Optional[Dict[str, Path]]` - If the pipeline stores data, i.e
+`data_directory` is set, then this dict is set with the path to where the
+dataset are stored.
 
 Take the running example, if our PET and CT picture originate from two different
 sources, the response address is last to add studies to the Patient.

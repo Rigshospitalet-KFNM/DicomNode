@@ -18,6 +18,10 @@ from dicomnode.lib.exceptions import InvalidDataset
 
 PRIVATIZATION_VERSION = 1
 
+# Ensure Correct loading
+import dicomnode.math as __math
+
+
 class Reserved_Tags(Enum):
   PRIVATE_TAG_NAMES = 0xFD
   PRIVATE_TAG_VRS = 0xFE

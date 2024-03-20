@@ -8,13 +8,14 @@ from unittest import TextTestRunner, TestSuite, TestLoader
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
 # DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing
-from tests.helpers import testing_logs
 
+from tests.helpers import testing_logs
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
   parser.add_argument("test_regex", default="test", nargs="?")
   parser.add_argument("--verbose", type=int, default=1)
+  parser.add_argument("-nc", "--no_clean_up", action='store_true')
   parser.add_argument("-p", "--performance", action='store_true')
 
   args = parser.parse_args()
@@ -30,12 +31,15 @@ if __name__ == "__main__":
 
   cwd = os.getcwd()
   tmpDirPath = Path(TESTING_TEMPORARY_DIRECTORY)
-  if tmpDirPath.exists():
-    shutil.rmtree(TESTING_TEMPORARY_DIRECTORY) #pragma: no cover
-  os.mkdir(TESTING_TEMPORARY_DIRECTORY, mode=0o777)
+
+  tmpDirPath.mkdir(mode=0o777, exist_ok=True)
+
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
   result = runner.run(suite)
   os.chdir(cwd)
-  shutil.rmtree(TESTING_TEMPORARY_DIRECTORY)
+
+  if not args.no_clean_up:
+    if tmpDirPath.exists():
+      shutil.rmtree(str(tmpDirPath))
 
   exit(len(result.errors) != 0)

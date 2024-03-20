@@ -7,19 +7,19 @@ https://xkcd.com/927/
 # Python standard library
 from functools import reduce
 from enum import Enum
-from typing import Any, List, Literal, Optional,  Tuple, TypeAlias
+from typing import Any, List, Literal, Optional,  Tuple, TypeAlias, Union
 
 # Third party packages
-from numpy import zeros_like, ndarray, dtype, float64, float32, empty
+from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
 from pydicom.tag import BaseTag
 from nibabel import Nifti1Image
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
+from dicomnode.math.affine import AffineMatrix, ReferenceSpace, build_affine_from_datasets
+from dicomnode.math.image import build_image_from_datasets
 from dicomnode.lib.exceptions import InvalidDataset
-
-AffineMatrix: TypeAlias = ndarray[Tuple[Literal[4], Literal[4]], dtype[float64]]
 
 def sortDatasets(dataset: Dataset):
   """Sorting function for a collection of datasets. The order is determined by
@@ -64,146 +64,6 @@ def shared_tag(datasets: List[Dataset], tag: BaseTag) -> bool:
                   for dataset in datasets],
                 True)
 
-
-def build_image_from_datasets(datasets: List[Dataset]):
-    pivot = datasets[0]
-    x_dim = pivot.Columns
-    y_dim = pivot.Rows
-    z_dim = len(datasets)
-    rescale = (0x00281052 in pivot and 0x00281053 in pivot)
-
-    if 0x7FE00008 in pivot:
-      dataType = float32
-    elif 0x7FE00009 in pivot:
-      dataType = float64
-    elif rescale:
-      dataType = float64
-    elif pivot.PixelRepresentation == 0:
-      dataType = UNSIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
-    else:
-      dataType = SIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
-
-    if dataType is None:
-      raise InvalidDataset
-
-    image_array: ndarray = empty((z_dim, y_dim, x_dim), dtype=dataType)
-
-    for i, dataset in enumerate(datasets):
-      image = dataset.pixel_array
-      if rescale:
-        image = image.astype(float64) * dataset.RescaleSlope + dataset.RescaleIntercept
-      image_array[i,:,:] = image
-
-    return image_array
-
-def build_affine_from_datasets(dataset: Dataset):
-  if 0x00200032 not in dataset or 0x00200037 in dataset:
-    return None
-
-
-def fit_image_into_unsigned_bit_range(image: ndarray,
-                                      bits_stored = 16,
-                                      bits_allocated = 16,
-                                     ) -> Tuple[ndarray, float, float]:
-    target_datatype = UNSIGNED_ARRAY_ENCODING.get(bits_allocated, None)
-    min_val = image.min()
-    max_val = image.max()
-
-    if max_val == min_val:
-      return zeros_like(image), 1.0, min_val
-
-    image_max_value = ((1 << bits_stored) - 1)
-
-    slope = (max_val - min_val) / image_max_value
-    intercept = min_val
-
-    new_image = ((image - intercept) / slope).astype(target_datatype)
-
-    return new_image, slope, intercept
-
-
-class ReferenceSpace(Enum):
-  """These are the possible reference spaces a study can be in.
-
-  Here we use the terms defined in:
-  https://nipy.org/nibabel/coordinate_systems.html
-  """
-
-  RAS = 0
-  """Indicate that the image have an affine matrix on the form:
-  | x, 0, 0 |
-  | 0, y, 0 |
-  | 0, 0, z |
-  """
-
-  RAI = 1
-  """Indicate that the image have an affine matrix on the form:
-  | x, 0,  0 |
-  | 0, y,  0 |
-  | 0, 0, -z |
-  """
-  RPS = 2
-  """Indicate that the image have an affine matrix on the form:
-  | x,  0, 0 |
-  | 0, -y, 0 |
-  | 0,  0, z |
-  """
-  RPI = 3
-  """Indicate that the image have an affine matrix on the form:
-  | x, 0,  0 |
-  | 0, -y, 0 |
-  | 0, 0, -z |
-  """
-  LAS = 4
-  """Indicate that the image have an affine matrix on the form:
-  | -x, 0, 0 |
-  | 0, y, 0 |
-  | 0, 0, z |
-  """
-  LAI = 5
-  """Indicate that the image have an affine matrix on the form:
-  | -x, 0, 0 |
-  | 0, y, 0 |
-  | 0, 0, -z |
-  """
-  LPS = 6
-  """Indicate that the image have an affine matrix on the form:
-  | -x, 0, 0 |
-  | 0, -y, 0 |
-  | 0, 0, z |
-  """
-  LPI = 7
-  """Indicate that the image have an affine matrix on the form:
-  | -x, 0, 0 |
-  | 0, -y, 0 |
-  | 0, 0, -z |
-  """
-
-def is_positive(num):
-  return 0 < num
-
-def detect_reference_space(affine: AffineMatrix) -> ReferenceSpace:
-  x_coord = affine[0,0]
-  y_coord = affine[1,1]
-  z_coord = affine[2,2]
-
-  if is_positive(x_coord) and is_positive(y_coord) and is_positive(z_coord):
-    return ReferenceSpace.RAS
-  if is_positive(x_coord) and is_positive(y_coord) and not is_positive(z_coord):
-    return ReferenceSpace.RAI
-  if is_positive(x_coord) and not is_positive(y_coord) and is_positive(z_coord):
-    return ReferenceSpace.RPS
-  if is_positive(x_coord) and not is_positive(y_coord) and not is_positive(z_coord):
-    return ReferenceSpace.RPI
-  if not is_positive(x_coord) and is_positive(y_coord) and is_positive(z_coord):
-    return ReferenceSpace.LAS
-  if not is_positive(x_coord) and is_positive(y_coord) and not is_positive(z_coord):
-    return ReferenceSpace.LAI
-  if not is_positive(x_coord) and not is_positive(y_coord) and is_positive(z_coord):
-    return ReferenceSpace.LPS
-  if not is_positive(x_coord) and not is_positive(y_coord) and not is_positive(z_coord):
-    return ReferenceSpace.LPI
-
 SERIES_VARYING_TAGS = set([
   0x00080018, # SOPInstanceUID
   0x00200013, # InstanceNumber
@@ -239,7 +99,7 @@ class Series:
     self.image_data = image_data
     self.affine = affine
     if self.affine is not None:
-      self.reference_space = detect_reference_space(self.affine)
+      self.reference_space = ReferenceSpace.detect_reference_space(self.affine)
 
 class DicomSeries(Series):
   pivot: Dataset
@@ -263,7 +123,7 @@ class DicomSeries(Series):
 
     super().__init__(image, affine)
 
-  def __getitem__(self, tag):
+  def __getitem__(self, tag) -> Optional[Union[DataElement, List[DataElement]]]:
     if self.datasets is None:
       return None
 
