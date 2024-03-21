@@ -134,12 +134,12 @@ class CMakeBuild(build_ext):
 if __name__ == '__main__':
   print("building from setup.py")
   extensions = [
-    CMakeExtension("dicomnode.performance._c")
+    CMakeExtension("dicomnode.math._c")
   ]
 
   if shutil.which("nvcc"):
     extensions.append(
-      CMakeExtension("dicomnode.performance._cuda")
+      CMakeExtension("dicomnode.math._cuda")
     )
 
   setup(name='dicomnode',

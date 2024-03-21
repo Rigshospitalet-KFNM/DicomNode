@@ -143,8 +143,8 @@ def bench(func: Callable) -> Callable:
 
     stats = pstats.Stats(profile)
     stats.sort_stats(pstats.SortKey.TIME)
-    Path("performance").mkdir(exist_ok=True)
-    stats.dump_stats(f"performance/{func.__name__}.prof")
+    Path("/tmp/performance").mkdir(exist_ok=True)
+    stats.dump_stats(f"/tmp/performance/{func.__name__}.prof")
     return ret
   return inner
 

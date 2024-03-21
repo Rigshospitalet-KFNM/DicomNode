@@ -132,7 +132,7 @@ def __getattr__(name):  #pragma: no cover
       __data_structures = import_module('dicomnode.data_structures')
     return __data_structures
 
-  if name == 'performance': #pragma: no cover
+  if name == 'math': #pragma: no cover
     global __math
     if __math is None:
       __math = import_module('dicomnode.math')

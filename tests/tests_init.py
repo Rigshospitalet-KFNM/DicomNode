@@ -26,7 +26,7 @@ class InitTestCase(TestCase):
       'dicom',
       'lib',
       'library_paths'
-      'performance',
+      'math',
       'report',
       'server',
       'tools',

@@ -599,4 +599,7 @@ class CudaException(PerformanceException):
   def fatal(self):
     return self.error_code.value in [803, 810, 911, 999, 10000]
 
-
+class Axes(Enum):
+  X = 0
+  Y = 1
+  Z = 2

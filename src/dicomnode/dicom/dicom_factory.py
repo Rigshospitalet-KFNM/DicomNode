@@ -23,7 +23,8 @@ from sortedcontainers import SortedDict
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.dicom.series import DicomSeries, fit_image_into_unsigned_bit_range
+from dicomnode.dicom.series import DicomSeries
+from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
