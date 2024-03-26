@@ -1,4 +1,6 @@
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import List, Tuple, Union
 
 
 class MirrorDirection(Enum):
@@ -9,6 +11,16 @@ class MirrorDirection(Enum):
   XZ = 4
   YZ = 5
   XYZ = 6
+
+class RotationAxes(Enum):
+  X = 0
+  Y = 1
+  Z = 2
+
+@dataclass(slots=True)
+class Transformation:
+  transformations: List[Union[Tuple[RotationAxes, int], MirrorDirection]] = field(default_factory=list)
+
 
 class PerformanceException(Exception):
   @property
@@ -599,7 +611,5 @@ class CudaException(PerformanceException):
   def fatal(self):
     return self.error_code.value in [803, 810, 911, 999, 10000]
 
-class Axes(Enum):
-  X = 0
-  Y = 1
-  Z = 2
+
+
