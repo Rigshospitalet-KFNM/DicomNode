@@ -491,3 +491,9 @@ class PipelineTree(ImageTreeInterface):
         lazy=self.options.lazy,
         input_container_type=self.options.input_container_type,
       )
+
+__all__ = [
+  'InputContainer',
+  'PatientNode',
+  'PipelineTree'
+]

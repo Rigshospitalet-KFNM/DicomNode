@@ -409,8 +409,9 @@ class AbstractPipeline():
 
       self.logger.debug(f"Sufficient data for patient {patient_id}")
 
-      if self.processing_directory is not None:
-        with TemporaryWorkingDirectory(self.get_processing_directory(patient_id)):
+      processing_directory = self.get_processing_directory(patient_id)
+      if processing_directory is not None:
+        with TemporaryWorkingDirectory(processing_directory):
           self._pipeline_processing(patient_id, released_container, patient_input_container)
       else:
         self._pipeline_processing(patient_id, released_container, patient_input_container)
@@ -704,3 +705,9 @@ class AbstractThreadedPipeline(AbstractPipeline):
   def handle_association_released(self, event: evt.Event):
     self.join_threads(event.assoc.native_id)
     return super().handle_association_released(event)
+
+__all__ = (
+  "AbstractPipeline",
+  "AbstractQueuedPipeline",
+  "AbstractThreadedPipeline"
+)

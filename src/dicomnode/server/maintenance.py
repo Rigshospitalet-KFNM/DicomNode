@@ -80,3 +80,7 @@ class MaintenanceThread(Thread):
     # This is considered so unlikely, that it's a bug I accept in the code
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.pipeline_tree.remove_expired_studies(expiry_datetime)
+
+__all__ = [
+  'MaintenanceThread'
+]

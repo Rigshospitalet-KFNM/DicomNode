@@ -141,18 +141,9 @@ def __getattr__(name):  #pragma: no cover
   raise AttributeError(f"module {__name__} has no attribute '{name}'")
 
 
-__all__ = (
-  'constants',
-  'data_structures',
-  'dicom',
-  'lib',
-  'library_paths'
-  'math',
-  'report',
-  'server',
-  'tools',
-  'version',
-)
+__all__ = [
+  'constants', 'data_structures', 'dicom', 'lib', 'library_paths', 'math', 'report', 'server', 'tools', 'version',
+]
 
 def __dir__():
   return __all__

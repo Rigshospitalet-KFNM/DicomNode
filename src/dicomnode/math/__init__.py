@@ -36,7 +36,7 @@ from . import affine
 from . import image
 
 
-def mirror_inplace_gpu(arr: image.image_type, direction: MirrorDirection):
+def mirror_inplace_gpu(arr: image.numpy_image, direction: MirrorDirection):
   """This mirrors the data inplace with a direction.
 
   Note that this is slower than mirror because it just provides a view of the
@@ -72,7 +72,7 @@ def mirror_inplace_gpu(arr: image.image_type, direction: MirrorDirection):
     raise CudaException(error)
 
 
-def mirror(arr: image.image_type, direction: MirrorDirection) -> image.image_type:
+def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_image:
   """Provides a view of the data mirrored with respect to the input
 
   Args:

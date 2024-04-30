@@ -9,6 +9,7 @@ from typing import Optional, List, Literal, Tuple, TypeAlias
 
 # Third party packages
 from numpy import array, absolute, dtype, float64, identity, ndarray
+from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
@@ -68,6 +69,7 @@ class AffineMatrix:
 
   def __init__(self, raw: RawAffineMatrix, span: Span):
     self.raw = raw
+    self.inverted_raw = inv(raw)
     self.span = span
 
   def correct_rotation(self) -> bool:
@@ -127,6 +129,13 @@ class AffineMatrix:
 
   def rotate(self, rotation_matrix):
     pass
+
+
+  def __matmul__(self, other):
+    return self.raw @ other
+
+  def __rmatmul__(self, other):
+    return other @ self.raw
 
 class ReferenceSpace(Enum):
   """These are the possible reference spaces a study can be in.
