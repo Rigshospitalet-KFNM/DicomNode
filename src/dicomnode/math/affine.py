@@ -13,7 +13,7 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.math.types import Axes
+from dicomnode.math.types import RotationAxes
 
 RawAffineMatrix: TypeAlias = ndarray[Tuple[Literal[4], Literal[4]], dtype[float64]]
 
