@@ -4,7 +4,7 @@ Or if you have multiple nodes which must share a resource (Think GPU)
 """
 
 # Python Standard Library
-from typing import List, Optional, Type
+from typing import Dict, List, Optional, Type, TypeAlias, Union
 
 # Third party packages
 
@@ -13,31 +13,37 @@ from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.server.nodes import AbstractPipeline, AbstractQueuedPipeline
 
+cluster_node_list: TypeAlias = List[Union[AbstractPipeline,
+                                          Type[AbstractPipeline]]]
+
+
 class Cluster:
-  nodes: Optional[List[AbstractPipeline, Type[AbstractPipeline]]] = None
-  _nodes: List[AbstractPipeline]
+  nodes: Optional[cluster_node_list] = None
+  ae_titles: List[str]
+  _nodes: Dict[str,AbstractPipeline]
 
   read_queued_warning = False
 
-  def __init_nodes(self, nodes: List[AbstractPipeline, AbstractQueuedPipeline]):
-    self._nodes = []
+  def __init_nodes(self, nodes: cluster_node_list):
+    self._nodes = {}
+
     multiple_queues = False
     for node in nodes:
-      if isinstance(node, Type[AbstractPipeline]):
-        node: AbstractPipeline = node()
+      if isinstance(node, Type):
+        node = node()
       if isinstance(node, AbstractQueuedPipeline):
         if multiple_queues:
           if not self.read_queued_warning:
-            self.logger.warning()
+            self.logger.warning("")
         else:
           multiple_queues = True
-      self._nodes.append(node)
+      self._nodes[node.ae_title] = node
 
-  def __init__(self, nodes: Optional[List[AbstractPipeline, Type[AbstractPipeline]]] = None) -> None:
+  def __init__(self, nodes: Optional[cluster_node_list] = None) -> None:
     self.logger = get_logger()
     if nodes is not None:
       self.__init_nodes(nodes)
     elif self.nodes is not None:
-      self.__init_nodes(nodes)
+      self.__init_nodes(self.nodes)
     else:
       raise IncorrectlyConfigured

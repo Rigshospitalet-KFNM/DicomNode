@@ -169,12 +169,21 @@ class MultiOutput(PipelineOutput):
   output: Iterable[PipelineOutput]
 
   def __init__(self, outputs: Iterable[PipelineOutput]) -> None:
-    super().__init__(outputs)
+    self.outputs = outputs
 
   def send(self) -> bool:
     success = True
 
-    for output in self.output:
+    for output in self.outputs:
       success &= output.send()
 
     return success
+
+
+__all__ = [
+  'PipelineOutput',
+  'NoOutput',
+  'DicomOutput',
+  'FileOutput',
+  'MultiOutput'
+]

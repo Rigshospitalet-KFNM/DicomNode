@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
 
 # Third party packages
 import numpy
-from nibabel import Nifti1Image
+from nibabel.nifti1 import Nifti1Image
 from pydicom import Dataset
 from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
@@ -260,3 +260,14 @@ class NiftiGrinder(Grinder):
       )
 
     return return_dir['NII'] # Yeah your documentation is wrong, and you should feel real fucking bad
+
+__all__ = [
+  'Grinder',
+  'IdentityGrinder',
+  'ListGrinder',
+  'DicomTreeGrinder',
+  'TagGrinder',
+  'ManyGrinder',
+  'NumpyGrinder',
+  'NiftiGrinder'
+]
