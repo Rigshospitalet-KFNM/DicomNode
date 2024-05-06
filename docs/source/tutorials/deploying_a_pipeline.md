@@ -280,7 +280,7 @@ which the pipeline system user isn't.
 
 To fix this, either move an unprivileged ports such as 11112, set the user to
 root (And hear the tolls of shame!), use authbind,
-(Read this tutorial)[https://www.baeldung.com/linux/bind-process-privileged-port],
+[Read this tutorial](https://www.baeldung.com/linux/bind-process-privileged-port),
 or wait for me (or contribute) to implement some fancy code and update this
  tutorial.
 
@@ -359,10 +359,10 @@ variables. You can set them using:
 `systemctl edit pipeline`
 
 You'll get a editor, where you can type:
-
+```
 [Service]
 Environment="SECRET=pGNqduRFkB4K9C2vijOmUDa2kPtUhArN"
 Environment="ENVIRONMENT_VARIABLE_NAME=ENVIRONMENT_VARIABLE_VALUE"
-
+```
 
 
