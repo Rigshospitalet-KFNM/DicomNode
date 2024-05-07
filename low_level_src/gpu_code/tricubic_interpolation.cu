@@ -4,9 +4,17 @@
 // Standard library
 #include<assert.h>
 #include<stdint.h>
+#include<iostream>
+#include<exception>
+
+// Thrid party
+#include<pybind11/pybind11.h>
+#include<pybind11/numpy.h>
 
 // Dicomnode Cuda Files
 #include"indexing.cu"
+
+namespace py = pybind11;
 
 // If constant memory size becomes a problem, move this standard memory
 // This matrix takes up 16 kB out of 64 kB sooo....
@@ -90,8 +98,6 @@ struct TricubicInterpolationMatrix {
   float val_dx_dy_dz;
 };
 
-__device__ void get_function(){}
-
 /**
  * @brief 
  * 
@@ -101,119 +107,99 @@ __device__ void get_function(){}
  * @param z_max 
 
  */
-__global__ void tricubic_interpolations(float* image,
+template<typename T>
+__global__ void tricubic_interpolations(T* image,
                                         uint32_t x_max,
                                         uint32_t y_max,
                                         uint32_t z_max,
                                         float minimum_value){
-  extern __shared__ char shared_memory[];
-  // Programming without this assumption is a fucking headegg
-  assert(blockDim.x == blockDim.y &&  blockDim.x == blockDim.z);
+  extern __shared__ volatile T shared_volume[];
 
-  const 
+  ImageDimensions image_dimensions{x_max, y_max, z_max};
+  auto volume = Volume<float, ImagePadding{1,2,1,2,1,2}>(
+    image, image_dimensions, shared_volume, minimum_value
+  );
+}
 
-  
+template<typename T>
+class PyTricubicInterpolation {
+  py::array_t<T, py::array::c_style | py::array::forcecast> src;
+  T* gpu_src;
+  bool ready = false;
+  public:
+    PyTricubicInterpolation(const py::array_t<T, py::array::c_style | py::array::forcecast> x){
+      src = x;
+      const pybind11::buffer_info arr_buffer = src.request(true);
+      if (arr_buffer.ndim != 3){
+        throw std::runtime_error("You need three dimensions to perform a TRIcubic interpolation");
+      }
+    }
 
-  Index local = Index(threadIdx.x,
-                      threadIdx.y,
-                      threadIdx.z,
-                      blockDim.x + 1,
-                      blockDim.y + 1,
-                      blockDim.z + 1);
-  Index global = Index(threadIdx.x + blockDim.x * blockIdx.x,
-                       threadIdx.y + blockDim.y * blockIdx.y,
-                       threadIdx.z + blockDim.z * blockIdx.z,
-                       x_max, y_max, z_max);
+    py::object enter(){
+      pybind11::buffer_info arr_buffer = src.request(true);
+      const uint32_t x = arr_buffer.shape[0];
+      const uint32_t y = arr_buffer.shape[1];
+      const uint32_t z = arr_buffer.shape[2];
 
-  shared_matrix[local.index].val = global.in_range() ? image[global.index] : minimum_value;
-  // This is to fill the border
-  // Small performance improvement, here we use the z index, to ensure that each
-  // warp only enters one of these 
-  if(threadIdx.z == 0){ // Handles x facing plane
-    Index x_face_local = Index(blockDim.x,
-                               threadIdx.x,
-                               threadIdx.y,
-                               blockDim.x + 1,
-                               blockDim.y + 1,
-                               blockDim.z + 1);
-    // note that we have some padding loading
-    Index x_face_global = Index(blockDim.x  + blockDim.x * blockIdx.x,
-                                threadIdx.x + blockDim.y * blockIdx.y,
-                                threadIdx.y + blockDim.z * blockIdx.z,
-                                x_max, y_max, z_max);
-    shared_matrix[x_face_local.index].val = x_face_global.in_range() ? image[x_face_global.index] : minimum_value;
-  }
+      size_t data_size = x * y * z * sizeof(T);
+      cudaError_t error;
 
-  if(threadIdx.z == 1){ // Handles y facing plane
-    Index y_face_local = Index(threadIdx.x,
-                               blockDim.x,
-                               threadIdx.y,
-                               blockDim.x + 1,
-                               blockDim.y + 1,
-                               blockDim.z + 1);
-    // note that we have some padding loading
-    Index y_face_global = Index(threadIdx.x  + blockDim.x * blockIdx.x,
-                                blockDim.y   + blockDim.y * blockIdx.y,
-                                threadIdx.y  + blockDim.z * blockIdx.z,
-                                x_max, y_max, z_max);
-    shared_matrix[y_face_local.index].val = y_face_global.in_range() ? image[y_face_global.index] : minimum_value;
-  }
+      error = cudaMalloc(&gpu_src, data_size);
+      if(error != cudaSuccess){
+        throw std::runtime_error("Failed to allocate memory GPU resources!");
+      }
 
-  if(threadIdx.z == 2){ // Handles z facing plane
-    Index z_face_local = Index(threadIdx.x,
-                               blockDim.x,
-                               threadIdx.y,
-                               blockDim.x + 1,
-                               blockDim.y + 1,
-                               blockDim.z + 1);
-    // note that we have some padding loading
-    Index z_face_global = Index(threadIdx.x + blockDim.x * blockIdx.x,
-                                threadIdx.y + blockDim.y * blockIdx.y,
-                                blockDim.z  + blockDim.z * blockIdx.z,
-                                x_max, y_max, z_max);
-    shared_matrix[z_face_local.index].val = z_face_global.in_range() ? image[z_face_global.index] : minimum_value;
-  }
+      error = cudaMemcpy(gpu_src, arr_buffer.ptr, data_size, cudaMemcpyHostToDevice);
+      if(error != cudaSuccess){
+        cudaFree(gpu_src);
+        throw std::runtime_error("Transport to gpu memory failed!");
+      }
 
-  if(threadIdx.z == 3 && threadIdx.y == 0){
-    Index xy_face_local = Index(blockDim.x,
-                                blockDim.y,
-                                threadIdx.x,
-                                blockDim.x + 1,
-                                blockDim.y + 1,
-                                blockDim.z + 1);
-    // note that we have some padding loading
-    Index xy_face_global = Index(blockDim.x  + blockDim.x * blockIdx.x,
-                                 blockDim.y  + blockDim.y * blockIdx.y,
-                                 threadIdx.x + blockDim.z * blockIdx.z,
-                                 x_max, y_max, z_max);
-    shared_matrix[xy_face_local.index].val = xy_face_global.in_range() ? image[xy_face_global.index] : minimum_value;
-  }
+      const uint32_t blockSize_x = 8;
+      const uint32_t blockSize_y = 8;
+      const uint32_t blockSize_z = 8;
 
-  if(threadIdx.z == 4 && threadIdx.y == 0){
-    Index xz_face_local = Index(blockDim.x,
-                                threadIdx.x,
-                                blockDim.z,
-                                blockDim.x + 1,
-                                blockDim.y + 1,
-                                blockDim.z + 1);
-    // note that we have some padding loading
-    Index xz_face_global = Index(blockDim.x  + blockDim.x * blockIdx.x,
-                                 threadIdx.x + blockDim.y * blockIdx.y,
-                                 blockDim.x + blockDim.z * blockIdx.z,
-                                 x_max, y_max, z_max);
-    shared_matrix[xz_face_local.index].val = xz_face_global.in_range() ? image[xz_face_global.index] : minimum_value;
-  }
+      const dim3 blockSize = {blockSize_x, blockSize_y, blockSize_z};
+      const uint32_t grid_x = x % blockSize_x == 0 ? x / blockSize_x : x / blockSize_x + 1;
+      const uint32_t grid_y = y % blockSize_y == 0 ? y / blockSize_x : x / blockSize_y + 1;
+      const uint32_t grid_z = z % blockSize_z == 0 ? z / blockSize_z : z / blockSize_z + 1;
+      const dim3 grid = {grid_x, grid_y, grid_z};
 
-  if(threadIdx.z == 5 && threadIdx.y == 0){
+      const size_t shared_memory_size = (blockSize.x + 3) * (blockSize.y + 3) * (blockSize.z + 3) * sizeof(T);
 
-  }
+      tricubic_interpolations<T><<<grid, blockSize, shared_memory_size>>>(gpu_src,
+                                         x, y, z, 0.0);
+      error = cudaGetLastError();
+      if(error != cudaSuccess){
+        cudaFree(gpu_src);
+        throw std::runtime_error("Kernel failed!");
+      }
 
-  if(threadIdx.z == 6 && threadIdx.x == 0 && threadIdx.y == 0){
+      ready = true;
+      return py::cast(this);
+    }
 
-  }
-  __syncthreads();
+    void exit(py::handle type, py::handle value, py::handle traceback){
+      // If enter throws then __exit__ will not be called!
+      cudaFree(gpu_src);
+      ready = false;
+    }
 
+    void call(){
+      if(ready){
+        py::print("Ok lets go!");
+      } else {
+        py::print("USE A CONTEXT MANAGER");
+      }
+    }
+};
 
+void apply_tricubic_interpolation_module(pybind11::module& m){
+  py::class_<PyTricubicInterpolation<float>>(m, "Tricubic")
+    .def(py::init<py::array_t<float, py::array::c_style | py::array::forcecast>>())
+    .def("__enter__", &PyTricubicInterpolation<float>::enter, "")
+    .def("__exit__", &PyTricubicInterpolation<float>::exit, "")
+    .def("__call__", &PyTricubicInterpolation<float>::call);
 }
 
 

@@ -15,7 +15,6 @@ void print_dtype(pybind11::array arr){
   pybind11::dtype arr_dtype = arr.dtype();
   pybind11::detail::str_attr_accessor type_name = arr_dtype.attr("name");
 
-  
 }
 
 

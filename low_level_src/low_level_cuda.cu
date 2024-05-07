@@ -15,8 +15,8 @@
 #include<pybind11/numpy.h>
 
 // Dicomnode imports
-#include"gpu_code/numpy_array.cu"
 #include"gpu_code/mirror.cu"
+#include"gpu_code/tricubic_interpolation.cu"
 
 PYBIND11_MODULE(_cuda, m){
   m.doc() = "pybind11 example plugin";
@@ -24,6 +24,9 @@ PYBIND11_MODULE(_cuda, m){
 
   // mirror.cu
   apply_mirror_module(m);
+  // tricubic_interpolation.cu
+  apply_tricubic_interpolation_module(m);
+
 }
 
 #endif
