@@ -6,6 +6,7 @@
 #include<stdint.h>
 #include<iostream>
 #include<exception>
+#include<string>
 
 // Thrid party
 #include<pybind11/pybind11.h>
@@ -99,12 +100,19 @@ struct TricubicInterpolationMatrix {
   T val_dx_dy_dz;
 };
 
+template<typename T>
+struct TricubicInterpolationCoefficients {
+  T data[64];
+};
+
 template<typename T, ImagePadding padding>
-__device__ TricubicInterpolationMatrix<T> fill_matrix(Volume<T, padding>& vol,
-                                           const uint32_t x,
-                                           const uint32_t y,
-                                           const uint32_t z){
-  TricubicInterpolationMatrix<T> tri;
+__device__ void fill_matrix(
+    Volume<T, padding>& volume,
+    volatile TricubicInterpolationMatrix<T>& tix,
+    const uint32_t x,
+    const uint32_t y,
+    const uint32_t z){
+
   tix.val_dx = 0.5 * (volume.index(x + 1, y, z)
                     - volume.index(x - 1, y, z));
   tix.val_dy = 0.5 * (volume.index(x, y + 1, z)
@@ -112,15 +120,15 @@ __device__ TricubicInterpolationMatrix<T> fill_matrix(Volume<T, padding>& vol,
   tix.val_dz = 0.5 * (volume.index(x, y, z + 1)
                     - volume.index(x, y, z - 1));
   tix.val_dx_dy = 0.25 * (volume.index(x + 1, y + 1, z)
-                        + volime.index(x - 1, y - 1, z)
+                        + volume.index(x - 1, y - 1, z)
                         - volume.index(x - 1, y + 1, z)
                         - volume.index(x + 1, y - 1, z));
   tix.val_dx_dz = 0.25 * (volume.index(x + 1, y, z + 1)
-                        + volime.index(x - 1, y, z - 1)
+                        + volume.index(x - 1, y, z - 1)
                         - volume.index(x - 1, y, z + 1)
                         - volume.index(x + 1, y, z - 1));
   tix.val_dy_dz = 0.25 * (volume.index(x, y + 1, z + 1)
-                        + volime.index(x, y - 1, z - 1)
+                        + volume.index(x, y - 1, z - 1)
                         - volume.index(x, y + 1, z + 1)
                         - volume.index(x, y - 1, z - 1));
   tix.val_dx_dy_dz = 0.125 * (volume.index(x + 1, y + 1, z + 1)
@@ -131,11 +139,6 @@ __device__ TricubicInterpolationMatrix<T> fill_matrix(Volume<T, padding>& vol,
                             - volume.index(x + 1, y - 1, z + 1)
                             - volume.index(x + 1, y + 1, z - 1)
                             - volume.index(x - 1, y - 1, z - 1));
-  return tri;
-}
-
-__device__ uint32_t  get () {
-
 }
 
 /**
@@ -148,165 +151,127 @@ __device__ uint32_t  get () {
 
  */
 template<typename T>
-__global__ void tricubic_interpolations(T* image,
-                                        uint32_t x_max,
-                                        uint32_t y_max,
-                                        uint32_t z_max,
-                                        float minimum_value){
-  extern __shared__ volatile T shared_memory[];
-  volatile T* shared_volume = shared_memory; // (blocksize + 3) ^ 3 * sizeof(T)
-  volatile TricubicInterpolationMatrix<T>* matrixes =
-    (TricubicInterpolationMatrix<T>*)&shared_volume[(blockDim.x + 3)
-                                                  * (blockDim.y + 3)
-                                                  * (blockDim.z + 3)];
-
-  const uint32_t mid = (blockDim.y + 1) * (blockDim.x + 1) * threadIdx.z
-                     + (blockDim.x + 1) * threadIdx.y
-                     + threadIdx.x;
-  ImageDimensions image_dimensions{x_max, y_max, z_max};
-  auto volume = Volume<T, ImagePadding{1,2,1,2,1,2}>(
-    image, image_dimensions, shared_volume, minimum_value
-  );
-  __syncthreads();
-  matrixes[mid] = fill_matrix(volume, threadIdx.x, threadIdx.y, threadIdx.z);
-  // Faces
-  if(threadIdx.x == blockDim.x - 1){
-    const uint32_t tmid = (blockDim.y + 1) * (blockDim.x + 1) * threadIdx.z
-                        + (blockDim.x + 1) * threadIdx.y
-                        + blockDim.x;
-    matrixes[tmid] = fill_matrix(volume, blockDim.x, threadIdx.y, threadIdx.z);
-  }
-
-  if(threadIdx.y == blockDim.y - 1){
-    const uint32_t tmid = (blockDim.y + 1) * (blockDim.x + 1) * threadIdx.z
-                        + (blockDim.x + 1) * blockDim.y
-                        + threadIdx.x;
-    matrixes[tmid] = fill_matrix(volume, threadIdx.x, blockDim.y, threadIdx.z);
-  }
-
-  if(threadIdx.z == blockDim.z - 1){
-    const uint32_t xmid = (blockDim.y + 1) * (blockDim.x + 1) * blockDim.z
-                        + (blockDim.x + 1) * threadIdx.y
-                        + threadIdx.x;
-    matrixes[xmid] = fill_matrix(volume, threadIdx.x, threadIdx.y, blockDim.z);
-  }
-  // Lines
-  if(threadIdx.x == blockDim.x - 1){
-    const uint32_t xmid = (blockDim.y + 1) * (blockDim.x + 1) * threadIdx.z
-                        + (blockDim.x + 1) * threadIdx.y
-                        + blockDim.x;
-    matrixes[xmid] = fill_matrix(volume, blockDim.x, threadIdx.y, threadIdx.z);
-  }
-
-  if(threadIdx.y == blockDim.y - 1){
-    const uint32_t xmid = (blockDim.y + 1) * (blockDim.x + 1) * threadIdx.z
-                        + (blockDim.x + 1) * blockDim.y
-                        + threadIdx.x;
-    matrixes[xmid] = fill_matrix(volume, threadIdx.x, blockDim.y, threadIdx.z);
-  }
-
-  if(threadIdx.z == blockDim.z - 1){
-    const uint32_t xmid = (blockDim.y + 1) * (blockDim.x + 1) * blockDim.z
-                        + (blockDim.x + 1) * threadIdx.y
-                        + threadIdx.x;
-    matrixes[xmid] = fill_matrix(volume, threadIdx.x, threadIdx.y, blockDim.z);
-  }
-  // Point
-  if(threadIdx.z == blockDim.z - 1){
-    const uint32_t xmid = (blockDim.y + 1) * (blockDim.x + 1) * blockDim.z
-                        + (blockDim.x + 1) * threadIdx.y
-                        + threadIdx.x;
-    matrixes[xmid] = fill_matrix(volume, threadIdx.x, threadIdx.y, blockDim.z);
-  }
-
-
-  __syncthreads();
-
+__global__ void tricubic_interpolation_kernel(const T* image,
+                                              const dim3 imagedim,
+                                              const float* affine,
+                                              const T* targets,
+                                              const size_t num_targets,
+                                              T* destination,
+                                              const T minimum_value){
+  
 }
 
 template<typename T>
-class PyTricubicInterpolation {
-  py::array_t<T, py::array::c_style | py::array::forcecast> src;
-  T* gpu_src;
-  bool ready = false;
-  public:
-    PyTricubicInterpolation(const py::array_t<T, py::array::c_style | py::array::forcecast> x){
-      src = x;
-      const pybind11::buffer_info arr_buffer = src.request(true);
-      if (arr_buffer.ndim != 3){
-        throw std::runtime_error("You need three dimensions to perform a TRIcubic interpolation");
-      }
-    }
+void tricubic_interpolation(const py::array_t<T, py::array::c_style | py::array::forcecast> data,
+                            const py::array_t<double, py::array::c_style | py::array::forcecast> affine,
+                            const py::array_t<T, py::array::c_style | py::array::forcecast> targets,
+                            const T minimum_value){
+  const pybind11::buffer_info data_buffer = data.request(false);
+  if (data_buffer.ndim != 3){
+    throw std::runtime_error("Data space must be a 3 dimensional volume");
+  }
 
-    py::object enter(){
-      pybind11::buffer_info arr_buffer = src.request(true);
-      const uint32_t x = arr_buffer.shape[0];
-      const uint32_t y = arr_buffer.shape[1];
-      const uint32_t z = arr_buffer.shape[2];
+  const pybind11::buffer_info affine_buffer = affine.request(false);
+  if (affine_buffer.ndim != 2){
+    throw std::runtime_error("Affine is not a 4x4 matrix!");
+  }
+  if (affine_buffer.shape[0] != 4 || affine_buffer.shape[1] != 4){
+    throw std::runtime_error("Affine is not a 4x4 matrix!");
+  }
 
-      size_t data_size = x * y * z * sizeof(T);
-      cudaError_t error;
+  const pybind11::buffer_info targets_buffer = targets.request(false);
+  if (targets_buffer.ndim != 2){
+    throw std::runtime_error("Targets must be a (3,n) dimensional array");
+  }
+  if (targets_buffer.shape[0] != 3){
+    throw std::runtime_error("Targets must be a (3,n) dimensional array");
+  }
 
-      error = cudaMalloc(&gpu_src, data_size);
-      if(error != cudaSuccess){
-        throw std::runtime_error("Failed to allocate memory GPU resources!");
-      }
+  const uint32_t x = data_buffer.shape[0];
+  const uint32_t y = data_buffer.shape[1];
+  const uint32_t z = data_buffer.shape[2];
+  const uint32_t num_targets = targets_buffer.shape[1];
 
-      error = cudaMemcpy(gpu_src, arr_buffer.ptr, data_size, cudaMemcpyHostToDevice);
-      if(error != cudaSuccess){
-        cudaFree(gpu_src);
-        throw std::runtime_error("Transport to gpu memory failed!");
-      }
+  const size_t data_size = x * y * z * sizeof(T);
+  const size_t affine_size = 16 * sizeof(double);
+  const size_t targets_size = num_targets * 3 * sizeof(T);
+  const size_t destinations_size = num_targets * sizeof(T);
 
-      const uint32_t blockSize_x = 8;
-      const uint32_t blockSize_y = 8;
-      const uint32_t blockSize_z = 8;
+  const size_t required_memory = data_size + affine_size + targets_size + destinations_size;
 
-      const dim3 blockSize = {blockSize_x, blockSize_y, blockSize_z};
-      const uint32_t grid_x = x % blockSize_x == 0 ? x / blockSize_x : x / blockSize_x + 1;
-      const uint32_t grid_y = y % blockSize_y == 0 ? y / blockSize_x : x / blockSize_y + 1;
-      const uint32_t grid_z = z % blockSize_z == 0 ? z / blockSize_z : z / blockSize_z + 1;
-      const dim3 grid = {grid_x, grid_y, grid_z};
-      const size_t shared_memory_size = (blockSize.x + 3) * (blockSize.y + 3) * (blockSize.z + 3) * sizeof(T)
-                                      + (blockSize.x + 1) * (blockSize.y + 1) * (blockSize.z + 1) * sizeof(TricubicInterpolationMatrix<T>);
+  size_t free_memory, total_memory;
+  run_cuda([&](){return cudaMemGetInfo(&free_memory, &total_memory);},
+           [&](cudaError_t error){
+              // No free here because none of the points could have been alocated yet!
+              throw std::runtime_error("Could not get free memory of device, something is very wrong");
+            });
 
-      const int32_t maximum_available_shared_mem = maximize_shared_memory(tricubic_interpolations<T>);
-      if(shared_memory_size < maximum_available_shared_mem){
-        throw std::runtime_error("Unable to allocate sufficient shared memory on your device!");
-      }
-      tricubic_interpolations<T><<<grid, blockSize, shared_memory_size>>>(gpu_src,
-                                         x, y, z, 0.0);
-      error = cudaGetLastError();
-      if(error != cudaSuccess){
-        cudaFree(gpu_src);
-        throw std::runtime_error("Kernel failed!");
-      }
 
-      ready = true;
-      return py::cast(this);
-    }
+  if(free_memory < required_memory){
+    std::string error_message = "Attempted to allocate: ";
+    error_message += std::to_string(required_memory);
+    error_message += " However only ";
+    error_message += std::to_string(free_memory);
+    error_message += " are available!";
+    throw std::runtime_error(error_message);
+  }
+  const uint32_t maximum_shared_memory = maximize_shared_memory(tricubic_interpolation_kernel<T>);
+  const threads = 128;
+  const uint32_t shared_memory_size = 64 * sizeof(T) * threads;
 
-    void exit(py::handle type, py::handle value, py::handle traceback){
-      // If enter throws then __exit__ will not be called!
-      cudaFree(gpu_src);
-      ready = false;
-    }
+  if(maximum_shared_memory < shared_memory_size){
+    std::string error_message = "This Kernels needs: ";
+    error_message += std::to_string(shared_memory_size);
+    error_message += " bytes of shared memory. However only ";
+    error_message += std::to_string(maximum_shared_memory);
+    error_message += " bytes are available!";
+    throw std::runtime_error(error_message);
+  }
 
-    void call(){
-      if(ready){
-        py::print("Ok lets go!");
-      } else {
-        py::print("USE A CONTEXT MANAGER");
-      }
-    }
-};
+  T* gpu_data = nullptr;
+  double* gpu_affine = nullptr;
+  T* gpu_targets = nullptr;
+  T* gpu_destinations = nullptr;
+
+  auto error_function = [&](cudaError_t error){
+    free_device_memory(&gpu_data, &gpu_affine, &gpu_targets, &gpu_destinations);
+    throw std::runtime_error("Failed to allocate GPU resources!");
+  };
+
+  // I hope you like monads
+  CudaRunner actions{error_function};
+  actions | [&](){return cudaMalloc(&gpu_data, data_size);}
+          | [&](){return cudaMalloc(&gpu_affine, affine_size);}
+          | [&](){return cudaMalloc(&gpu_targets, targets_size);}
+          | [&](){return cudaMalloc(&gpu_destinations, destinations_size);}
+          | [&](){return cudaMemcpy(gpu_data,
+                                    data_buffer.ptr,
+                                    data_size,
+                                    cudaMemcpyHostToDevice);}
+          | [&](){return cudaMemcpy(gpu_affine,
+                                    affine_buffer.ptr,
+                                    affine_size,
+                                    cudaMemcpyHostToDevice);}
+          | [&](){return cudaMemcpy(gpu_targets,
+                                    targets_buffer.ptr,
+                                    targets_size,
+                                    cudaMemcpyHostToDevice);}
+          | [&](){
+            tricubic_interpolation_kernel<<<{1,1,1}, threads, shared_memory_size>>>(gpu_data, {x, y, z},
+                                                            affine,
+                                                            gpu_targets, num_targets,
+                                                            gpu_destinations,
+                                                            minimum_value);
+            return cudaGetLastError();
+          };
+
+
+  free_device_memory(&gpu_data, &gpu_affine, &gpu_targets, &gpu_destinations);
+}
+
 
 void apply_tricubic_interpolation_module(py::module& m){
-  py::class_<PyTricubicInterpolation<float>>(m, "Tricubic")
-    .def(py::init<py::array_t<float, py::array::c_style | py::array::forcecast>>())
-    .def("__enter__", &PyTricubicInterpolation<float>::enter, "")
-    .def("__exit__", &PyTricubicInterpolation<float>::exit, "")
-    .def("__call__", &PyTricubicInterpolation<float>::call);
+  m.def("tricubic_interpolation", &tricubic_interpolation<float>);
 }
 
 

@@ -4,11 +4,57 @@ fitting to the actual GPU device
 #ifndef DICOMNODE_CUDA_MANAGEMENT
 #define DICOMNODE_CUDA_MANAGEMENT
 
+//#include"cuda_management.cuh"
+
 #include<stdint.h>
 
 #include<pybind11/pybind11.h>
 
 namespace py = pybind11;
+
+template<typename... Ts>
+void free_device_memory(Ts** && ... device_pointer){
+  ([&]{
+    cudaPointerAttributes attr;
+    cudaError_t error = cudaPointerGetAttributes(&attr, *device_pointer);
+    if(error != cudaSuccess){
+      std::cout << "something went wrong!\n";
+      return;
+    }
+    if(attr.type == cudaMemoryType::cudaMemoryTypeDevice || attr.type == cudaMemoryType::cudaMemoryTypeManaged){
+      error = cudaFree(*device_pointer);
+      if(error != cudaSuccess){
+        std::cout << "freeing failed!";
+      }
+      *device_pointer = nullptr;
+    }
+  }(), ...);
+}
+
+class CudaRunner {
+  std::function<void(cudaError_t)> error_function;
+  public:
+    cudaError_t error = cudaSuccess;
+    CudaRunner(std::function<void(cudaError_t)> error_lambda) : error_function(error_lambda){}
+    CudaRunner& operator|(std::function<cudaError_t()> func){
+       if(error != cudaSuccess){
+        error = func();
+        if (error != cudaSuccess){
+          error_function(error);
+        }
+      }
+      return *this;
+    };
+};
+
+void run_cuda(std::function<cudaError_t()> action_function,
+              std::function<void(cudaError_t)> error_function){
+    cudaError error = action_function();
+    if(error != cudaSuccess){
+        error_function(error);
+    }
+}
+
 
 cudaDeviceProp get_current_device(){
   cudaDeviceProp prop;
@@ -23,10 +69,10 @@ py::object cast_current_device(){
 }
 
 template<class R, class... Args>
-int32_t maximize_shared_memory(R (func)(Args...)){
+int32_t maximize_shared_memory(R (kernel)(Args...)){
   cudaDeviceProp dev_prop = get_current_device();
   if (dev_prop.major >= 7){
-    cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, dev_prop.sharedMemPerBlockOptin);
+    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, dev_prop.sharedMemPerBlockOptin);
   }
   return dev_prop.sharedMemPerBlockOptin;
 }

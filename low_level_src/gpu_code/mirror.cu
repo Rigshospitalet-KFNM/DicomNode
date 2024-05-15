@@ -10,7 +10,7 @@
 #include<pybind11/numpy.h>
 
 // Dicomnode imports
-
+#include"cuda_management.cu"
 
 template<typename T>
 __device__ T index3D(T x, T y, T z, T x_dim, T y_max, T z_dim){
@@ -190,28 +190,6 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
     throw std::runtime_error("Input shape must be 3");
   }
 
-  // Initial success value is unused, however I dislike uninitailized variables
-  cudaError error = cudaSuccess;
-
-  // Device points
-  T* dev_in;
-  T* dev_out;
-  // We allocate once, and index into dev_in to place dev_in
-  error = cudaMalloc(&dev_in, 2 * buffer_size);
-  if(error != cudaSuccess){
-    return (int)error;
-  }
-
-  // why allocate twice, when you can allocate once?
-  dev_out = dev_in + arr_buffer.size;
-
-  error = cudaMemcpy(dev_in, arr_buffer.ptr, buffer_size,
-                     cudaMemcpyHostToDevice);
-  if(error != cudaSuccess){
-    cudaFree(dev_in);
-    return (int)error;
-  }
-
   uint32_t threads = arr_buffer.shape[0]
                    * arr_buffer.shape[1]
                    * arr_buffer.shape[2];
@@ -221,25 +199,37 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
                 ? threads / threads_per_block
                 : threads / threads_per_block + 1;
 
-  kernel<<<blocks,threads_per_block>>>(dev_in,
+  // Initial success value is unused, however I dislike uninitailized variables
+  // Device points
+  T* dev_in = nullptr;
+  T* dev_out = nullptr;
+  // We allocate once, and index into dev_in to place dev_in
+  auto error_function = [&](cudaError_t error){
+    free_device_memory(&dev_in);
+  };
+  CudaRunner runner{error_function};
+  runner | [&](){return cudaMalloc(&dev_in, 2 * buffer_size);};
+  if(runner.error != cudaSuccess){
+    return (int)runner.error;
+  }
+  dev_out = dev_in + arr_buffer.size;
+  runner
+    | [&](){return cudaMemcpy(dev_in, arr_buffer.ptr, buffer_size, cudaMemcpyHostToDevice);}
+    | [&](){
+      kernel<<<blocks,threads_per_block>>>(dev_in,
                                        dev_out,
                                        arr_buffer.shape[2],
                                        arr_buffer.shape[1],
                                        arr_buffer.shape[0]);
-
-  error = cudaGetLastError();
-  if(error != cudaSuccess){
-    cudaFree(dev_in);
-    return (int)error;
-  }
-
-  error = cudaMemcpy(arr_buffer.ptr, dev_out, buffer_size,
-                     cudaMemcpyDeviceToHost);
-
+      return cudaGetLastError();}
+    | [&](){
+      return cudaMemcpy(arr_buffer.ptr, dev_out, buffer_size,
+                       cudaMemcpyDeviceToHost);
+    };
   // I assume you can always free, this might be wrong
   cudaFree(dev_in);
 
-  return (int)error;
+  return (int)runner.error;
 }
 
 void apply_mirror_module(pybind11::module& m){
