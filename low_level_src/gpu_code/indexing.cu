@@ -84,6 +84,12 @@ struct ImagePadding {
   uint32_t x_m,y_m,z_m,x_p,y_p,z_p;
 };
 
+struct Index {
+  int32_t x;
+  int32_t y;
+  int32_t z;
+};
+
 template<typename T, ImagePadding padding>
 class Volume {
   volatile T* image;
