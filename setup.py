@@ -137,6 +137,8 @@ extensions = []
 if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda"))
 
+print(f"extensions: {extensions}")
+
 setup(name='dicomnode',
     version='0.0.4.3',
     description='Test',
