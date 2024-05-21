@@ -135,9 +135,14 @@ class CMakeBuild(build_ext):
 extensions = []
 
 if shutil.which("nvcc"):
-  extensions.append(CMakeExtension("dicomnode.math._cuda"))
+  extensions.append(CMakeExtension("dicomnode.math._cuda", ))
 
 print(f"extensions: {extensions}")
+
+p = Path(".")
+
+for a_path in p.glob('*'):
+  print(a_path)
 
 setup(name='dicomnode',
     version='0.0.4.3',
