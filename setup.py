@@ -131,18 +131,13 @@ class CMakeBuild(build_ext):
     except Exception as E:
       print(f"failed to copy! {E}")
 
-if __name__ == '__main__':
-  print("building from setup.py")
-  extensions = [
-    CMakeExtension("dicomnode.math._c")
-  ]
 
-  if shutil.which("nvcc"):
-    extensions.append(
-      CMakeExtension("dicomnode.math._cuda")
-    )
+extensions = []
 
-  setup(name='dicomnode',
+if shutil.which("nvcc"):
+  extensions.append(CMakeExtension("dicomnode.math._cuda"))
+
+setup(name='dicomnode',
     version='0.0.4.3',
     description='Test',
     author='Christoffer Vilstrup Jensen',
@@ -150,7 +145,7 @@ if __name__ == '__main__':
     package_dir={"":"src"},
     zip_safe=False,
     cmdclass={"build_ext": CMakeBuild},
-    ext_modules=extensions,
+    ext_modules = extensions,
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
@@ -175,5 +170,5 @@ if __name__ == '__main__':
       'console_scripts': [
       'omnitool=dicomnode.bin.omnitool:entry_func'
     ]},
-  )
+)
 

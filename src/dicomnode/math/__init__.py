@@ -21,10 +21,6 @@ from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
 # Module Imports
 from . import types
 
-
-# Cpp code
-from . import _c # type: ignore
-
 # Cuda code
 try:
   from . import _cuda # type: ignore
