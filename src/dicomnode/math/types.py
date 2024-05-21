@@ -17,7 +17,7 @@ class RotationAxes(Enum):
   Y = 1
   Z = 2
 
-@dataclass(slots=True)
+@dataclass
 class Transformation:
   transformations: List[Union[Tuple[RotationAxes, int], MirrorDirection]] = field(default_factory=list)
 

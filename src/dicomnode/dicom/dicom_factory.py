@@ -182,7 +182,7 @@ class SeriesElement(VirtualElement):
 # End of static Virtual Elements
 # InstanceBasedVirtual Elements
 
-@dataclass(slots=True)
+@dataclass
 class InstanceEnvironment:
   instance_number: int
   factory: 'DicomFactory'
