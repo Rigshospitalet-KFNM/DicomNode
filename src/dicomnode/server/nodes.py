@@ -69,7 +69,6 @@ class AbstractPipeline():
   DO NOT SET THIS EQUAL TO DATA DIRECTORY
   """
 
-
   # Maintenance Configuration
   maintenance_thread: Type[MaintenanceThread] = MaintenanceThread
   """Class of MaintenanceThread to be created when the server opens"""
@@ -107,7 +106,6 @@ class AbstractPipeline():
 
   input_container_type: Type[InputContainer] = InputContainer
   "Class of PatientContainer that the PatientNode should create when processing a patient"
-
 
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
@@ -259,15 +257,33 @@ class AbstractPipeline():
     # Handler setup
     # class needs to be instantiated before handlers can be defined
     self.evt_handlers = [
+      (evt.EVT_C_ECHO, self.handle_c_echo),
+      (evt.EVT_CONN_OPEN, self.handle_connection_opened),
+      (evt.EVT_CONN_CLOSE, self.handle_connection_closed),
       (evt.EVT_C_STORE,  self.handle_c_store),
       (evt.EVT_ACCEPTED, self.handle_association_accepted),
-      (evt.EVT_RELEASED, self.handle_association_released)
+      (evt.EVT_REJECTED, self.handle_association_rejected),
+      (evt.EVT_RELEASED, self.handle_association_released),
     ]
     self._updated_patients: Dict[Optional[int], Set[str]] = {}
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
     self.post_init()
   # End def __init__
+
+  #region logging handlers
+  def handle_c_echo(self, event: evt.Event):
+    self.logger.debug(f"Connection {event.address} send an echo")
+    return 0x0000
+
+  def handle_connection_opened(self, event: evt.Event):
+    self.logger.debug(f"Connection {event.address} opened a connection")
+
+  def handle_connection_closed(self, event: evt.Event):
+    self.logger.debug(f"Connection {event.address} closed a connection")
+
+  def handle_association_rejected(self, event):
+    self.logger.debug(f"Connection {event.address} rejected a connection")
 
   # Store dataset process
   # Responsibility's:
@@ -560,6 +576,10 @@ class AbstractPipeline():
 
     self._maintenance_thread.start()
     self.logger.info(f"Starting Server at port: {self.port} and AE: {self.ae_title}")
+    self.logger.debug(f"self.dicom_application_entry.require_called_aet: {self.dicom_application_entry.require_called_aet}")
+    self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
+    self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
+    self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
     self.dicom_application_entry.start_server(
       (self.ip,self.port),
       block=blocking,
