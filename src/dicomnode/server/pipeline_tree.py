@@ -436,7 +436,7 @@ class PipelineTree(ImageTreeInterface):
         new_data_dict[patient_id] = patient_node
 
     for patient_id in patient_ids:
-      self._locked_patients.discard(patient_id)
+      self.unlock_patient(patient_id)
     self.images -= removed_images
     self.data = new_data_dict
     self.logger.debug(f"Removed {removed_images} from {len(patient_ids)} Patients")
@@ -464,14 +464,16 @@ class PipelineTree(ImageTreeInterface):
       else:
         new_data_dict[patient_id_dict] = patient_node
 
-
     self.images -= removed_images
     self.data = new_data_dict
-    self._locked_patients.discard(patient_id)
+    self.unlock_patient(patient_id)
     self.logger.debug(f"Removed {patient_id} and {removed_images} images from Pipeline")
 
   def lock_patient(self, patient_id):
     self._locked_patients.add(patient_id)
+
+  def unlock_patient(self, patient_id):
+    self._locked_patients.discard(patient_id)
 
   def _get_patient_container_options(self, container_path: Optional[Path]) -> PatientNode.Options:
     """Creates the options for the underlying Patient Container
