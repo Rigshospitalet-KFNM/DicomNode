@@ -1,10 +1,15 @@
 
 [build-system]
-requires = ["setuptools>42","wheel", "pybind11>=2.11.1", "cmake>=3.28"]
+requires = ["setuptools>42",
+            "wheel",
+            "pybind11>=2.11.1",
+            "cmake>=3.28"
+           ]
 build-backend = "setuptools.build_meta"
 
-#name = dicomnode
-
+[project]
+name = "dicomnode"
+version="0.0.5"
 
 [tool.coverage.run]
 

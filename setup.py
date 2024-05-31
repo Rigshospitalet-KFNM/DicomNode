@@ -138,11 +138,9 @@ if shutil.which("nvcc"):
   p = Path(".")
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir=str(p.absolute())))
 
-for a_path in p.glob('*'):
-  print(a_path)
 
 setup(name='dicomnode',
-    version='0.0.4.3',
+    version='0.0.5',
     description='Test',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
@@ -169,7 +167,7 @@ setup(name='dicomnode',
      "docs" : ["myst_parser", "sphinx-rtd-theme"],
     },
 
-    python_requires='>=3.9.1',
+    python_requires='>=3.10.0',
     entry_points={
       'console_scripts': [
       'omnitool=dicomnode.bin.omnitool:entry_func'

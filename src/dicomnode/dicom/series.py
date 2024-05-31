@@ -18,7 +18,7 @@ from nibabel import Nifti1Image
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.math.affine import AffineMatrix, ReferenceSpace, build_affine_from_datasets
-from dicomnode.math.image import build_image_from_datasets, image_type
+from dicomnode.math.image import build_image_from_datasets, numpy_image
 from dicomnode.lib.exceptions import InvalidDataset
 
 def sortDatasets(dataset: Dataset):
@@ -88,13 +88,13 @@ class Series:
   It's a
   """
 
-  image_data: image_type
+  image_data: numpy_image
   affine: Optional[AffineMatrix] = None
   reference_space: Optional[ReferenceSpace] = None
 
   # Constructors
   def __init__(self,
-               image_data: image_type,
+               image_data: numpy_image,
                affine:Optional[AffineMatrix]) -> None:
     self.image_data = image_data
     self.affine = affine
