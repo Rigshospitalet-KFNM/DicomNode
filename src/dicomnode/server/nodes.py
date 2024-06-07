@@ -178,7 +178,7 @@ class AbstractPipeline():
   log_level: int = logging.INFO
   "Level of Logger"
 
-  log_format: str = "[%(asctime)s] |%(thread)d| %(name)s - %(levelname)s - %(message)s"
+  log_format: str = "[%(asctime)s] |%(thread_id)d| %(name)s - %(levelname)s - %(message)s"
   "Format of log messages using the '%' style."
 
   pynetdicom_logger_level: int = logging.CRITICAL + 1
@@ -351,7 +351,9 @@ class AbstractPipeline():
 
         if patient_id not in self._updated_patients[c_store_container.association_id]:
           self._updated_patients[c_store_container.association_id].add(patient_id)
-          threads.add(get_native_id())
+          if thread_id not in threads:
+            self.logger.info("Adding Store Thread id to threads!")
+            threads.add(thread_id)
       # End of Critical zone
       try:
         # Critical Patient zone

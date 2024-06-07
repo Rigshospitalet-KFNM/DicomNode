@@ -7,6 +7,7 @@ from logging import Logger, basicConfig, StreamHandler, getLogger, Formatter,\
   DEBUG, INFO, CRITICAL
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
+from threading import get_native_id
 from io import TextIOWrapper
 from sys import stdout
 from typing import Optional, Union, TextIO
@@ -57,7 +58,7 @@ def __setup_logger() -> Logger:
 
   __logger = getLogger(__logger_name)
   __logger.setLevel(__log_level)
-
+  __logger.addFilter(__thread_id_filter)
 
   if __log_output is None:
     __logger.setLevel(CRITICAL + 1)
@@ -82,6 +83,9 @@ def __setup_logger() -> Logger:
 
   return __logger
 
+def __thread_id_filter(record):
+  record.thread_id = get_native_id()
+  return record
 
 def set_logger(
     log_output: Optional[Union[TextIO, Path]],
@@ -124,6 +128,8 @@ def set_logger(
 
   if propagate is not None:
     __propagate = propagate
+
+
 
   return __setup_logger()
 
