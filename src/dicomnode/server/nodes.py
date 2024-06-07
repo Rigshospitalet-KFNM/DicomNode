@@ -340,12 +340,13 @@ class AbstractPipeline():
 
     if self.patient_identifier_tag in c_store_container.dataset:
       patient_id = str(c_store_container.dataset[self.patient_identifier_tag].value)
+      thread_id = get_native_id()
       # Critical zone for managing keys
       with self._lock_key:
         if patient_id in self._patient_locks:
           threads, patient_lock = self._patient_locks[patient_id]
         else:
-          threads, patient_lock = ({get_native_id()}, Lock())
+          threads, patient_lock = (thread_id, Lock())
           self._patient_locks[patient_id] = (threads, patient_lock)
 
         if patient_id not in self._updated_patients[c_store_container.association_id]:
@@ -405,9 +406,9 @@ class AbstractPipeline():
           self.logger.critical("Another thread deleted thread-set and Patient log")
           self.logger.critical("This is a bug in the library, please report it")
           continue
+        # I am really not sure if i need the lock key for this
         with patient_lock:
           if len(threads) == 1:
-            self.data_state.lock_patient(patient_id)
             if self.data_state.validate_patient_id(patient_id):
               # Note this prevents you from adding more images to that patient
               # While the other locks prevents multiple threads from adding
@@ -416,11 +417,10 @@ class AbstractPipeline():
               self.logger.info(f"Insufficient data for patient {patient_id}")
               continue
             del self._patient_locks[patient_id]
-            self.data_state.unlock_patient(patient_id)
           else:
             thread_id = get_native_id()
-            self.logger.debug(f"Thread: {thread_id} leaving {patient_id}-container")
-            self.logger.debug(f"Threads {threads}")
+            self.logger.info(f"Thread: {thread_id} leaving {patient_id}-container")
+            self.logger.info(f"Threads {threads}")
             threads.remove(thread_id)
             continue
       # End of Critical Zone

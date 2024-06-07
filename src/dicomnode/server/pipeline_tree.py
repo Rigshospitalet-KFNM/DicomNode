@@ -37,7 +37,7 @@ class InputContainer:
                ) -> None:
     self.__data = data
     self.datasets = datasets
-    self.paths  = paths
+    self.paths = paths
     self.responding_address = None
 
   def __getitem__(self, key: str):
@@ -273,8 +273,6 @@ class PipelineTree(ImageTreeInterface):
     self.tree_node_definition: Dict[str, Type[AbstractInput]] = pipelineArgs
     self.options = options
 
-    self._locked_patients: Set[str] = set()
-
     #Logger Setup
     if self.options.logger is None:
       self.logger = get_logger()
@@ -301,10 +299,6 @@ class PipelineTree(ImageTreeInterface):
 
   def add_image(self, dicom : Dataset) -> int:
     key = self.get_patient_id(dicom)
-
-    if key in self._locked_patients:
-      self.logger.error("Attempting to add an image to a locked patient")
-      raise InvalidDataset()
 
     if key not in self:
       input_container_path: Optional[Path] = None
@@ -435,8 +429,6 @@ class PipelineTree(ImageTreeInterface):
       else:
         new_data_dict[patient_id] = patient_node
 
-    for patient_id in patient_ids:
-      self.unlock_patient(patient_id)
     self.images -= removed_images
     self.data = new_data_dict
     self.logger.debug(f"Removed {removed_images} from {len(patient_ids)} Patients")
@@ -466,14 +458,8 @@ class PipelineTree(ImageTreeInterface):
 
     self.images -= removed_images
     self.data = new_data_dict
-    self.unlock_patient(patient_id)
+
     self.logger.debug(f"Removed {patient_id} and {removed_images} images from Pipeline")
-
-  def lock_patient(self, patient_id):
-    self._locked_patients.add(patient_id)
-
-  def unlock_patient(self, patient_id):
-    self._locked_patients.discard(patient_id)
 
   def _get_patient_container_options(self, container_path: Optional[Path]) -> PatientNode.Options:
     """Creates the options for the underlying Patient Container
