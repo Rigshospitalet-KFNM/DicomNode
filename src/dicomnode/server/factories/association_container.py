@@ -8,6 +8,7 @@ For further processing
 # Python Standard Library
 from dataclasses import dataclass
 from enum import Enum
+from threading import get_native_id
 from typing import Optional
 
 # Third party packages
@@ -32,6 +33,10 @@ class AssociationContainer: # FUCK THIS IS BAD NAMING
   """ip address of the triggering association"""
   association_ae : str
   """AE title of the triggering association"""
+  handling_thread : int
+  """The Thread ID of the handling thread, used when the thread pass work to
+  another thread, for reference back. Output from get_native_id
+  """
 
 
 ##### Dataclasses ######
@@ -91,6 +96,7 @@ class AssociationContainerFactory:
       self.__get_event_id(event),
       association_ip,
       association_ae,
+      get_native_id(),
       association_types,
     )
 
@@ -117,8 +123,9 @@ class AssociationContainerFactory:
       self.__get_event_id(event),
       association_ip,
       association_ae,
+      get_native_id(),
       association_types,
-      )
+    )
 
 
   def build_association_c_store(self, event: Event) -> CStoreContainer:
@@ -137,4 +144,5 @@ class AssociationContainerFactory:
     return CStoreContainer(self.__get_event_id(event),
                            event.assoc.requestor.address,
                            event.assoc.requestor.ae_title,
+                           get_native_id(),
                            dataset)

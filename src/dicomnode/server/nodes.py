@@ -340,7 +340,7 @@ class AbstractPipeline():
 
     if self.patient_identifier_tag in c_store_container.dataset:
       patient_id = str(c_store_container.dataset[self.patient_identifier_tag].value)
-      thread_id = get_native_id()
+      thread_id = c_store_container.association_id
       # Critical zone for managing keys
       with self._lock_key:
         if patient_id in self._patient_locks:
@@ -420,7 +420,7 @@ class AbstractPipeline():
               continue
             del self._patient_locks[patient_id]
           else:
-            thread_id = get_native_id()
+            thread_id = released_container.association_id
             self.logger.info(f"Thread: {thread_id} leaving {patient_id}-container")
             self.logger.info(f"Threads {threads}")
             threads.remove(thread_id)
