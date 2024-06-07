@@ -346,7 +346,7 @@ class AbstractPipeline():
         if patient_id in self._patient_locks:
           threads, patient_lock = self._patient_locks[patient_id]
         else:
-          threads, patient_lock = (thread_id, Lock())
+          threads, patient_lock = (set([thread_id]), Lock())
           self._patient_locks[patient_id] = (threads, patient_lock)
 
         if patient_id not in self._updated_patients[c_store_container.association_id]:
@@ -580,7 +580,7 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.require_called_aet: {self.dicom_application_entry.require_called_aet}")
     self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
-    self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
+    #self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
     self.dicom_application_entry.start_server(
       (self.ip,self.port),
       block=blocking,
