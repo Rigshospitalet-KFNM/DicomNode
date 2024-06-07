@@ -178,7 +178,7 @@ class AbstractPipeline():
   log_level: int = logging.INFO
   "Level of Logger"
 
-  log_format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
+  log_format: str = "[%(asctime)s] |%(thread)d| %(name)s - %(levelname)s - %(message)s"
   "Format of log messages using the '%' style."
 
   pynetdicom_logger_level: int = logging.CRITICAL + 1

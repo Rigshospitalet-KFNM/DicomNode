@@ -164,16 +164,15 @@ class AbstractInput(ImageTreeInterface, ABC):
     # Dataset Validation
     for required_tag in self.required_tags:
       if required_tag not in dicom:
-        self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
+        #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
 
     for required_tag, required_value in self.required_values.items():
       if required_tag not in dicom:
-        self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
+        #self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
       if not self._validate_value(dicom[required_tag].value, required_value):
-        self.logger.debug(f"required value {required_value}\
-                           not match {dicom[required_tag]} in dicom")
+        #self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
         return False
 
     return True
