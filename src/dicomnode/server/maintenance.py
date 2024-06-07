@@ -13,7 +13,10 @@ from typing import Any, Iterable, Mapping, Optional
 # Thrid party Packages
 
 # Dicomnode packages
+from dicomnode.lib.logging import get_logger
 from dicomnode.server.pipeline_tree import PipelineTree
+
+
 
 class MaintenanceThread(Thread):
   """This thread ensures that old studies are removed from the input
@@ -37,6 +40,7 @@ class MaintenanceThread(Thread):
     self.study_expiration_days = study_expiration_days
     self._running = True
     self.waiting_event = None
+    self.logger = get_logger()
 
 
   def run(self):
@@ -47,6 +51,7 @@ class MaintenanceThread(Thread):
       if waiting:
         break
 
+      self.logger.info("Running Maintenance!")
       self.maintenance()
 
 

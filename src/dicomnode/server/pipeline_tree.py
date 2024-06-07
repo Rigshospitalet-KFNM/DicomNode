@@ -353,15 +353,15 @@ class PipelineTree(ImageTreeInterface):
       InvalidDataset: If the value used for separating is missing, or is None
     """
     if self.patient_identifier_tag not in dataset:
-      self.logger.debug(f"{hex(self.patient_identifier_tag)} not in dataset")
-      self.logger.debug("Patient Identifier tag not in dataset")
+      self.logger.error(f"{hex(self.patient_identifier_tag)} not in dataset")
+      self.logger.error("Patient Identifier tag not in dataset")
       raise InvalidDataset()
 
     value = dataset[self.patient_identifier_tag].value
 
     if value is None:
-      self.logger.debug(f"Input dataset have tag {hex(self.patient_identifier_tag)}\
-                         but it's None and therefore unhashable")
+      self.logger.error(f"Input dataset have tag {hex(self.patient_identifier_tag)}\
+                          but it's None and therefore unhashable")
       raise InvalidDataset()
 
     return str(value)
@@ -407,10 +407,10 @@ class PipelineTree(ImageTreeInterface):
       if isinstance(patient_node, PatientNode):
         if patient_node.creation_time < expiry_time:
           to_be_removed.add(patient_id)
-      else:
-        raise InvalidTreeNode #pragma: no cover
-
-    self.clean_up_patients(to_be_removed)
+      else: #pragma: no cover
+        raise InvalidTreeNode
+    if len(to_be_removed) > 0:
+      self.clean_up_patients(to_be_removed)
 
   def clean_up_patients(self, patient_ids: Iterable[str]):
     """Removes many patients from the pipeline tree
