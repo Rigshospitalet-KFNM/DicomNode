@@ -4,6 +4,7 @@
 // Standard library
 #include<stdint.h>
 #include<functional>
+#include<iostream>
 
 // Thrid party
 #include<pybind11/pybind11.h>
@@ -208,7 +209,8 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
     free_device_memory(&dev_in);
   };
   CudaRunner runner{error_function};
-  runner | [&](){return cudaMalloc(&dev_in, 2 * buffer_size);};
+  runner
+    | [&](){return cudaMalloc(&dev_in, 2 * buffer_size);};
   if(runner.error != cudaSuccess){
     return (int)runner.error;
   }
@@ -228,7 +230,6 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
     };
   // I assume you can always free, this might be wrong
   cudaFree(dev_in);
-
   return (int)runner.error;
 }
 

@@ -347,14 +347,11 @@ class AbstractPipeline():
           threads, patient_lock = self._patient_locks[patient_id]
         else:
           threads, patient_lock = (set([thread_id]), Lock())
-          self.logger.info(f"creating threads: {threads}")
           self._patient_locks[patient_id] = (threads, patient_lock)
 
-        if patient_id not in self._updated_patients[c_store_container.association_id]:
-          self._updated_patients[c_store_container.association_id].add(patient_id)
-          if thread_id not in threads:
-            self.logger.info(f"Adding {thread_id} to {threads}")
-            threads.add(thread_id)
+        if patient_id not in self._updated_patients[thread_id]:
+          self._updated_patients[thread_id].add(patient_id)
+          threads.add(thread_id)
       # End of Critical zone
       try:
         # Critical Patient zone
@@ -423,8 +420,6 @@ class AbstractPipeline():
               continue
           else:
             thread_id = released_container.association_id
-            self.logger.info(f"Thread: {thread_id} leaving {patient_id}-container")
-            self.logger.info(f"Threads {threads}")
             threads.remove(thread_id)
             continue
       # End of Critical Zone

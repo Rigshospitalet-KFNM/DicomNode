@@ -5,7 +5,7 @@ fitting to the actual GPU device
 #define DICOMNODE_CUDA_MANAGEMENT
 
 //#include"cuda_management.cuh"
-
+#include<iostream>
 #include<stdint.h>
 
 #include<pybind11/pybind11.h>
@@ -37,7 +37,7 @@ class CudaRunner {
     cudaError_t error = cudaSuccess;
     CudaRunner(std::function<void(cudaError_t)> error_lambda) : error_function(error_lambda){}
     CudaRunner& operator|(std::function<cudaError_t()> func){
-       if(error != cudaSuccess){
+       if(error == cudaSuccess){
         error = func();
         if (error != cudaSuccess){
           error_function(error);

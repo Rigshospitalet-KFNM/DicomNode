@@ -255,12 +255,13 @@ class PipelineTree(ImageTreeInterface):
                pipelineArgs: Dict[str, Type[AbstractInput]],
                options = Options()
     ) -> None:
-    """_summary_
+    """A Dicom tree of height 2* where the first node is the patient identifier
+    The second layer is instances of the abstract input.
 
     Args:
-        patient_identifier (int): _description_
-        pipelineArgs (Dict[str, Type]): _description_
-        Options: PipelineTree.Options
+        patient_identifier (int): The Dicom tag for to separate dicom series
+        pipelineArgs (Dict[str, Type]): A "Blueprint" for each node
+        Options: PipelineTree.Options: Options for the pipeline tree
 
     Raises:
         InvalidRootDataDirectory: _description_

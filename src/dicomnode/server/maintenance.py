@@ -62,10 +62,15 @@ class MaintenanceThread(Thread):
       self.waiting_event.set()
 
 
-  def calculate_seconds_to_next_maintenance(self, now=None) -> float:
+  def calculate_seconds_to_next_maintenance(self, input_now:Optional[datetime] = None) -> float:
     """Calculates the time in seconds to the next scheduled clean up"""
-    if now is None:
+    if input_now is None:
       now = datetime.now()
+    else:
+      now = input_now
+
+    if(now.hour == 23 and now.minute == 59):
+      return self._seconds_in_a_day
 
     tomorrow = now + timedelta(days=1)
     clean_up_datetime = datetime(tomorrow.year, tomorrow.month, tomorrow.day,
@@ -75,11 +80,13 @@ class MaintenanceThread(Thread):
     return time_delta.days * self._seconds_in_a_day + float(time_delta.seconds)
 
 
-  def maintenance(self, now = None) -> None:
+  def maintenance(self, input_now: Optional[datetime] = None) -> None:
     """Removes old studies in the pipeline tree to ensure GDPR compliance
     """
-    if now is None:
+    if input_now is None:
       now = datetime.now()
+    else:
+      now = input_now
     # Note this might cause some bug,
     # where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code

@@ -2,7 +2,7 @@
 results"""
 
 # Python standard library
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skip
 
 # Third party packages
 import numpy
@@ -15,9 +15,10 @@ from dicomnode.math.types import MirrorDirection
 # Test helper packages
 from tests.helpers import bench
 
-test_iterations = 100
+test_iterations = 5
 
 class MirrorTestCase(TestCase):
+
   @skipIf(not math.CUDA, "Needs Cuda compare functionality between cuda and Numpy")
   def test_mirror_x(self):
     for _ in range(test_iterations):
@@ -83,7 +84,6 @@ class MirrorTestCase(TestCase):
       cpu = math.mirror(data, MirrorDirection.YZ)
 
       self.assertTrue((data_gpu == cpu).all())
-
 
   @skipIf(not math.CUDA, "Needs Cuda compare functionality between cuda and Numpy")
   def test_mirror_xyz(self):

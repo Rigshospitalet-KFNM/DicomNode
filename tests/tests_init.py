@@ -25,7 +25,7 @@ class InitTestCase(TestCase):
       'data_structures',
       'dicom',
       'lib',
-      'library_paths'
+      'library_paths',
       'math',
       'report',
       'server',

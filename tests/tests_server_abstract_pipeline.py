@@ -125,7 +125,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.assertEqual(0xB007,self.node.consume_c_store_container(container))
 
-    self.assertEqual(cm.output[0], "INFO:dicomnode:Node rejected dataset: Received dataset doesn't have patient Identifier tag")
+    self.assertEqual(cm.output[0], "INFO:dicomnode:Node rejected dataset: Received dataset doesn't have patient Identifier tag: 0x100020")
 
   def test_consume_c_store_missing_required_tag(self):
     self.node._updated_patients[self.thread_id] = set()
@@ -340,7 +340,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._consume_association_release_store_association(container)
 
-    log = f'DEBUG:dicomnode:Thread: {self.thread_id} leaving {TEST_CPR}-container'
+    log = f"DEBUG:dicomnode:PatientID to be updated in: {{{self.thread_id}: {{'1502799995'}}}}"
     self.assertIn(log, cm.output)
 
 
