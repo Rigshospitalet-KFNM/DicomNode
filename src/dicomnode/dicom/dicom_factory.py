@@ -11,7 +11,8 @@ from inspect import getfullargspec
 from pathlib import Path
 from pprint import pformat
 from random import randint
-from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,  Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
+    Optional,Sequence as TypingSequence, Tuple, TypeVar, Union
 
 # Third Party Library
 from numpy import ndarray, zeros_like
@@ -295,7 +296,7 @@ class Blueprint():
   def __delitem__(self, tag):
     del self._dict[tag]
 
-  def __init__(self, virtual_elements: Union[List[VirtualElement],'Blueprint'] = []) -> None:
+  def __init__(self, virtual_elements: Union[TypingSequence[VirtualElement],'Blueprint'] = []) -> None:
     # Init
     self._dict: SortedDict = SortedDict()
 
@@ -460,7 +461,7 @@ class DicomFactory():
   def build_series(self,
                    image: ndarray[Tuple[int,int,int],Any],
                    blueprint: Blueprint,
-                   parent_series: DicomSeries,
+                   parent_series: Union[DicomSeries, List[Dataset]],
                    filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
                    kwargs: Dict[Any, Any] = {}
                    ) -> DicomSeries:
@@ -501,7 +502,14 @@ class DicomFactory():
     if not len(image.shape) == 3:
       raise ValueError("Image must be a 3 dimensional image")
 
-    can_copy_instances = parent_series.can_copy_into_image(image)
+    if isinstance(parent_series, List):
+      parent_datasets = parent_series
+      can_copy_instances = len(parent_datasets) == image.shape[2]
+    else:
+      parent_datasets = parent_series.datasets
+      can_copy_instances = parent_series.can_copy_into_image(image)
+
+
     datasets = []
 
     for i, image_slice in enumerate(image):
@@ -514,7 +522,7 @@ class DicomFactory():
     series = DicomSeries(datasets)
 
     for virtual_tag in blueprint:
-      result = virtual_tag.corporealialize(parent_series.datasets)
+      result = virtual_tag.corporealialize(parent_datasets)
       if isinstance(result, DataElement):
         series.set_shared_tag(virtual_tag.tag, result)
       elif isinstance(result, InstanceVirtualElement):
@@ -526,7 +534,7 @@ class DicomFactory():
               kwargs=kwargs,
               instance_dataset=dataset,
               image=image,
-            ) for (i, dataset) in enumerate(parent_series.datasets)
+            ) for (i, dataset) in enumerate(parent_datasets)
           ]
         else:
           envs = [

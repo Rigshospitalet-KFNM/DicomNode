@@ -10,7 +10,8 @@ import logging
 from os import environ
 
 from dicomnode.dicom.dimse import Address
-from dicomnode.dicom.numpy_factory import NumpyFactory, CTImageStorage_NumpyBlueprint
+from dicomnode.dicom.dicom_factory import DicomFactory
+from dicomnode.dicom.blueprints import ct_image_blueprint
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.dicom.sop_mapping import CTImageStorage_required_tags
 
@@ -39,9 +40,6 @@ class PlusOnePipeline(AbstractPipeline):
   log_level: int = logging.INFO
   log_output: str = "log.log"
 
-  dicom_factory: NumpyFactory = NumpyFactory()
-  header_blueprint = CTImageStorage_NumpyBlueprint
-
   endpoint = Address('1.2.3.4', 104, "ENDPOINT_AE")
 
   input = {
@@ -50,14 +48,13 @@ class PlusOnePipeline(AbstractPipeline):
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     data: ndarray = input_data[INPUT_KW] # type: ignore
-    if input_data.header is None:
-      self.logger.critical("Header is missing!")
-      raise Exception
-    # Data processing
+
     data += 1
 
     # Conversion back to dicom
-    series = self.dicom_factory.build_from_header(input_data.header, data)
+    series = DicomFactory().build_series(data,
+                                ct_image_blueprint,
+                                input_data.datasets[INPUT_KW])
 
     # Producing Pipeline Output
     out = DicomOutput([(self.endpoint, series)], self.ae_title)

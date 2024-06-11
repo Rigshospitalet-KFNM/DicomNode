@@ -1,3 +1,3 @@
-from . import helpers
-from . import tests_end2end
-from . import dicom_math
+from tests import helpers
+from tests import tests_end2end
+from tests import math_

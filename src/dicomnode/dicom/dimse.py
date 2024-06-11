@@ -28,12 +28,25 @@ class QueryLevels(Enum):
   STUDY="STUDY"
   SERIES="SERIES"
 
+class DIMSE_StatusCodes(Enum):
+  SUCCESS = 0x0000
+  PENDING = 0xFF00
+  PENDING_MISSING_KEYS = 0xFF01
+  CANCELLED = 0xFE00
+  SOP_NOT_SUPPORTED = 0x0122
+  OUT_OF_RESOURCES  =0xA700
+  FAILED = 0xC000 # Note that this is a Range from 0xC000 to 0xCFFF
+
+
 
 @dataclass
 class Address:
   ip: str
   port: int
   ae_title: str # SCP ae title
+
+  def __str__(self):
+    return f"{self.ip}:{self.port} - {self.ae_title}"
 
 @dataclass(init=False)
 class ResponseAddress(Address):

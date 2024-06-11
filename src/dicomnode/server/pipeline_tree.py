@@ -32,7 +32,7 @@ class InputContainer:
 
   def __init__(self,
                data: Dict[str, Any],
-               datasets: Dict[str, Iterable[Dataset]] = {},
+               datasets: Dict[str, List[Dataset]] = {},
                paths: Optional[Dict[str, Path]] = None,
                ) -> None:
     self.__data = data

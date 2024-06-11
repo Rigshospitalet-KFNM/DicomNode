@@ -1,7 +1,13 @@
+# Python Standard library
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple, Union
 
+# Third party package
+
+# Dicomnode packages
+# As this is a types module, then do not import other modules, as this module
+# is assumed to be able to imported without dependencies.
 
 class MirrorDirection(Enum):
   X = 0
@@ -21,7 +27,6 @@ class RotationAxes(Enum):
 class Transformation:
   transformations: List[Union[Tuple[RotationAxes, int], MirrorDirection]] = field(default_factory=list)
 
-
 class PerformanceException(Exception):
   @property
   def fatal(self) -> bool:
@@ -31,10 +36,11 @@ class PerformanceException(Exception):
     Fatal errors often idicate driver issuses with cuda
 
     Returns:
-        _type_: _description_
+        (bool): False indicate that the program can continue false, indicate
+        that the program MUST shut down, since continuing should be considered
+        undefined behavior
     """
     return False
-  
 
 ##### Cuda specific errors
 
@@ -609,7 +615,4 @@ class CudaException(PerformanceException):
 
   @property
   def fatal(self):
-    return self.error_code.value in [803, 810, 911, 999, 10000]
-
-
-
+    return self.error_code.value in [710,803, 810, 911, 999, 10000]

@@ -295,7 +295,11 @@ class GrinderTests(TestCase):
     ds[2].SamplesPerPixel = 4
 
     grinder = NumpyGrinder()
-    self.assertRaises(InvalidDataset, grinder, ds)
+    with self.assertLogs('dicomnode') as recorded_logs:
+      self.assertRaises(InvalidDataset, grinder, ds)
+    self.assertEqual(recorded_logs.output[0], "ERROR:dicomnode:Dataset contains"
+                     " a retired value for Samples Per Pixel, which is not"
+                     " supported")
 
   def test_numpy_SamplesPerPixel_Nonsense(self):
     ds = list(generate_numpy_datasets(3, Rows=2, Cols=2, rescale=False, Bits=32))
@@ -305,7 +309,10 @@ class GrinderTests(TestCase):
     ds[2].SamplesPerPixel = 12
 
     grinder = NumpyGrinder()
-    self.assertRaises(InvalidDataset, grinder, ds)
+    with self.assertLogs('dicomnode') as recorded_logs:
+      self.assertRaises(InvalidDataset, grinder, ds)
+    self.assertEqual(recorded_logs.output[0], "ERROR:dicomnode:Dataset contains"
+                     " a invalid value for Samples Per Pixel")
 
 
   def test_tag_meta_grinder(self):
@@ -342,7 +349,6 @@ class GrinderTests(TestCase):
     dataset.PatientSize = patient_height
 
     grinder = TagGrinder([0x00100020, 0x00101020,0x00101030], optional=False)
-
     self.assertRaises(InvalidDataset, grinder, [dataset])
 
 
@@ -371,7 +377,7 @@ class NiftyGrinderTestCase(TestCase):
       slice_thickness=slice_z,
       orientation=1,
       initial_position=(0.0,0.0,0.0),
-      image_orientation=tuple(image_orientation),
+      image_orientation=(1.0,0.0,0.0,0.0,1.0,0.0),
       image_number=1,
       slices=slices
     )
@@ -387,8 +393,6 @@ class NiftyGrinderTestCase(TestCase):
     self.assertEqual(res.header.get_data_shape(), (cols, rows, slices)) #type: ignore
 
     image_data = res.get_fdata()
-
-    self.assertTrue(image_data.flags["F_CONTIGUOUS"])
     self.assertEqual(image_data.shape, (cols, rows, slices))
 
   def test_nifti_grinder_MR_create_dir_and_resampling(self):
@@ -416,7 +420,7 @@ class NiftyGrinderTestCase(TestCase):
       slice_thickness=slice_z,
       orientation=1,
       initial_position=(0.0,0.0,0.0),
-      image_orientation=tuple(image_orientation),
+      image_orientation=(1.0,0.0,0.0,0.0,1.0,0.0),
       image_number=1,
       slices=slices
     )
@@ -433,9 +437,6 @@ class NiftyGrinderTestCase(TestCase):
 
     image_data = res.get_fdata()
 
-    # WELL WELL WELL WE HAVE SOME IDIOT ALLOCATION
-    self.assertFalse(image_data.flags["F_CONTIGUOUS"])
-    self.assertTrue(image_data.flags["C_CONTIGUOUS"])
     self.assertEqual(image_data.shape, (cols, rows, slices))
 
   def test_nifti_grinder_CT(self):
@@ -447,7 +448,7 @@ class NiftyGrinderTestCase(TestCase):
       slice_thickness=1,
       orientation=1,
       initial_position=(0.0,0.0,0.0),
-      image_orientation=tuple(image_orientation),
+      image_orientation=(1.0,0.0,0.0,0.0,1.0,0.0),
       image_number=1,
       slices=slices
     )

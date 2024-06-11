@@ -10,3 +10,7 @@ def from_wildcard(string: str) -> Pattern:
       Pattern: _description_
   """
   return compile(string.replace('*', '.*'))
+
+__all__ = [
+  'from_wildcard'
+]

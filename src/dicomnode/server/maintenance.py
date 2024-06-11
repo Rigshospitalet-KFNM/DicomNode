@@ -43,7 +43,7 @@ class MaintenanceThread(Thread):
     self.logger = get_logger()
 
 
-  def run(self):
+  def run(self): # pragma: no cover
     while self._running:
       self.waiting_event = Event()
       waiting = self.waiting_event.wait(
@@ -51,7 +51,6 @@ class MaintenanceThread(Thread):
       if waiting:
         break
 
-      self.logger.info("Running Maintenance!")
       self.maintenance()
 
 
@@ -85,8 +84,7 @@ class MaintenanceThread(Thread):
     """
     if input_now is None:
       now = datetime.now()
-    else:
-      now = input_now
+
     # Note this might cause some bug,
     # where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code

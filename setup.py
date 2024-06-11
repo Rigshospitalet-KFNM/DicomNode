@@ -148,6 +148,7 @@ setup(name='dicomnode',
     zip_safe=False,
     cmdclass={"build_ext": CMakeBuild},
     ext_modules = extensions,
+    test_suite="tests",
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',

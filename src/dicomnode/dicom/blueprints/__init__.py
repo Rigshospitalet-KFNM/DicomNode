@@ -1,10 +1,42 @@
+# Python Standard library
+from random import randint
+from datetime import date, time, datetime
+from typing import Any
+
+# Third party packages
+from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec
+
+# Dicomnode packages
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import Blueprint, CopyElement, StaticElement,\
   FunctionalElement, InstanceCopyElement, SeriesElement, InstanceEnvironment
-from random import randint
-from datetime import date, time, datetime
 
-###### Private functions
+# This trick is mostly just to prevent pollution of namespace
+class _ErrorConstants():
+  SAMPLES_PER_PIXEL = 3
+  PHOTOMETRIC_INTERPRETATION = "RGB"
+  PLANAR_CONFIGURATION = 0
+  ROWS = 500
+  COLUMNS = 500
+  BIT_ALLOCATED = 8
+  BIT_STORED = 8
+  HIGH_BIT = 7
+  PIXEL_REPRESENTATION = 0
+
+ERROR_CONSTANTS = _ErrorConstants()
+
+def generate_error_picture(_: Any):
+  figure = Figure((ERROR_CONSTANTS.COLUMNS, ERROR_CONSTANTS.ROWS))
+  grid_spec = GridSpec(1,1, hspace=0.0)
+  subplot = figure.add_subplot(grid_spec[0])
+  subplot.set_axis_off()
+  subplot.text(50, 50, "ERROR IN PIPELINE!", fontsize=24)
+  subplot.text(50, 150, "Please contact the system administrator!", fontsize=24)
+  figure.canvas.draw()
+  figure.canvas.tostring_rgb() #type:ignore method added by draw call above
+
+  return b""
 
 ###### Header function ######
 
@@ -13,22 +45,20 @@ def _add_InstanceNumber(caller_args: InstanceEnvironment):
   # This function assumes that the factory is aware of this
   return caller_args.instance_number
 
-def _add_UID_tag(_: InstanceEnvironment):
+def add_UID_tag(_: Any):
   return gen_uid()
 
-def _get_today(_: InstanceEnvironment) -> date:
+def get_today(_: Any) -> date:
   return date.today()
 
-def _get_time(_: InstanceEnvironment) -> time:
+def get_time(_: Any) -> time:
   return datetime.now().time()
 
-def _get_now_datetime(_: InstanceEnvironment) -> datetime:
+def get_now_datetime(_: Any) -> datetime:
   return datetime.now()
 
-def _get_random_number(_:InstanceEnvironment) -> int:
+def get_random_number(_: Any) -> int:
   return randint(1, 2147483646)
-
-
 
 ###### Header Tag Lists ######
 patient_blueprint = Blueprint([
@@ -66,7 +96,6 @@ general_equipment_blueprint = Blueprint([
 general_image_blueprint = Blueprint([
   StaticElement(0x00080008, 'CS', ['DERIVED', 'PRIMARY']), # Image Type # write a test for this
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber), # InstanceNumber
-
 ])
 
 
@@ -115,27 +144,27 @@ patient_study_blueprint = Blueprint([
 
 general_series_blueprint = Blueprint([
   CopyElement(0x00080060), # Modality
-  SeriesElement(0x00080021, 'DA', _get_today),         # SeriesDate
-  SeriesElement(0x00080031, 'TM', _get_time),          # SeriesTime
+  SeriesElement(0x00080021, 'DA', get_today),         # SeriesDate
+  SeriesElement(0x00080031, 'TM', get_time),          # SeriesTime
   SeriesElement(0x0020000E, 'UI', gen_uid),            # SeriesInstanceUID
   SeriesElement(0x0008103E, 'LO', lambda: "Dicomnode pipeline output"), # SeriesDescription
-  SeriesElement(0x00200011, 'IS', _get_random_number), # SeriesNumber
+  SeriesElement(0x00200011, 'IS', get_random_number), # SeriesNumber
   CopyElement(0x00081070, Optional=True),              # Operators' Name
   CopyElement(0x00185100),                             # PatientPosition
 ])
 
 SOP_common_blueprint: Blueprint = Blueprint([
   CopyElement(0x00080016),                                  # SOPClassUID, you might need to change this
-  FunctionalElement(0x00080018, 'UI', _add_UID_tag), # SOPInstanceUID
+  FunctionalElement(0x00080018, 'UI', add_UID_tag), # SOPInstanceUID
   FunctionalElement(0x00200013, 'IS', _add_InstanceNumber)  # InstanceNumber
 ])
 
 
 default_report_blueprint = Blueprint([
   CopyElement(0x00080020, Optional=True), # Study Date
-  FunctionalElement(0x00080023, 'DA', _get_today), #ContentDate
-  FunctionalElement(0x0008002A, 'DT', _get_now_datetime), # AcquisitionDateTime
-  FunctionalElement(0x00080033, 'TM', _get_time), #ContentTime
+  FunctionalElement(0x00080023, 'DA', get_today), #ContentDate
+  FunctionalElement(0x0008002A, 'DT', get_now_datetime), # AcquisitionDateTime
+  FunctionalElement(0x00080033, 'TM', get_time), #ContentTime
   CopyElement(0x00080030, Optional=True), # Study Time
   CopyElement(0x00080050), # AccessionNumber
   StaticElement(0x00080060, 'CS', 'DOC'), # Modality
@@ -147,6 +176,15 @@ default_report_blueprint = Blueprint([
   CopyElement(0x0020000D), # StudyInstanceUID
   CopyElement(0x00200010, Optional=True), # StudyID
   StaticElement(0x00200012, 'IS', 1), # InstanceNumber
-  SeriesElement(0x0020000E, 'UI', _add_UID_tag), # SeriesInstanceUID
+  SeriesElement(0x0020000E, 'UI', add_UID_tag), # SeriesInstanceUID
   StaticElement(0x00280301, 'CS', 'NO'),  # BurnedInAnnotation
 ])
+
+
+from .error_blueprint_english import ERROR_BLUEPRINT
+
+__all__ = [
+  'SOP_common_blueprint',
+  'default_report_blueprint',
+  'ERROR_BLUEPRINT'
+]

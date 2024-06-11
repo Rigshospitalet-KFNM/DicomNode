@@ -10,7 +10,7 @@ from . import nodes
 from . import output
 from . import pipeline_tree
 
-__all__ = (
+__all__ = [
   'factories',
   'grinders',
   'input',
@@ -18,7 +18,7 @@ __all__ = (
   'nodes',
   'output',
   'pipeline_tree',
-)
+]
 
 def __dir__():
   return __all__

@@ -21,9 +21,10 @@ from pathlib import Path
 from queue import Queue, Empty
 import shutil
 from sys import stdout
-from threading import Thread, Lock, get_native_id
+from threading import Thread, Lock
 from time import sleep
-from typing import Any, Dict, List, NoReturn, Optional, Set, TextIO, Type, Union, Tuple
+from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
+  Type, Union, Tuple
 
 # Third part packages
 from pynetdicom import evt
@@ -34,9 +35,10 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, FillingStrategy
-from dicomnode.dicom.dimse import Address
+from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
+  CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import log_traceback, set_logger
 from dicomnode.server.factories.association_container import AcceptedContainer, \
@@ -158,6 +160,8 @@ class AbstractPipeline():
   default_response_port: int = 104
   "Default Port used for unspecified Dicomnodes"
 
+  unhandled_error_blueprint: Optional[Blueprint] = None
+
   #Logging Configuration
   number_of_backups: int = 8
   "Number of backups before the os starts deleting old logs"
@@ -270,20 +274,19 @@ class AbstractPipeline():
     self._lock_key = Lock()
     self.post_init()
   # End def __init__
-
   #region logging handlers
   def handle_c_echo(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} send an echo")
+    self.logger.debug(f"Connection {event.address} send an echo") #type: ignore
     return 0x0000
 
   def handle_connection_opened(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} opened a connection")
+    self.logger.debug(f"Connection {event.address} opened a connection") #type: ignore
 
   def handle_connection_closed(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} closed a connection")
+    self.logger.debug(f"Connection {event.address} closed a connection") #type: ignore
 
   def handle_association_rejected(self, event):
-    self.logger.debug(f"Connection {event.address} rejected a connection")
+    self.logger.debug(f"Connection {event.address} rejected a connection") #type: ignore
 
   # Store dataset process
   # Responsibility's:
@@ -453,6 +456,10 @@ class AbstractPipeline():
         result = NoOutput()
     except Exception as exception:
       log_traceback(self.logger, exception, "Exception in user Processing")
+      exception_handler = self.exception_handlers.get(
+        type(exception), self.exception_handler_respond_with_dataset
+      )
+      exception_handler(exception, released_container, patient_input_container)
     else:
       self.logger.debug(f"Process {patient_id} Successful, Dispatching output!")
       if self._dispatch(result):
@@ -503,6 +510,7 @@ class AbstractPipeline():
 
 
   ##### User functions ######
+  #region User functions
   # These are the functions you should consider overwriting
   def filter(self, dataset : Dataset) -> bool:
     """This is a custom filter function, it is called before the node attempt to add the picture.
@@ -591,7 +599,7 @@ class AbstractPipeline():
 
     if isinstance(identifier, DicomSeries):
       val = identifier[self.patient_identifier_tag]
-      if val is not None:
+      if val is not None and not isinstance(val, List):
         return self.processing_directory / str(val.value)
       else:
         return None
@@ -611,7 +619,7 @@ class AbstractPipeline():
 
     if isinstance(identifier, DicomSeries):
       val = identifier[self.patient_identifier_tag]
-      if val is not None:
+      if val is not None and not isinstance(val, List):
         return self.data_directory / str(val.value)
       else:
         return None
@@ -624,6 +632,78 @@ class AbstractPipeline():
 
     raise TypeError("Unknown identifier type")
 
+  def _build_error_dataset(self, blueprint: Blueprint,
+                                 pivot: Dataset,
+                                 exception: Exception) -> Dataset:
+    factory = DicomFactory()
+    return factory.build_instance(
+      pivot, blueprint, kwargs={
+        'exception' : exception
+      }
+    )
+
+
+  def exception_handler_respond_with_dataset(self,
+                                             exception : Exception,
+                                             release_container: ReleasedContainer,
+                                             input_container: InputContainer):
+    """This function is the default exception handler for processing
+
+    By default, if there's a error blueprint, it creates a dicom image, and
+    sends it back to the triggering ip address.
+
+    For more info read the tutorial on the error handling
+
+    Args:
+        exception (Exception): The unhandled Exception triggered from process
+        release_container (ReleasedContainer): The Release Container pipeline
+        processing was called with. Contains information on association
+        input_container (InputContainer): The InputContainer that was used to
+        call process that threw.
+    """
+    if self.unhandled_error_blueprint is None:
+      return
+
+    if release_container.association_ip is None:
+      self.logger.error("Unable to send error dataset to client due to missing "
+                        "Ip address")
+      return
+    pivot_dataset = None
+    for dataset_iterator in input_container.datasets.values():
+      for dataset in dataset_iterator:
+        pivot_dataset = dataset
+        break
+      if pivot_dataset is not None:
+        break
+
+    if pivot_dataset is None:
+      self.logger.error("Unable to extract a dataset from the input container")
+      self.logger.error("Unless this is a test case, I am impressed")
+      return
+
+    response_address = Address(release_container.association_ip,
+                               self.default_response_port,
+                               release_container.association_ae)
+
+    error_dataset = self._build_error_dataset(
+      self.unhandled_error_blueprint,
+      pivot_dataset,
+      exception
+    )
+    try:
+      response = send_image(self.ae_title, response_address, error_dataset)
+      if 0x0000_0900 in response: # Status tag
+        if response.Status == DIMSE_StatusCodes.SUCCESS:
+          self.logger.info(f"Client {response_address} is informed of Failure "
+                           "triggered by Process Exception")
+        else:
+          self.logger.error(f"Client {response_address} did not accept the "
+                            f"error dataset, and responded with {response}")
+      else:
+        self.logger.error(f"Client {response_address} send an invalid response...")
+    except CouldNotCompleteDIMSEMessage:
+      self.logger.error("Unable to send error message to the client at "
+                        f"{response_address}")
 
   ##### Handler Directories #####
   # Handlers are an extendable way of
@@ -636,6 +716,10 @@ class AbstractPipeline():
 
   _release_handlers = { # Dict[AssociationTypes, Callable[[Self, ReleasedContainer], None]]
     AssociationTypes.STORE_ASSOCIATION : _consume_association_release_store_association
+  }
+
+  exception_handlers: Dict[Type[Exception], Callable[[Exception, ReleasedContainer, InputContainer], None]] = {
+
   }
 
 
@@ -675,7 +759,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       self.master_queue.put(released_container)
 
 
-  def __init__(self, master_queue: Queue[ReleasedContainer]=None) -> None:
+  def __init__(self, master_queue: Optional[Queue[ReleasedContainer]]=None) -> None:
     self.running = True
     self.master_queue = master_queue
     self.process_queue = Queue()

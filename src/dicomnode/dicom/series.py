@@ -123,6 +123,10 @@ class DicomSeries(Series):
 
     super().__init__(image, affine)
 
+  def __iter__(self):
+    for dataset in self.datasets:
+      yield dataset
+
   def __getitem__(self, tag) -> Optional[Union[DataElement, List[DataElement]]]:
     if self.datasets is None:
       return None

@@ -47,7 +47,7 @@ def __getattr__(name):
       utils.deprecation_message('dicomnode.lib.anonymization',
                                 'dicomnode.dicom.anonymization')
       __anonymization = import_module('dicomnode.dicom.anonymization')
-      return __anonymization
+    return __anonymization
 
   if name == 'dicom':
     global __dicom
