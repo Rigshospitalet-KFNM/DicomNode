@@ -82,14 +82,7 @@ class Image:
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     image_data = build_image_from_datasets(datasets)
-    affine = build_affine_from_datasets(datasets)
-
-    if affine is None:
-      pivot = datasets[0]
-      x_dim = pivot.Columns
-      y_dim = pivot.Rows
-      z_dim = len(datasets)
-      affine = AffineMatrix(identity(4), AffineMatrix.Span((0.0, x_dim),(0.0, y_dim),(0,z_dim)))
+    affine = AffineMatrix.from_datasets(datasets)
 
     return cls(image_data, affine)
   

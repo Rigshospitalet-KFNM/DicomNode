@@ -276,17 +276,17 @@ class AbstractPipeline():
   # End def __init__
   #region logging handlers
   def handle_c_echo(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} send an echo") #type: ignore
+    self.logger.debug(f"Connection {event.assoc.remote['ae_title']} send an echo") #type: ignore
     return 0x0000
 
   def handle_connection_opened(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} opened a connection") #type: ignore
+    self.logger.debug(f"Connection {event.address[0]} opened a connection") #type: ignore
 
   def handle_connection_closed(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address} closed a connection") #type: ignore
+    self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
 
-  def handle_association_rejected(self, event):
-    self.logger.debug(f"Connection {event.address} rejected a connection") #type: ignore
+  def handle_association_rejected(self, event: evt.Event):
+    self.logger.debug(f"Connection {event.assoc.remote['ae_title']} rejected a connection") #type: ignore
 
   # Store dataset process
   # Responsibility's:
@@ -301,8 +301,8 @@ class AbstractPipeline():
     If you require different functionality, consider first if it's possible to
     extend the handler functions consume
     """
-    self.logger.debug(f"Association with {event.assoc.requestor.ae_title}\
-                       - {event.assoc.requestor.address} Accepted")
+    self.logger.debug(f"Association with {event.assoc.requestor.ae_title}"
+                      f" - {event.assoc.requestor.address} Accepted")
     association_accept_container = self._association_container_factory\
                                        .build_association_accepted(event)
 
@@ -452,7 +452,10 @@ class AbstractPipeline():
     try:
       result = self.process(patient_input_container)
       if result is None:
-        self.logger.warning("You forgot to return a PipelineOutput object in the process function. If output is handled by process, return a NoOutput Object")
+        error_message = "You forgot to return a PipelineOutput object in the "\
+                        "process function. If output is handled by process, "\
+                        "return a NoOutput Object"
+        self.logger.warning(error_message)
         result = NoOutput()
     except Exception as exception:
       log_traceback(self.logger, exception, "Exception in user Processing")
@@ -555,7 +558,7 @@ class AbstractPipeline():
       If your application includes additional connections, you should overwrite this method,
       And close any connections and call the super function.
     """
-    while self.dicom_application_entry.active_associations != []:
+    while self.dicom_application_entry.active_associations != []: #pragma: no cover
       sleep(0.005)
 
     self.logger.info("Closing Server!")
@@ -603,7 +606,6 @@ class AbstractPipeline():
         return self.processing_directory / str(val.value)
       else:
         return None
-
 
     if isinstance(identifier, Dataset):
       return self.processing_directory / str(identifier[self.patient_identifier_tag].value)
@@ -665,9 +667,11 @@ class AbstractPipeline():
       return
 
     if release_container.association_ip is None:
-      self.logger.error("Unable to send error dataset to client due to missing "
-                        "Ip address")
+      error_message = "Unable to send error dataset to client due to missing "\
+                      "IP address"
+      self.logger.error(error_message)
       return
+
     pivot_dataset = None
     for dataset_iterator in input_container.datasets.values():
       for dataset in dataset_iterator:

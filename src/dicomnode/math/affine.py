@@ -8,9 +8,11 @@ from enum import Enum
 from typing import Optional, List, Literal, Tuple, TypeAlias
 
 # Third party packages
+from nibabel.nifti1 import Nifti1Image
 from numpy import array, absolute, dtype, float64, identity, ndarray
 from numpy.linalg import inv
 from pydicom import Dataset
+
 
 # Dicomnode packages
 from dicomnode.math.types import RotationAxes
@@ -71,6 +73,46 @@ class AffineMatrix:
     self.raw = raw
     self.inverted_raw = inv(raw)
     self.span = span
+
+  @classmethod
+  def from_nifti(cls, nifti: Nifti1Image):
+    maybe_affine = nifti.affine
+
+    if maybe_affine is not None:
+      affine = maybe_affine
+    else:
+      affine = identity(4, dtype=float64)
+
+    return cls(affine)
+
+  @classmethod
+  def from_datasets(cls, datasets: List[Dataset]):
+    affine = None
+
+    try:
+      datasets.sort(key=lambda ds: ds.InstanceNumber)
+
+      first_dataset = datasets[0]
+      last_dataset = datasets[-1]
+      start_coordinates = first_dataset.ImagePositionPatient
+
+    except ValueError:
+      pass
+    except AttributeError:
+      pass
+
+    if affine is None:
+      pivot = datasets[0]
+      x_dim = pivot.Columns
+      y_dim = pivot.Rows
+      z_dim = len(datasets)
+      return cls(identity(4),
+                            AffineMatrix.Span((0.0, x_dim),
+                                              (0.0, y_dim),
+                                              (0,z_dim))
+                            )
+    else:
+      return affine
 
   def correct_rotation(self) -> bool:
     """Detect if the image is rotated such that the reference space makes sense
@@ -235,10 +277,11 @@ def build_affine_from_datasets(datasets: List[Dataset]) -> Optional[AffineMatrix
     last_dataset = datasets[-1]
     start_coordinates = first_dataset.ImagePositionPatient
 
-
-
   except ValueError:
-    return None
+    pass
   except AttributeError:
-    return None
+    pass
+  
+
+
 

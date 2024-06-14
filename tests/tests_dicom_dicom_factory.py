@@ -284,9 +284,9 @@ class DicomFactoryTestCase(TestCase):
     self.assertIn('ERROR:dicomnode:You are trying to add a private tag, that have been reserved by Dicomnode', cm.output)
 
   def test_build_a_private_Sequence(self):
-    blueprint = Blueprint()
-    sequence_blueprint = Blueprint()
-    sequence_sequence_blueprint = Blueprint()
+    blueprint = Blueprint([StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage)])
+    sequence_blueprint = Blueprint([StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage)])
+    sequence_sequence_blueprint = Blueprint([StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage)])
 
     blueprint.add_virtual_element(SequenceElement(0x00115000, [sequence_blueprint], "Sequence 1"))
     sequence_blueprint.add_virtual_element(SequenceElement(0x00115000, [sequence_sequence_blueprint], "Sequence 2"))
@@ -298,6 +298,7 @@ class DicomFactoryTestCase(TestCase):
 
   def test_factory_build_with_copy(self):
     dataset = Dataset()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
     dataset.PatientName = "TestName"
     dataset.PatientID = "12345678"
 
@@ -316,7 +317,8 @@ class DicomFactoryTestCase(TestCase):
       FunctionalElement(0x01115001, 'IS', lambda env: env.instance_number + 34)
     ])
 
-    test_image = numpy.random.normal(0,1,(11,12,13))
+    # Note that images are store z,y,x
+    test_image = numpy.random.normal(0,1,(13, 12, 11))
 
     produced_series = self.factory.build_series(
       test_image,
@@ -324,7 +326,10 @@ class DicomFactoryTestCase(TestCase):
       self.parent_series
     )
 
+    self.assertEqual(len(produced_series), 13)
     for dataset in produced_series.datasets:
+      self.assertEqual(dataset.Columns,11)
+      self.assertEqual(dataset.Rows,12)
       self.assertEqual(dataset.PatientName, self.patient_name)
       self.assertIn(0x7fe00010, dataset)
       self.assertEqual(dataset.SmallestImagePixelValue, 0)

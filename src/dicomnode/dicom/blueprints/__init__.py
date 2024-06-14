@@ -1,11 +1,18 @@
 # Python Standard library
+from io import BytesIO
 from random import randint
 from datetime import date, time, datetime
 from typing import Any
 
 # Third party packages
+import matplotlib
+matplotlib.use('agg')
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
+from pydicom.uid import (
+  EncapsulatedPDFStorage
+)
 
 # Dicomnode packages
 from dicomnode.dicom import gen_uid
@@ -27,19 +34,23 @@ class _ErrorConstants():
 ERROR_CONSTANTS = _ErrorConstants()
 
 def generate_error_picture(_: Any):
-  figure = Figure((ERROR_CONSTANTS.COLUMNS, ERROR_CONSTANTS.ROWS))
-  grid_spec = GridSpec(1,1, hspace=0.0)
-  subplot = figure.add_subplot(grid_spec[0])
-  subplot.set_axis_off()
-  subplot.text(50, 50, "ERROR IN PIPELINE!", fontsize=24)
-  subplot.text(50, 150, "Please contact the system administrator!", fontsize=24)
-  figure.canvas.draw()
-  figure.canvas.tostring_rgb() #type:ignore method added by draw call above
+  my_dpi = 300
+  figure = Figure(figsize=(ERROR_CONSTANTS.COLUMNS / my_dpi, ERROR_CONSTANTS.ROWS / my_dpi), dpi=my_dpi)
+  canvas = FigureCanvasAgg(figure)
+  axis=canvas.figure.add_subplot(1,1,1)
+  axis.set_axis_off()
+  axis.text(50,50, "ERROR IN THE PIPELINE")
+  figure.set_facecolor("red")
+  canvas.draw()
+  bytes_io = BytesIO()
+  figure.savefig(bytes_io, format='rgba') # SO MATPLOTLIB DOESN*T SUPPORT RGB...
+  bytes_io.seek(0)
+  bytes_rgba = bytes_io.read()
+  bytes_rgb = bytes([b for i, b in enumerate(bytes_rgba) if i % 4 != 3])
+  return bytes_rgb
 
-  return b""
 
 ###### Header function ######
-
 def _add_InstanceNumber(caller_args: InstanceEnvironment):
   # iterator is Zero indexed while, instance number is 1 indexed
   # This function assumes that the factory is aware of this
@@ -161,6 +172,7 @@ SOP_common_blueprint: Blueprint = Blueprint([
 
 
 default_report_blueprint = Blueprint([
+  StaticElement(0x0008_0016, 'UI', EncapsulatedPDFStorage),
   CopyElement(0x00080020, Optional=True), # Study Date
   FunctionalElement(0x00080023, 'DA', get_today), #ContentDate
   FunctionalElement(0x0008002A, 'DT', get_now_datetime), # AcquisitionDateTime

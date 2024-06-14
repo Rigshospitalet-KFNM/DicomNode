@@ -442,8 +442,8 @@ class DicomFactory():
 
     dataset.SamplesPerPixel = 1
     dataset.PhotometricInterpretation = self.default_photometric_interpretation.value
-    dataset.Columns = encoded_image.shape[0]
-    dataset.Rows = encoded_image.shape[1]
+    dataset.Columns = encoded_image.shape[1]
+    dataset.Rows = encoded_image.shape[0]
     dataset.BitsAllocated = self.default_bits_allocated
     dataset.BitsStored = self.default_bits_stored
     dataset.HighBit = self.default_bits_stored - 1
@@ -543,7 +543,7 @@ class DicomFactory():
               factory=self,
               kwargs=kwargs,
               image=image,
-            ) for i in range(image.shape[2])
+            ) for i in range(image.shape[0])
           ]
 
         data_elements = [
@@ -599,6 +599,9 @@ class DicomFactory():
         de = de.produce(args)
       if de is not None:
         dataset.add(de)
+    if 0x0008_0016 not in dataset:
+      raise ValueError("You are attempting to create a Dataset with out an SOPClassUID")
+    make_meta(dataset)
     return dataset
 
   def encode_pdf(self,

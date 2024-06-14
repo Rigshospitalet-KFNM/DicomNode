@@ -48,6 +48,27 @@ class Address:
   def __str__(self):
     return f"{self.ip}:{self.port} - {self.ae_title}"
 
+class AssociationContextManager:
+  def __init__(self, ae: ApplicationEntity, *args, **kwargs) -> None:
+    self.ae = ae
+    self.args = args
+    self.kwargs = kwargs
+    self.assoc = None
+
+  def __enter__(self):
+    self.assoc = self.ae.associate(
+      *self.args,
+      **self.kwargs
+    )
+    if self.assoc.is_established:
+      return self.assoc
+    else:
+      return None
+
+  def __exit__(self, exception_type, exception, traceback):
+    pass
+
+
 @dataclass(init=False)
 class ResponseAddress(Address):
   """Dynamic address of target"""
@@ -58,28 +79,20 @@ class ResponseAddress(Address):
 def send_image(SCU_AE: str, address: Address, dicom_image: Dataset) -> Dataset:
   ae = ApplicationEntity(ae_title=SCU_AE)
   ae.add_requested_context(dicom_image.SOPClassUID)
-  assoc = ae.associate(
-    address.ip,
+  with AssociationContextManager(ae, address.ip,
     address.port,
-    ae_title=address.ae_title
-  )
-  if assoc.is_established:
-    if hasattr(dicom_image, 'file_meta'):
-      make_meta(dicom_image)
-    if 0x00020010 not in dicom_image.file_meta:
-      make_meta(dicom_image)
-    response = assoc.send_c_store(dicom_image)
-    assoc.release()
-    return response
-  else:
-    error_message = f"""Could not connect to the SCP with the following inputs:
-      IP: {address.ip}
-      Port: {address.port}
-      SCP AE: {address.ae_title}
-      SCU AE: {SCU_AE}
-    """
-    logger.error(error_message)
-    raise CouldNotCompleteDIMSEMessage("Could not connect")
+    ae_title=address.ae_title) as assoc:
+
+    if assoc is not None:
+      if hasattr(dicom_image, 'file_meta'):
+        make_meta(dicom_image)
+      if 0x00020010 not in dicom_image.file_meta:
+        make_meta(dicom_image)
+      print(dicom_image)
+      response = assoc.send_c_store(dicom_image)
+      return response
+  raise CouldNotCompleteDIMSEMessage("Could not connect")
+
 
 def send_images(SCU_AE: str,
                 address: Address,

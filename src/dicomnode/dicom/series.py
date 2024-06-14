@@ -7,18 +7,19 @@ https://xkcd.com/927/
 # Python standard library
 from functools import reduce
 from enum import Enum
-from typing import Any, List, Literal, Optional,  Tuple, TypeAlias, Union
+from typing import Any, Callable, List, Literal, Optional,  Tuple, TypeAlias, Union
 
 # Third party packages
 from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
+from pydicom.datadict import dictionary_VR
 from pydicom.tag import BaseTag
 from nibabel import Nifti1Image
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.math.affine import AffineMatrix, ReferenceSpace, build_affine_from_datasets
-from dicomnode.math.image import build_image_from_datasets, numpy_image
+from dicomnode.math.image import build_image_from_datasets, numpy_image, Image
 from dicomnode.lib.exceptions import InvalidDataset
 
 def sortDatasets(dataset: Dataset):
@@ -88,18 +89,22 @@ class Series:
   It's a
   """
 
-  image_data: numpy_image
-  affine: Optional[AffineMatrix] = None
-  reference_space: Optional[ReferenceSpace] = None
+  @property
+  def image(self):
+    if self._image is None:
+      if self._image_constructor is None: #pragma: no cover
+        raise Exception
+      self._image = self._image_constructor()
+    return self._image
 
   # Constructors
-  def __init__(self,
-               image_data: numpy_image,
-               affine:Optional[AffineMatrix]) -> None:
-    self.image_data = image_data
-    self.affine = affine
-    if self.affine is not None:
-      self.reference_space = ReferenceSpace.detect_reference_space(self.affine)
+  def __init__(self, image: Union[Image, Callable[[],Image]]):
+    if isinstance(image, Image):
+      self._image = image
+      self._image_constructor = image
+    else:
+      self._image = None
+      self._image_constructor = image
 
 class DicomSeries(Series):
   pivot: Dataset
@@ -113,37 +118,51 @@ class DicomSeries(Series):
     self.datasets = datasets
     self.pivot = self.datasets[0]
 
-    image = build_image_from_datasets(self.datasets)
+    def image_constructor():
+      return Image.from_datasets(self.datasets)
+
     # It's forbidden to call method on self, since the object have not been
     # Constructed yet!
-    if shared_tag(datasets, 0x00180050):
-      affine = build_affine_from_datasets(self.pivot)
-    else:
-      affine = None
-
-    super().__init__(image, affine)
+    super().__init__(image_constructor)
 
   def __iter__(self):
     for dataset in self.datasets:
       yield dataset
 
-  def __getitem__(self, tag) -> Optional[Union[DataElement, List[DataElement]]]:
-    if self.datasets is None:
-      return None
+  def __len__(self):
+    return len(self.datasets)
 
+  def __getitem__(self, tag) -> Optional[Union[DataElement, List[DataElement]]]:
     if tag in SERIES_VARYING_TAGS:
       return [dataset.get(tag, None) for dataset in self.datasets]
     return self.pivot.get(tag, None)
+
+  def __setitem__(self, tag: int, value):
+    if tag in SERIES_VARYING_TAGS:
+      if not isinstance(value, List):
+        error_message = f"The tag is a varying dicom tag. The correct type is a list of length {len(self)}"
+        raise TypeError(error_message)
+      self.set_individual_tag(tag, value)
+    else:
+      if not isinstance(value, DataElement):
+        value = DataElement(tag, dictionary_VR(tag), value)
+
+      self.set_shared_tag(tag, value)
 
   def set_shared_tag(self, tag: BaseTag, value: DataElement):
     for dataset in self.datasets:
       dataset[tag] = value
 
   def set_individual_tag(self, tag: BaseTag, values: List[DataElement]):
-    if len(values) == len(self.datasets):
-      raise ValueError("The amount of values doesn't match the amount datasets")
+    if len(values) != len(self):
+      error_message = f"The amount of values ({len(values)}) doesn't match the amount datasets ({len(self)})"
+      raise ValueError(error_message)
     for dataset, value in zip(self.datasets, values):
+      if not isinstance(value, DataElement):
+        value = DataElement(tag, dictionary_VR(tag), value)
       dataset[tag] = value
+
+
 
   def can_copy_into_image(self, image:ndarray[Tuple[int,int,int],Any]) -> bool:
     return image.shape[2] == len(self.datasets)
@@ -155,5 +174,12 @@ class NiftiSeries(Series):
   def __init__(self, nifti: Nifti1Image) -> None:
     self.nifti = nifti
     image_data = self.nifti.get_fdata()
+    affine = AffineMatrix.from_nifti(self.nifti)
 
-    super().__init__(image_data, self.nifti.affine)
+    super().__init__(Image(image_data, affine))
+
+__all__ = [
+  'Series',
+  'Dicomnode',
+  'NiftiSeries',
+]

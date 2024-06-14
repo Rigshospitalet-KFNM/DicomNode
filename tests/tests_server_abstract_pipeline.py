@@ -1,11 +1,18 @@
 """These are test for a node. AVOID end 2 end test cases here, I set up a server
 Most of these tests are just to show case the many error states, and that the
-node logs correctly"""
+node logs correctly
+
+Another critical difference is that they do not setup a server. They just call
+different handler functions
+
+For the tests 
+"""
 
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Standard Python Library #
 import logging
+from logging import DEBUG
 from pathlib import Path
 from sys import stdout
 from shutil import rmtree
@@ -22,6 +29,7 @@ from pydicom.uid import RawDataStorage, SecondaryCaptureImageStorage
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dicom_factory import DicomFactory
 from dicomnode.dicom.series import DicomSeries
+from dicomnode.dicom.blueprints.error_blueprint_english import ERROR_BLUEPRINT
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.grinders import SeriesGrinder
@@ -32,6 +40,7 @@ from dicomnode.server.factories.association_container import CStoreContainer,\
 
 # Test Helpers #
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY
+from tests.helpers.storage_endpoint import TestStorageEndpoint
 
 # Constants declarations #
 TEST_AE_TITLE = "NODE_TITLE"
@@ -372,3 +381,112 @@ class PipeLineTestCase(TestCase):
 
     self.assertIn("CRITICAL:dicomnode:Exception in user Output Send Function",
                   cm.output)
+
+  def test_missing_output_from_process(self):
+    class DumbPipeline(AbstractPipeline):
+      def process(self, *args):
+        return None
+    node = DumbPipeline()
+    with self.assertLogs(node.logger, DEBUG) as recorded_logs:
+      node._pipeline_processing(
+        'Test_patient',
+        ReleasedContainer(0, '127.0.0.1', "TEST", ()),
+        InputContainer({}, {}, None)
+      )
+    self.assertIn('WARNING:dicomnode:You forgot to return a PipelineOutput '
+                  'object in the process function. If output is handled by '
+                  'process, return a NoOutput Object', recorded_logs.output)
+
+  def test_double_failed_log(self):
+    class FalseOutput(PipelineOutput):
+      def __init__(self ) -> None:
+        pass
+
+      def send(self):
+        return False
+
+    class DumbPipeline(AbstractPipeline):
+      def process(self, *args):
+        return FalseOutput()
+
+    node = DumbPipeline()
+    with self.assertLogs(node.logger, DEBUG) as recorded_logs:
+      node._pipeline_processing(
+        'Test_patient',
+        ReleasedContainer(0, '127.0.0.1', "TEST", ()),
+        InputContainer({}, {}, None)
+      )
+    self.assertIn('ERROR:dicomnode:Unable to dispatch output for Test_patient', recorded_logs.output)
+
+
+  def test_exception_handler(self):
+    class HandlerPipeline(AbstractPipeline):
+      unhandled_error_blueprint = ERROR_BLUEPRINT
+      default_response_port = 11112
+
+    node = HandlerPipeline()
+    with self.assertLogs(node.logger) as recorded_log:
+      node.exception_handler_respond_with_dataset(
+        Exception(),
+        ReleasedContainer(
+          1, None, "TEST", set()
+        ),
+        InputContainer({},{},None)
+      )
+
+    self.assertIn('ERROR:dicomnode:Unable to send error dataset to client due'
+                  ' to missing IP address',recorded_log.output)
+
+    with self.assertLogs(node.logger) as recorded_log:
+      node.exception_handler_respond_with_dataset(
+        Exception(),
+        ReleasedContainer(
+          1, '127.0.0.1', "TEST", set()
+        ),
+        InputContainer({},{},None)
+      )
+
+    self.assertIn('ERROR:dicomnode:Unable to extract a dataset from the input '
+                  'container',recorded_log.output)
+
+    dataset = Dataset()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    dataset.AccessionNumber = "TEST_NUMBER"
+    dataset.PatientName = "PATIENT NAME"
+    dataset.PatientID = "123456970"
+    dataset.StudyInstanceUID = gen_uid()
+
+    with self.assertLogs(node.logger) as recorded_log:
+      node.exception_handler_respond_with_dataset(
+        Exception(),
+        ReleasedContainer(
+          1, '127.0.0.1', "TEST", set()
+        ),
+        InputContainer({},{
+          'DATASETS' : [
+            dataset
+          ]
+        },None)
+      )
+    self.assertIn(
+      'ERROR:dicomnode:Unable to send error message to the client at'
+      ' 127.0.0.1:11112 - TEST', recorded_log.output
+    )
+
+    endpoint = TestStorageEndpoint(11112, "ENDPOINT")
+    endpoint.open()
+
+    with self.assertLogs(node.logger) as recorded_log:
+      node.exception_handler_respond_with_dataset(
+        Exception(),
+        ReleasedContainer(
+          1, '127.0.0.1', "TEST", set()
+        ),
+        InputContainer({},{
+          'DATASETS' : [
+            dataset
+          ]
+        },None)
+      )
+
+    endpoint.close()
