@@ -14,11 +14,11 @@ from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
 from pydicom.datadict import dictionary_VR
 from pydicom.tag import BaseTag
-from nibabel import Nifti1Image
+from nibabel.nifti1 import Nifti1Image
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-from dicomnode.math.affine import AffineMatrix, ReferenceSpace, build_affine_from_datasets
+from dicomnode.math.affine import AffineMatrix, ReferenceSpace
 from dicomnode.math.image import build_image_from_datasets, numpy_image, Image
 from dicomnode.lib.exceptions import InvalidDataset
 
@@ -101,7 +101,7 @@ class Series:
   def __init__(self, image: Union[Image, Callable[[],Image]]):
     if isinstance(image, Image):
       self._image = image
-      self._image_constructor = image
+      self._image_constructor = None
     else:
       self._image = None
       self._image_constructor = image
@@ -149,11 +149,11 @@ class DicomSeries(Series):
 
       self.set_shared_tag(tag, value)
 
-  def set_shared_tag(self, tag: BaseTag, value: DataElement):
+  def set_shared_tag(self, tag: int, value: DataElement):
     for dataset in self.datasets:
       dataset[tag] = value
 
-  def set_individual_tag(self, tag: BaseTag, values: List[DataElement]):
+  def set_individual_tag(self, tag: int, values: List[DataElement]):
     if len(values) != len(self):
       error_message = f"The amount of values ({len(values)}) doesn't match the amount datasets ({len(self)})"
       raise ValueError(error_message)
@@ -161,8 +161,6 @@ class DicomSeries(Series):
       if not isinstance(value, DataElement):
         value = DataElement(tag, dictionary_VR(tag), value)
       dataset[tag] = value
-
-
 
   def can_copy_into_image(self, image:ndarray[Tuple[int,int,int],Any]) -> bool:
     return image.shape[2] == len(self.datasets)
@@ -180,6 +178,6 @@ class NiftiSeries(Series):
 
 __all__ = [
   'Series',
-  'Dicomnode',
+  'DicomSeries',
   'NiftiSeries',
 ]

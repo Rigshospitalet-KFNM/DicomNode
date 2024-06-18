@@ -12,11 +12,11 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.math.affine import AffineMatrix, build_affine_from_datasets
+from dicomnode.math.affine import AffineMatrix
 
 numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
 
-def fit_image_into_unsigned_bit_range(image: numpy_image,
+def fit_image_into_unsigned_bit_range(image: ndarray,
                                       bits_stored = 16,
                                       bits_allocated = 16,
                                      ) -> Tuple[numpy_image, float, float]:
@@ -74,7 +74,7 @@ class Image:
                image_data: numpy_image,
                affine: AffineMatrix,
                minimum_value=0) -> None:
-    self.image = image_data
+    self.raw = image_data
     self.affine = affine
     self.minimum_value = minimum_value
 
@@ -89,12 +89,13 @@ class Image:
   @staticmethod
   def _map_args_coordinates(*args) -> ndarray[Tuple[Literal[4]], Any]:
         # Args manipulation
-    if len(args) == 3:
-      i,j,k = args
+    input_arg = args[0]
+    if len(input_arg) == 3:
+      i,j,k = input_arg
       coordinates = array([i,j,k,1])
     elif len(args) == 1:
-      if isinstance(args[0], Tuple) or isinstance(args[0], List):
-        i,j,k = args[0]
+      if isinstance(input_arg, Tuple) or isinstance(input_arg, List):
+        i,j,k = tuple(input_arg[0])
         coordinates = array([i,j,k,1])
       else:
         coordinates = args[0]
@@ -102,13 +103,10 @@ class Image:
       error_message = f"Invalid number of args. Must be 1 or 3, but got {len(args)}"
       raise TypeError(error_message)
 
-    if not isinstance(coordinates, ndarray):
+    if not isinstance(coordinates, ndarray): #pragma: no cover
       raise TypeError("Could not converts arguments to a Numpy.ndarray")
 
-    if coordinates.shape == (3,):
-      coordinates = append(coordinates, 1)
-
-    if coordinates.shape != (4,):
+    if coordinates.shape != (4,): #pragma: no cover
       raise ValueError("Input vector is not a coordinate (x,y,z)")
 
     return coordinates
@@ -133,8 +131,6 @@ class Image:
       raise TypeError("Could not converts arguments to a Numpy.ndarray")
 
     return coordinates
-
-
 
   def coordinates_at(self,*args):
     """
@@ -187,7 +183,7 @@ class Image:
   def value_at_index(self, *args):
     x, y, z = self._map_args_point(args)
 
-    columns, rows, slices = self.image.shape
+    columns, rows, slices = self.raw.shape
 
     if not (0 < x < columns):
       return self.minimum_value
@@ -198,7 +194,7 @@ class Image:
     if not (0 < z < slices):
       return self.minimum_value
 
-    return self.image[x,y,z]
+    return self.raw[x,y,z]
 
   def value_at_point_nn(self, *args):
     minimum_distance = 1000
@@ -214,7 +210,7 @@ class Image:
 
 
   def center_index(self):
-    columns, rows, slices = self.image.shape
+    columns, rows, slices = self.raw.shape
 
     return (
       (columns - 1) // 2,

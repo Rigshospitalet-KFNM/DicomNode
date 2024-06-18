@@ -9,8 +9,6 @@ from datetime import date, datetime, time
 from enum import Enum
 from inspect import getfullargspec
 from pathlib import Path
-from pprint import pformat
-from random import randint
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
     Optional,Sequence as TypingSequence, Tuple, TypeVar, Union
 
@@ -23,12 +21,12 @@ from sortedcontainers import SortedDict
 
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.dicom import make_meta
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset
 from dicomnode.lib.logging import get_logger
-from dicomnode.lib.exceptions import InvalidTagType, HeaderConstructionFailure
+from dicomnode.lib.exceptions import MissingPivotDataset
 
 logger = get_logger()
 
@@ -109,7 +107,6 @@ class VirtualElement(ABC):
 
     """
     raise NotImplemented # pragma: no cover
-
 
 
 class CopyElement(VirtualElement):
@@ -605,7 +602,7 @@ class DicomFactory():
     return dataset
 
   def encode_pdf(self,
-                 report: Union['Report', Path, str],
+                 report: Union['Report', Path, str], # type:ignore
                  datasets: Iterable[Dataset],
                  report_blueprint: Blueprint,
                  filling_strategy = FillingStrategy.DISCARD,
@@ -631,6 +628,9 @@ class DicomFactory():
     Returns:
         Dataset: An EncapsulatedPDFStorage encoded Dicom Dataset with the input
         report
+
+    Raises:
+        MissingPivotDataset: If unable to get a dataset from datasets argument
     """
     from dicomnode.report import Report
     # Getting the PDF data
@@ -648,6 +648,8 @@ class DicomFactory():
       document_bytes = fp.read()
 
     pivot = get_pivot(datasets)
+    if pivot is None:
+      raise MissingPivotDataset
     report_dataset = self.build_instance(pivot, report_blueprint, filling_strategy, kwargs)
 
     if 'EncapsulatedDocument' not in report_dataset:
@@ -675,6 +677,3 @@ class DicomFactory():
       report_dataset.SourceInstanceSequence = Sequence(sequence)
 
     return report_dataset
-
-
-

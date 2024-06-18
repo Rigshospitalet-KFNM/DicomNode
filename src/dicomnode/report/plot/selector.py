@@ -23,7 +23,7 @@ class AverageSelector(Selector):
   def __call__(self, images: Sequence[numpy.ndarray]):
     pivot = None
     pivot_index = -1
-    pivot_average = -numpy.Infinity
+    pivot_average = -numpy.inf
 
     for index, image in enumerate(images):
       image_average = numpy.mean(image)
@@ -38,7 +38,7 @@ class MaxSelector(Selector):
   def __call__(self, images: Sequence[numpy.ndarray]):
     pivot = None
     pivot_index = -1
-    pivot_max = -numpy.Infinity
+    pivot_max = -numpy.inf
 
     for index, image in enumerate(images):
       image_max = image.max()

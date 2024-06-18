@@ -88,7 +88,6 @@ def send_image(SCU_AE: str, address: Address, dicom_image: Dataset) -> Dataset:
         make_meta(dicom_image)
       if 0x00020010 not in dicom_image.file_meta:
         make_meta(dicom_image)
-      print(dicom_image)
       response = assoc.send_c_store(dicom_image)
       return response
   raise CouldNotCompleteDIMSEMessage("Could not connect")

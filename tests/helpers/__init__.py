@@ -32,7 +32,7 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
 from dicomnode.lib.logging import set_logger
 from dicomnode.lib.dicom import gen_uid, make_meta
 
-def generate_numpy_dataset(
+def _generate_numpy_dataset(
     StudyUID: UID,
     SeriesUID: UID,
     Cols: int,
@@ -40,7 +40,12 @@ def generate_numpy_dataset(
     bits: int,
     rescale: bool,
     PixelRepresentation: int,
-    PatientID: str
+    PatientID: str,
+    image_position,
+    image_orientation,
+    pixel_spacing,
+    slice_thickness,
+    
   ) -> Dataset:
   ds = Dataset()
   ds.SOPClassUID = SecondaryCaptureImageStorage
@@ -54,6 +59,11 @@ def generate_numpy_dataset(
   ds.Rows = Rows
   ds.Columns = Cols
   ds.PixelRepresentation = PixelRepresentation
+
+  ds.ImagePositionPatient = image_position
+  ds.ImageOrientationPatient = image_orientation
+  ds.PixelSpacing = pixel_spacing
+  ds.SliceThickness = slice_thickness
 
   make_meta(ds)
 
@@ -90,12 +100,25 @@ def generate_numpy_datasets(
     Bits = 16,
     rescale = True,
     PixelRepresentation = 0,
-    PatientID: str = "None"
+    PatientID: str = "None",
+    starting_image_position = None,
+    image_orientation = None,
+    pixel_spacing = None,
+    slice_thickness = 4
   ) -> Iterator[Dataset]:
+  if starting_image_position is None:
+    image_position = [0,0,0]
+  else:
+    image_position = starting_image_position
+  if image_orientation is None:
+    image_orientation = [1,0,0,0,1,0]
+  if pixel_spacing is None:
+    pixel_spacing = [4,4]
+
   yielded = 0
   while yielded < datasets:
     yielded += 1
-    ds = generate_numpy_dataset(
+    ds = _generate_numpy_dataset(
       StudyUID,
       SeriesUID,
       Cols,
@@ -103,8 +126,14 @@ def generate_numpy_datasets(
       Bits,
       rescale,
       PixelRepresentation,
-      PatientID
+      PatientID,
+      image_position,
+      image_orientation,
+      pixel_spacing,
+      slice_thickness
     )
+    image_position[2] += slice_thickness
+
     ds.InstanceNumber = yielded + 1
     yield ds
 

@@ -8,7 +8,7 @@ class InvalidRootDataDirectory(Exception):
   """creating a pipelineTree with invalid root data directory"""
 
 class BlueprintConstructionFailure(Exception):
-  """When you add a tag, that you're not allowed to"""
+  """Blueprint contains a tag reserved by Dicomnode"""
 
 class HeaderConstructionFailure(Exception):
   """When a DicomFactory fails to construct a header"""
@@ -20,10 +20,14 @@ class InvalidTagType(Exception):
   """Added an invalid type of tag"""
 
 class InvalidQueryDataset(InvalidDataset):
-  """Querying with an invalid dataset"""
+  """When sending DIMSE message Querying with an invalid dataset"""
 
 class MissingModule(ImportError):
   """Missing an module"""
+
+class MissingPivotDataset(ValueError):
+  """When iterating over an dataset iterator and by assumption it has a length
+  greater than 1. This exception is raised when this assumption is broken"""
 
 class InvalidEncoding(Exception):
   """When a data structure have an unexpected encoding"""

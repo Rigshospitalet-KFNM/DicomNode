@@ -9,6 +9,7 @@ from typing import Optional, List, Literal, Tuple, TypeAlias
 
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
+import numpy
 from numpy import array, absolute, dtype, float64, identity, ndarray
 from numpy.linalg import inv
 from pydicom import Dataset
@@ -77,42 +78,73 @@ class AffineMatrix:
   @classmethod
   def from_nifti(cls, nifti: Nifti1Image):
     maybe_affine = nifti.affine
+    data = nifti.get_fdata()
 
     if maybe_affine is not None:
       affine = maybe_affine
+      span = cls.Span(
+        (affine[0,3], 0.0), # wrong values
+        (affine[1,3], 0.0), # wrong values
+        (affine[2,3], 0.0) # wrong values
+      )
     else:
       affine = identity(4, dtype=float64)
+      span = cls.Span(
+        (0.0, data.shape[2]),
+        (0.0, data.shape[1]),
+        (0.0, data.shape[0])
+      )
 
-    return cls(affine)
+    return cls(affine, span)
 
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
-    affine = None
-
     try:
       datasets.sort(key=lambda ds: ds.InstanceNumber)
 
       first_dataset = datasets[0]
       last_dataset = datasets[-1]
       start_coordinates = first_dataset.ImagePositionPatient
+      image_orientation = first_dataset.ImageOrientationPatient
+      end_coordinates = last_dataset.ImagePositionPatient
+      thickness_x = first_dataset.PixelSpacing[0]
+      thickness_y = first_dataset.PixelSpacing[1]
+      thickness_z = first_dataset.SliceThickness
 
-    except ValueError:
-      pass
-    except AttributeError:
+      affine_raw = numpy.array([
+        [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0, start_coordinates[0]],
+        [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0, start_coordinates[1]],
+        [thickness_x * image_orientation[2], thickness_y * image_orientation[5],  thickness_z, start_coordinates[2]],
+        [0,0,0,1], 
+      ])
+
+      end_coordinates = [
+        thickness_x * image_orientation[0] * first_dataset.Columns + start_coordinates[0],
+        thickness_y * image_orientation[4] * first_dataset.Rows + start_coordinates[1],
+        thickness_z * len(datasets) + start_coordinates[2]
+      ]
+
+      return cls(
+        affine_raw,
+        cls.Span(
+          (start_coordinates[0], end_coordinates[0]),
+          (start_coordinates[1], end_coordinates[1]),
+          (start_coordinates[2], end_coordinates[2]),
+        )
+      )
+    except Exception:
       pass
 
-    if affine is None:
-      pivot = datasets[0]
-      x_dim = pivot.Columns
-      y_dim = pivot.Rows
-      z_dim = len(datasets)
-      return cls(identity(4),
-                            AffineMatrix.Span((0.0, x_dim),
-                                              (0.0, y_dim),
-                                              (0,z_dim))
-                            )
-    else:
-      return affine
+    pivot = datasets[0]
+    x_dim = pivot.Columns
+    y_dim = pivot.Rows
+    z_dim = len(datasets)
+    return cls(identity(4),
+               cls.Span((0.0, x_dim),
+                        (0.0, y_dim),
+                        (0.0, z_dim))
+               )
+    
 
   def correct_rotation(self) -> bool:
     """Detect if the image is rotated such that the reference space makes sense
@@ -268,20 +300,3 @@ class ReferenceSpace(Enum):
       return cls.LPI
 
     return None
-
-def build_affine_from_datasets(datasets: List[Dataset]) -> Optional[AffineMatrix]:
-  try:
-    datasets.sort(key=lambda ds: ds.InstanceNumber)
-
-    first_dataset = datasets[0]
-    last_dataset = datasets[-1]
-    start_coordinates = first_dataset.ImagePositionPatient
-
-  except ValueError:
-    pass
-  except AttributeError:
-    pass
-  
-
-
-
