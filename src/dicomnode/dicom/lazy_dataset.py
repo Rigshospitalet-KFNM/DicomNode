@@ -7,11 +7,9 @@ Must code have been shamelessly stolen from https://coderbook.com/python/2020/04
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
-from pathlib import Path
 import operator
-from typing import Callable
 
-# Thrid Party Operator
+# Third party modules
 from pydicom import Dataset
 
 # Dicomnode packages
