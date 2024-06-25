@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Union
 
 # Third party packages
-from numpy import ndarray
+from numpy import concatenate, ndarray
 from nibabel.loadsave import load
 from nibabel.nifti1 import Nifti1Image
 from pydicom import Dataset
@@ -14,6 +14,8 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.series import DicomSeries
+from dicomnode.math.affine import AffineMatrix
+from dicomnode.math.image import build_image_from_datasets
 
 GATED_BLUEPRINT = Blueprint([
 
@@ -26,35 +28,41 @@ class BuildGatedSeriesArguments:
                 List[Nifti1Image], 
                 List[ndarray]]
 
+def _load_affine_nifti(nifti_image: Nifti1Image):
+  return AffineMatrix.from_nifti(nifti_image)
+
+def _load_affine_path(path: Path):
+  return _load_affine_nifti(load(path))
+
 def _load_nifti(nifti_image: Nifti1Image) -> ndarray:
   return nifti_image.get_fdata()
 
-def _load_path(path) -> ndarray:
+def _load_path(path: Path) -> ndarray:
   return _load_nifti(load(path)) #type: ignore
 
 def _load_dicom(dicoms: List[Dataset]) -> ndarray:
-  if(len(dicoms) == 0):
-    raise ValueError("")
-  pivot = dicoms[0]
-  x = pivot.Columns
-  y = pivot.Rows
-  z = len(dicoms)
-
-  return ndarray((x,y,z))
+  return build_image_from_datasets(dicoms)
 
 def build_gated_series(
     args: BuildGatedSeriesArguments
 ) -> DicomSeries:
   
   images: List[ndarray] = []
+  pivot = args.images[0]
+
+  if isinstance(pivot, Path):
+    affine =
+
   for image in args.images:
     if isinstance(image, Path):
       images.append(_load_path(image))
-    if isinstance(image, Nifti1Image):
+    elif isinstance(image, Nifti1Image):
       images.append(_load_nifti(image))
-    if isinstance(image, ndarray):
+    elif isinstance(image, ndarray):
       images.append(image)
-    if isinstance(image, List):
+    elif isinstance(image, List):
       images.append(_load_dicom(image))
   
+  image_space = concatenate(images)
+
   return DicomSeries([])
