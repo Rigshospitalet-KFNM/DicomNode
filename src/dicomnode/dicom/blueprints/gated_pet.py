@@ -51,7 +51,11 @@ def build_gated_series(
   pivot = args.images[0]
 
   if isinstance(pivot, Path):
-    affine =
+    affine = _load_affine_path(pivot)
+  elif isinstance(pivot, Nifti1Image):
+    affine = _load_nifti(pivot)
+  elif isinstance(pivot, List):
+    pass
 
   for image in args.images:
     if isinstance(image, Path):
