@@ -25,12 +25,14 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
 import numpy
 from nibabel.nifti1 import Nifti1Image
 from pydicom import Dataset
+from pydicom.uid import RTStructureSetStorage
+from rt_utils import RTStruct
 from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicom node package
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, MissingPivotDataset
 from dicomnode.lib.logging import get_logger
 
 logger = get_logger()
@@ -261,6 +263,28 @@ class NiftiGrinder(Grinder):
 
     return return_dir['NII'] # Yeah your documentation is wrong, and you should feel real fucking bad
 
+class RTStructGrinder(Grinder):
+  """Grinder for extracting RT structs from  
+
+  """
+  def __call__(self, image_generator: Iterable[Dataset]) -> Any:
+    rt_struct = None
+    rt_series = []
+    for dataset in image_generator:
+      if dataset.SOPClassUID == RTStructureSetStorage:
+        if rt_struct is None :
+          rt_struct = dataset
+        else:
+          logger.error(f"{self.__class__.__name__} only support single RTStructs")
+          logger.error(f"the dataset is ignored:")
+          logger.error(f"{dataset}")
+      else:
+        rt_series.append(dataset)
+    if rt_struct is None:
+      raise MissingPivotDataset
+
+    return RTStruct(rt_series, rt_struct)
+
 __all__ = [
   'Grinder',
   'IdentityGrinder',
@@ -269,5 +293,6 @@ __all__ = [
   'TagGrinder',
   'ManyGrinder',
   'NumpyGrinder',
-  'NiftiGrinder'
+  'NiftiGrinder',
+  'RTStructGrinder',
 ]
