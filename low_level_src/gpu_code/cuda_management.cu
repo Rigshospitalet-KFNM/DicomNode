@@ -12,6 +12,19 @@ fitting to the actual GPU device
 
 namespace py = pybind11;
 
+#if defined(__CUDACC__) // NVCC
+   #define ALIGN(n) __align__(n)
+#elif defined(__GNUC__) // GCC
+  #define ALIGN(n) __attribute__((aligned(n)))
+#elif defined(_MSC_VER) // MSVC
+  #define ALIGN(n) __declspec(align(n))
+#else
+  #error "Please provide a definition for ALIGN macro for your host compiler!"
+#endif
+
+
+
+
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
   ([&]{
@@ -97,6 +110,5 @@ void apply_cuda_management_module(py::module& m){
 
   m.def("get_device_properties", &cast_current_device);
 }
-
 
 #endif

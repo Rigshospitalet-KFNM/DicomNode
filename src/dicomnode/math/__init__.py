@@ -10,9 +10,10 @@ that for you.
   """
 
 # Python standard library
+from typing import List, Tuple
 
 # Third party packages
-from numpy import flip, rot90
+from numpy import flip, ndarray,  rot90
 
 # Imports
 from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
@@ -98,6 +99,23 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
   else:
     return flip(arr, (0,1,2))
 
+def bounding_box(array):
+  bounding_box_list = [
+    [shape_dim - 1, 0] for shape_dim in array.shape
+  ]
+
+  for flat_index, value in enumerate(array.flat):
+    if value:
+      dim_iter = 1
+      for shape_index, dim in enumerate(reversed(array.shape)):
+        dim_index = (flat_index % (dim * dim_iter)) // dim_iter
+        dim_iter *= dim
+        current_min = bounding_box_list[shape_index][0]
+        current_max = bounding_box_list[shape_index][1]
+        bounding_box_list[shape_index][0] = min(current_min, dim_index)
+        bounding_box_list[shape_index][1] = max(current_max, dim_index)
+
+  return bounding_box_list
 
 def __all__():
   return [

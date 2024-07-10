@@ -363,18 +363,6 @@ void tricubic_interpolation(const py::array_t<T, array_flags> data,
   //const uint32_t maximum_shared_memory = maximize_shared_memory(tricubic_interpolation_kernel<T>);
   const uint32_t threads = 128;
   const uint32_t blocks = num_targets % threads == 0 ? num_targets / threads : (num_targets / threads) + 1;
-  //const uint32_t shared_memory_size = 64 * sizeof(T) * threads;
-
-  /*
-  if(maximum_shared_memory < shared_memory_size){
-    std::string error_message = "This Kernels needs: ";
-    error_message += std::to_string(shared_memory_size);
-    error_message += " bytes of shared memory. However only ";
-    error_message += std::to_string(maximum_shared_memory);
-    error_message += " bytes are available!";
-    throw std::runtime_error(error_message);
-  }
-  */
 
   T* gpu_data = nullptr;
   T* gpu_affine = nullptr;

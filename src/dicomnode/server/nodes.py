@@ -20,6 +20,7 @@ from os import chdir, getcwd
 from pathlib import Path
 from queue import Queue, Empty
 import shutil
+import signal
 from sys import stdout
 from threading import Thread, Lock
 from time import sleep
@@ -48,6 +49,7 @@ from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, Patient
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
 
+default_sigint_handler = signal.getsignal(signal.SIGINT)
 
 class ProcessingDirectoryOptions(Enum):
   NO_PROCESSING_DIRECTORY = 0
@@ -757,24 +759,33 @@ class AbstractQueuedPipeline(AbstractPipeline):
   def handle_association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     released_container = self._association_container_factory.build_association_released(event)
-    if self.master_queue is None:
-      self.process_queue.put(released_container)
-    else:
-      self.master_queue.put(released_container)
+    self.process_queue.put(released_container)
+
+  def signal_handler_SIGINT(self, signal, frame):
+    self.running = False
+    default_sigint_handler(signal, frame)
 
 
   def __init__(self, master_queue: Optional[Queue[ReleasedContainer]]=None) -> None:
     self.running = True
-    self.master_queue = master_queue
-    self.process_queue = Queue()
+    if master_queue is None:
+      self.process_queue = Queue()
+    else: 
+      self.process_queue = master_queue
     self.process_thread = Thread(target=self.process_worker, daemon=False)
     self.process_thread.start()
+
     # Super is called at the end of the function
     super().__init__()
+
+  def open(self, blocking=True):
+    signal.signal(signal.SIGINT, self.signal_handler_SIGINT)
+    super().open(blocking)
 
   def close(self) -> None:
     self.running = False
     self.process_queue.join()
+    signal.signal(signal.SIGINT, default_sigint_handler)
 
     return super().close()
 
