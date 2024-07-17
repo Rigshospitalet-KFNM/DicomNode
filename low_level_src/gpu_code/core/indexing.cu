@@ -8,7 +8,7 @@ template<uint8_t DIMENSIONS>
 struct Index {
   static_assert(DIMENSIONS > 0);
   // Negative number would indicate and out of image index
-  int32_t address[DIMENSIONS];
+  int32_t coordinates[DIMENSIONS];
 
   template<typename... Args>
   __device__ __host__ Index(const Args... args){
@@ -17,31 +17,38 @@ struct Index {
     uint32_t temp[] = {static_cast<uint32_t>(args)...};
     #pragma unroll
     for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
-      address[dim] = temp[dim];
+      coordinates[dim] = temp[dim];
     }
   };
 
+  __device__ __host__ Index(const int32_t* temp){
+    #pragma unroll
+    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = temp[dim];
+    }
+  }
+
   __device__ __host__  const int32_t& operator[](const uint8_t idx){
     // you can't put a static assert in here :(
-    return address[idx];
+    return coordinates[idx];
   }
 
   __device__ __host__ int32_t operator[](const uint8_t idx) const {
-    return address[idx];
+    return coordinates[idx];
   }
 
   __device__ __host__ const int32_t& x() const {
-    return address[0];
+    return coordinates[0];
   }
 
   __device__ __host__ const int32_t& y() const {
     static_assert(DIMENSIONS > 1);
-    return address[1];
+    return coordinates[1];
   }
 
   __device__ __host__ const int32_t& z() const {
     static_assert(DIMENSIONS > 2);
-    return address[2];
+    return coordinates[2];
   }
 };
 
@@ -126,6 +133,20 @@ struct Space {
   __device__ __host__ const uint32_t& z() const {
     static_assert(DIMENSIONS > 2);
     return sizes[2];
+  }
+
+  __device__ __host__ Index<DIMENSIONS> from_flat_index(int64_t flat_index) const {
+    int32_t coordinates[DIMENSIONS];
+    uint64_t dimension_temp = 1;
+
+    #pragma unroll
+    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = (flat_index % (dimension_temp * sizes[dim]))
+        / dimension_temp;
+      dimension_temp *= sizes[dim];
+    }
+
+    return Index(coordinates);
   }
 };
 
