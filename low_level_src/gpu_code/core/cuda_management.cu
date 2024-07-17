@@ -13,33 +13,15 @@ fitting to the actual GPU device
 
 namespace py = pybind11;
 
-inline std::ostream& operator<<(std::ostream& os, const cudaMemoryType cmt){
-    switch(cmt){
-      case cudaMemoryTypeUnregistered:
-        os << "cudaMemoryTypeUnregistered";
-        break;
-      case cudaMemoryTypeHost:
-        os << "cudaMemoryTypeHost";
-        break;
-      case cudaMemoryTypeDevice:
-        os << "cudaMemoryTypeDevice";
-        break;
-      case cudaMemoryTypeManaged:
-        os << "cudaMemoryTypeManaged";
-        break;
-  }
-  return os;
-}
-
-template<typename T>
-cudaError_t get_pointer_type(const T* const pointer,
-                             cudaMemoryType& pointer_type){
-  cudaPointerAttributes attributes;
-  cudaError_t error = cudaPointerGetAttributes(&attributes, pointer);
-  pointer_type = attributes.type;
-
-  return error;
-}
+#if defined(__CUDACC__) // NVCC
+   #define ALIGN(n) __align__(n)
+#elif defined(__GNUC__) // GCC
+  #define ALIGN(n) __attribute__((aligned(n)))
+#elif defined(_MSC_VER) // MSVC
+  #define ALIGN(n) __declspec(align(n))
+#else
+  #error "Please provide a definition for ALIGN macro for your host compiler!"
+#endif
 
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){

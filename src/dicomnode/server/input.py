@@ -25,6 +25,7 @@ from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.validators import get_validator_for_value
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
@@ -78,8 +79,8 @@ class AbstractInput(ImageTreeInterface, ABC):
       self.logger = get_logger()
 
     # Tag for SOPInstance is (0x0008,0018)
-    if 0x00080018 not in self.required_tags:
-      self.required_tags.append(0x00080018)
+    if 0x0008_0018 not in self.required_tags:
+      self.required_tags.append(0x0008_0018)
 
     if self.path is not None:
       if not self.path.exists():
@@ -148,9 +149,7 @@ class AbstractInput(ImageTreeInterface, ABC):
     return self.path / image_name
 
   def _validate_value(self, value, target):
-    if isinstance(target, Pattern):
-      return target.match(value) is not None
-    return value == target
+    return get_validator_for_value(value)(target)
 
   def validate_image(self, dicom: Dataset) -> bool:
     """Checks if an image belongs in the input

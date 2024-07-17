@@ -63,7 +63,7 @@ def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
     for i, dataset in enumerate(datasets):
       image = dataset.pixel_array
       if rescale:
-        image = image.astype(float64) * dataset.RescaleSlope\
+        image = image.astype(dataType) * dataset.RescaleSlope\
               + dataset.RescaleIntercept
       image_array[i,:,:] = image
 
