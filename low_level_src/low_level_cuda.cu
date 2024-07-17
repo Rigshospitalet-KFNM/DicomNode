@@ -1,21 +1,9 @@
-#ifndef LOW_LEVEL_CUDA_DICOMNODE_H
-#define LOW_LEVEL_CUDA_DICOMNODE_H
-
-// Standard library
-#include<iostream>
-#include<stdint.h>
-#include<float.h>
-#include<vector>
-#include<string.h>
-#include<typeinfo>
-#include<variant>
-
 // Third party
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
 // Dicomnode imports
-#include"gpu_code/cuda_management.cu"
+#include"gpu_code/core/cuda_management.cu"
 #include"gpu_code/mirror.cu"
 #include"gpu_code/tricubic_interpolation.cu"
 
@@ -27,7 +15,4 @@ PYBIND11_MODULE(_cuda, m){
   apply_mirror_module(m);
   apply_tricubic_interpolation_module(m);
   apply_cuda_management_module(m);
-
 }
-
-#endif

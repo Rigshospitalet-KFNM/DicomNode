@@ -1,8 +1,9 @@
+#pragma once
+
 /* This module setup work around CUDA different devices, allowing for better
 fitting to the actual GPU device
 */
-#ifndef DICOMNODE_CUDA_MANAGEMENT
-#define DICOMNODE_CUDA_MANAGEMENT
+
 
 //#include"cuda_management.cuh"
 #include<iostream>
@@ -11,6 +12,34 @@ fitting to the actual GPU device
 #include<pybind11/pybind11.h>
 
 namespace py = pybind11;
+
+inline std::ostream& operator<<(std::ostream& os, const cudaMemoryType cmt){
+    switch(cmt){
+      case cudaMemoryTypeUnregistered:
+        os << "cudaMemoryTypeUnregistered";
+        break;
+      case cudaMemoryTypeHost:
+        os << "cudaMemoryTypeHost";
+        break;
+      case cudaMemoryTypeDevice:
+        os << "cudaMemoryTypeDevice";
+        break;
+      case cudaMemoryTypeManaged:
+        os << "cudaMemoryTypeManaged";
+        break;
+  }
+  return os;
+}
+
+template<typename T>
+cudaError_t get_pointer_type(const T* const pointer,
+                             cudaMemoryType& pointer_type){
+  cudaPointerAttributes attributes;
+  cudaError_t error = cudaPointerGetAttributes(&attributes, pointer);
+  pointer_type = attributes.type;
+
+  return error;
+}
 
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
@@ -97,6 +126,3 @@ void apply_cuda_management_module(py::module& m){
 
   m.def("get_device_properties", &cast_current_device);
 }
-
-
-#endif

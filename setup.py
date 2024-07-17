@@ -2,7 +2,6 @@
 import os
 import sys
 import re
-import glob
 import subprocess
 from pathlib import Path
 import shutil
@@ -174,4 +173,3 @@ setup(name='dicomnode',
       'omnitool=dicomnode.bin.omnitool:entry_func'
     ]},
 )
-

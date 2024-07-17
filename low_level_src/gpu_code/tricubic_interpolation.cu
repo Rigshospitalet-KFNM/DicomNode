@@ -13,9 +13,7 @@
 #include<pybind11/numpy.h>
 
 // Dicomnode Cuda Files
-#include"cuda_management.cu"
-#include"indexing.cu"
-#include"numpy_array.cu"
+#include"core/core.cu"
 
 namespace py = pybind11;
 
@@ -96,77 +94,78 @@ struct TricubicInterpolationCoefficients {
 };
 
 template<typename T>
-__device__ T idx(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return dims.contains(i.x, i.y, i.y) ? image[dims.index(i.x, i.y, i.z)] : defaultval;
+__device__ T idx(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  cuda::std::optional<uint64_t> flat_index = dims.flat_index(i.x(), i.y(), i.z());
+  return flat_index.has_value() ? image[flat_index.value()] : defaultval;
 }
 
 template<typename T>
-__device__ T dfdx(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.5 * (idx(image, dims, {i.x + 1, i.y, i.z}, defaultval)
-              - idx(image, dims, {i.x - 1, i.y, i.z}, defaultval));
+__device__ T dfdx(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.5 * (idx(image, dims, {i.x() + 1, i.y(), i.z()}, defaultval)
+              - idx(image, dims, {i.x() - 1, i.y(), i.z()}, defaultval));
 }
 
 template<typename T>
-__device__ T dfdy(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.5 * (idx(image, dims, {i.x, i.y + 1, i.z}, defaultval)
-              - idx(image, dims, {i.x, i.y - 1, i.z}, defaultval));
+__device__ T dfdy(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.5 * (idx(image, dims, {i.x(), i.y() + 1, i.z()}, defaultval)
+              - idx(image, dims, {i.x(), i.y() - 1, i.z()}, defaultval));
 }
 
 template<typename T>
-__device__ T dfdz(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.5 * (idx(image, dims, {i.x, i.y, i.z + 1}, defaultval)
-              - idx(image, dims, {i.x, i.y, i.z - 1}, defaultval));
+__device__ T dfdz(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.5 * (idx(image, dims, {i.x(), i.y(), i.z() + 1}, defaultval)
+              - idx(image, dims, {i.x(), i.y(), i.z() - 1}, defaultval));
 }
 
 template<typename T>
-__device__ T d2fdxdy(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.25 * (idx(image, dims, {i.x + 1, i.y + 1, i.z}, defaultval)
-               + idx(image, dims, {i.x - 1, i.y - 1, i.z}, defaultval)
-               - idx(image, dims, {i.x + 1, i.y - 1, i.z}, defaultval)
-               - idx(image, dims, {i.x - 1, i.y + 1, i.z}, defaultval));
+__device__ T d2fdxdy(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.25 * (idx(image, dims, {i.x() + 1, i.y() + 1, i.z()}, defaultval)
+               + idx(image, dims, {i.x() - 1, i.y() - 1, i.z()}, defaultval)
+               - idx(image, dims, {i.x() + 1, i.y() - 1, i.z()}, defaultval)
+               - idx(image, dims, {i.x() - 1, i.y() + 1, i.z()}, defaultval));
 }
 
 template<typename T>
-__device__ T d2fdxdz(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.25 * (idx(image, dims, {i.x + 1, i.y, i.z + 1}, defaultval)
-               + idx(image, dims, {i.x - 1, i.y, i.z - 1}, defaultval)
-               - idx(image, dims, {i.x + 1, i.y, i.z - 1}, defaultval)
-               - idx(image, dims, {i.x - 1, i.y, i.z + 1}, defaultval));
+__device__ T d2fdxdz(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.25 * (idx(image, dims, {i.x() + 1, i.y(), i.z() + 1}, defaultval)
+               + idx(image, dims, {i.x() - 1, i.y(), i.z() - 1}, defaultval)
+               - idx(image, dims, {i.x() + 1, i.y(), i.z() - 1}, defaultval)
+               - idx(image, dims, {i.x() - 1, i.y(), i.z() + 1}, defaultval));
 }
 
 template<typename T>
-__device__ T d2fdydz(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.25 * (idx(image, dims, {i.x, i.y + 1, i.z + 1}, defaultval)
-               + idx(image, dims, {i.x, i.y - 1, i.z - 1}, defaultval)
-               - idx(image, dims, {i.x, i.y + 1, i.z - 1}, defaultval)
-               - idx(image, dims, {i.x, i.y - 1, i.z + 1}, defaultval));
+__device__ T d2fdydz(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.25 * (idx(image, dims, {i.x(), i.y() + 1, i.z() + 1}, defaultval)
+               + idx(image, dims, {i.x(), i.y() - 1, i.z() - 1}, defaultval)
+               - idx(image, dims, {i.x(), i.y() + 1, i.z() - 1}, defaultval)
+               - idx(image, dims, {i.x(), i.y() - 1, i.z() + 1}, defaultval));
 }
 
 template<typename T>
-__device__ T d3fdxdydz(const T* image, const ImageDimensions dims, const Index i, const T defaultval){
-  return 0.125 * (idx(image, dims, {i.x + 1, i.y + 1, i.z + 1}, defaultval)
-                + idx(image, dims, {i.x + 1, i.y - 1, i.z - 1}, defaultval)
-                + idx(image, dims, {i.x - 1, i.y + 1, i.z - 1}, defaultval)
-                + idx(image, dims, {i.x - 1, i.y - 1, i.z + 1}, defaultval)
-                - idx(image, dims, {i.x - 1, i.y + 1, i.z + 1}, defaultval)
-                - idx(image, dims, {i.x + 1, i.y - 1, i.z + 1}, defaultval)
-                - idx(image, dims, {i.x + 1, i.y + 1, i.z - 1}, defaultval)
-                - idx(image, dims, {i.x - 1, i.y - 1, i.z - 1}, defaultval));
+__device__ T d3fdxdydz(const T* image, const Space<3> dims, const Index<3> i, const T defaultval){
+  return 0.125 * (idx(image, dims, {i.x() + 1, i.y() + 1, i.z() + 1}, defaultval)
+                + idx(image, dims, {i.x() + 1, i.y() - 1, i.z() - 1}, defaultval)
+                + idx(image, dims, {i.x() - 1, i.y() + 1, i.z() - 1}, defaultval)
+                + idx(image, dims, {i.x() - 1, i.y() - 1, i.z() + 1}, defaultval)
+                - idx(image, dims, {i.x() - 1, i.y() + 1, i.z() + 1}, defaultval)
+                - idx(image, dims, {i.x() + 1, i.y() - 1, i.z() + 1}, defaultval)
+                - idx(image, dims, {i.x() + 1, i.y() + 1, i.z() - 1}, defaultval)
+                - idx(image, dims, {i.x() - 1, i.y() - 1, i.z() - 1}, defaultval));
 }
 
 
 /**
- * @brief 
- * 
- * @param image 
- * @param x_max 
- * @param y_max 
- * @param z_max 
+ * @brief
+ *
+ * @param image
+ * @param x_max
+ * @param y_max
+ * @param z_max
 
  */
 template<typename T>
 __global__ void tricubic_interpolation_kernel(const T* image,
-                                              const ImageDimensions imagedim,
+                                              const Space<3> imagedim,
                                               const T* affine,
                                               const T* targets,
                                               const size_t num_targets,
@@ -360,21 +359,9 @@ void tricubic_interpolation(const py::array_t<T, array_flags> data,
     error_message += " are available!";
     throw std::runtime_error(error_message);
   }
-  //const uint32_t maximum_shared_memory = maximize_shared_memory(tricubic_interpolation_kernel<T>);
+
   const uint32_t threads = 128;
   const uint32_t blocks = num_targets % threads == 0 ? num_targets / threads : (num_targets / threads) + 1;
-  //const uint32_t shared_memory_size = 64 * sizeof(T) * threads;
-
-  /*
-  if(maximum_shared_memory < shared_memory_size){
-    std::string error_message = "This Kernels needs: ";
-    error_message += std::to_string(shared_memory_size);
-    error_message += " bytes of shared memory. However only ";
-    error_message += std::to_string(maximum_shared_memory);
-    error_message += " bytes are available!";
-    throw std::runtime_error(error_message);
-  }
-  */
 
   T* gpu_data = nullptr;
   T* gpu_affine = nullptr;
@@ -409,7 +396,7 @@ void tricubic_interpolation(const py::array_t<T, array_flags> data,
                                     targets_size,
                                     cudaMemcpyHostToDevice);}
           | [&](){
-            const ImageDimensions dims{x,y,z};
+            const Space dims = Space<3>(x,y,z);
             tricubic_interpolation_kernel<<<blocks, threads>>>(gpu_data, dims,
                                                                gpu_affine,
                                                                gpu_targets, num_targets,
@@ -417,9 +404,9 @@ void tricubic_interpolation(const py::array_t<T, array_flags> data,
                                                                minimum_value);
             return cudaGetLastError();}
           | [&](){
-            return cudaMemcpy(result_buffer.ptr, 
-                              gpu_destinations, 
-                              sizeof(T) * num_targets, 
+            return cudaMemcpy(result_buffer.ptr,
+                              gpu_destinations,
+                              sizeof(T) * num_targets,
                               cudaMemcpyDeviceToHost);
           };
 

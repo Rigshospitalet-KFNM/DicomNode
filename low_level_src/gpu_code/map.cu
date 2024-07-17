@@ -1,7 +1,3 @@
-#ifndef DICOMNODE_CUDA_MAP
-#define DICOMNODE_CUDA_MAP
+#pragma once
 
-
-
-
-#endif
+#include<concepts>

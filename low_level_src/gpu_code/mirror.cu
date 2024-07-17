@@ -11,7 +11,7 @@
 #include<pybind11/numpy.h>
 
 // Dicomnode imports
-#include"cuda_management.cu"
+#include"core/core.cu"
 
 template<typename T>
 __device__ T index3D(T x, T y, T z, T x_dim, T y_max, T z_dim){
@@ -19,7 +19,6 @@ __device__ T index3D(T x, T y, T z, T x_dim, T y_max, T z_dim){
        + y * x_dim
        + x;
 }
-
 
 template<typename T>
 __device__ T invert_index(T index, T size){

@@ -10,14 +10,6 @@ find_package(Python COMPONENTS Interpreter Development)
 
 find_package(pybind11 REQUIRED)
 
-
-pybind11_add_module(_c MODULE low_level_src/low_level.cpp)
-target_compile_definitions(_c
-                           PRIVATE VERSION_INFO={EXAMPLE_VERSION_INFO})
-# This causes a copy error, and is placed correctly by setup.py
-#set_target_properties(_c PROPERTIES OUTPUT_NAME dicomnode._c)
-
-
 # -----------------------------------------------------------------------
 # Checking for CUDA
 include(CheckLanguage)
