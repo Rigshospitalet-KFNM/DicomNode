@@ -123,14 +123,12 @@ class BoundingBoxOP_3D {
       return space.from_flat_index(index);
     }
 
-    return *this::identity();
+    return identity();
   }
 };
 
-
 template<typename T>
-pybind11::list bounding_box(pybind11::array_t<T, pybind11::array::c_style
-                                               | pybind11::array::forcecast>){
+pybind11::list bounding_box(pybind11::array_t<T, array_flags>){
 
 }
 
