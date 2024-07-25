@@ -20,9 +20,40 @@ if(CMAKE_CUDA_COMPILER)
   set(CMAKE_CUDA_STANDARD 20)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 #
-  pybind11_add_module(_cuda low_level_src/low_level_cuda.cu)
-  target_compile_definitions(_cuda
-                             PRIVATE VERSION_INFO={EXAMPLE_VERSION_INFO})
+  pybind11_add_module(_cuda SHARED
+                      low_level_src/low_level_cuda.cu)
+
+  # In debug create tests:
+  if(NOT DEFINED NO_TESTING)
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG e397860
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+    enable_testing()
+
+    add_executable(cu_tests low_level_src/test_initiator.cu)
+    target_link_libraries(
+      cu_tests
+      GTest::gtest_main
+    )
+
+    # For some reason this doesn't link :(
+    target_link_libraries(
+      cu_tests
+      _cuda
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(cu_tests)
+    # Sadly Coverage for GPU code is not supported...
+    # https://docs.nvidia.com/cuda/cuda-features-archive/index.html#bullseye-support
+
+  endif()
 
 else()
   message(STATUS "No Cuda Compiler!")

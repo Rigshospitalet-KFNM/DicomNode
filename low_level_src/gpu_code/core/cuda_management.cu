@@ -3,14 +3,14 @@
 /* This module setup work around CUDA different devices, allowing for better
 fitting to the actual GPU device
 */
-
-
-//#include"cuda_management.cuh"
-#include<iostream>
+// C includes
 #include<stdint.h>
-
+// STL includes
+#include<iostream>
+#include<string>
+#include<functional>
+// Pybind includes
 #include<pybind11/pybind11.h>
-
 namespace py = pybind11;
 
 #if defined(__CUDACC__) // NVCC
@@ -44,14 +44,17 @@ void free_device_memory(Ts** && ... device_pointer){
 
 class CudaRunner {
   std::function<void(cudaError_t)> error_function;
+  cudaError_t m_error = cudaSuccess;
   public:
-    cudaError_t error = cudaSuccess;
+    cudaError_t error() const {
+      return m_error;
+    }
     CudaRunner(std::function<void(cudaError_t)> error_lambda) : error_function(error_lambda){}
     CudaRunner& operator|(std::function<cudaError_t()> func){
-       if(error == cudaSuccess){
-        error = func();
-        if (error != cudaSuccess){
-          error_function(error);
+       if(m_error == cudaSuccess){
+        m_error = func();
+        if (m_error != cudaSuccess){
+          error_function(m_error);
         }
       }
       return *this;
@@ -87,7 +90,6 @@ int32_t maximize_shared_memory(R (kernel)(Args...)){
   }
   return dev_prop.sharedMemPerBlockOptin;
 }
-
 
 void apply_cuda_management_module(py::module& m){
   py::class_<cudaDeviceProp>(m, "DeviceProperties")

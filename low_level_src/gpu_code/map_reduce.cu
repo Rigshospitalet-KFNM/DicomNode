@@ -542,7 +542,7 @@ cudaError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, const 
                        device_prefixes, device_counter);
   };
 
-  CudaRunner runner = CudaRunner(error_function);
+  CudaRunner runner{error_function};
 
   runner
     | [&](){return cudaMalloc(&device_in, sizeof(T_IN) * data_size);}
@@ -552,7 +552,7 @@ cudaError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, const 
     | [&](){return cudaMalloc(&device_prefixes, sizeof(T_OUT) * grid.x);}
     | [&](){return cudaMalloc(&device_counter, sizeof(uint32_t));}
     | [&](){return cudaMemcpy(device_in, data, sizeof(T_IN) * data_size, cudaMemcpyHostToDevice);}
-    | [&](){return cudaMemSet(&device_counter, 0, sizeof(uint32_t);)}
+    | [&](){return cudaMemset(device_counter, 0, sizeof(uint32_t));}
     | [&](){scan_kernel<chunk, OP, T_IN, T_OUT, Args...>
               <<<grid, SCAN_BLOCK_SIZE, shared_memory_size>>>(
                 device_in, device_out, data_size, device_flags, device_aggregates, device_prefixes, device_counter, args...
@@ -563,9 +563,9 @@ cudaError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, const 
     | [&](){free_device_memory(device_in, device_out, device_flags,
                                 device_aggregates, device_prefixes,
                                 device_counter);
-            return cudaSuccess};
+            return cudaSuccess;};
 
-  return runner.error
+  return runner.error();
 }
 
 
@@ -585,7 +585,7 @@ cudaError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, const 
  */
 template<uint8_t chunk, typename OP, typename T_IN, typename T_OUT, typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
-cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT& output, const Args... args){
+cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output, const Args... args){
   T_IN*     device_in = nullptr;
   T_OUT*    device_out = nullptr;
   Flag*     device_flags = nullptr;
@@ -593,37 +593,37 @@ cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT& output, cons
   T_OUT*    device_prefixes = nullptr;
   uint32_t* device_counter = nullptr;
 
-  constexpr size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
-
   auto error_function = [&](cudaError_t error){
-    free_device_memory(device_in, device_out, device_flags, device_aggregates,
-                       device_prefixes, device_counter);
+    free_device_memory(&device_in, &device_out, &device_flags, &device_aggregates,
+                       &device_prefixes, &device_counter);
   };
 
-  CudaRunner runner = CudaRunner(error_function);
+  CudaRunner runner{error_function};
 
   runner
-    | [&](){return cudaMalloc(&device_in, sizeof(T_IN) * data_size);}
-    | [&](){return cudaMalloc(&device_out, sizeof(T_OUT));}
-    | [&](){return cudaMalloc(&device_flags, sizeof(Flag) * grid.x);}
-    | [&](){return cudaMalloc(&device_aggregates, sizeof(T_OUT) * grid.x);}
-    | [&](){return cudaMalloc(&device_prefixes, sizeof(T_OUT) * grid.x);}
-    | [&](){return cudaMalloc(&device_counter, sizeof(uint32_t));}
-    | [&](){return cudaMemcpy(device_in, data, sizeof(T_IN) * data_size, cudaMemcpyHostToDevice);}
-    | [&](){return cudaMemSet(&device_counter, 0, sizeof(uint32_t);)}
-    | [&](){reduce_kernel<chunk, OP, T_IN, T_OUT, Args...>
+    | [&](){ return cudaMalloc(&device_in, sizeof(T_IN) * data_size);}
+    | [&](){ return cudaMalloc(&device_out, sizeof(T_OUT));}
+    | [&](){ return cudaMalloc(&device_flags, sizeof(Flag) * grid.x);}
+    | [&](){ return cudaMalloc(&device_aggregates, sizeof(T_OUT) * grid.x);}
+    | [&](){ return cudaMalloc(&device_prefixes, sizeof(T_OUT) * grid.x);}
+    | [&](){ return cudaMalloc(&device_counter, sizeof(uint32_t));}
+    | [&](){ return cudaMemcpy(device_in, data, sizeof(T_IN) * data_size, cudaMemcpyHostToDevice);}
+    | [&](){ return cudaMemset(device_counter, 0, sizeof(uint32_t));}
+    | [&](){
+      reduce_kernel<chunk, OP, T_IN, T_OUT, Args...>
               <<<grid, SCAN_BLOCK_SIZE, shared_memory_size>>>(
                 device_in, device_out, data_size, device_flags, device_aggregates, device_prefixes, device_counter, args...
               );
             return cudaGetLastError();
            }
-    | [&](){return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDeviceToHost);}
-    | [&](){free_device_memory(device_in, device_out, device_flags,
-                                device_aggregates, device_prefixes,
-                                device_counter);
-            return cudaSuccess};
+    | [&](){ return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDeviceToHost);}
+    | [&](){ free_device_memory(&device_in, &device_out, &device_flags,
+                                &device_aggregates, &device_prefixes,
+                                &device_counter);
+            return cudaSuccess;};
 
-  return runner.error
+  return runner.error();
 }

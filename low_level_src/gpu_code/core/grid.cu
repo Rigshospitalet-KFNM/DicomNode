@@ -12,12 +12,12 @@
    * @param threads - The size of thread block
    * @return dim3 - The number of blocks to run in the kernel
    */
-  template<uint8_t CHUNK = 1>
-  [[nodiscard]] inline dim3 get_grid(const size_t &entries, const uint16_t &threads) noexcept {
-    const size_t entiries_after_chunk = entries % CHUNK == 0 ? entries / CHUNK : entries / CHUNK + 1;
+template<uint8_t CHUNK = 1>
+[[nodiscard]] inline dim3 get_grid(const size_t &entries, const uint16_t &threads) noexcept {
+  const size_t entiries_after_chunk = entries % CHUNK == 0 ? entries / CHUNK : entries / CHUNK + 1;
 
-    return entiries_after_chunk % threads == 0 ? entiries_after_chunk / threads : entiries_after_chunk / threads + 1;
-  }
+  return entiries_after_chunk % threads == 0 ? entiries_after_chunk / threads : entiries_after_chunk / threads + 1;
+}
 
 /**
    * @brief Get the blocks object

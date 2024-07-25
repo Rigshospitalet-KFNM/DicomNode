@@ -4,6 +4,9 @@
 #include<stdint.h>
 #include<cuda/std/optional>
 
+template<uint8_t>
+struct Space;
+
 template<uint8_t DIMENSIONS>
 struct Index {
   static_assert(DIMENSIONS > 0);
@@ -14,12 +17,23 @@ struct Index {
   __device__ __host__ Index(const Args... args){
     static_assert(sizeof...(args) == DIMENSIONS);
 
-    uint32_t temp[] = {static_cast<uint32_t>(args)...};
+    int32_t temp[] = {static_cast<int32_t>(args)...};
     #pragma unroll
     for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
       coordinates[dim] = temp[dim];
     }
   };
+
+  __device__ __host__ Index(const uint64_t flat_index, const Space<DIMENSIONS> space){
+    uint64_t dimension_temp = 1;
+
+    #pragma unroll
+    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = (flat_index % (dimension_temp * space[dim]))
+        / dimension_temp;
+      dimension_temp *= space[dim];
+    }
+  }
 
   __device__ __host__ Index(const int32_t* temp){
     #pragma unroll
@@ -71,6 +85,10 @@ struct Space {
       sizes[dim] = temp[dim];
     }
   };
+
+  __device__ __host__ const uint32_t& operator[](const int i) const {
+    return sizes[i];
+  }
 
   __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const{
     bool in = true;
@@ -135,7 +153,7 @@ struct Space {
     return sizes[2];
   }
 
-  __device__ __host__ Index<DIMENSIONS> from_flat_index(int64_t flat_index) const {
+  __device__ __host__ Index<DIMENSIONS> from_flat_index(uint64_t flat_index) const {
     int32_t coordinates[DIMENSIONS];
     uint64_t dimension_temp = 1;
 
@@ -146,7 +164,7 @@ struct Space {
       dimension_temp *= sizes[dim];
     }
 
-    return Index(coordinates);
+    return Index<DIMENSIONS>(coordinates);
   }
 };
 

@@ -306,9 +306,9 @@ __global__ void tricubic_interpolation_kernel(const T* image,
 }
 
 template<typename T>
-void tricubic_interpolation(const py::array_t<T, array_flags> data,
-                            const py::array_t<double, array_flags> affine,
-                            const py::array_t<T, array_flags> targets,
+void tricubic_interpolation(const py::array_t<T, ARRAY_FLAGS> data,
+                            const py::array_t<double, ARRAY_FLAGS> affine,
+                            const py::array_t<T, ARRAY_FLAGS> targets,
                             const T minimum_value){
   const pybind11::buffer_info data_buffer = data.request(false);
   if (data_buffer.ndim != 3){
@@ -374,7 +374,7 @@ void tricubic_interpolation(const py::array_t<T, array_flags> data,
   };
 
   const ssize_t result_size = ((int32_t)num_targets) * sizeof(T);
-  py::array_t<T, array_flags> result{result_size};
+  py::array_t<T, ARRAY_FLAGS> result{result_size};
   py::buffer_info result_buffer = result.request(true);
 
   // I hope you like monads

@@ -210,8 +210,8 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
   CudaRunner runner{error_function};
   runner
     | [&](){return cudaMalloc(&dev_in, 2 * buffer_size);};
-  if(runner.error != cudaSuccess){
-    return (int)runner.error;
+  if(runner.error() != cudaSuccess){
+    return (int)runner.error();
   }
   dev_out = dev_in + arr_buffer.size;
   runner
@@ -229,7 +229,7 @@ int map3D(pybind11::array_t<T, pybind11::array::c_style
     };
   // I assume you can always free, this might be wrong
   cudaFree(dev_in);
-  return (int)runner.error;
+  return (int)runner.error();
 }
 
 void apply_mirror_module(pybind11::module& m){
