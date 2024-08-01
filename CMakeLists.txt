@@ -21,7 +21,7 @@ if(CMAKE_CUDA_COMPILER)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 #
   pybind11_add_module(_cuda SHARED
-                      low_level_src/low_level_cuda.cu)
+                      low_level_src/python_entry_point.cu)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
@@ -32,7 +32,7 @@ if(CMAKE_CUDA_COMPILER)
     GIT_TAG e397860
     )
     # For Windows: Prevent overriding the parent project's compiler/linker settings
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
     enable_testing()
 
@@ -41,13 +41,6 @@ if(CMAKE_CUDA_COMPILER)
       cu_tests
       GTest::gtest_main
     )
-
-    # For some reason this doesn't link :(
-    target_link_libraries(
-      cu_tests
-      _cuda
-    )
-
     include(GoogleTest)
     gtest_discover_tests(cu_tests)
     # Sadly Coverage for GPU code is not supported...

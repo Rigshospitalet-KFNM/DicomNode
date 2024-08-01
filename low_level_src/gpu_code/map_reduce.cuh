@@ -2,25 +2,14 @@
 
 #include<stdint.h>
 #include<concepts>
+#include<assert.h>
 
-#include"core/core.cu"
+#include"core/core.cuh"
 
-template<typename OP, typename T>
-concept CBinaryOperator = requires (OP foo, T a, T b) {
-  {OP::apply(a, b) } -> std::same_as<T>;
-  {OP::equals(a, b) } -> std::same_as<bool>;
-  {OP::identity() } -> std::same_as<T>;
-  {OP::remove_volatile(a)} -> std::same_as<T>;
-};
+#include"map_reduce.cuh"
 
-template<class OP, typename T_IN, class T_OUT, typename... Args>
-concept MappingBinaryOperator = requires (OP op, T_OUT a, T_OUT b, const T_IN c, const uint64_t index, Args... args) {
-  {OP::apply(a, b) } -> std::same_as<T_OUT>;
-  {OP::equals(a, b) } -> std::same_as<bool>;
-  {OP::identity() } -> std::same_as<T_OUT>;
-  {OP::remove_volatile(a)} -> std::same_as<T_OUT>;
-  {OP::map_to(c, index, args...)} -> std::same_as<T_OUT>;
-};
+
+namespace { // Private function
 
 enum STATUS_FLAGS: uint8_t {
   STATUS_INVALID=0,
@@ -35,24 +24,24 @@ struct FlagVal {
     T val;
     Flag flag;
 
-    __device__ __host__ inline FlagVal() : val(), flag(STATUS_INVALID) {}
-    __device__ __host__ inline FlagVal(const Flag& _flag, const T& value) {
+    __host__ __device__ inline FlagVal() : val(), flag(STATUS_INVALID) {}
+    __host__ __device__ inline FlagVal(const Flag& _flag, const T& value) {
       val = value;
       flag = _flag;
     }
 
-    __device__ __host__ inline FlagVal(volatile FlagVal& flag_val) {
+    __host__ __device__ inline FlagVal(volatile FlagVal& flag_val) {
       val = OP::remove_volatile(flag_val.val);
       flag = flag_val.flag;
     }
 
-    __device__ __host__ inline void operator=(const FlagVal& flag_val) volatile {
+    __host__ __device__ inline void operator=(const FlagVal& flag_val) volatile {
       val = flag_val.val;
       flag = flag_val.flag;
     }
 };
 
-static __device__ uint32_t get_shared_id(uint32_t* counter){
+__device__ uint32_t get_shared_id(uint32_t* counter){
   __shared__ uint32_t address;
   if(threadIdx.x == 0){
     uint32_t local = atomicAdd(counter, 1);
@@ -66,16 +55,16 @@ static __device__ uint32_t get_shared_id(uint32_t* counter){
 template<typename T, CBinaryOperator<T> OP>
 class FlagOp {
   public:
-    static __device__ __host__ inline FlagVal<T, OP> identity() {return FlagVal<T, OP>(STATUS_AGGREGATE, OP::identity());}
-    static __device__ __host__ inline bool equals(const FlagVal<T, OP> a, const FlagVal<T, OP> b){
+    static __host__ __device__ inline FlagVal<T, OP> identity() {return FlagVal<T, OP>(STATUS_AGGREGATE, OP::identity());}
+    static __host__ __device__ inline bool equals(const FlagVal<T, OP> a, const FlagVal<T, OP> b){
       return OP::equals(a.val, b.val) && a.flag == b.flag;
     }
 
-    static __device__ __host__ inline FlagVal<T, OP> map_to(T in, int64_t index, Flag flag) {
+    static __host__ __device__ inline FlagVal<T, OP> map_to(T in, int64_t index, Flag flag) {
       return FlagVal<T, OP>(flag, in);
     }
 
-    static __device__ __host__ inline FlagVal<T, OP> apply(const FlagVal<T, OP> a, const FlagVal<T, OP> b){
+    static __host__ __device__ inline FlagVal<T, OP> apply(const FlagVal<T, OP> a, const FlagVal<T, OP> b){
       // This is here for return value optimization
       FlagVal<T, OP> returnStruct;
       if(b.flag == STATUS_PREFIX){
@@ -94,7 +83,7 @@ class FlagOp {
       return returnStruct;
     }
 
-    static __device__ __host__ inline FlagVal<T, OP> remove_volatile(volatile FlagVal<T, OP>& flag_val){
+    static __host__ __device__ inline FlagVal<T, OP> remove_volatile(volatile FlagVal<T, OP>& flag_val){
       FlagVal<T, OP> fv = flag_val;
       return fv;
     }
@@ -102,7 +91,7 @@ class FlagOp {
 
 
 template<typename T, uint8_t CHUCK = 1>
-static __device__ inline void copy_to_shared_memory(volatile T* dst_shared, T* src_global, size_t number_of_elements, T default_element=0, size_t offset=0){
+__device__ inline void copy_to_shared_memory(volatile T* dst_shared, T* src_global, size_t number_of_elements, T default_element=0, size_t offset=0){
   #pragma unroll
   for(uint8_t i=0; i < CHUCK; i++){
     const uint16_t local_index = threadIdx.x + blockDim.x * i;
@@ -119,7 +108,7 @@ static __device__ inline void copy_to_shared_memory(volatile T* dst_shared, T* s
 
 template<uint8_t CHUCK, typename OP, typename T_IN, typename T_OUT, typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
-static __device__ inline void map_into_shared_memory(
+__device__ inline void map_into_shared_memory(
     volatile T_OUT* dst_shared,
     T_IN* src_global,
     size_t number_of_elements,
@@ -141,7 +130,7 @@ static __device__ inline void map_into_shared_memory(
 }
 
 template<typename T, uint8_t CHUCK = 1>
-static __device__ inline void copy_from_shared_memory(volatile T* dst_global, volatile T* src_shared, size_t number_of_elements, size_t offset=0){
+__device__ inline void copy_from_shared_memory(volatile T* dst_global, volatile T* src_shared, size_t number_of_elements, size_t offset=0){
   #pragma unroll
   for(uint8_t i=0; i < CHUCK; i++){
     const uint32_t local_index = threadIdx.x + blockDim.x * i;
@@ -165,7 +154,7 @@ static __device__ inline void copy_from_shared_memory(volatile T* dst_global, vo
  * @return __device__
  */
 template<typename T, CBinaryOperator<T> OP>
-static __device__ inline T scan_inclusive_warp_kogge_stone(volatile T* data, const size_t index){
+__device__ inline T scan_inclusive_warp_kogge_stone(volatile T* data, const size_t index){
   const uint8_t lane = index & (WARP_SIZE - 1);
 
   #pragma unroll
@@ -182,7 +171,7 @@ static __device__ inline T scan_inclusive_warp_kogge_stone(volatile T* data, con
 }
 
 template<typename T, CBinaryOperator<T> OP>
-static __device__ inline T scan_inclusive_block(volatile T* shared_memory, const uint32_t index){
+__device__ inline T scan_inclusive_block(volatile T* shared_memory, const uint32_t index){
     const unsigned int lane   = index & (WARP_SIZE-1);
     const unsigned int warpid = index >> LOG_WARP;
 
@@ -217,7 +206,7 @@ static __device__ inline T scan_inclusive_block(volatile T* shared_memory, const
 }
 
 template<typename T, CBinaryOperator<T> OP>
-static __device__ inline T reduce_inclusive_block(volatile T* shared_memory, const uint32_t index){
+__device__ inline T reduce_inclusive_block(volatile T* shared_memory, const uint32_t index){
   const unsigned int lane   = index & (WARP_SIZE-1);
   const unsigned int warpid = index >> LOG_WARP;
 
@@ -251,7 +240,7 @@ static __device__ inline T reduce_inclusive_block(volatile T* shared_memory, con
 
 template<uint8_t CHUNK, typename OP, typename T_IN, typename T_OUT,  typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
-static __global__ void scan_kernel(T_IN* src,
+__global__ void scan_kernel(T_IN* src,
                              T_OUT* dst,
                              const size_t N,
                              volatile Flag* flags,
@@ -385,7 +374,7 @@ static __global__ void scan_kernel(T_IN* src,
 
 template<uint8_t CHUNK, typename OP, typename T_IN, typename T_OUT,  typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
-static __global__ void reduce_kernel(T_IN* src,
+__global__ void reduce_kernel(T_IN* src,
                        T_OUT* dst,
                        const size_t N,
                        volatile Flag* flags,
@@ -509,29 +498,37 @@ static __global__ void reduce_kernel(T_IN* src,
   }
 }
 
+} // End of anonymous namespace
+
+
 /**
- * @brief
+ * @brief performs a scan on the data array
  *
- * @tparam chunk
+ * @tparam chunk Number of elements each thread processes
  * @tparam OP
  * @tparam T_IN
  * @tparam T_OUT
  * @tparam Args
- * @param data
- * @param data_size
- * @param output
- * @param args
+ * @param data host array of length data_size and of type T_IN
+ * @param data_size length of data and out
+ * @param output host array of length data_size and of type T_OUT
+ * @param args argumentment pack such that OP::map_to(data[n], args...) = t_out[n]
  * @return requires
  */
 template<uint8_t chunk, typename OP, typename T_IN, typename T_OUT, typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
 cudaError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, const Args... args){
+  assert(data != nullptr);
+  assert(output != nullptr);
+  assert(data_size != 0);
+
   T_IN*     device_in = nullptr;
   T_OUT*    device_out = nullptr;
   Flag*     device_flags = nullptr;
   T_OUT*    device_aggregates = nullptr;
   T_OUT*    device_prefixes = nullptr;
   uint32_t* device_counter = nullptr;
+
 
   constexpr size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
@@ -610,7 +607,7 @@ cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output, cons
     | [&](){ return cudaMalloc(&device_aggregates, sizeof(T_OUT) * grid.x);}
     | [&](){ return cudaMalloc(&device_prefixes, sizeof(T_OUT) * grid.x);}
     | [&](){ return cudaMalloc(&device_counter, sizeof(uint32_t));}
-    | [&](){ return cudaMemcpy(device_in, data, sizeof(T_IN) * data_size, cudaMemcpyHostToDevice);}
+    | [&](){ return cudaMemcpy(device_in, data, sizeof(T_IN) * data_size, cudaMemcpyDefault);}
     | [&](){ return cudaMemset(device_counter, 0, sizeof(uint32_t));}
     | [&](){
       reduce_kernel<chunk, OP, T_IN, T_OUT, Args...>
@@ -619,7 +616,7 @@ cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output, cons
               );
             return cudaGetLastError();
            }
-    | [&](){ return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDeviceToHost);}
+    | [&](){ return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDefault);}
     | [&](){ free_device_memory(&device_in, &device_out, &device_flags,
                                 &device_aggregates, &device_prefixes,
                                 &device_counter);

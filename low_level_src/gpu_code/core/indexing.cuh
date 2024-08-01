@@ -13,6 +13,13 @@ struct Index {
   // Negative number would indicate and out of image index
   int32_t coordinates[DIMENSIONS];
 
+  __device__ __host__ Index(int32_t temp[]){
+    #pragma unroll
+    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = temp[dim];
+    }
+  }
+
   template<typename... Args>
   __device__ __host__ Index(const Args... args){
     static_assert(sizeof...(args) == DIMENSIONS);
@@ -32,13 +39,6 @@ struct Index {
       coordinates[dim] = (flat_index % (dimension_temp * space[dim]))
         / dimension_temp;
       dimension_temp *= space[dim];
-    }
-  }
-
-  __device__ __host__ Index(const int32_t* temp){
-    #pragma unroll
-    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = temp[dim];
     }
   }
 
@@ -100,6 +100,20 @@ struct Space {
     return in;
   }
 
+  template<typename... Args>
+  __device__ __host__ bool contains(const Args... args) const {
+    static_assert(sizeof...(args) == DIMENSIONS);
+    int32_t temp[] = {static_cast<int32_t>(args)...};
+
+    bool in = true;
+    #pragma unroll
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      in &= 0 <= temp[i] && temp[i] < sizes[i];
+    }
+
+    return in;
+  }
+
   __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Index<DIMENSIONS> index) const {
     if(!contains(index)){
       return {};
@@ -118,25 +132,25 @@ struct Space {
   }
 
   template<typename... Args>
-  __device__ __host__ bool contains(const Args... args) const {
-    static_assert(sizeof...(args) == DIMENSIONS);
-    int32_t temp[] = {static_cast<int32_t>(args)...};
-
-    bool in = true;
-    #pragma unroll
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
-      in &= 0 <= temp[i] && temp[i] < sizes[i];
-    }
-
-    return in;
-  }
-
-  template<typename... Args>
   __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Args... args) const {
     static_assert(sizeof...(args) == DIMENSIONS);
     Index index = Index<DIMENSIONS>(args...);
 
     return flat_index(index);
+  }
+
+  __device__ __host__ Index<DIMENSIONS> from_flat_index(uint64_t flat_index) const {
+    int32_t coordinates[DIMENSIONS];
+    uint64_t dimension_temp = 1;
+
+    #pragma unroll
+    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = (flat_index % (dimension_temp * sizes[dim]))
+        / dimension_temp;
+      dimension_temp *= sizes[dim];
+    }
+
+    return Index<DIMENSIONS>(coordinates);
   }
 
   __device__ __host__ const uint32_t& x() const {
@@ -153,18 +167,15 @@ struct Space {
     return sizes[2];
   }
 
-  __device__ __host__ Index<DIMENSIONS> from_flat_index(uint64_t flat_index) const {
-    int32_t coordinates[DIMENSIONS];
-    uint64_t dimension_temp = 1;
+  __device__  __host__ size_t size() const {
+    size_t size = 1;
 
     #pragma unroll
-    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = (flat_index % (dimension_temp * sizes[dim]))
-        / dimension_temp;
-      dimension_temp *= sizes[dim];
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      size *= sizes[i];
     }
 
-    return Index<DIMENSIONS>(coordinates);
+    return size;
   }
 };
 

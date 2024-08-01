@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include"../low_level_cuda.cuh"
+#include"../gpu_code/dicom_node_gpu.cu"
 
 #include<iostream>
 
