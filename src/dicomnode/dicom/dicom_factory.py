@@ -90,8 +90,9 @@ class VirtualElement(ABC):
       self.name = DataElement(tag, VR, None).name
     elif 64 < len(name):
       logger.warning(f"Virtual Element name is being truncated from {name} to {name[64:]}")
-    else:
       self.name = name[64:]
+    else:
+      self.name = name
 
   @abstractmethod
   def corporealialize(self, datasets: Iterable[Dataset]
@@ -606,7 +607,6 @@ class DicomFactory():
                  datasets: Iterable[Dataset],
                  report_blueprint: Blueprint,
                  filling_strategy=FillingStrategy.DISCARD,
-                 as_secondary_image_capture=False,
                  kwargs: Dict[Any, Any] = {}) -> List[Dataset]:
     """Encodes a pdf file to a dicom file such that it can be transported with
     the Dicom protocol
@@ -661,7 +661,7 @@ class DicomFactory():
     handler_function = self.REPORT_HANDLER_FUNCTIONS.get(report_class_UID, None)
 
     if handler_function is not None:
-      return handler_function(datasets,
+      return handler_function(self, datasets,
                               report_blueprint,
                               filling_strategy,
                               document_bytes,

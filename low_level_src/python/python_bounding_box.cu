@@ -32,11 +32,6 @@ pybind11::list bounding_box(pybind11::array_t<T, ARRAY_FLAGS> arr){
     std::cout << cudaGetErrorString(error) << "\n";
   }
 
-  std::cout << "x:(" << out.x_min << ", " << out.x_max << ")\n" <<
-               "y:(" << out.y_min << ", " << out.y_max << ")\n" <<
-               "z:(" << out.z_min << ", " << out.z_max << ")\n";
-
-
   pybind11::list returnList(6);
   returnList[0] = out.x_min;
   returnList[1] = out.x_max;

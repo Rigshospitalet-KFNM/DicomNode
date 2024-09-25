@@ -12,7 +12,7 @@ os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTOR
 
 from tests.helpers import testing_logs
 
-PYTHON_3_12_PLUS = sys.version_info[0] <= 12
+PYTHON_3_12_PLUS = 12 <= sys.version_info.minor
 
 
 if __name__ == "__main__":
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     else:
       duration_args = None
 
-    runner = TextTestRunner(verbosity=args.verbose, durations=duration_args)
+    runner = TextTestRunner(verbosity=args.verbose, durations=duration_args) #type: ignore
   else:
     runner = TextTestRunner(verbosity=args.verbose)
 

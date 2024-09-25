@@ -102,8 +102,6 @@ class GeneratorTestCase(TestCase):
     factory = DicomFactory()
 
     encoded_report = factory.encode_pdf(report, [dataset], default_report_blueprint)
-    make_meta(encoded_report)
+    make_meta(encoded_report[0])
 
-    save_dicom(library_paths.report_directory/'test_report.dcm', encoded_report)
-
-
+    save_dicom(library_paths.report_directory/'test_report.dcm', encoded_report[0])

@@ -8,7 +8,7 @@ import numpy
 
 
 # Dicomnode modules
-from dicomnode.math import CUDA, bounding_box, bounding_box_gpu
+from dicomnode.math import CUDA, _bounding_box_cpu, _bounding_box_gpu, bounding_box
 
 # Testing modules
 
@@ -22,7 +22,7 @@ class BoundingBoxTestCase(TestCase):
     array[5] = 1
     array[7] = 1
 
-    bbox = bounding_box(array)
+    bbox = _bounding_box_cpu(array)
 
     self.assertEqual(len(bbox),1)
     self.assertEqual(len(bbox[0]), 2)
@@ -36,7 +36,7 @@ class BoundingBoxTestCase(TestCase):
     array[5][5] = 1
     array[3][7] = 1
 
-    bbox = bounding_box(array)
+    bbox = _bounding_box_cpu(array)
 
     self.assertEqual(len(bbox),2)
     self.assertEqual(len(bbox[0]), 2)
@@ -53,7 +53,7 @@ class BoundingBoxTestCase(TestCase):
     array[7][5] = 1
     array[7][7] = 1
 
-    bbox = bounding_box(array)
+    bbox = _bounding_box_cpu(array)
 
     self.assertEqual(len(bbox),2)
     self.assertEqual(len(bbox[0]), 2)
@@ -70,7 +70,7 @@ class BoundingBoxTestCase(TestCase):
     array[5][5] = 1
     array[7][7] = 1
 
-    bbox = bounding_box(array)
+    bbox = _bounding_box_cpu(array)
 
     self.assertEqual(len(bbox),2)
     self.assertEqual(len(bbox[0]), 2)
@@ -128,10 +128,8 @@ class BoundingBoxTestCase(TestCase):
 
     array[z_min][y_min][x_min] = 1
     array[z_max][y_max][x_max] = 1
-    start = time()
     (bx_min, bx_max), (by_min, by_max), (bz_min, bz_max) = bounding_box(array)
-    stop = time()
-    print("Dicomnode",stop - start)
+
     self.assertEqual(x_min, bx_min)
     self.assertEqual(x_max, bx_max)
     self.assertEqual(y_min, by_min)
@@ -151,12 +149,8 @@ class BoundingBoxTestCase(TestCase):
 
     array[z_min][y_min][x_min] = 1
     array[z_max][y_max][x_max] = 1
-    start = time()
-    bx_min, bx_max, by_min, by_max, bz_min, bz_max = bounding_box_gpu(array)
-    print(x_min, x_max, y_min, y_max, z_min, z_max)
-    print(bx_min, bx_max, by_min, by_max, bz_min, bz_max)
-    stop = time()
-    print("bounding box gpu",stop - start)
+    (bx_min, bx_max), (by_min, by_max), (bz_min, bz_max) = _bounding_box_gpu(array)
+
     self.assertEqual(x_min, bx_min)
     self.assertEqual(x_max, bx_max)
     self.assertEqual(y_min, by_min)
