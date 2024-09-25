@@ -74,7 +74,7 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
 
   Args:
       arr (image.image_type): This is the image data that needs to be mirrored
-      direction (MirrorDirection): This is the direction 
+      direction (MirrorDirection): This is the direction
 
   Raises:
       ValueError: Raised if the input array is not an image
@@ -116,6 +116,9 @@ def bounding_box(array):
         bounding_box_list[shape_index][1] = max(current_max, dim_index)
 
   return bounding_box_list
+
+def bounding_box_gpu(array):
+  return _cuda.bounding_box(array)
 
 def __all__():
   return [

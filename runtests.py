@@ -1,4 +1,5 @@
 # Python Standard Library
+import sys
 import argparse
 import os
 import shutil
@@ -11,17 +12,31 @@ os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTOR
 
 from tests.helpers import testing_logs
 
+PYTHON_3_12_PLUS = sys.version_info[0] <= 12
+
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
   parser.add_argument("test_regex", default="test", nargs="?")
   parser.add_argument("--verbose", type=int, default=1)
   parser.add_argument("-nc", "--no_clean_up", action='store_true')
   parser.add_argument("-p", "--performance", action='store_true')
+  if PYTHON_3_12_PLUS:
+    parser.add_argument("-d", "--duration", action='store_true')
 
   args = parser.parse_args()
   testing_logs()
 
-  runner = TextTestRunner(verbosity=args.verbose)
+  if PYTHON_3_12_PLUS:
+    if args.duration:
+      duration_args = 100000
+    else:
+      duration_args = None
+
+    runner = TextTestRunner(verbosity=args.verbose, durations=duration_args)
+  else:
+    runner = TextTestRunner(verbosity=args.verbose)
+
   loader = TestLoader()
   suite: TestSuite = loader.discover("tests", pattern=f"*{args.test_regex}*.py")
   if args.performance:

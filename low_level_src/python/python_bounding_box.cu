@@ -24,13 +24,17 @@ pybind11::list bounding_box(pybind11::array_t<T, ARRAY_FLAGS> arr){
     (T*)buffer.ptr,
     buffer_size,
     &out,
-    {buffer.shape[0], buffer.shape[1], buffer.shape[2]}
+    {buffer.shape[2], buffer.shape[1], buffer.shape[0]}
   );
 
   if(error != cudaSuccess){
     std::cout << cudaGetErrorName(error) << "\n";
     std::cout << cudaGetErrorString(error) << "\n";
   }
+
+  std::cout << "x:(" << out.x_min << ", " << out.x_max << ")\n" <<
+               "y:(" << out.y_min << ", " << out.y_max << ")\n" <<
+               "z:(" << out.z_min << ", " << out.z_max << ")\n";
 
 
   pybind11::list returnList(6);

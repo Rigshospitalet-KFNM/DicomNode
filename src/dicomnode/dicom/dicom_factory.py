@@ -24,7 +24,7 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.dicom import make_meta
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
-from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset
+from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import MissingPivotDataset
 
@@ -605,8 +605,9 @@ class DicomFactory():
                  report: Union['Report', Path, str], # type:ignore
                  datasets: Iterable[Dataset],
                  report_blueprint: Blueprint,
-                 filling_strategy = FillingStrategy.DISCARD,
-                 kwargs: Dict[Any, Any] = {}) -> Dataset:
+                 filling_strategy=FillingStrategy.DISCARD,
+                 as_secondary_image_capture=False,
+                 kwargs: Dict[Any, Any] = {}) -> List[Dataset]:
     """Encodes a pdf file to a dicom file such that it can be transported with
     the Dicom protocol
 
@@ -647,10 +648,36 @@ class DicomFactory():
     with open(report_file_path, 'rb') as fp:
       document_bytes = fp.read()
 
+    report_class_UID = None
+
+    if 0x0008_0016 in report_blueprint:
+      class_UID_element = report_blueprint[0x0008_0016]
+      if isinstance(class_UID_element, StaticElement):
+        report_class_UID = class_UID_element.value
+
+    if report_class_UID is None:
+      raise ValueError("Unable to determine class UID of dicom series report")
+
+    handler_function = self.REPORT_HANDLER_FUNCTIONS.get(report_class_UID, None)
+
+    if handler_function is not None:
+      return handler_function(datasets,
+                              report_blueprint,
+                              filling_strategy,
+                              document_bytes,
+                              kwargs)
+    raise ValueError(f"No handler function for {report_class_UID}")
+
+  def _build_pdf_in_encapsulated_document(self,
+                                          datasets,
+                                          report_blueprint,
+                                          filling_strategy,
+                                          document_bytes,
+                                          kwargs) -> List[Dataset]:
     pivot = get_pivot(datasets)
     if pivot is None:
       raise MissingPivotDataset
-    report_dataset = self.build_instance(pivot, report_blueprint, filling_strategy, kwargs)
+    report_dataset = self.build_instance(pivot, report_blueprint, filling_strategy, kwargs=kwargs)
 
     if 'EncapsulatedDocument' not in report_dataset:
       report_dataset.EncapsulatedDocument = document_bytes
@@ -676,4 +703,39 @@ class DicomFactory():
            sequence.append(sequence_dataset)
       report_dataset.SourceInstanceSequence = Sequence(sequence)
 
-    return report_dataset
+    return [report_dataset]
+
+  def _build_pdf_in_secondary_image_capture(self,
+                                            datasets: Iterable[Dataset],
+                                            report_blueprint,
+                                            filling_strategy,
+                                            document_bytes,
+                                            kwargs: Dict) -> List[Dataset]:
+    try:
+      import pdf2image
+    except ImportError as E: #pragma ignore
+      raise MissingOptionalDependency("Missing package pdf2latex", E)
+
+    pivot = get_pivot(datasets)
+    if pivot is None:
+      raise MissingPivotDataset
+
+    image_pages = pdf2image.convert_from_bytes(document_bytes)
+
+    report_datasets = []
+
+    for page_number, image_page in enumerate(image_pages):
+      kwargs['__dicom_factory_image'] = image_page
+      # Page number are not 0-index
+      kwargs['__dicom_factory_page_number'] = page_number + 1
+
+      report_datasets.append(
+        self.build_instance(pivot, report_blueprint, filling_strategy, kwargs)
+      )
+
+    return report_datasets
+
+  REPORT_HANDLER_FUNCTIONS = {
+    SecondaryCaptureImageStorage : _build_pdf_in_secondary_image_capture,
+    EncapsulatedPDFStorage : _build_pdf_in_encapsulated_document
+  }

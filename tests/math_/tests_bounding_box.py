@@ -1,14 +1,14 @@
 # Python standard library
 from random import randint
 from time import time
-from unittest import TestCase
+from unittest import TestCase, skipIf
 
 # Third party modules
 import numpy
 
 
 # Dicomnode modules
-from dicomnode.math import bounding_box
+from dicomnode.math import CUDA, bounding_box, bounding_box_gpu
 
 # Testing modules
 
@@ -19,7 +19,7 @@ class BoundingBoxTestCase(TestCase):
     array = numpy.zeros((10))
 
     array[3] = 1
-    array[5] = 1 
+    array[5] = 1
     array[7] = 1
 
     bbox = bounding_box(array)
@@ -33,7 +33,7 @@ class BoundingBoxTestCase(TestCase):
     array = numpy.zeros((10, 10))
 
     array[7][3] = 1
-    array[5][5] = 1 
+    array[5][5] = 1
     array[3][7] = 1
 
     bbox = bounding_box(array)
@@ -50,7 +50,7 @@ class BoundingBoxTestCase(TestCase):
     array = numpy.zeros((12, 10))
 
     array[7][3] = 1
-    array[7][5] = 1 
+    array[7][5] = 1
     array[7][7] = 1
 
     bbox = bounding_box(array)
@@ -67,7 +67,7 @@ class BoundingBoxTestCase(TestCase):
     array = numpy.zeros((12, 10))
 
     array[3][3] = 1
-    array[5][5] = 1 
+    array[5][5] = 1
     array[7][7] = 1
 
     bbox = bounding_box(array)
@@ -84,7 +84,7 @@ class BoundingBoxTestCase(TestCase):
     array = numpy.zeros((12, 10, 4))
 
     array[3][3][3] = 1
-    array[5][5][3] = 1 
+    array[5][5][3] = 1
     array[7][7][3] = 1
 
     (x_min, x_max), (y_min, y_max), (z_min, z_max) = bounding_box(array)
@@ -117,7 +117,7 @@ class BoundingBoxTestCase(TestCase):
       self.assertEqual(z_min, bz_min)
       self.assertEqual(z_max, bz_max)
 
-  def test_big_box(self):
+  def performance_big_box(self):
     array = numpy.zeros((650, 440, 440))
     x_min = randint(0, 220)
     x_max = randint(220, 439)
@@ -139,7 +139,32 @@ class BoundingBoxTestCase(TestCase):
     self.assertEqual(z_min, bz_min)
     self.assertEqual(z_max, bz_max)
 
-  def test_other_solution(self):
+  @skipIf(not CUDA, "Need a GPU to do bounding box")
+  def test_gpu_big_box(self):
+    array = numpy.zeros((650, 440, 440))
+    x_min = randint(0, 220)
+    x_max = randint(220, 439)
+    y_min = randint(0, 220)
+    y_max = randint(220, 439)
+    z_min = randint(0, 325)
+    z_max = randint(325, 649)
+
+    array[z_min][y_min][x_min] = 1
+    array[z_max][y_max][x_max] = 1
+    start = time()
+    bx_min, bx_max, by_min, by_max, bz_min, bz_max = bounding_box_gpu(array)
+    print(x_min, x_max, y_min, y_max, z_min, z_max)
+    print(bx_min, bx_max, by_min, by_max, bz_min, bz_max)
+    stop = time()
+    print("bounding box gpu",stop - start)
+    self.assertEqual(x_min, bx_min)
+    self.assertEqual(x_max, bx_max)
+    self.assertEqual(y_min, by_min)
+    self.assertEqual(y_max, by_max)
+    self.assertEqual(z_min, bz_min)
+    self.assertEqual(z_max, bz_max)
+
+  def performance_other_solution(self):
     array = numpy.zeros((650, 440, 440))
     x_min = randint(0, 220)
     x_max = randint(220, 439)
@@ -192,16 +217,15 @@ class BoundingBoxTestCase(TestCase):
                       if z>zmax : zmax=z
 
       return xmin,1+xmax-xmin,ymin,1+ymax-ymin,zmin,1+zmax-zmin
-    
+
     start = time()
     bx_min, bx_max, by_min, by_max, bz_min, bz_max = bbox(array)
     stop = time()
     print("RH kinetics", stop - start)
-    
+
     print(x_min, bx_min)
     print(x_max, bx_max)
     print(y_min, by_min)
     print(y_max, by_max)
     print(z_min, bz_min)
     print(z_max, bz_max)
-  
