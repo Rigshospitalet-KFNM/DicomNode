@@ -103,7 +103,7 @@ class BoundingBoxOP_3D {
 
   static __device__ __host__ BoundingBox_3D map_to(const T value,
                                                    const uint64_t flat_index,
-                                                   const Space<3> space
+                                                   const Domain<3> space
                                                    ){
 
     if (value){

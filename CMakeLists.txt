@@ -22,6 +22,7 @@ if(CMAKE_CUDA_COMPILER)
 #
   pybind11_add_module(_cuda SHARED
                       low_level_src/python_entry_point.cu)
+  
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
