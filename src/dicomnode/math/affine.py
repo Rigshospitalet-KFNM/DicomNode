@@ -115,7 +115,7 @@ class AffineMatrix:
         [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0, start_coordinates[0]],
         [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0, start_coordinates[1]],
         [thickness_x * image_orientation[2], thickness_y * image_orientation[5],  thickness_z, start_coordinates[2]],
-        [0,0,0,1], 
+        [0,0,0,1],
       ])
 
       end_coordinates = [
@@ -132,8 +132,8 @@ class AffineMatrix:
           (start_coordinates[2], end_coordinates[2]),
         )
       )
-    except Exception:
-      pass
+    except Exception as E:
+      print(E)
 
     pivot = datasets[0]
     x_dim = pivot.Columns
@@ -144,7 +144,7 @@ class AffineMatrix:
                         (0.0, y_dim),
                         (0.0, z_dim))
                )
-    
+
 
   def correct_rotation(self) -> bool:
     """Detect if the image is rotated such that the reference space makes sense
@@ -267,8 +267,6 @@ class ReferenceSpace(Enum):
   | 0, -y, 0 |
   | 0, 0, -z |
   """
-
-
 
   @classmethod
   def from_affine(cls, affine: AffineMatrix):

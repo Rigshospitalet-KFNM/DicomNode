@@ -99,7 +99,7 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
   else:
     return np.flip(arr, (0,1,2))
 
-def _bounding_box_cpu(array: np.ndarray):
+def _bounding_box_cpu(array):
   bounding_box_list = [
     [shape_dim - 1, 0] for shape_dim in array.shape
   ]
@@ -116,22 +116,15 @@ def _bounding_box_cpu(array: np.ndarray):
         bounding_box_list[shape_index][1] = max(current_max, dim_index)
   return bounding_box_list
 
-def bounding_box(array: np.ndarray) -> np.ndarray:
-  if CUDA and len(array.shape) == 3:
-    x_min, x_max, y_min, y_max, z_min, z_max = _cuda.bounding_box(array)
-    return np.array([
-      min(x_min, array.shape[0]),
-      x_max,
-      min(y_min, array.shape[1]),
-      y_max,
-      min(z_min, array.shape[2]),
-      z_max
-    ])
+def _bounding_box_gpu(array):
+  x_min, x_max, y_min, y_max, z_min, z_max = _cuda.bounding_box(array)
+  return (x_min, x_max), (y_min, y_max), (z_min, z_max)
+
+def bounding_box(array):
+  if CUDA:
+    return _bounding_box_gpu(array)
   else:
-    return np.array(_bounding_box_cpu(array))
-
-
-
+    return _bounding_box_cpu(array)
 
 def __all__():
   return [
@@ -140,4 +133,5 @@ def __all__():
     image,
     mirror,
     types,
+    bounding_box,
   ]

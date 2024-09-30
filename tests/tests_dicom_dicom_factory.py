@@ -15,12 +15,12 @@ from unittest import TestCase
 
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
-
+from dicomnode.lib.logging import get_logger
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.blueprints import SOP_common_blueprint, general_series_blueprint
 from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
   Blueprint, SeriesElement, StaticElement, InstanceCopyElement, \
-  InstanceEnvironment, SequenceElement
+  InstanceEnvironment, SequenceElement, get_pivot
 from dicomnode.dicom.series import DicomSeries
 
 from dicomnode.lib.exceptions import IncorrectlyConfigured
@@ -158,6 +158,16 @@ class BlueprintTestCase(TestCase):
     ])
 
     self.assertListEqual(blueprint.get_required_tags(), [0x00100030, 0x00100050])
+
+  def test_get_pivot_of_dataset(self):
+    test_dataset = Dataset()
+    self.assertIs(get_pivot(test_dataset),test_dataset)
+
+  def test_blueprint_with_long_customer_name(self):
+    with self.assertLogs(get_logger()) as cm:
+      StaticElement(0x0011_1099, 'IS',1, name="a" * 1000)
+
+    self.assertEqual(len(cm.output), 1)
 
 
 class DicomFactoryTestCase(TestCase):
@@ -305,8 +315,8 @@ class DicomFactoryTestCase(TestCase):
     blueprint = Blueprint()
     blueprint.add_virtual_element(CopyElement(0x00100010))
 
-    build_dataset = self.factory.build_instance(dataset, 
-                                                blueprint, 
+    build_dataset = self.factory.build_instance(dataset,
+                                                blueprint,
                                                 filling_strategy=FillingStrategy.COPY)
     self.assertIn(0x00100010, build_dataset)
     self.assertIn(0x00100020, build_dataset)

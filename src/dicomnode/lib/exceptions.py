@@ -46,3 +46,6 @@ class InvalidPynetdicomEvent(Exception):
 
 class MissingNiftiImage(Exception):
   """When a nibabel Nifti image doesn't contain an image"""
+
+class MissingOptionalDependency(ImportError):
+  """Raised when trying to import an optional dependency, that's missing"""

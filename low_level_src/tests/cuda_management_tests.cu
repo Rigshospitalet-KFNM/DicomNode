@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include"../gpu_code/dicom_node_gpu.cu"
 
 #include<iostream>
@@ -31,7 +30,7 @@ TEST(CUDA_MANAGEMENT_TESTS, CUDA_RUNNER_TEST){
       return cudaSuccess;
     };
 
-  std::cout << (function_flag == 1) << "\n";
-  std::cout << (error_flag == cudaErrorInitializationError) << "\n";
-  std::cout << (runner.error() == cudaErrorInitializationError) << "\n";
+  ASSERT_TRUE(function_flag == 1);
+  ASSERT_TRUE(error_flag == cudaErrorInitializationError);
+  ASSERT_TRUE(runner.error() == cudaErrorInitializationError);
 }
