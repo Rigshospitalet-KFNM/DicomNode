@@ -66,15 +66,16 @@ def shared_tag(datasets: List[Dataset], tag: BaseTag) -> bool:
                 True)
 
 SERIES_VARYING_TAGS = set([
-  0x00080018, # SOPInstanceUID
-  0x00200013, # InstanceNumber
-  0x00200032, # ImagePositionPatient
-  0x00201041, # SliceLocation
-  0x00280106, # SmallestImagePixelValue
-  0x00280106, # LargestImagePixelValue
-  0x00281052, # RescaleIntercept
-  0x00281053, # RescaleSlope
-  0x73E00010, # PixelData
+  0x0008_0018, # SOPInstanceUID
+  0x0020_0013, # InstanceNumber
+  0x0020_0032, # ImagePositionPatient
+  0x0020_1041, # SliceLocation
+  0x0028_0106, # SmallestImagePixelValue
+  0x0028_0106, # LargestImagePixelValue
+  0x0028_1052, # RescaleIntercept
+  0x0028_1053, # RescaleSlope
+  0x0054_1330, # ImageIndex
+  0x73E0_0010, # PixelData
 ])
 """This is a list of tags that are assumed to be varying across a series
 Note that this is not a complete list.
@@ -153,7 +154,7 @@ class DicomSeries(Series):
     for dataset in self.datasets:
       dataset[tag] = value
 
-  def set_individual_tag(self, tag: int, values: List[DataElement]):
+  def set_individual_tag(self, tag: int, values: List[Union[DataElement, Any]]):
     if len(values) != len(self):
       error_message = f"The amount of values ({len(values)}) doesn't match the amount datasets ({len(self)})"
       raise ValueError(error_message)

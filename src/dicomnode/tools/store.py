@@ -3,7 +3,7 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard library
-from argparse import _SubParsersAction, Namespace
+from argparse import ArgumentParser, _SubParsersAction, Namespace
 from pathlib import Path
 
 # Third party packages
@@ -24,7 +24,7 @@ def get_parser(subparser : _SubParsersAction):
                                    be added to.
   """
   _, _, tool_name = __name__.split(".")
-  module_parser = subparser.add_parser(tool_name,
+  module_parser: ArgumentParser = subparser.add_parser(tool_name,
                                        help="Sends a C_STORE DIMSE Message with <dicom file>")
   module_parser.add_argument('ip', type=str, help="IP of SCP")
   module_parser.add_argument('port', type=int, help="Port of SCP")

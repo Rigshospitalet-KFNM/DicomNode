@@ -13,7 +13,7 @@ that for you.
 from typing import List, Tuple
 
 # Third party packages
-from numpy import flip, ndarray,  rot90
+import numpy as np
 
 # Imports
 from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
@@ -74,7 +74,7 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
 
   Args:
       arr (image.image_type): This is the image data that needs to be mirrored
-      direction (MirrorDirection): This is the direction 
+      direction (MirrorDirection): This is the direction
 
   Raises:
       ValueError: Raised if the input array is not an image
@@ -85,21 +85,21 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
   if len(arr.shape) != 3:
     raise ValueError("Mirror is only supported for 3 dimensional volumes")
   if direction == MirrorDirection.X:
-    return flip(arr, 2)
+    return np.flip(arr, 2)
   if direction == MirrorDirection.Y:
-    return flip(arr, 1)
+    return np.flip(arr, 1)
   if direction == MirrorDirection.Z:
-    return flip(arr, 0)
+    return np.flip(arr, 0)
   if direction == MirrorDirection.XY:
-    return flip(arr, (2,1))
+    return np.flip(arr, (2,1))
   if direction == MirrorDirection.XZ:
-    return flip(arr, (2,0))
+    return np.flip(arr, (2,0))
   if direction == MirrorDirection.YZ:
-    return flip(arr, (0,1))
+    return np.flip(arr, (0,1))
   else:
-    return flip(arr, (0,1,2))
+    return np.flip(arr, (0,1,2))
 
-def bounding_box(array):
+def _bounding_box_cpu(array: np.ndarray):
   bounding_box_list = [
     [shape_dim - 1, 0] for shape_dim in array.shape
   ]
@@ -114,8 +114,24 @@ def bounding_box(array):
         current_max = bounding_box_list[shape_index][1]
         bounding_box_list[shape_index][0] = min(current_min, dim_index)
         bounding_box_list[shape_index][1] = max(current_max, dim_index)
-
   return bounding_box_list
+
+def bounding_box(array: np.ndarray) -> np.ndarray:
+  if CUDA and len(array.shape) == 3:
+    x_min, x_max, y_min, y_max, z_min, z_max = _cuda.bounding_box(array)
+    return np.array([
+      min(x_min, array.shape[0]),
+      x_max,
+      min(y_min, array.shape[1]),
+      y_max,
+      min(z_min, array.shape[2]),
+      z_max
+    ])
+  else:
+    return np.array(_bounding_box_cpu(array))
+
+
+
 
 def __all__():
   return [

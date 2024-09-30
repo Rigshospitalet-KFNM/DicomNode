@@ -89,6 +89,20 @@ def apply_private_tags(
   return dataset
 
 
+def discover_files(source: Path) -> List[Path]:
+  discover_stack: List[Path] = [source]
+  files: List[Path] = []
+
+  while discover_stack:
+    path = discover_stack.pop()
+    if path.is_file():
+      files.append(path)
+    if path.is_dir():
+      for subpath in path.glob('*'):
+        if len(subpath.name) and subpath.name[0] != '.':
+          discover_stack.append(subpath)
+  return files
+
 def load_dicom(dicom_path: Path) -> Dataset:
   """Loads a single dicom image, doesn't parse private tags
   To parse multiple dataset use load_dicoms
@@ -184,7 +198,6 @@ def load_private_tags_from_args(
   if args.privatetags:
     private_tags = load_private_tags(args.privatetags, args.strictParsing)
   return private_tags
-
 
 
 class TemporaryWorkingDirectory():

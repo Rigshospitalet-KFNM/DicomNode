@@ -8,7 +8,6 @@ import argparse
 import importlib
 from dicomnode import tools
 
-
 def entry_func():
   parser = argparse.ArgumentParser(description="This is an omnitool for dicom communication")
   subparsers = parser.add_subparsers(help="help", dest="command")

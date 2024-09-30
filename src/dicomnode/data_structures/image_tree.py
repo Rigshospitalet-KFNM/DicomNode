@@ -326,31 +326,36 @@ class ImageTreeInterface(ABC):
     self.__data: Dict[str, Union[Dataset, ImageTreeInterface]] = {} # Dict containing Images, Series, Studies or Patients
     self.images: int = 0 # The total number of images of this tree and it's subtrees
 
-
     if dcm is not None:
       if isinstance(dcm, Dataset):
         self.add_image(dcm)
       elif isinstance(dcm, Iterable):
         self.add_images(dcm)
 
+  def __repr__(self) -> str: #pragma: no cover
+    return str(self)
+
 class SeriesTree(ImageTreeInterface):
   """Final Layer of the DicomTree that contains the data.
   """
 
-  SeriesDescription = "Tree of Undefined Series"
+  def __init__(self, dcm: Iterable[Dataset] | Dataset = []) -> None:
+    self.series_instance_UID = None
+    self.series_description = "Tree of Undefined Series"
+    super().__init__(dcm)
 
   def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'SeriesInstanceUID'):
       raise ValueError("Dicom image doesn't have a SeriesInstanceUID")
     if not hasattr(dicom, 'SOPInstanceUID'):
       raise ValueError("Dicom image doesn't have a SOPInstanceUID")
-    if hasattr(self, 'SeriesInstanceUID'):
-      if self.SeriesInstanceUID != dicom.SeriesInstanceUID.name:
+    if self.series_instance_UID is not None:
+      if self.series_instance_UID != dicom.SeriesInstanceUID.name:
         raise KeyError("Attempting to add an image to a series where it doesn't belong")
     else:
-      self.SeriesInstanceUID = dicom.SeriesInstanceUID.name
+      self.series_instance_UID = dicom.SeriesInstanceUID.name
       if hasattr(dicom, 'SeriesDescription'):
-        self.SeriesDescription = f"Tree of {dicom.SeriesDescription}"
+        self.series_description = f"Tree of {dicom.SeriesDescription}"
     if dicom.SOPInstanceUID.name in self.data:
       raise ValueError("Duplicate Image added!")
     self[dicom.SOPInstanceUID.name] = dicom
@@ -371,7 +376,7 @@ class SeriesTree(ImageTreeInterface):
         save_dicom(file_target, dicom)
 
   def __str__(self) -> str:
-    return f"{self.SeriesDescription} with {self.images} images"
+    return f"{self.series_description} with {self.images} images"
 
 class StudyTree(ImageTreeInterface):
   """A Study tree is a data object that contains all studies with the same study ID
@@ -405,12 +410,20 @@ class StudyTree(ImageTreeInterface):
       seriesStr += f"      {series}\n"
     return f"{self.StudyDescription} with {self.images} images with Series:\n{seriesStr}"
 
+  def series(self) -> Iterable[SeriesTree]:
+    for series in self.data.values():
+      if not isinstance(series, SeriesTree):
+        raise InvalidTreeNode
+      yield series
+
 
 class PatientTree(ImageTreeInterface):
   """A Tree of Dicom images under one patient, based around Patient ID
   """
 
-  TreeName : str = "Unknown Tree"
+  def __init__(self, dcm: Iterable[Dataset] | Dataset = []) -> None:
+    super().__init__(dcm)
+    self.tree_name = "Unknown Tree"
 
   def add_image(self, dicom : Dataset) -> int:
     if not hasattr(dicom, 'StudyInstanceUID'):
@@ -423,7 +436,7 @@ class PatientTree(ImageTreeInterface):
     else:
       self.PatientID = dicom.PatientID
       if hasattr(dicom, 'PatientName'):
-        self.TreeName = f"StudyTree of {dicom.PatientName}"
+        self.tree_name = f"StudyTree of {dicom.PatientName}"
     if tree := self.data.get(dicom.StudyInstanceUID.name):
       tree.add_image(dicom)
     else:
@@ -435,7 +448,18 @@ class PatientTree(ImageTreeInterface):
     studyStr = ""
     for study in self.data.values():
       studyStr += f"    {study}"
-    return f"Patient {self.TreeName} with {self.images} images\n{studyStr}"
+    return f"Patient {self.tree_name} with {self.images} images\n{studyStr}"
+
+  def studies(self) -> Iterable[StudyTree]:
+    for study in self.data.values():
+      yield study
+
+  def series(self) -> Iterable[SeriesTree]:
+    for study in self.data.values():
+      if not isinstance(study, StudyTree):
+        raise InvalidTreeNode()
+      for series in study.series():
+        yield series
 
 class DicomTree(ImageTreeInterface):
   """This is a Root node of an Tree structure, with the ability to index
@@ -460,3 +484,23 @@ class DicomTree(ImageTreeInterface):
     for patientTree in self.data.values():
       patientStr += f"  {patientTree}"
     return f"Dicom Tree with {self.images} images\n{patientStr}"
+
+  def patients(self) -> Iterable[PatientTree]: #pragma: no cover
+    for patient in self.data.values():
+      if not isinstance(PatientTree):
+        raise InvalidTreeNode
+      yield patient
+
+  def studies(self) -> Iterable[StudyTree]:
+    for patient in self.data.values():
+      if not isinstance(patient, PatientTree): #pragma: no cover
+        raise InvalidTreeNode()
+      for study in patient.studies():
+        yield study
+
+  def series(self) -> Iterable[SeriesTree]:
+    for study in self.data.values():
+      if not isinstance(study, PatientTree): #pragma: no cover
+        raise InvalidTreeNode()
+      for series in study.series():
+        yield series
