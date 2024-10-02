@@ -24,22 +24,22 @@ class SECONDARY_IMAGE_REPORT_CONSTANTS():
   PIXEL_REPRESENTATION = 0
 
 def generate_report_image(env: InstanceEnvironment):
-  report_page_image: Image = env.kwargs['__dicom_factory_image']
+  report_page_image: Image = env.image
 
   return report_page_image.tobytes('raw')
 
 def get_image_rows(env: InstanceEnvironment):
-  report_page_image: Image = env.kwargs['__dicom_factory_image']
+  report_page_image: Image = env.image
 
   return report_page_image.height
 
 def get_image_cols(env: InstanceEnvironment):
-  report_page_image: Image = env.kwargs['__dicom_factory_image']
+  report_page_image: Image = env.image
 
   return report_page_image.width
 
 def get_instance_number(env: InstanceEnvironment):
-  return env.kwargs['__dicom_factory_page_number']
+  return env.instance_number
 
 SECONDARY_IMAGE_REPORT_BLUEPRINT = Blueprint([
   CopyElement(0x0010_0010), # Patient Name
