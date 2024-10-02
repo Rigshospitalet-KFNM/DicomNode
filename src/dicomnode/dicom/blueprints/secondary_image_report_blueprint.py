@@ -26,17 +26,17 @@ class SECONDARY_IMAGE_REPORT_CONSTANTS():
 def generate_report_image(env: InstanceEnvironment):
   report_page_image: Image = env.kwargs['__dicom_factory_image']
 
-  return report_page_image.tobytes('rgb')
+  return report_page_image.tobytes('raw')
 
 def get_image_rows(env: InstanceEnvironment):
   report_page_image: Image = env.kwargs['__dicom_factory_image']
 
-  return report_page_image.width
+  return report_page_image.height
 
 def get_image_cols(env: InstanceEnvironment):
   report_page_image: Image = env.kwargs['__dicom_factory_image']
 
-  return report_page_image.height
+  return report_page_image.width
 
 def get_instance_number(env: InstanceEnvironment):
   return env.kwargs['__dicom_factory_page_number']

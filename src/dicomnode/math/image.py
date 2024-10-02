@@ -2,7 +2,7 @@
 data"""
 
 # Python standard library
-from typing import Any, List, Literal, Tuple, TypeAlias
+from typing import Any, List, Literal, Tuple, TypeAlias, Union
 
 # Third party Packages
 from numpy import append, array, ceil, empty, float32, float64, floor, identity, int32, ndarray, zeros_like
@@ -14,7 +14,7 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.math.affine import AffineMatrix
 
-numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
+numpy_image: TypeAlias = Union[ndarray[Tuple[int,int,int], Any],ndarray[Tuple[int,int,int,int], Any]]
 
 def fit_image_into_unsigned_bit_range(image: ndarray,
                                       bits_stored = 16,
@@ -42,7 +42,7 @@ def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
     y_dim = pivot.Rows
     z_dim = len(datasets)
     # tags are RescaleIntercept, RescaleSlope
-    rescale = (0x00281052 in pivot and 0x00281053 in pivot) 
+    rescale = (0x00281052 in pivot and 0x00281053 in pivot)
 
     if 0x7FE00008 in pivot:
       dataType = float32
@@ -85,7 +85,7 @@ class Image:
     affine = AffineMatrix.from_datasets(datasets)
 
     return cls(image_data, affine)
-  
+
   @staticmethod
   def _map_args_coordinates(*args) -> ndarray[Tuple[Literal[4]], Any]:
         # Args manipulation

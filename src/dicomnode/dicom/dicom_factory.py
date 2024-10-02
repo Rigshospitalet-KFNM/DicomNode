@@ -32,10 +32,6 @@ logger = get_logger()
 
 T = TypeVar('T')
 
-class FillingStrategy(Enum):
-  DISCARD = 0
-  COPY = 1
-
 PRIVATIZATION_VERSION = 1
 
 def get_pivot(datasets: Union[Dataset,Iterable[Dataset]]) -> Optional[Dataset]:
@@ -187,7 +183,7 @@ class InstanceEnvironment:
   factory: 'DicomFactory'
   kwargs : Dict[Any, Any] = field(default_factory=dict)
   instance_dataset: Optional[Dataset] = None
-  image: Optional[ndarray[Tuple[int,int,int], Any]] = None # Unmodified image
+  image: Any = None
 
 class InstanceVirtualElement(VirtualElement):
   """Represents a virtual element, that is unique per image slice"""
@@ -457,10 +453,9 @@ class DicomFactory():
 
 
   def build_series(self,
-                   image: ndarray[Tuple[int,int,int],Any],
+                   image,
                    blueprint: Blueprint,
                    parent_series: Union[DicomSeries, List[Dataset]],
-                   filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
                    kwargs: Dict[Any, Any] = {}
                    ) -> DicomSeries:
     """Builds a dicom series from a series, from an image, blueprint, and series
@@ -480,7 +475,6 @@ class DicomFactory():
         image (ndarray): _description_
         blueprint (Blueprint): _description_
         parent_series (Series): _description_
-        filling_strategy (FillingStrategy, optional): _description_. Defaults to FillingStrategy.DISCARD.
         kwargs (Dict[Any, Any], optional): _description_. Defaults to {}.
 
     Returns:
@@ -497,27 +491,15 @@ class DicomFactory():
     #
     # The ways that it's solved now is that most things are wrapped in a series
     #
-    if not len(image.shape) == 3:
-      raise ValueError("Image must be a 3 dimensional image")
 
     if isinstance(parent_series, List):
       parent_datasets = parent_series
-      can_copy_instances = len(parent_datasets) == image.shape[2]
     else:
       parent_datasets = parent_series.datasets
-      can_copy_instances = parent_series.can_copy_into_image(image)
 
+    can_copy_instances = len(parent_datasets) == len(image)
 
-    datasets = []
-
-    for i, image_slice in enumerate(image):
-      dataset = Dataset()
-      self.store_image_in_dataset(dataset, image_slice)
-      dataset.InstanceNumber = i + 1
-
-      datasets.append(dataset)
-
-    series = DicomSeries(datasets)
+    series = DicomSeries([Dataset() for _ in image])
 
     for virtual_tag in blueprint:
       result = virtual_tag.corporealialize(parent_datasets)
@@ -531,8 +513,8 @@ class DicomFactory():
               factory=self,
               kwargs=kwargs,
               instance_dataset=dataset,
-              image=image,
-            ) for (i, dataset) in enumerate(parent_datasets)
+              image=slice_,
+            ) for (i, (dataset, slice_)) in enumerate(zip(parent_datasets, image))
           ]
         else:
           envs = [
@@ -540,8 +522,8 @@ class DicomFactory():
               instance_number=i,
               factory=self,
               kwargs=kwargs,
-              image=image,
-            ) for i in range(image.shape[0])
+              image=slice_,
+            ) for i, slice_ in enumerate(image)
           ]
 
         data_elements = [
@@ -551,15 +533,67 @@ class DicomFactory():
         series.set_individual_tag(virtual_tag.tag,
                                   data_elements)
 
-    for dataset in series.datasets:
+    for i,dataset in enumerate(series.datasets):
+      self.store_image_in_dataset(dataset, image[i])
       make_meta(dataset)
 
     return series
 
+  def build_series_without_image_encoding(self,
+                                          images: Sequence,
+                                          blueprint: Blueprint,
+                                          datasets: Union[DicomSeries, List[Dataset]],
+                                          kwargs: Dict,
+                                          ):
+    if isinstance(datasets, List):
+      parent_datasets = datasets
+    else:
+      parent_datasets = datasets.datasets
+
+    can_copy_instances = len(parent_datasets) == len(images)
+    build_series = DicomSeries([Dataset() for _ in images])
+
+    for virtual_element in blueprint:
+      de = virtual_element.corporealialize(parent_datasets)
+      if isinstance(de, DataElement):
+        build_series.set_shared_tag(virtual_element.tag, de)
+      elif isinstance(de, InstanceVirtualElement):
+        if can_copy_instances:
+          envs = [
+            InstanceEnvironment(
+              instance_number=i,
+              factory=self,
+              kwargs=kwargs,
+              instance_dataset=dataset,
+              image=slice_,
+            ) for (i, (dataset, slice_)) in enumerate(zip(parent_datasets, images))
+          ]
+        else:
+          envs = [
+            InstanceEnvironment(
+              instance_number=i,
+              factory=self,
+              kwargs=kwargs,
+              image=slice_,
+            ) for i, slice_ in enumerate(images)
+          ]
+
+        data_elements = [
+          de.produce(env) for env in envs
+        ]
+
+        build_series.set_individual_tag(virtual_element.tag,
+                                        data_elements)
+
+    for dataset in build_series.datasets:
+      make_meta(dataset)
+
+    return build_series
+
+
   def build_instance(self,
             pivot: Dataset,
             blueprint: Blueprint,
-            filling_strategy: FillingStrategy = FillingStrategy.DISCARD,
             kwargs: Dict[Any, Any] = {}) -> Dataset:
     """Builds a singular dataset from blueprint and pivot dataset
 
@@ -569,27 +603,12 @@ class DicomFactory():
         pivot (Dataset): Dataset the blueprint will use to extract data from
         blueprint (Blueprint): Determines what data will be in the newly
                                constructed dataset
-        filling_strategy (FillingStrategy, optional): Strategy to handle tags
-                                                      that in the dataset, but
-                                                      in not the blueprint.
-                                                      Discards ignores the tag,
-                                                      while copies the
-                                                      un-annotated tag. Defaults
-                                                      to FillingStrategy.DISCARD,
-                                                      and for most dataset this
-                                                      is the sensible option
 
     Returns:
         Dataset: The constructed dataset
     """
 
     dataset = Dataset()
-    if filling_strategy == FillingStrategy.COPY:
-      for data_element in pivot:
-        if data_element.tag in blueprint:
-          pass
-        else:
-          dataset.add(data_element)
     for virtual_element in blueprint:
       de = virtual_element.corporealialize([pivot])
       if isinstance(de, InstanceVirtualElement):
@@ -604,9 +623,8 @@ class DicomFactory():
 
   def encode_pdf(self,
                  report: Union['Report', Path, str], # type:ignore
-                 datasets: Iterable[Dataset],
+                 datasets: List[Dataset],
                  report_blueprint: Blueprint,
-                 filling_strategy=FillingStrategy.DISCARD,
                  kwargs: Dict[Any, Any] = {}) -> List[Dataset]:
     """Encodes a pdf file to a dicom file such that it can be transported with
     the Dicom protocol
@@ -620,11 +638,7 @@ class DicomFactory():
         the generated report. The Blueprint should not include the tags:
           EncapsulatedDocument, EncapsulatedDocumentLength, SourceInstanceSequence
         Defaults to default_report_blueprint.
-        filling_strategy (dicomnode.FillingStrategy, optional): Filling
-        strategy for the underlying build command. For more detailed docs look
-        at the build method. Defaults to FillingStrategy.DISCARD.
-        kwargs (Dict[Any, Any], optional): Extra kwargs for underlying build
-        command. Defaults to {}.
+
 
     Returns:
         Dataset: An EncapsulatedPDFStorage encoded Dicom Dataset with the input
@@ -663,7 +677,6 @@ class DicomFactory():
     if handler_function is not None:
       return handler_function(self, datasets,
                               report_blueprint,
-                              filling_strategy,
                               document_bytes,
                               kwargs)
     raise ValueError(f"No handler function for {report_class_UID}")
@@ -671,13 +684,12 @@ class DicomFactory():
   def _build_pdf_in_encapsulated_document(self,
                                           datasets,
                                           report_blueprint,
-                                          filling_strategy,
                                           document_bytes,
                                           kwargs) -> List[Dataset]:
     pivot = get_pivot(datasets)
     if pivot is None:
       raise MissingPivotDataset
-    report_dataset = self.build_instance(pivot, report_blueprint, filling_strategy, kwargs=kwargs)
+    report_dataset = self.build_instance(pivot, report_blueprint, kwargs=kwargs)
 
     if 'EncapsulatedDocument' not in report_dataset:
       report_dataset.EncapsulatedDocument = document_bytes
@@ -706,15 +718,14 @@ class DicomFactory():
     return [report_dataset]
 
   def _build_pdf_in_secondary_image_capture(self,
-                                            datasets: Iterable[Dataset],
-                                            report_blueprint,
-                                            filling_strategy,
+                                            datasets: List[Dataset],
+                                            report_blueprint : Blueprint,
                                             document_bytes,
                                             kwargs: Dict) -> List[Dataset]:
     try:
       import pdf2image
     except ImportError as E: #pragma ignore
-      raise MissingOptionalDependency("Missing package pdf2latex", E)
+      raise MissingOptionalDependency("Missing package pdf2image", E)
 
     pivot = get_pivot(datasets)
     if pivot is None:
@@ -722,18 +733,9 @@ class DicomFactory():
 
     image_pages = pdf2image.convert_from_bytes(document_bytes)
 
-    report_datasets = []
+    series = self.build_series_without_image_encoding(image_pages, report_blueprint, datasets, kwargs)
 
-    for page_number, image_page in enumerate(image_pages):
-      kwargs['__dicom_factory_image'] = image_page
-      # Page number are not 0-index
-      kwargs['__dicom_factory_page_number'] = page_number + 1
-
-      report_datasets.append(
-        self.build_instance(pivot, report_blueprint, filling_strategy, kwargs)
-      )
-
-    return report_datasets
+    return series.datasets
 
   REPORT_HANDLER_FUNCTIONS = {
     SecondaryCaptureImageStorage : _build_pdf_in_secondary_image_capture,

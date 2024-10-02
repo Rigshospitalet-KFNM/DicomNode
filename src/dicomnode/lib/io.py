@@ -41,6 +41,8 @@ def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str
   keyword_dict.update(new_names_dict)
 
 
+
+
 def apply_private_tags(
     dataset: Dataset,
     private_tags: Dict[int, Tuple[str, str, str, str, str]] = {},
@@ -157,7 +159,6 @@ def load_dicoms(dicom_path: Path) -> List[Dataset]:
 
   return datasets
 
-
 def save_dicom(
     dicom_path: Path,
     dicom: Dataset
@@ -233,3 +234,14 @@ class TemporaryWorkingDirectory():
     os.chdir(self.__cwd)
     if self.temp_directory_path.exists():
       shutil.rmtree(self.temp_directory_path)
+
+class DicomLazyIterator:
+  """This class is for creating a lazy dataset iterator for large datasets
+  """
+  def __init__(self, path: Path, dicom_fileheader="dcm") -> None:
+    self._path = path
+    self._dicom_fileheader = dicom_fileheader
+
+  def __iter__(self):
+    for sub_path in self._path.glob(f'**/*.{self._dicom_fileheader}'):
+      yield load_dicom(sub_path)

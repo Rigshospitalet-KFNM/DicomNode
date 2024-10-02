@@ -241,8 +241,6 @@ header from.
 
 Futhermore there's two Optional Attributes.
 
-* `filling_strategy: FillingStrategy` - FillingStrategy to be used in
-`SeriesHeader` Creation, defaults to `Discard`
 * `parent_input: Optional[Str]` - Specifies the input series to be used as
 parent, must equal a key in the `input` attribute. If unspecified a random
 input series is used.

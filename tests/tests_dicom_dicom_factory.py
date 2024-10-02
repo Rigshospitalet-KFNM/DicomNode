@@ -2,23 +2,22 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from datetime import datetime, date, time
-from random import randint
 from logging import ERROR
+from typing import Any, List, Tuple
+from random import randint
+from unittest import TestCase
 
 # Third Party Modules
 import numpy
 from pydicom import DataElement, Dataset
 from pydicom.tag import Tag
-from pydicom.uid import SecondaryCaptureImageStorage
-from typing import Any, List
-from unittest import TestCase
+from pydicom.uid import SecondaryCaptureImageStorage, CTImageStorage
 
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.logging import get_logger
-from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.dicom.blueprints import SOP_common_blueprint, general_series_blueprint
-from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement, FillingStrategy, \
+from dicomnode.dicom import gen_uid
+from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement,\
   Blueprint, SeriesElement, StaticElement, InstanceCopyElement, \
   InstanceEnvironment, SequenceElement, get_pivot
 from dicomnode.dicom.series import DicomSeries
@@ -305,7 +304,6 @@ class DicomFactoryTestCase(TestCase):
     dataset = Dataset()
     build_dataset = self.factory.build_instance(dataset, blueprint)
 
-
   def test_factory_build_with_copy(self):
     dataset = Dataset()
     dataset.SOPClassUID = SecondaryCaptureImageStorage
@@ -313,22 +311,24 @@ class DicomFactoryTestCase(TestCase):
     dataset.PatientID = "12345678"
 
     blueprint = Blueprint()
+    blueprint.add_virtual_element(StaticElement(0x0008_0016, 'UI', CTImageStorage))
     blueprint.add_virtual_element(CopyElement(0x00100010))
+    blueprint.add_virtual_element(CopyElement(0x00100020))
 
     build_dataset = self.factory.build_instance(dataset,
-                                                blueprint,
-                                                filling_strategy=FillingStrategy.COPY)
+                                                blueprint)
     self.assertIn(0x00100010, build_dataset)
     self.assertIn(0x00100020, build_dataset)
 
   def test_build_a_series_with_rescaling(self):
     test_blueprint = Blueprint([
       CopyElement(0x00100010),
-      FunctionalElement(0x01115001, 'IS', lambda env: env.instance_number + 34)
+      StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
+      FunctionalElement(0x01115001, 'IS', lambda env: env.instance_number + 34),
     ])
 
     # Note that images are store z,y,x
-    test_image = numpy.random.normal(0,1,(13, 12, 11))
+    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11))
 
     produced_series = self.factory.build_series(
       test_image,

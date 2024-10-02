@@ -35,7 +35,7 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, FillingStrategy
+from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
@@ -114,10 +114,6 @@ class AbstractPipeline():
   #DicomGeneration
   dicom_factory: Optional[DicomFactory] = None
   "Class for producing various Dicom objects and series"
-
-  filling_strategy: FillingStrategy = FillingStrategy.DISCARD
-  """Filling strategy the dicom factory should follow in the case of
-  unspecified tags in the blueprint."""
 
   header_blueprint: Optional[Blueprint] = None
   "Blueprint for creating a series header"
@@ -770,7 +766,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
     self.running = True
     if master_queue is None:
       self.process_queue = Queue()
-    else: 
+    else:
       self.process_queue = master_queue
     self.process_thread = Thread(target=self.process_worker, daemon=False)
     self.process_thread.start()

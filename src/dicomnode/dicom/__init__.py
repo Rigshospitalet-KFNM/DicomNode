@@ -2,8 +2,9 @@
 """
 
 # Python Standard Library
+from functools import reduce
 from enum import Enum
-from typing import Any, List, Callable, Optional, Tuple
+from typing import Any, List, Callable, Optional, Tuple, Union
 
 # Third Party Libraries
 import numpy
@@ -248,6 +249,19 @@ def format_from_patient_name(person_name: PersonName) -> str:
     return_str += f"{person_name.name_suffix}"
 
   return return_str.strip()
+
+def has_tags(dataset: Dataset, tags: Union[
+                                        List[str],
+                                        List[int],
+                                        List[Tuple[int,int]],
+                                        List[Union[int,str, Tuple[int,int]]],
+                                      ]):
+  def and_(a, b):
+    return a and b
+
+  def in_(tag):
+    return tag in dataset
+  return reduce(and_, map(in_, tags), True)
 
 from ..data_structures import image_tree as __image_tree # to prevent circular imports
 from . import anonymization

@@ -7,7 +7,8 @@ https://xkcd.com/927/
 # Python standard library
 from functools import reduce
 from enum import Enum
-from typing import Any, Callable, List, Literal, Optional,  Tuple, TypeAlias, Union
+from typing import Any, Callable, List, Iterable, Literal, Optional, Tuple,\
+  TypeAlias, Union
 
 # Third party packages
 from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
@@ -18,9 +19,11 @@ from nibabel.nifti1 import Nifti1Image
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
+
+from dicomnode.dicom import has_tags
 from dicomnode.math.affine import AffineMatrix, ReferenceSpace
 from dicomnode.math.image import build_image_from_datasets, numpy_image, Image
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset
 
 def sortDatasets(dataset: Dataset):
   """Sorting function for a collection of datasets. The order is determined by
@@ -115,9 +118,12 @@ class DicomSeries(Series):
     if len(datasets) == 0:
       raise ValueError("Cannot construct a dicom series from an empty list")
 
-    datasets.sort(key=sortDatasets)
     self.datasets = datasets
     self.pivot = self.datasets[0]
+    if 'InstanceNumber' in self.pivot:
+      datasets.sort(key=sortDatasets)
+    else:
+      self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
 
     def image_constructor():
       return Image.from_datasets(self.datasets)
@@ -176,6 +182,52 @@ class NiftiSeries(Series):
     affine = AffineMatrix.from_nifti(self.nifti)
 
     super().__init__(Image(image_data, affine))
+
+class LargeDynamicPetSeries(Series):
+  REQUIRED_TAGS = [
+    'NumberOfSlices',
+    'NumberOfTimeSlices',
+    'Rows',
+    'Cols',
+    'RescaleIntercept',
+    'RescaleSlope',
+    'PixelData',
+  ]
+
+  def __init__(self, datasets: Iterable[Dataset]):
+    first_dataset = None
+    raw_image = None
+    def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
+      if not has_tags(dataset, self.REQUIRED_TAGS):
+        raise InvalidDataset(f"Dataset doesn't appear to be large pet")
+
+      time_series = dataset.ImageIndex // dataset.NumberOfSlices
+      slice_number_in_series = dataset.ImageIndex % dataset.NumberOfSlices
+
+      raw[time_series, slice_number_in_series, :, :] = \
+        dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
+          + dataset.RescaleIntercept
+
+    for dataset in datasets:
+      if first_dataset is None:
+        first_dataset = dataset
+
+      if raw_image is None:
+        raw_image = empty((dataset.NumberOfTimeSlices, dataset.NumberOfSlices, dataset.Rows, dataset.Cols), float32)
+
+      insert_image(raw_image, dataset)
+
+    if first_dataset is None:
+      raise MissingPivotDataset
+    if raw_image is None:
+      raise MissingPivotDataset
+
+
+    super().__init__(Image(raw_image))
+
+
+
+
 
 __all__ = [
   'Series',

@@ -42,7 +42,6 @@ This class is the server running the dicom node. It contains configuration for t
 #### DicomGeneration
 
 * `factory: Optional[DicomFactory] = None` - Class for producing various Dicom objects and series
-* `filling_strategy: FillingStrategy = FillingStrategy.DISCARD` - Filling strategy the dicom factory should follow in the case of unspecified tags in the blueprint.
 * `header_blueprint: Optional[Blueprint] = None` - Blueprint for creating a series header
 * `c_move_blueprint: Optional[Blueprint] = None` - Blueprint for create a C Move object
 
@@ -95,4 +94,4 @@ These methods are not intended to be overwritten by a user as they require intim
 * `_consume_c_store_container(self, c_store_container: CStoreContainer) -> int` -> Updates the pipeline with respect C Store request
 * `_consume_association_release_store_association` -> Handler function that performs side effects related to the releasing of a store association
 * `_dispatch(self, output: PipelineOutput): -> bool` - Dispatching output to their destination and handles errors of dispatching
-* `_get_input_container(self, patient_ID: str, released_container: ReleasedContainer) -> InputContainer` - Extracts 
+* `_get_input_container(self, patient_ID: str, released_container: ReleasedContainer) -> InputContainer` - Extracts
