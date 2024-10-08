@@ -21,7 +21,7 @@ from nibabel.nifti1 import Nifti1Image
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 
 from dicomnode.dicom import has_tags
-from dicomnode.math.affine import AffineMatrix, ReferenceSpace
+from dicomnode.math.affine import Space, ReferenceSpace
 from dicomnode.math.image import build_image_from_datasets, numpy_image, Image
 from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset
 
@@ -179,7 +179,7 @@ class NiftiSeries(Series):
   def __init__(self, nifti: Nifti1Image) -> None:
     self.nifti = nifti
     image_data = self.nifti.get_fdata()
-    affine = AffineMatrix.from_nifti(self.nifti)
+    affine = Space.from_nifti(self.nifti)
 
     super().__init__(Image(image_data, affine))
 
@@ -192,11 +192,14 @@ class LargeDynamicPetSeries(Series):
     'RescaleIntercept',
     'RescaleSlope',
     'PixelData',
+    'ActualFrameTime',
+    'AcquisitionTime'
   ]
 
   def __init__(self, datasets: Iterable[Dataset]):
     first_dataset = None
     raw_image = None
+
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
       if not has_tags(dataset, self.REQUIRED_TAGS):
         raise InvalidDataset(f"Dataset doesn't appear to be large pet")
@@ -221,6 +224,7 @@ class LargeDynamicPetSeries(Series):
       raise MissingPivotDataset
     if raw_image is None:
       raise MissingPivotDataset
+
 
 
     super().__init__(Image(raw_image))

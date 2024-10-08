@@ -12,7 +12,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.math.affine import AffineMatrix
+from dicomnode.math.affine import Space
 
 numpy_image: TypeAlias = Union[ndarray[Tuple[int,int,int], Any],ndarray[Tuple[int,int,int,int], Any]]
 
@@ -72,7 +72,7 @@ def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
 class Image:
   def __init__(self,
                image_data: numpy_image,
-               affine: AffineMatrix,
+               affine: Space,
                minimum_value=0) -> None:
     self.raw = image_data
     self.affine = affine
@@ -82,7 +82,7 @@ class Image:
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     image_data = build_image_from_datasets(datasets)
-    affine = AffineMatrix.from_datasets(datasets)
+    affine = Space.from_datasets(datasets)
 
     return cls(image_data, affine)
 

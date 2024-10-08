@@ -18,7 +18,6 @@ import numpy as np
 # Imports
 from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
 
-
 # Module Imports
 from . import types
 

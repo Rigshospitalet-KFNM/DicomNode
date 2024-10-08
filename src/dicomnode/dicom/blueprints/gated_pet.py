@@ -14,7 +14,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.math.affine import AffineMatrix
+from dicomnode.math.affine import Space
 from dicomnode.math.image import build_image_from_datasets
 
 GATED_BLUEPRINT = Blueprint([
@@ -23,13 +23,13 @@ GATED_BLUEPRINT = Blueprint([
 
 @dataclass
 class BuildGatedSeriesArguments:
-  images: Union[List[Path], 
-                List[List[Dataset]], 
-                List[Nifti1Image], 
+  images: Union[List[Path],
+                List[List[Dataset]],
+                List[Nifti1Image],
                 List[ndarray]]
 
 def _load_affine_nifti(nifti_image: Nifti1Image):
-  return AffineMatrix.from_nifti(nifti_image)
+  return Space.from_nifti(nifti_image)
 
 def _load_affine_path(path: Path):
   return _load_affine_nifti(load(path))
@@ -46,7 +46,7 @@ def _load_dicom(dicoms: List[Dataset]) -> ndarray:
 def build_gated_series(
     args: BuildGatedSeriesArguments
 ) -> DicomSeries:
-  
+
   images: List[ndarray] = []
   pivot = args.images[0]
 
@@ -66,7 +66,7 @@ def build_gated_series(
       images.append(image)
     elif isinstance(image, List):
       images.append(_load_dicom(image))
-  
+
   image_space = concatenate(images)
 
   return DicomSeries([])

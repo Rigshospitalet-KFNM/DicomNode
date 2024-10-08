@@ -18,7 +18,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.math.types import RotationAxes
 
-RawAffineMatrix: TypeAlias = ndarray[Tuple[Literal[4], Literal[4]], dtype[float64]]
+RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float64]]
 
 
 # Rotation matrix can be found here:
@@ -26,22 +26,22 @@ RawAffineMatrix: TypeAlias = ndarray[Tuple[Literal[4], Literal[4]], dtype[float6
 ROTATION_MATRIX_90_DEG_X  = array([
   [1, 0,  0],
   [0, 0, -1],
-  [0, 1,  0]
+  [0, 1,  0],
 ])
 
 ROTATION_MATRIX_90_DEG_Y  = array([
   [ 0, 0, 1],
   [ 0, 1, 0],
-  [-1, 0, 0]
+  [-1, 0, 0],
 ])
 
 ROTATION_MATRIX_90_DEG_Z  = array([
   [0, -1, 0],
   [1,  0, 0],
-  [0,  0, 1]
+  [0,  0, 1],
 ])
 
-class AffineMatrix:
+class Space:
   class Span:
     def __init__(self,
                  x: Tuple[float, float],
@@ -67,11 +67,11 @@ class AffineMatrix:
 
       raise KeyError
 
-  raw: RawAffineMatrix
+  basis: RawBasisMatrix
   span: Span
 
-  def __init__(self, raw: RawAffineMatrix, span: Span):
-    self.raw = raw
+  def __init__(self, raw: RawBasisMatrix, span: Span):
+    self.basis = raw
     self.inverted_raw = inv(raw)
     self.span = span
 
@@ -88,7 +88,7 @@ class AffineMatrix:
         (affine[2,3], 0.0) # wrong values
       )
     else:
-      affine = identity(4, dtype=float64)
+      affine = identity(3, dtype=float64)
       span = cls.Span(
         (0.0, data.shape[2]),
         (0.0, data.shape[1]),
@@ -112,10 +112,9 @@ class AffineMatrix:
       thickness_z = first_dataset.SliceThickness
 
       affine_raw = numpy.array([
-        [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0, start_coordinates[0]],
-        [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0, start_coordinates[1]],
-        [thickness_x * image_orientation[2], thickness_y * image_orientation[5],  thickness_z, start_coordinates[2]],
-        [0,0,0,1],
+        [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0],
+        [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0],
+        [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z, ],
       ])
 
       end_coordinates = [
@@ -139,7 +138,7 @@ class AffineMatrix:
     x_dim = pivot.Columns
     y_dim = pivot.Rows
     z_dim = len(datasets)
-    return cls(identity(4),
+    return cls(identity(3),
                cls.Span((0.0, x_dim),
                         (0.0, y_dim),
                         (0.0, z_dim))
@@ -154,7 +153,7 @@ class AffineMatrix:
         bool: _description_
     """
 
-    abs_affine = absolute(self.raw)
+    abs_affine = absolute(self.basis)
 
     return abs_affine[0,1] < abs_affine[0,0] and \
            abs_affine[0,2] < abs_affine[0,0] and \
@@ -178,9 +177,9 @@ class AffineMatrix:
         return 0
 
   def rotation_to_standard_space(self) -> ndarray:
-    axis_x_dom = self.__dominant_axis(self.raw[0,:3])
-    axis_y_dom = self.__dominant_axis(self.raw[1,:3])
-    axis_z_dom = self.__dominant_axis(self.raw[2,:3])
+    axis_x_dom = self.__dominant_axis(self.basis[0])
+    axis_y_dom = self.__dominant_axis(self.basis[1])
+    axis_z_dom = self.__dominant_axis(self.basis[2])
 
     if axis_x_dom == axis_y_dom or axis_x_dom == axis_z_dom or axis_y_dom == axis_z_dom:
       raise Exception
@@ -206,10 +205,10 @@ class AffineMatrix:
 
 
   def __matmul__(self, other):
-    return self.raw @ other
+    return self.basis @ other
 
   def __rmatmul__(self, other):
-    return other @ self.raw
+    return other @ self.basis
 
 class ReferenceSpace(Enum):
   """These are the possible reference spaces a study can be in.
@@ -269,16 +268,16 @@ class ReferenceSpace(Enum):
   """
 
   @classmethod
-  def from_affine(cls, affine: AffineMatrix):
+  def from_affine(cls, affine: Space):
     if not affine.correct_rotation():
       return None
 
     def is_positive(num):
       return 0 < num
 
-    x_coord = affine.raw[0,0]
-    y_coord = affine.raw[1,1]
-    z_coord = affine.raw[2,2]
+    x_coord = affine.basis[0,0]
+    y_coord = affine.basis[1,1]
+    z_coord = affine.basis[2,2]
 
     if is_positive(x_coord) and is_positive(y_coord) and is_positive(z_coord):
       return cls.RAS

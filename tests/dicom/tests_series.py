@@ -6,7 +6,7 @@ from unittest import TestCase
 
 # Third party module
 from numpy import ndarray
-from pydicom import Dataset
+from pydicom import Dataset, DataElement
 
 # Dicomnode
 from dicomnode.dicom import gen_uid
@@ -42,9 +42,17 @@ class DicomSeriesTestCase(TestCase):
 
   def test_dicomnode_get_tag(self):
     ds = DicomSeries(self.datasets)
-    self.assertEqual(ds[0x0028_0010].value, 3)
+    de = ds[0x0028_0010]
+    if not isinstance(de, DataElement):
+      self.assertIsInstance(de, DataElement)
+      raise Exception
+    self.assertEqual(de.value, 3)
     sop_instance_uids = ds[0x0008_0018]
     self.assertIsInstance(sop_instance_uids, List)
+    if not isinstance(sop_instance_uids, List):
+      self.assertFalse(True)
+      raise Exception
+
     self.assertEqual(len(sop_instance_uids), self.num_datasets)
 
   def test_shared_tag(self):

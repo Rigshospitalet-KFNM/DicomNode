@@ -5,10 +5,7 @@ from unittest import TestCase
 from pydicom import Dataset
 
 # Dicomnode package
-from dicomnode.math.affine import AffineMatrix
-
-
-
+from dicomnode.math.affine import Space
 
 
 class AffineTestCases(TestCase):
@@ -26,4 +23,4 @@ class AffineTestCases(TestCase):
 
       return ds
 
-    affine = AffineMatrix.from_datasets([build_dataset(i) for i in range(10)])
+    affine = Space.from_datasets([build_dataset(i) for i in range(10)])
