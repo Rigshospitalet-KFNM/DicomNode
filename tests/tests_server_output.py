@@ -6,8 +6,8 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 from unittest import TestCase
 
-from dicomnode.lib.dimse import Address
-from dicomnode.lib.dicom import gen_uid, make_meta
+from dicomnode.dicom.dimse import Address
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.server.output import DicomOutput, FileOutput
 from tests.helpers import get_test_ae
 

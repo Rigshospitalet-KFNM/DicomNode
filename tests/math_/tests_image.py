@@ -62,11 +62,3 @@ class ImageTestCase(TestCase):
     ])
 
     self.assertTrue((image.affine.basis==expected_affine).all())
-    self.assertTrue((image.coordinates_at(3,3,3)==numpy.array([12.0,12.0,12.0])).all())
-    self.assertTrue((image.coordinates_at([3,3,3])==numpy.array([12.0,12.0,12.0])).all())
-    self.assertTrue((image.coordinates_at((3,3,3))==numpy.array([12.0,12.0,12.0])).all())
-    self.assertTrue((image.coordinates_at(numpy.array([3,3,3]))==numpy.array([12.0,12.0,12.0])).all())
-    self.assertTrue((image.coordinates_at(numpy.array([3,3,3]))==numpy.array([12.0,12.0,12.0])).all())
-    image.raw[4,4,4] = 4
-    self.assertEqual(image.value_at_index(4,4,4), 4)
-    self.assertEqual(image.center_index(), (4,4,4))

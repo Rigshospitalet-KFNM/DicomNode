@@ -13,7 +13,7 @@ import numpy
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.lib.dicom import gen_uid
+from dicomnode.dicom import gen_uid
 from dicomnode.lib.utils import str2bool, colomn_to_row_major_order
 
 # Testing helpers
@@ -88,5 +88,3 @@ class pydicomTestCases(TestCase):
        [ 5.0, 11.0, 17.0, 23.0],
       ]
     ])
-
-
