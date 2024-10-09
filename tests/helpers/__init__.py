@@ -30,7 +30,7 @@ except KeyError:
 # Dicomnode
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
 from dicomnode.lib.logging import set_logger
-from dicomnode.lib.dicom import gen_uid, make_meta
+from dicomnode.dicom import gen_uid, make_meta
 
 def _generate_numpy_dataset(
     StudyUID: UID,
@@ -45,7 +45,7 @@ def _generate_numpy_dataset(
     image_orientation,
     pixel_spacing,
     slice_thickness,
-    
+
   ) -> Dataset:
   ds = Dataset()
   ds.SOPClassUID = SecondaryCaptureImageStorage
@@ -258,5 +258,3 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 def testing_logs():
   """Set or reset logs up for testing"""
   set_logger(None)
-
-

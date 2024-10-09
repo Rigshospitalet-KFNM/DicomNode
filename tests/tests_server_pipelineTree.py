@@ -17,9 +17,8 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode packages
-from dicomnode.lib.dicom import gen_uid, make_meta
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
-from dicomnode.lib.dicom_factory import Blueprint, StaticElement, InstanceCopyElement, CopyElement, DicomFactory
 from dicomnode.server.grinders import Grinder
 from dicomnode.server.input import AbstractInput, DynamicInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode

@@ -14,7 +14,8 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.math.affine import Space
 
-numpy_image: TypeAlias = Union[ndarray[Tuple[int,int,int], Any],ndarray[Tuple[int,int,int,int], Any]]
+numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
+raw_image_frames: TypeAlias = ndarray[Tuple[int,int,int,int], Any]
 
 def fit_image_into_unsigned_bit_range(image: ndarray,
                                       bits_stored = 16,
@@ -92,11 +93,11 @@ class Image:
     input_arg = args[0]
     if len(input_arg) == 3:
       i,j,k = input_arg
-      coordinates = array([i,j,k,1])
+      coordinates = array([i,j,k])
     elif len(args) == 1:
       if isinstance(input_arg, Tuple) or isinstance(input_arg, List):
         i,j,k = tuple(input_arg[0])
-        coordinates = array([i,j,k,1])
+        coordinates = array([i,j,k])
       else:
         coordinates = args[0]
     else:
@@ -106,7 +107,7 @@ class Image:
     if not isinstance(coordinates, ndarray): #pragma: no cover
       raise TypeError("Could not converts arguments to a Numpy.ndarray")
 
-    if coordinates.shape != (4,): #pragma: no cover
+    if coordinates.shape != (3,): #pragma: no cover
       raise ValueError("Input vector is not a coordinate (x,y,z)")
 
     return coordinates
@@ -131,20 +132,6 @@ class Image:
       raise TypeError("Could not converts arguments to a Numpy.ndarray")
 
     return coordinates
-
-  def coordinates_at(self,*args):
-    """
-
-    Args:
-
-
-    Raises:
-        TypeError: _description_
-        TypeError: _description_
-    """
-    coordinates = self._map_args_coordinates(args)
-
-    return (self.affine @ coordinates)[:3]
 
   def _get_value_box_around_index(self, pseudo_index):
     x,y,z = pseudo_index
@@ -182,7 +169,6 @@ class Image:
 
   def value_at_index(self, *args):
     x, y, z = self._map_args_point(args)
-
     columns, rows, slices = self.raw.shape
 
     if not (0 < x < columns):
@@ -208,7 +194,6 @@ class Image:
 
     return return_value
 
-
   def center_index(self):
     columns, rows, slices = self.raw.shape
 
@@ -217,3 +202,7 @@ class Image:
       (rows - 1) // 2,
       (slices - 1) // 2,
     )
+
+class FramedImage():
+  def __init__(self, frames: raw_image_frames) -> None:
+    self.raw = frames

@@ -19,7 +19,6 @@ from rt_utils.ds_helper import get_contour_sequence_by_roi_number
 # Dicomnode packages
 from dicomnode.lib.exceptions import InvalidDataset
 
-
 def get_contour_sequence_by_name(RT_dataset: Dataset, name: str) -> Sequence:
   if 'StructureSetROISequence' not in RT_dataset:
     raise InvalidDataset("RT data doesn't contain any contour data (StructureSetROISequence)")

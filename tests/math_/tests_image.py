@@ -36,7 +36,6 @@ class ImageTestCase(TestCase):
     min_val = data.min()
 
     bits_stored = 12
-    bits_max_val = (1 << bits_stored) - 1
 
     fitted_data, slope, intercept = fit_image_into_unsigned_bit_range(
       data, bits_stored=bits_stored, bits_allocated=16
@@ -57,10 +56,9 @@ class ImageTestCase(TestCase):
 
     self.assertEqual(image.raw.shape, (10,10,10))
     expected_affine = numpy.array([
-      [4, 0, 0, 0],
-      [0, 4, 0, 0],
-      [0, 0, 4, 0],
-      [0, 0, 0, 1],
+      [4, 0, 0],
+      [0, 4, 0],
+      [0, 0, 4],
     ])
 
     self.assertTrue((image.affine.basis==expected_affine).all())

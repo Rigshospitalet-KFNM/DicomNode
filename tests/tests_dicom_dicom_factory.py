@@ -20,6 +20,7 @@ from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement,\
   Blueprint, SeriesElement, StaticElement, InstanceCopyElement, \
   InstanceEnvironment, SequenceElement, get_pivot
+from dicomnode.dicom.blueprints import add_UID_tag
 from dicomnode.dicom.series import DicomSeries
 
 from dicomnode.lib.exceptions import IncorrectlyConfigured
@@ -345,3 +346,42 @@ class DicomFactoryTestCase(TestCase):
       self.assertEqual(dataset.SmallestImagePixelValue, 0)
       # Some numeric unstably might cause Numpy to round down.
       #self.assertGreaterEqual(dataset.LargestImagePixelValue, 65534)
+
+  def test_create_dataset_with_private_tags(self):
+    bp = Blueprint([])
+
+    bp.add_virtual_element(StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage))
+    bp.add_virtual_element(FunctionalElement(0x0008_0018, 'UI', add_UID_tag))
+    bp.add_virtual_element(StaticElement(0x0020_0013, 'IS', 1))
+
+    bp.add_virtual_element(StaticElement(0x3003_0199, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3003_0101, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3003_0102, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3005_0101, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3003_0182, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3003_0181, 'IS', 14710))
+
+    bp.add_virtual_element(StaticElement(0x3005_0199, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3005_0102, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3005_01AE, 'IS', 14710))
+    bp.add_virtual_element(StaticElement(0x3003_01AE, 'IS', 14710))
+
+    factory = DicomFactory()
+    pivot = Dataset()
+    build_dataset = factory.build_instance(pivot, bp)
+    prev_tag = None
+
+    for str_ in build_dataset[0x3003_01FE]:
+      if prev_tag is None:
+        prev_tag = str_
+        continue
+      self.assertLess(prev_tag, str_)
+      prev_tag = str_
+
+    prev_tag = None
+    for str_ in build_dataset[0x3005_01FE]:
+      if prev_tag is None:
+        prev_tag = str_
+        continue
+      self.assertLess(prev_tag, str_)
+      prev_tag = str_

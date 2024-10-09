@@ -19,7 +19,7 @@ a method called validate, which these have NOTHING to with required_values
 
 # Python Standard Library
 from re import Pattern
-from typing import Any,Iterable, Optional, Union
+from typing import Any,Iterable, Optional, Union, Type
 
 # Third party Modules
 
@@ -32,8 +32,8 @@ class Validator:
     pass
 
   def __call__(self, target: Any) -> bool:
-    return False
-  
+    return False # pragma: no cover
+
 
 class EqualityValidator(Validator):
   def __init__(self, value: Any) -> None:
@@ -48,28 +48,28 @@ class RegexValidator(Validator):
   def __init__(self, value: Union[str, Pattern]) -> None:
     super().__init__(value)
     if isinstance(value, str):
-      self.pattern = from_wildcard(value)
+      self.pattern = from_wildcard(f"{value}")
     else:
       self.pattern = value
 
   def __call__(self, target: Any) -> bool:
-    return  self.pattern.match(target) is not None
+    return  self.pattern.search(target) is not None
 
 
 class OptionsValidator(Validator):
-  def __init__(self, value: Iterable[Any], validator: Optional[Validator] = None) -> None:
+  def __init__(self, value: Iterable[Any], validator: Type[Validator] = EqualityValidator) -> None:
     super().__init__(value)
     self.options = value
-    self.optional_validator = validator
+    self.internal_validator = validator
 
   def __call__(self, target: Any) -> bool:
     return_value = False
     for value in self.options:
-      if self.optional_validator is None:
-        return_value |= value == target
-      else:
-        return_value |= self.optional_validator(target)
-    return value
+      validator = self.internal_validator(value)
+      return_value |= validator(target)
+      if return_value:
+        break
+    return return_value
 
 
 def get_validator_for_value(value):
@@ -77,5 +77,5 @@ def get_validator_for_value(value):
     return value
   if isinstance(value, Pattern):
     return RegexValidator(value)
-  
+
   return EqualityValidator(value)

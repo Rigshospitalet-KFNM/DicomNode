@@ -70,7 +70,7 @@ class VirtualElement(ABC):
 
   @property
   def is_private(self) -> bool:
-    return bool((self.tag >> 16) % 2)
+    return self.tag.is_private
 
   @VR.setter
   def VR(self, val: str) -> None:
@@ -298,11 +298,11 @@ class Blueprint():
     for ve in virtual_elements:
       self.add_virtual_element(ve)
 
-  def __len__(self) -> int:
-    return len(self._dict)
-
   def __contains__(self, tag: int) -> bool:
     return tag in self._dict
+
+  def __len__(self):
+    return len(self._dict)
 
   def __add__(self, blueprint: 'Blueprint') -> 'Blueprint':
     new_header_blueprint = type(self)()
@@ -331,7 +331,14 @@ class Blueprint():
         raise IncorrectlyConfigured
       group_id = (tag & 0xFFFF0000) + ((tag >> 8) & 0xFF)
       tag_group = tag & 0xFFFFFF00
-      index = len(list(self._dict.irange(tag_group, tag))) - 1
+      tags = list(self._dict.irange(tag_group, tag))
+      if tags:
+        if tags[-1] < tag:
+          index = len(tags)
+        else:
+          index = len(tags) -1
+      else:
+        index = 0
       tag_name = tag_group + Reserved_Tags.PRIVATE_TAG_NAMES.value
       tag_VR = tag_group + Reserved_Tags.PRIVATE_TAG_VRS.value
 
@@ -348,7 +355,7 @@ class Blueprint():
           del static_element.value[index]
 
       VE_names: StaticElement[List[str]] = self._dict[tag_name]
-      VE_names.value.insert(index, virtual_element.name)
+      VE_names.value.insert(index, f"({virtual_element.tag.group:04x}, {virtual_element.tag.element:04x}) - {virtual_element.name}")
       VE_VR: StaticElement[List[str]] = self._dict[tag_VR]
       VE_VR.value.insert(index, virtual_element.VR)
 
@@ -540,7 +547,7 @@ class DicomFactory():
     return series
 
   def build_series_without_image_encoding(self,
-                                          images: Sequence,
+                                          images: TypingSequence,
                                           blueprint: Blueprint,
                                           datasets: Union[DicomSeries, List[Dataset]],
                                           kwargs: Dict,

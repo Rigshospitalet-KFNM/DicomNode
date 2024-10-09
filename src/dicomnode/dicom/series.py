@@ -5,12 +5,14 @@ https://xkcd.com/927/
 """
 
 # Python standard library
+from datetime import datetime
 from functools import reduce
 from enum import Enum
 from typing import Any, Callable, List, Iterable, Literal, Optional, Tuple,\
   TypeAlias, Union
 
 # Third party packages
+import numpy
 from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
 from pydicom.datadict import dictionary_VR
@@ -22,8 +24,8 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 
 from dicomnode.dicom import has_tags
 from dicomnode.math.affine import Space, ReferenceSpace
-from dicomnode.math.image import build_image_from_datasets, numpy_image, Image
-from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset
+from dicomnode.math.image import Image, FramedImage
+from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
 
 def sortDatasets(dataset: Dataset):
   """Sorting function for a collection of datasets. The order is determined by
@@ -96,14 +98,15 @@ class Series:
   @property
   def image(self):
     if self._image is None:
-      if self._image_constructor is None: #pragma: no cover
-        raise Exception
-      self._image = self._image_constructor()
+      if isinstance(self._image_constructor, Callable): #pragma: no cover
+        self._image = self._image_constructor()
+      else:
+        raise IncorrectlyConfigured("An Image must have an image or ")
     return self._image
 
   # Constructors
-  def __init__(self, image: Union[Image, Callable[[],Image]]):
-    if isinstance(image, Image):
+  def __init__(self, image: Union[Image, FramedImage, Callable[[],Union[Image, FramedImage]]]):
+    if isinstance(image, Image) or isinstance(image, FramedImage):
       self._image = image
       self._image_constructor = None
     else:
@@ -193,12 +196,16 @@ class LargeDynamicPetSeries(Series):
     'RescaleSlope',
     'PixelData',
     'ActualFrameTime',
-    'AcquisitionTime'
+    'AcquisitionTime',
+    'AcquisitionDate',
   ]
 
   def __init__(self, datasets: Iterable[Dataset]):
     first_dataset = None
     raw_image = None
+    frame_times_ms = None
+    frame_acquisition_time = None
+
 
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
       if not has_tags(dataset, self.REQUIRED_TAGS):
@@ -218,20 +225,25 @@ class LargeDynamicPetSeries(Series):
       if raw_image is None:
         raw_image = empty((dataset.NumberOfTimeSlices, dataset.NumberOfSlices, dataset.Rows, dataset.Cols), float32)
 
+      if frame_times_ms is None:
+        frame_times_ms = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.int32)
+
+      if frame_acquisition_time is None:
+        frame_acquisition_time = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.datetime64)
+
+      frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
       insert_image(raw_image, dataset)
+      frame_times_ms[frameIndex] = dataset.ActualFrameDuration
+      frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
 
     if first_dataset is None:
-      raise MissingPivotDataset
+      raise MissingPivotDataset("Cannot construct an image from no datasets")
     if raw_image is None:
-      raise MissingPivotDataset
+      raise MissingPivotDataset("Cannot construct an image from no datasets")
 
-
-
-    super().__init__(Image(raw_image))
-
-
-
-
+    super().__init__(FramedImage(raw_image))
+    self.frame_durations_ms = frame_times_ms
+    self.frame_acquisition_time = frame_acquisition_time
 
 __all__ = [
   'Series',
