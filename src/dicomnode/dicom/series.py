@@ -8,8 +8,8 @@ https://xkcd.com/927/
 from datetime import datetime
 from functools import reduce
 from enum import Enum
-from typing import Any, Callable, List, Iterable, Literal, Optional, Tuple,\
-  TypeAlias, Union
+from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
+  Tuple, TypeAlias, Union
 
 # Third party packages
 import numpy
@@ -147,6 +147,12 @@ class DicomSeries(Series):
       return [dataset.get(tag, None) for dataset in self.datasets]
     return self.pivot.get(tag, None)
 
+  def __getattribute__(self, name: str) -> Any:
+    try:
+      return super().__getattribute__(name)
+    except AttributeError:
+        return self.datasets[0].__getattribute__(name)
+
   def __setitem__(self, tag: int, value):
     if tag in SERIES_VARYING_TAGS:
       if not isinstance(value, List):
@@ -198,14 +204,38 @@ class LargeDynamicPetSeries(Series):
     'ActualFrameTime',
     'AcquisitionTime',
     'AcquisitionDate',
+    'ImageIndex',
   ]
+
+  @property
+  def image(self) -> FramedImage:
+    image = super().image
+    if not isinstance(image, FramedImage):
+      raise IncorrectlyConfigured
+
+    return image
+
+  @property
+  def raw(self):
+    return self.image.raw
+
+  @property
+  def frame_durations_ms(self):
+    return self._frame_durations_ms
+
+  @property
+  def frame_acquisition_time(self):
+    return self._frame_acquisition_time
+
+  @property
+  def pixel_volume(self):
+    return self._pixel_volume
 
   def __init__(self, datasets: Iterable[Dataset]):
     first_dataset = None
     raw_image = None
     frame_times_ms = None
     frame_acquisition_time = None
-
 
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
       if not has_tags(dataset, self.REQUIRED_TAGS):
@@ -229,7 +259,7 @@ class LargeDynamicPetSeries(Series):
         frame_times_ms = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.int32)
 
       if frame_acquisition_time is None:
-        frame_acquisition_time = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.datetime64)
+        frame_acquisition_time = numpy.ones((dataset.NumberOfTimeSlices), dtype='datetime64[ms]')
 
       frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
       insert_image(raw_image, dataset)
@@ -240,10 +270,22 @@ class LargeDynamicPetSeries(Series):
       raise MissingPivotDataset("Cannot construct an image from no datasets")
     if raw_image is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
+    if frame_times_ms is None:
+      raise MissingPivotDataset("Cannot construct an image from no datasets")
+    if frame_acquisition_time is None:
+      raise MissingPivotDataset("Cannot construct an image from no datasets")
 
     super().__init__(FramedImage(raw_image))
-    self.frame_durations_ms = frame_times_ms
-    self.frame_acquisition_time = frame_acquisition_time
+    self._pivot = first_dataset
+    self._frame_durations_ms = frame_times_ms
+    self._frame_acquisition_time = frame_acquisition_time
+    self._pixel_volume = numpy.array([first_dataset.SliceThickness, first_dataset.PixelSpacing[1], first_dataset.PixelSpacing[0]])
+
+  def __getattribute__(self, name: str) -> Any:
+    try:
+      return super().__getattribute__(name)
+    except AttributeError:
+      return self._pivot.__getattribute__(name)
 
 __all__ = [
   'Series',

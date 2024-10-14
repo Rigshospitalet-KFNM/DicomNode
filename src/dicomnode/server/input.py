@@ -16,6 +16,7 @@ from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
 
 # Third party packages
 from pydicom import Dataset
+from pydicom.datadict import tag_for_keyword
 from pydicom.uid import UID
 
 # Dicomnode packages
@@ -40,11 +41,11 @@ class AbstractInput(ImageTreeInterface, ABC):
   # Private tags should be injected, rather than put into the input
   _private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
 
-  required_tags: List[int] = [0x00080018] # SOPInstanceUID
+  required_tags: List[Union[int,str]] = [0x00080018] # SOPInstanceUID
   """The list of tags that must be present in a dataset to be accepted
   into the input. Consider checking SOP_mapping.py for collections of Tags."""
 
-  required_values: Dict[int, Any] = {}
+  required_values: Dict[Union[int,str], Any] = {}
   "A Mapping of tags and associated values, doesn't work for values in sequences"
 
   image_grinder: Grinder = IdentityGrinder()
@@ -162,11 +163,21 @@ class AbstractInput(ImageTreeInterface, ABC):
     """
     # Dataset Validation
     for required_tag in self.required_tags:
+      if isinstance(required_tag, str):
+        required_tag = tag_for_keyword(required_tag)
+        if required_tag is None:
+          raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
+
       if required_tag not in dicom:
         #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
 
     for required_tag, required_value in self.required_values.items():
+      if isinstance(required_tag, str):
+        required_tag = tag_for_keyword(required_tag)
+        if required_tag is None:
+          raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
+
       if required_tag not in dicom:
         #self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False

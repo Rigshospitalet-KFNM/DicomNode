@@ -31,7 +31,7 @@ from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicom node package
 from dicomnode.data_structures.image_tree import DicomTree
-from dicomnode.dicom.series import DicomSeries
+from dicomnode.dicom.series import DicomSeries, LargeDynamicPetSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, MissingPivotDataset
 from dicomnode.lib.logging import get_logger
 
@@ -264,7 +264,7 @@ class NiftiGrinder(Grinder):
     return return_dir['NII'] # Yeah your documentation is wrong, and you should feel real fucking bad
 
 class RTStructGrinder(Grinder):
-  """Grinder for extracting RT structs from  
+  """Grinder for extracting RT structs from
 
   """
   def __call__(self, image_generator: Iterable[Dataset]) -> Any:
@@ -283,7 +283,16 @@ class RTStructGrinder(Grinder):
     if rt_struct is None:
       raise MissingPivotDataset
 
-    return RTStruct(rt_series, rt_struct)
+    return RTStruct(rt_series, rt_struct) # pragma: type ignore
+
+class LargeDynamicPetSeriesGrinder(Grinder):
+  def __init__(self, save_dataset=True) -> None:
+    super().__init__()
+    self.save_dataset = save_dataset
+
+  def __call__(self, image_generator: Iterable[Dataset]):
+    return LargeDynamicPetSeries(image_generator, save_datasets=self.save_dataset)
+
 
 __all__ = [
   'Grinder',
