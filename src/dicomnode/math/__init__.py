@@ -13,7 +13,7 @@ that for you.
 from typing import List, Tuple
 
 # Third party packages
-import numpy as np
+import numpy
 
 # Imports
 from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
@@ -30,6 +30,24 @@ except ImportError:
 
 from . import affine
 from . import image
+
+def sum_1_to_n(n: int) -> int:
+  return n * (n + 1) // 2
+
+def sum_n_to_m(n:int, m:int):
+  return sum_1_to_n(m) - sum_1_to_n(n)
+
+def center_of_gravity(data: numpy.ndarray):
+    ndims = data.ndim
+    imadim = data.shape
+    cog = numpy.zeros((ndims,), dtype=int)
+
+    # loop over each dimension to find center
+    for dim in range(0,ndims):
+        cog[dim] = numpy.sum(range(0,imadim[dim])*numpy.sum(data, axis=dim))//numpy.sum(numpy.sum(data, axis=dim))
+
+    return cog
+
 
 
 def mirror_inplace_gpu(arr: image.numpy_image, direction: MirrorDirection):
@@ -84,21 +102,21 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
   if len(arr.shape) != 3:
     raise ValueError("Mirror is only supported for 3 dimensional volumes")
   if direction == MirrorDirection.X:
-    return np.flip(arr, 2)
+    return numpy.flip(arr, 2)
   if direction == MirrorDirection.Y:
-    return np.flip(arr, 1)
+    return numpy.flip(arr, 1)
   if direction == MirrorDirection.Z:
-    return np.flip(arr, 0)
+    return numpy.flip(arr, 0)
   if direction == MirrorDirection.XY:
-    return np.flip(arr, (2,1))
+    return numpy.flip(arr, (2,1))
   if direction == MirrorDirection.XZ:
-    return np.flip(arr, (2,0))
+    return numpy.flip(arr, (2,0))
   if direction == MirrorDirection.YZ:
-    return np.flip(arr, (0,1))
+    return numpy.flip(arr, (0,1))
   else:
-    return np.flip(arr, (0,1,2))
+    return numpy.flip(arr, (0,1,2))
 
-def _bounding_box_cpu(array):
+def _bounding_box_cpu(array : numpy.ndarray):
   bounding_box_list = [
     [shape_dim - 1, 0] for shape_dim in array.shape
   ]
