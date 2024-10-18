@@ -12,7 +12,14 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.math.affine import Space
+from dicomnode.math.space import Space
+
+try:
+  from dicomnode.math import _cuda # type: ignore
+  CUDA = True
+except ImportError:
+  CUDA = False
+
 
 numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
 raw_image_frames: TypeAlias = ndarray[Tuple[int,int,int,int], Any]
@@ -73,10 +80,10 @@ def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
 class Image:
   def __init__(self,
                image_data: numpy_image,
-               affine: Space,
+               space: Space,
                minimum_value=0) -> None:
     self.raw = image_data
-    self.affine = affine
+    self.space = space
     self.minimum_value = minimum_value
 
 
@@ -86,6 +93,9 @@ class Image:
     affine = Space.from_datasets(datasets)
 
     return cls(image_data, affine)
+
+  def resample_to(self, space: Space):
+    pass
 
   @staticmethod
   def _map_args_coordinates(*args) -> ndarray[Tuple[Literal[4]], Any]:
@@ -165,7 +175,7 @@ class Image:
         _type_: _description_
     """
     point = self._map_args_point(args)
-    return self.affine.inverted_raw @ point
+    return self.space.inverted_raw @ point
 
   def value_at_index(self, *args):
     x, y, z = self._map_args_point(args)

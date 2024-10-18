@@ -19,6 +19,7 @@ from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Py
 
 # Dicomnode Library
 from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
+from dicomnode.lib.utils import type_corrosion
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
   """Updated the dicom dictionary with a set of new private tags,
@@ -91,6 +92,7 @@ def apply_private_tags(
   return dataset
 
 
+@type_corrosion(Path)
 def discover_files(source: Path) -> List[Path]:
   discover_stack: List[Path] = [source]
   files: List[Path] = []
@@ -105,6 +107,7 @@ def discover_files(source: Path) -> List[Path]:
           discover_stack.append(subpath)
   return files
 
+@type_corrosion(Path)
 def load_dicom(dicom_path: Path) -> Dataset:
   """Loads a single dicom image, doesn't parse private tags
   To parse multiple dataset use load_dicoms
@@ -127,6 +130,7 @@ def load_dicom(dicom_path: Path) -> Dataset:
 
   return pydicom.dcmread(dicom_path)
 
+@type_corrosion(Path)
 def load_dicoms(dicom_path: Path) -> List[Dataset]:
   if not dicom_path.exists():
     raise FileNotFoundError
@@ -238,6 +242,7 @@ class TemporaryWorkingDirectory():
 class DicomLazyIterator:
   """This class is for creating a lazy dataset iterator for large datasets
   """
+  @type_corrosion(Path)
   def __init__(self, path: Path, dicom_fileheader="dcm") -> None:
     self._path = path
     self._dicom_fileheader = dicom_fileheader

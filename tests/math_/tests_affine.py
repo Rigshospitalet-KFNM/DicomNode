@@ -5,7 +5,7 @@ from unittest import TestCase
 from pydicom import Dataset
 
 # Dicomnode package
-from dicomnode.math.affine import Space
+from dicomnode.math.space import Space
 
 
 class AffineTestCases(TestCase):

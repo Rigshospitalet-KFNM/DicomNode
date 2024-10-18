@@ -14,7 +14,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.math.affine import Space
+from dicomnode.math.space import Space
 from dicomnode.math.image import build_image_from_datasets
 
 GATED_BLUEPRINT = Blueprint([
@@ -32,7 +32,7 @@ def _load_affine_nifti(nifti_image: Nifti1Image):
   return Space.from_nifti(nifti_image)
 
 def _load_affine_path(path: Path):
-  return _load_affine_nifti(load(path))
+  return _load_affine_nifti(load(path)) #type: ignore
 
 def _load_nifti(nifti_image: Nifti1Image) -> ndarray:
   return nifti_image.get_fdata()

@@ -61,4 +61,4 @@ class ImageTestCase(TestCase):
       [0, 0, 4],
     ])
 
-    self.assertTrue((image.affine.basis==expected_affine).all())
+    self.assertTrue((image.space.basis==expected_affine).all())

@@ -23,8 +23,6 @@ void free_device_memory(Ts** && ... device_pointer){
   }(), ...);
 }
 
-cudaDeviceProp get_current_device();
-
 class CudaRunner{
   public:
     CudaRunner(std::function<void(cudaError_t)> error_lambda)
@@ -49,7 +47,7 @@ class CudaRunner{
     cudaError_t m_error = cudaSuccess;
 };
 
-cudaDeviceProp get_current_device(){
+static cudaDeviceProp get_current_device(){
   cudaDeviceProp prop;
   int current_device;
   cudaGetDevice(&current_device);

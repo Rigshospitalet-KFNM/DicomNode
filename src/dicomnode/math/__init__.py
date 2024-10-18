@@ -28,7 +28,7 @@ try:
 except ImportError:
   CUDA = False
 
-from . import affine
+from . import space
 from . import image
 
 def sum_1_to_n(n: int) -> int:
@@ -145,7 +145,7 @@ def bounding_box(array):
 
 def __all__():
   return [
-    affine,
+    space,
     CUDA,
     image,
     mirror,

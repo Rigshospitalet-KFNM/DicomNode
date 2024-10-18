@@ -8,7 +8,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from argparse import ArgumentTypeError
 from threading import Thread
 from logging import Logger
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Type, TypeVar, Union
 try:
   from os import getuid, setuid
   UNIX = True
@@ -19,6 +19,7 @@ from warnings import warn
 
 # Third party packages
 import numpy
+
 
 # Dicomnode Packages
 # This module is imported first, therefore DO NOT PLACE ANY DICOMNODE MODULES IN HERE
@@ -114,3 +115,18 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
 
 def deprecation_message(deprecated_module_path, new_module_path) -> None:
   warn(f"{deprecated_module_path} has been moved to {new_module_path}", DeprecationWarning)
+
+def type_corrosion(*types: Type):
+  def decorator(func):
+    def wrapper(*args, **kwargs):
+      if len(args) != len(types):
+        raise TypeError(f"{func.__name__} expected {len(types)} arguments, but received {len(args)} arguments.")
+      new_args = []
+      for type_, arg in zip(types, args):
+        if isinstance(arg, type_):
+          new_args.append(arg)
+        else:
+          new_args.append(type_(arg))
+      return func(*new_args, **kwargs)
+    return wrapper
+  return decorator

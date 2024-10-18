@@ -3,9 +3,9 @@
 #include<pybind11/numpy.h>
 
 // Dicomnode imports
-#include"python/python_bounding_box.cu"
-#include"python/python_cuda_management.cu"
-#include"python/python_mirror.cu"
+#include"python/python_bounding_box.cuh"
+#include"python/python_cuda_management.cuh"
+#include"python/python_mirror.cuh"
 
 PYBIND11_MODULE(_cuda, m){
   m.doc() = "Dicomnode cuda library of functions, you shouldn't really need to\

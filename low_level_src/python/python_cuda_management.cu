@@ -1,5 +1,3 @@
-#pragma once
-
 // Pybind includes
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>

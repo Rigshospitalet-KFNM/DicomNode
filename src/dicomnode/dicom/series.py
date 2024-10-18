@@ -23,7 +23,7 @@ from nibabel.nifti1 import Nifti1Image
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 
 from dicomnode.dicom import has_tags
-from dicomnode.math.affine import Space, ReferenceSpace
+from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import Image, FramedImage
 from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
 
