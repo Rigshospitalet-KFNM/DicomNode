@@ -240,16 +240,16 @@ __global__ void scan_kernel(T_IN* src,
   } // Remove the Global offset register
 
   {
-    T_OUT thread_pivot = OP::identity();
+    chunk_registers[0] = shared_input[threadIdx.x * CHUNK];
     #pragma unroll
-    for(uint8_t i = 0; i < CHUNK; i++){
-      thread_pivot = OP::apply(thread_pivot, OP::remove_volatile(shared_input[threadIdx.x * CHUNK + i]));
-      chunk_registers[i] = thread_pivot;
+    for(uint8_t i = 1; i < CHUNK; i++){
+      chunk_registers[i] = OP::apply(chunk_registers[i - 1],
+      OP::remove_volatile(shared_input[threadIdx.x * CHUNK + i]));
     }
 
     __syncthreads();
     // Overwrite Shared memory
-    shared_input[threadIdx.x] = thread_pivot;
+    shared_input[threadIdx.x] = chunk_registers[CHUNK - 1];
   }
   __syncthreads();
 
@@ -374,16 +374,17 @@ __global__ void reduce_kernel(T_IN* src,
   } // Remove the Global offset register
 
   {
-    T_OUT thread_pivot = OP::identity();
+    chunk_registers[0] = shared_input[threadIdx.x * CHUNK];
     #pragma unroll
-    for(uint8_t i = 0; i < CHUNK; i++){
-      thread_pivot = OP::apply(thread_pivot, OP::remove_volatile(shared_input[threadIdx.x * CHUNK + i]));
-      chunk_registers[i] = thread_pivot;
+    for(uint8_t i = 1; i < CHUNK; i++){
+      chunk_registers[i] = OP::apply(chunk_registers[i - 1],
+                                     OP::remove_volatile(shared_input[threadIdx.x * CHUNK + i])
+      );
     }
 
     __syncthreads();
     // Overwrite Shared memory
-    shared_input[threadIdx.x] = thread_pivot;
+    shared_input[threadIdx.x] = chunk_registers[CHUNK - 1];
   }
   __syncthreads();
 

@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 project(dicomnode_c LANGUAGES CXX)
 
+include(ProcessorCount)
+
+ProcessorCount(NUMBER_OF_PROCESSORS)
+if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
+  set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
+endif()
+
 
 set(VERSION_INFO 0.0.1)
 set(CMAKE_CXX_STANDARD 20)
