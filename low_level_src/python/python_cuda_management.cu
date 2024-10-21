@@ -1,8 +1,34 @@
+#include<string>
+
 // Pybind includes
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
+
 #include"../gpu_code/dicom_node_gpu.cu"
+
+std::string get_byte_string (size_t bytes){
+  std::stringstream ss;
+  if(bytes < 1024){
+    ss << bytes << " B";
+    return ss.str();
+  }
+  bytes >>= 10;
+  if(bytes < 1024){
+    ss << bytes << " kB";
+    return ss.str();
+  }
+  bytes >>= 10;
+  if(bytes < 1024){
+    ss << bytes << " MB";
+    return ss.str();
+  }
+
+  bytes >>= 10;
+  ss << bytes << " GB";
+  return ss.str();
+}
+
 
 pybind11::object cast_current_device(){
   return pybind11::cast(get_current_device());
@@ -23,7 +49,20 @@ void apply_cuda_management_module(pybind11::module& m){
     .def_readonly("unifiedFunctionPointers", &cudaDeviceProp::unifiedFunctionPointers)
     .def_readonly("concurrentKernels", &cudaDeviceProp::concurrentKernels)
     .def_readonly("concurrentManagedAccess", &cudaDeviceProp::concurrentManagedAccess)
-    .def_readonly("directManagedMemAccessFromHost", &cudaDeviceProp::directManagedMemAccessFromHost);
+    .def_readonly("directManagedMemAccessFromHost", &cudaDeviceProp::directManagedMemAccessFromHost)
+    .def("__repr__",
+    [](const cudaDeviceProp& prop){
+      std::stringstream ss;
+      ss << "-----Cuda Device Properties-----\n"
+         << "Name: " << prop.name << "\n"
+         << "Compute capability: " << prop.major << "." << prop.minor << "\n"
+         << "Total memory: " << get_byte_string(prop.totalGlobalMem) << "\n"
+         << "Shared memory: " << get_byte_string(prop.sharedMemPerBlock) << "\n"
+         << "Shared memory (optin): " << get_byte_string(prop.sharedMemPerBlock) << "\n"
+         << "Registers per block: " << get_byte_string(prop.regsPerBlock) << "\n"
+         << "Registers per multiprocessor: " << get_byte_string(prop.regsPerMultiprocessor);
+      return ss.str();
+    });
 
   m.def("get_device_properties", &cast_current_device);
 }

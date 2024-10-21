@@ -16,6 +16,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from enum import Enum
 import logging
 from logging import getLogger
+import multiprocessing
 from os import chdir, getcwd
 from pathlib import Path
 from queue import Queue, Empty
@@ -371,6 +372,7 @@ class AbstractPipeline():
 
     return 0x0000
 
+  #region handle_association_released
   def handle_association_released(self, event: evt.Event):
     """This function is called whenever an association is released
 
@@ -385,7 +387,27 @@ class AbstractPipeline():
     for association_type in released_container.association_types:
       handler = self._release_handlers.get(association_type)
       if handler is not None:
-        handler(self, released_container)
+        input_containers = []
+        with self._lock_key:
+          for patient_id in self._updated_patients[released_container.association_id]:
+            if patient_id in self._patient_locks:
+              threads, patient_lock = self._patient_locks[patient_id]
+
+
+
+        process = multiprocessing.Process(target=handler, args=(self, released_container))
+        process.start()
+        process.join()
+        if process.exitcode:
+          # Do clean up
+          pass
+        else:
+          self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
+
+
+
+      else:
+        self.logger.critical(f"Missing Release Handler for {association_type}!")
 
 
   def _consume_association_release_store_association(
@@ -759,8 +781,6 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
   def signal_handler_SIGINT(self, signal, frame):
     self.running = False
-    default_sigint_handler(signal, frame)
-
 
   def __init__(self, master_queue: Optional[Queue[ReleasedContainer]]=None) -> None:
     self.running = True

@@ -10,7 +10,7 @@ from typing import Optional, List, Literal, Tuple, TypeAlias
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
 import numpy
-from numpy import array, absolute, dtype, float64, identity, ndarray
+from numpy import array, absolute, dtype, float32, identity, ndarray
 from numpy.linalg import inv
 from pydicom import Dataset
 
@@ -18,7 +18,7 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.math.types import RotationAxes
 
-RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float64]]
+RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float32]]
 
 
 # Rotation matrix can be found here:
@@ -47,9 +47,25 @@ class Space:
                  x: Tuple[float, float],
                  y: Tuple[float, float],
                  z: Tuple[float, float]) -> None:
-      self.x = x
-      self.y = y
-      self.z = z
+      self._data = numpy.empty((6), float32)
+      self._data[0] = z[0]
+      self._data[1] = z[1]
+      self._data[2] = y[0]
+      self._data[3] = y[1]
+      self._data[4] = x[0]
+      self._data[5] = x[1]
+
+    @property
+    def x(self):
+      return self._data[4:6]
+
+    @property
+    def y(self):
+      return self._data[2:4]
+
+    @property
+    def z(self):
+      return self._data[0:2]
 
     def __getitem__(self, key):
       if key == 1:
@@ -88,7 +104,7 @@ class Space:
         (affine[2,3], 0.0) # wrong values
       )
     else:
-      affine = identity(3, dtype=float64)
+      affine = identity(3, dtype=float32)
       span = cls.Span(
         (0.0, data.shape[2]),
         (0.0, data.shape[1]),
@@ -115,7 +131,7 @@ class Space:
         [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0],
         [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0],
         [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z, ],
-      ])
+      ], dtype=float32)
 
       end_coordinates = [
         thickness_x * image_orientation[0] * first_dataset.Columns + start_coordinates[0],
@@ -138,7 +154,7 @@ class Space:
     x_dim = pivot.Columns
     y_dim = pivot.Rows
     z_dim = len(datasets)
-    return cls(identity(3),
+    return cls(identity(3, dtype=float32),
                cls.Span((0.0, x_dim),
                         (0.0, y_dim),
                         (0.0, z_dim))

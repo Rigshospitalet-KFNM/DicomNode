@@ -3,11 +3,13 @@ import os
 import sys
 import re
 import subprocess
+import multiprocessing
 from pathlib import Path
 import shutil
 
 # Third party Tools
 from setuptools import setup, find_packages, Extension
+from setuptools._distutils.dist import Distribution
 from setuptools.command.build_ext import build_ext
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
@@ -25,7 +27,6 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
   def build_extension(self, ext: CMakeExtension) -> None:
-    print("build Extension is called!")
     # Must be in this form due to bug in .resolve() only fixed in Python 3.10+
     ext_fullpath = Path.cwd() / self.get_ext_fullpath(ext.name)  # type: ignore[no-untyped-call]
     extdir = ext_fullpath.parent.resolve()
@@ -49,7 +50,10 @@ class CMakeBuild(build_ext):
       f"-DPYTHON_EXECUTABLE={sys.executable}",
       f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
     ]
-    build_args = []
+    build_args = [f"-j{multiprocessing.cpu_count()}"]
+    # self.parallel is a Python 3 only way to set parallel jobs by hand
+    # using -j in the build_ext call, not supported by pip or PyPA-build.
+
     # Adding CMake arguments set as environment variable
     # (needed e.g. to build for ARM OSx on conda-forge)
     if "CMAKE_ARGS" in os.environ:
@@ -103,12 +107,6 @@ class CMakeBuild(build_ext):
 
         # Set CMAKE_BUILD_PARALLEL_LEVEL to control the parallel build level
         # across all generators.
-    if "CMAKE_BUILD_PARALLEL_LEVEL" not in os.environ:
-      # self.parallel is a Python 3 only way to set parallel jobs by hand
-      # using -j in the build_ext call, not supported by pip or PyPA-build.
-      if hasattr(self, "parallel") and self.parallel:
-        # CMake 3.12+ only.
-        build_args += [f"-j{self.parallel}"]
 
     build_temp = Path(self.build_temp) / ext.name
     if not build_temp.exists():
@@ -121,7 +119,6 @@ class CMakeBuild(build_ext):
       subprocess.run(
         ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
       )
-      print("Build Successfully")
     except:
       print(f"failed to build {ext.name}")
 

@@ -240,7 +240,7 @@ __global__ void scan_kernel(T_IN* src,
   } // Remove the Global offset register
 
   {
-    chunk_registers[0] = shared_input[threadIdx.x * CHUNK];
+    chunk_registers[0] = OP::remove_volatile(shared_input[threadIdx.x * CHUNK]);
     #pragma unroll
     for(uint8_t i = 1; i < CHUNK; i++){
       chunk_registers[i] = OP::apply(chunk_registers[i - 1],
@@ -374,7 +374,7 @@ __global__ void reduce_kernel(T_IN* src,
   } // Remove the Global offset register
 
   {
-    chunk_registers[0] = shared_input[threadIdx.x * CHUNK];
+    chunk_registers[0] = OP::remove_volatile(shared_input[threadIdx.x * CHUNK]);
     #pragma unroll
     for(uint8_t i = 1; i < CHUNK; i++){
       chunk_registers[i] = OP::apply(chunk_registers[i - 1],

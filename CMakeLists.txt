@@ -4,8 +4,13 @@ project(dicomnode_c LANGUAGES CXX)
 include(ProcessorCount)
 
 ProcessorCount(NUMBER_OF_PROCESSORS)
+
 if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
+  message(STATUS "Processors ${NUMBER_OF_PROCESSORS}")
   set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
+  set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=${NUMBER_OF_PROCESSORS})
+  set(CMAKE_JOB_POOL_COMPILE compile_pool)
+
 endif()
 
 
@@ -39,15 +44,28 @@ if(CMAKE_CUDA_COMPILER)
 #
   message(status ${PYTHON_INCLUDE_DIRS})
 
-  add_py_object_library(bounding_box low_level_src/python/python_bounding_box.cu)
-  add_py_object_library(cuda_management low_level_src/python/python_cuda_management.cu)
-  add_py_object_library(mirror low_level_src/python/python_mirror.cu)
+  set(CUDA_LIBRARIES
+    bounding_box low_level_src/python/python_bounding_box.cu
+    cuda_management low_level_src/python/python_cuda_management.cu
+    mirror low_level_src/python/python_mirror.cu
+    interpolation low_level_src/python/python_interpolation.cu
+  )
+
+  set(OBJECT_TARGETS)
+  list(LENGTH CUDA_LIBRARIES LIBRARY_COUNT)
+  math(EXPR LIBRARY_COUNT "${LIBRARY_COUNT} - 1")
+  foreach(INDEX RANGE 0 ${LIBRARY_COUNT} 2)
+    math(EXPR SOURCE_INDEX "${INDEX} + 1")
+    list(GET CUDA_LIBRARIES ${INDEX} LIBRARY_NAME)
+    list(GET CUDA_LIBRARIES ${SOURCE_INDEX} SOURCE_FILE)
+    add_py_object_library(${LIBRARY_NAME} ${SOURCE_FILE})
+    list(APPEND OBJECT_TARGETS $<TARGET_OBJECTS:${LIBRARY_NAME}>)
+  endforeach()
+
 
   pybind11_add_module(_cuda SHARED
                       low_level_src/python_entry_point.cu
-                      $<TARGET_OBJECTS:bounding_box>
-                      $<TARGET_OBJECTS:cuda_management>
-                      $<TARGET_OBJECTS:mirror>
+                      ${OBJECT_TARGETS}
   )
 
   target_compile_options(_cuda PRIVATE -O3)

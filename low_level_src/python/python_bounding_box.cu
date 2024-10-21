@@ -4,7 +4,7 @@
 
 template<typename T,  uint8_t CHUNK>
 pybind11::list bounding_box(pybind11::array_t<T, ARRAY_FLAGS> arr){
-  pybind11::buffer_info buffer = arr.request(false);
+  const pybind11::buffer_info& buffer = arr.request(false);
   if (buffer.ndim != 3){
     throw std::runtime_error("This function requires 3 dimensional input!");
   }
@@ -17,14 +17,14 @@ pybind11::list bounding_box(pybind11::array_t<T, ARRAY_FLAGS> arr){
   const size_t buffer_size = items;
   BoundingBox_3D out;
   Domain<3> space(
-    buffer.shape[0], buffer.shape[1], buffer.shape[2]
+    buffer.shape[2], buffer.shape[1], buffer.shape[0]
   );
 
   cudaError_t error = reduce<1, BoundingBoxOP_3D<T>, T, BoundingBox_3D, Domain<3>>(
     (T*)buffer.ptr,
     buffer_size,
     &out,
-    {buffer.shape[2], buffer.shape[1], buffer.shape[0]}
+    space
   );
 
   if(error != cudaSuccess){
