@@ -88,7 +88,6 @@ def _generate_numpy_dataset(
   image = numpy.random.randint(0, 2 ** bits - 1, (Cols, Rows), dtype=dType)
   ds.PixelData = image.tobytes()
 
-
   return ds
 
 def generate_numpy_datasets(

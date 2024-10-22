@@ -196,6 +196,7 @@ class PatientNode(ImageTreeInterface):
       else:
         raise InvalidTreeNode # pragma: no cover
     if added == 0:
+      self.logger.info("No datasets where added to the overall Tree")
       raise InvalidDataset()
     self.images += added
     return added
@@ -331,6 +332,8 @@ class PipelineTree(ImageTreeInterface):
       Optional[InputContainer]: If there's insufficient data returns None,
         Otherwise a InputContainer with the grinded values
     """
+    if patient_id not in self:
+      return False
     patient_node = self[patient_id]
     if isinstance(patient_node, PatientNode):
       return patient_node.validate_inputs()
@@ -432,7 +435,7 @@ class PipelineTree(ImageTreeInterface):
 
     self.images -= removed_images
     self.data = new_data_dict
-    self.logger.debug(f"Removed {removed_images} from {len(patient_ids)} Patients")
+    self.logger.debug(f"Removed {removed_images} from {len([0 for _ in patient_ids])} Patients")
 
   def clean_up_patient(self, patient_id: str) -> None:
     """Removes a patient from the tree, and removes any files stored under the patient

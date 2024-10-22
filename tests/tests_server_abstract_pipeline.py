@@ -5,7 +5,7 @@ node logs correctly
 Another critical difference is that they do not setup a server. They just call
 different handler functions
 
-For the tests 
+For the tests
 """
 
 __author__ = "Christoffer Vilstrup Jensen"
@@ -22,7 +22,7 @@ from unittest import skip, TestCase
 
 # Third Party packages #
 import numpy
-from pydicom import Dataset
+from pydicom import Dataset, DataElement
 from pydicom.uid import RawDataStorage, SecondaryCaptureImageStorage
 
 # Dicomnode Packages
@@ -35,11 +35,11 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.grinders import SeriesGrinder
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
-from dicomnode.server.factories.association_container import CStoreContainer,\
-  ReleasedContainer, AssociationTypes
+from dicomnode.server.factories.association_events import CStoreEvent,\
+  ReleasedEvent, AssociationTypes
 
 # Test Helpers #
-from tests.helpers import TESTING_TEMPORARY_DIRECTORY
+from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
 from tests.helpers.storage_endpoint import TestStorageEndpoint
 
 # Constants declarations #
@@ -63,6 +63,15 @@ DEFAULT_DATASET.PatientID = TEST_CPR
 DICOM_STORAGE_PATH = Path(f"{TESTING_TEMPORARY_DIRECTORY}/file_storage")
 PROCESSING_DIRECTORY = Path(f"{TESTING_TEMPORARY_DIRECTORY}/working_directory")
 
+DATASETS = DicomSeries([ds for ds in generate_numpy_datasets(
+  11,
+  Cols=11,
+  Rows=12,
+  PatientID=TEST_CPR
+)])
+
+DATASETS.set_shared_tag(0x0010_0040, DataElement(0x0010_0040, 'CS', 'M'))
+
 class TestInput(AbstractInput):
   required_values = {
     0x00100040 : 'M'
@@ -77,6 +86,8 @@ class TestInput(AbstractInput):
 
       if 0x00110103 in pivot:
         return False
+    else:
+      return False
 
     return True
 
@@ -116,7 +127,7 @@ class PipeLineTestCase(TestCase):
 
   def tearDown(self) -> None:
     storage = self.node.get_storage_directory(TEST_CPR)
-    if storage.exists():
+    if storage is not None and storage.exists():
       rmtree(storage)
 
   def test_consume_c_store_missing_Patient_ID(self):
@@ -124,7 +135,7 @@ class PipeLineTestCase(TestCase):
     self.node._updated_patients[self.thread_id] = set()
     input_dataset = Dataset()
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -141,7 +152,7 @@ class PipeLineTestCase(TestCase):
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -159,7 +170,7 @@ class PipeLineTestCase(TestCase):
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110101,'LO', 'ret_false')
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -177,7 +188,7 @@ class PipeLineTestCase(TestCase):
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110101,'LO', 'ret_raise')
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -195,7 +206,7 @@ class PipeLineTestCase(TestCase):
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110102,'LO', 'ret_raise')
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -216,7 +227,7 @@ class PipeLineTestCase(TestCase):
     input_dataset.PatientSex = 'M'
     make_meta(input_dataset)
 
-    container = CStoreContainer(
+    container = CStoreEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
@@ -234,36 +245,18 @@ class PipeLineTestCase(TestCase):
   def test_consume_release_container(self):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
+    self.node.data_state.add_images(DATASETS)
+    input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
 
-    factory = DicomFactory()
-
-    self.patient_name = "test^patient"
-    info_uint16 = numpy.iinfo(numpy.uint16)
-    def gen_dataset(i: int) -> Dataset:
-      ds = Dataset()
-      factory.store_image_in_dataset(ds, numpy.random.randint(0,info_uint16.max, (11,12), numpy.uint16))
-      ds.InstanceNumber = i + 1
-      ds.PatientName = self.patient_name
-      ds.PatientID = TEST_CPR
-      ds.PatientSex = 'M'
-      return ds
-
-    parent_series = DicomSeries([
-      gen_dataset(i) for i in range(13)
-    ])
-
-    self.node.data_state.add_images(parent_series.datasets)
-
-    container = ReleasedContainer(
+    container = ReleasedEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
-      association_types=[AssociationTypes.STORE_ASSOCIATION]
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
     )
 
-
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
-      self.node._consume_association_release_store_association(container)
+      self.node._process_entry_point(container, [(TEST_CPR, input_container)])
 
     log_process = f"INFO:dicomnode:Processing {TEST_CPR}"
     log_dispatch = f"INFO:dicomnode:Dispatched {TEST_CPR} Successful"
@@ -274,80 +267,36 @@ class PipeLineTestCase(TestCase):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
 
-    factory = DicomFactory()
-
-    self.patient_name = "test^patient"
-    info_uint16 = numpy.iinfo(numpy.uint16)
-    def gen_dataset(i: int) -> Dataset:
-      ds = Dataset()
-      factory.store_image_in_dataset(ds, numpy.random.randint(0,info_uint16.max, (11,12), numpy.uint16))
-      ds.InstanceNumber = i + 1
-      ds.PatientName = self.patient_name
-      ds.PatientID = TEST_CPR
-      ds.PatientSex = 'M'
-      ds.add_new(0x00110103, 'LO', "This works now?")
-      return ds
-
-    parent_series = DicomSeries([
-      gen_dataset(i) for i in range(13)
-    ])
-
-    self.node.data_state.add_images(parent_series.datasets)
-
-    container = ReleasedContainer(
+    container = ReleasedEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
-      association_types=[AssociationTypes.STORE_ASSOCIATION]
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
     )
 
-
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
-      self.node._consume_association_release_store_association(container)
+      self.node._release_store_handler(container)
 
     log = f"INFO:dicomnode:Insufficient data for patient {TEST_CPR}"
     self.assertIn(log, cm.output)
 
-
   def test_consume_release_container_another_thread_leaving(self):
+    # Simulate there's another thread adding to TEST_CPR images
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id,
                                                self.thread_id + 1]),
                                           threading.Lock())
+    self.node.data_state.add_images(DATASETS)
 
-    factory = DicomFactory()
-
-    self.patient_name = "test^patient"
-    info_uint16 = numpy.iinfo(numpy.uint16)
-    def gen_dataset(i: int) -> Dataset:
-      ds = Dataset()
-      factory.store_image_in_dataset(ds, numpy.random.randint(0,
-                                                              info_uint16.max,
-                                                              (11,12),
-                                                              numpy.uint16)
-                                    )
-      ds.InstanceNumber = i + 1
-      ds.PatientName = self.patient_name
-      ds.PatientID = TEST_CPR
-      ds.PatientSex = 'M'
-      return ds
-
-    parent_series = DicomSeries([
-      gen_dataset(i) for i in range(13)
-    ])
-
-    self.node.data_state.add_images(parent_series.datasets)
-
-    container = ReleasedContainer(
+    container = ReleasedEvent(
       association_id=self.thread_id,
       association_ip=None,
       association_ae="AE",
-      association_types=[AssociationTypes.STORE_ASSOCIATION]
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
     )
 
-
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
-      self.node._consume_association_release_store_association(container)
+      self.node._release_store_handler(container)
 
     log = f"DEBUG:dicomnode:PatientID to be updated in: {{{self.thread_id}: {{'1502799995'}}}}"
     self.assertIn(log, cm.output)
@@ -390,7 +339,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger, DEBUG) as recorded_logs:
       node._pipeline_processing(
         'Test_patient',
-        ReleasedContainer(0, '127.0.0.1', "TEST", ()),
+        ReleasedEvent(0, '127.0.0.1', "TEST", set()),
         InputContainer({}, {}, None)
       )
     self.assertIn('WARNING:dicomnode:You forgot to return a PipelineOutput '
@@ -413,7 +362,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger, DEBUG) as recorded_logs:
       node._pipeline_processing(
         'Test_patient',
-        ReleasedContainer(0, '127.0.0.1', "TEST", ()),
+        ReleasedEvent(0, '127.0.0.1', "TEST", set()),
         InputContainer({}, {}, None)
       )
     self.assertIn('ERROR:dicomnode:Unable to dispatch output for Test_patient', recorded_logs.output)
@@ -428,7 +377,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger) as recorded_log:
       node.exception_handler_respond_with_dataset(
         Exception(),
-        ReleasedContainer(
+        ReleasedEvent(
           1, None, "TEST", set()
         ),
         InputContainer({},{},None)
@@ -440,7 +389,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger) as recorded_log:
       node.exception_handler_respond_with_dataset(
         Exception(),
-        ReleasedContainer(
+        ReleasedEvent(
           1, '127.0.0.1', "TEST", set()
         ),
         InputContainer({},{},None)
@@ -459,7 +408,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger) as recorded_log:
       node.exception_handler_respond_with_dataset(
         Exception(),
-        ReleasedContainer(
+        ReleasedEvent(
           1, '127.0.0.1', "TEST", set()
         ),
         InputContainer({},{
@@ -479,7 +428,7 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs(node.logger) as recorded_log:
       node.exception_handler_respond_with_dataset(
         Exception(),
-        ReleasedContainer(
+        ReleasedEvent(
           1, '127.0.0.1', "TEST", set()
         ),
         InputContainer({},{

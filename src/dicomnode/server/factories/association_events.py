@@ -23,7 +23,7 @@ class AssociationTypes(Enum):
   STORE_ASSOCIATION = 1
 
 @dataclass
-class AssociationContainer: # FUCK THIS IS BAD NAMING
+class AssociationEvent: # FUCK THIS IS BAD NAMING
   """Base Class for AssociationContainers these class extracts the information
   of a pynetdicom."""
   association_id : int
@@ -36,26 +36,26 @@ class AssociationContainer: # FUCK THIS IS BAD NAMING
 
 ##### Dataclasses ######
 @dataclass
-class AcceptedContainer(AssociationContainer):
+class AcceptedEvent(AssociationEvent):
   """Extracted data from an AssociationAccepted event."""
   association_types : set[AssociationTypes]
   """Checks if this association is a store association or not"""
 
 
 @dataclass
-class ReleasedContainer(AssociationContainer):
+class ReleasedEvent(AssociationEvent):
   """Extracted data from an AssociationReleased event."""
   association_types : set[AssociationTypes]
   """Checks if this association is a store association or not"""
 
 
 @dataclass
-class CStoreContainer(AssociationContainer):
+class CStoreEvent(AssociationEvent):
   """Extracted data from a evt.EVT_C_STORE"""
   dataset: Dataset
 
 ##### Corresponding Factory #####
-class AssociationContainerFactory:
+class AssociationEventFactory:
   """Factory class for extracting data from various pynetdicom.Event.
 
   The idea is that if pynetdicom changes their API, then it's this part that'll
@@ -69,7 +69,7 @@ class AssociationContainerFactory:
       raise ValueError("") # pragma: no cover
     return event.assoc.native_id
 
-  def build_association_accepted(self, event: Event) -> AcceptedContainer:
+  def build_association_accepted(self, event: Event) -> AcceptedEvent:
     """Extracts information from an accepted event and puts into a accepted
     container.
 
@@ -87,7 +87,7 @@ class AssociationContainerFactory:
     association_ae = event.assoc.requestor.ae_title
     association_ip = event.assoc.requestor.address
 
-    return AcceptedContainer(
+    return AcceptedEvent(
       self.__get_event_id(event),
       association_ip,
       association_ae,
@@ -95,7 +95,7 @@ class AssociationContainerFactory:
     )
 
 
-  def build_association_released(self, event: Event) -> ReleasedContainer:
+  def build_association_released(self, event: Event) -> ReleasedEvent:
     """Extracts information from an release event and puts into a release
     container.
 
@@ -113,7 +113,7 @@ class AssociationContainerFactory:
     association_ae = event.assoc.requestor.ae_title
     association_ip = event.assoc.requestor.address
 
-    return ReleasedContainer(
+    return ReleasedEvent(
       self.__get_event_id(event),
       association_ip,
       association_ae,
@@ -121,7 +121,7 @@ class AssociationContainerFactory:
     )
 
 
-  def build_association_c_store(self, event: Event) -> CStoreContainer:
+  def build_association_c_store(self, event: Event) -> CStoreEvent:
     """Extracts information from an C-Store event and puts into a C-Store
     container.
 
@@ -134,7 +134,7 @@ class AssociationContainerFactory:
     dataset = event.dataset
     dataset.file_meta = event.file_meta
 
-    return CStoreContainer(self.__get_event_id(event),
+    return CStoreEvent(self.__get_event_id(event),
                            event.assoc.requestor.address,
                            event.assoc.requestor.ae_title,
                            dataset)
