@@ -1,5 +1,11 @@
 from re import compile, Pattern
 
+def escape_pattern(string: str) -> Pattern:
+  escaped_string = string.replace("[", r"\[").replace("]", r"\]")
+
+  return compile(escaped_string)
+
+
 def from_wildcard(string: str) -> Pattern:
   """Builds a regex from a wildcard
 

@@ -16,6 +16,7 @@ from logging import DEBUG
 from pathlib import Path
 from sys import stdout
 from shutil import rmtree
+import re
 from typing import List, Dict, Any, Iterable, NoReturn, Optional, Tuple
 import threading
 from unittest import skip, TestCase
@@ -39,6 +40,7 @@ from dicomnode.server.factories.association_events import CStoreEvent,\
   ReleasedEvent, AssociationTypes
 
 # Test Helpers #
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
 from tests.helpers.storage_endpoint import TestStorageEndpoint
 
@@ -102,7 +104,7 @@ class TestPipeLine(AbstractPipeline):
   data_directory = DICOM_STORAGE_PATH
   processing_directory = PROCESSING_DIRECTORY
   log_level = logging.DEBUG
-  log_output = stdout
+  log_output = "test_file.log"
 
   input = {
     INPUT_KW : TestInput
@@ -117,12 +119,20 @@ class TestPipeLine(AbstractPipeline):
     return True
 
   def process(self, input_container: InputContainer):
+    if(self.raise_error):
+      raise Exception
+
     return NoOutput()
 
+  def __init__(self) -> None:
+    super().__init__()
+    self.raise_error = False
 
-class PipeLineTestCase(TestCase):
+class PipeLineTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.node = TestPipeLine()
+    self.node.log_output = f"{self._testMethodName}.log"
+    self.node._setup_logger()
     self.thread_id = threading.get_native_id()
 
   def tearDown(self) -> None:
@@ -246,8 +256,31 @@ class PipeLineTestCase(TestCase):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
     self.node.data_state.add_images(DATASETS)
-    input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
+    container = ReleasedEvent(
+      association_id=self.thread_id,
+      association_ip=None,
+      association_ae="AE",
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
+    )
 
+    #with self.assertLogs('dicomnode', logging.DEBUG):
+    self.node._release_store_handler(container)
+
+    with open(f"{self._testMethodName}.log", 'r') as log_file:
+      log_lines = [line.strip() for line in log_file.readlines()]
+
+    log_process = f"Processing {TEST_CPR}"
+    log_dispatch = f"Dispatched {TEST_CPR} Successful"
+    log_cleanup = f"Removing ['{ TEST_CPR}']'s images"
+    self.assertRegexIn(log_process, log_lines)
+    self.assertRegexIn(log_dispatch, log_lines)
+    self.assertRegexIn(log_cleanup, log_lines)
+
+  def test_pipeline_container(self):
+    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
+    self.node.data_state.add_images(DATASETS)
+    input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
     container = ReleasedEvent(
       association_id=self.thread_id,
       association_ip=None,
@@ -258,10 +291,11 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._process_entry_point(container, [(TEST_CPR, input_container)])
 
-    log_process = f"INFO:dicomnode:Processing {TEST_CPR}"
-    log_dispatch = f"INFO:dicomnode:Dispatched {TEST_CPR} Successful"
-    self.assertIn(log_process, cm.output)
-    self.assertIn(log_dispatch, cm.output)
+    log_process = f"Processing {TEST_CPR}"
+    log_dispatch = f"Dispatched {TEST_CPR} Successful"
+
+    self.assertRegexIn(log_process, cm.output)
+    self.assertRegexIn(log_dispatch, cm.output)
 
   def test_consume_release_container_not_enough_data(self):
     self.node._updated_patients[self.thread_id] = set([TEST_CPR])
@@ -277,8 +311,8 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._release_store_handler(container)
 
-    log = f"INFO:dicomnode:Insufficient data for patient {TEST_CPR}"
-    self.assertIn(log, cm.output)
+    log = f"Insufficient data for patient {TEST_CPR}"
+    self.assertRegexIn(log, cm.output)
 
   def test_consume_release_container_another_thread_leaving(self):
     # Simulate there's another thread adding to TEST_CPR images
@@ -298,9 +332,53 @@ class PipeLineTestCase(TestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._release_store_handler(container)
 
-    log = f"DEBUG:dicomnode:PatientID to be updated in: {{{self.thread_id}: {{'1502799995'}}}}"
-    self.assertIn(log, cm.output)
+    log = f"PatientID to be updated in: {{{self.thread_id}: {{'1502799995'}}}}"
+    self.assertRegexIn(log, cm.output)
 
+  def test_consume_release_container_with_raised_error(self):
+    # Simulate there's another thread adding to TEST_CPR images
+    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._patient_locks[TEST_CPR] = (set([self.thread_id,]),
+                                          threading.Lock())
+    self.node.data_state.add_images(DATASETS)
+
+    container = ReleasedEvent(
+      association_id=self.thread_id,
+      association_ip=None,
+      association_ae="AE",
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
+    )
+
+    self.node.raise_error = True
+    with self.assertLogs('dicomnode', logging.DEBUG):
+      self.node._release_store_handler(container)
+
+    # Note that you can't use the normal context handler to figure this out
+
+  def test_failed_processing_exit_with_code_1(self):
+    # Simulate there's another thread adding to TEST_CPR images
+    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._patient_locks[TEST_CPR] = (set([self.thread_id]),
+                                          threading.Lock())
+    self.node.data_state.add_images(DATASETS)
+
+    input_containers = self.node.data_state.get_patient_input_container(TEST_CPR)
+
+    container = ReleasedEvent(
+      association_id=self.thread_id,
+      association_ip=None,
+      association_ae="AE",
+      association_types=set([AssociationTypes.STORE_ASSOCIATION])
+    )
+
+    self.node.raise_error = True
+    with self.assertLogs('dicomnode', logging.DEBUG):
+      with self.assertRaises(SystemExit) as cm:
+        self.node._pipeline_processing(TEST_CPR,  container, input_containers)
+
+    self.assertEqual(cm.exception.code, 1)
+
+    # Note that you can't use the normal context handler to figure this out
 
   def test_dispatch(self):
     class DumbOutput(PipelineOutput):

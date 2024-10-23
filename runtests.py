@@ -18,7 +18,7 @@ PYTHON_3_12_PLUS = 12 <= sys.version_info.minor
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
   parser.add_argument("test_regex", default="test", nargs="?")
-  parser.add_argument("--verbose", type=int, default=1)
+  parser.add_argument("--verbose", "-v", type=int, default=1)
   parser.add_argument("-nc", "--no_clean_up", action='store_true')
   parser.add_argument("-p", "--performance", action='store_true')
   if PYTHON_3_12_PLUS:

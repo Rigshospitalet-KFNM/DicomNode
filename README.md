@@ -54,3 +54,7 @@ To run tests you need to install the extra packages for testing with:
 
 Then run the tests with:
 > `coverage run runtests.py && coverage report --show-missing`
+
+## Windows support
+
+[For windows support](https://ubuntu.com/tutorials/install-ubuntu-desktop)

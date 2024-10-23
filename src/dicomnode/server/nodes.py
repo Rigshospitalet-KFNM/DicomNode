@@ -22,6 +22,7 @@ from pathlib import Path
 from queue import Queue, Empty
 import shutil
 import signal
+import sys
 from sys import stdout
 from threading import Thread, Lock
 from time import sleep
@@ -190,14 +191,7 @@ class AbstractPipeline():
 
   # End of Attributes definitions.
 
-  def __init__(self) -> None:
-    # This function starts and opens the server
-    #
-    # 1. Logging
-    # 2. File system
-    # 3. Create Server
-
-    # logging
+  def _setup_logger(self):
     if isinstance(self.log_output, str):
       self.log_output = Path(self.log_output)
 
@@ -211,6 +205,17 @@ class AbstractPipeline():
     )
     # Set pynetdicom logger
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
+
+
+  def __init__(self) -> None:
+    # This function starts and opens the server
+    #
+    # 1. Logging
+    # 2. File system
+    # 3. Create Server
+
+    # logging
+    self._setup_logger()
 
     self.__cwd = getcwd()
     # Load any previous state
@@ -259,21 +264,14 @@ class AbstractPipeline():
 
     # Handler setup
     # class needs to be instantiated before handlers can be defined
-    self.evt_handlers = [
-      (evt.EVT_C_ECHO, self.handle_c_echo),
-      (evt.EVT_CONN_OPEN, self.handle_connection_opened),
-      (evt.EVT_CONN_CLOSE, self.handle_connection_closed),
-      (evt.EVT_C_STORE,  self.handle_c_store),
-      (evt.EVT_ACCEPTED, self.handle_association_accepted),
-      (evt.EVT_REJECTED, self.handle_association_rejected),
-      (evt.EVT_RELEASED, self.handle_association_released),
-    ]
     self._updated_patients: Dict[Optional[int], Set[str]] = {}
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
     self.post_init()
   # End def __init__
   #region logging handlers
+
+
   def handle_c_echo(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} send an echo") #type: ignore
     return 0x0000
@@ -373,16 +371,19 @@ class AbstractPipeline():
 
   def _extract_input_containers(self, release_event: ReleasedEvent
                                 ) -> List[Tuple[str, InputContainer]]:
-    """
+    """Iterates through all patients of the pipeline tree that this association
+    have added images to and extract all valid inputs from pipeline tree of this
+    node.
 
     Side Effects:
-      Removes the release event from
+      Removes the association id (thread id) from self._updated_patients
 
     Args:
-        release_event (ReleasedEvent): _description_
+        release_event (ReleasedEvent): The Event triggered by an C-STORE
+        association releasing (finishing storing images in the dicom node)
 
     Returns:
-        List[Tuple[str, InputContainer]]: _description_
+        List[Tuple[str, InputContainer]]: A list of all patients that is
     """
     input_containers: List[Tuple[str, InputContainer]] = []
     self.logger.debug(f"PatientID to be updated in: {self._updated_patients}")
@@ -390,10 +391,11 @@ class AbstractPipeline():
       for patient_id in self._updated_patients[release_event.association_id]:
         if patient_id in self._patient_locks:
           threads, patient_lock = self._patient_locks[patient_id]
-        else: #pragma no cover
-          self.logger.critical("Another thread deleted thread-set and Patient log")
-          self.logger.critical("This is a bug in the library, please report it")
-          continue
+        else:
+          self.logger.critical("This is a bug in the library, please report it") #pragma: no cover
+          self.logger.critical(f"patient_locks: {self._patient_locks} patient id: {patient_id}") #pragma: no cover
+          self.logger.critical("Another thread deleted thread-set and Patient log") #pragma: no cover
+          continue # pragma: no cover
         with patient_lock:
           if len(threads) == 1:
             if self.data_state.validate_patient_id(patient_id):
@@ -432,21 +434,23 @@ class AbstractPipeline():
       if handler is not None:
         handler(self, released_event)
       else:
-        self.logger.critical(f"Missing Release Handler for {association_type}!")
+        self.logger.critical(f"Missing Release Handler for {association_type}!") # pragma: no cover
 
   def _release_store_handler(self, released_event: ReleasedEvent):
     input_containers: List[Tuple[str, InputContainer]] = self._extract_input_containers(released_event)
     if len(input_containers) == 0:
       self.logger.info(f"Release Event did not return any input containers to be processed.")
       return
-    self.logger.info(input_containers)
-    process = multiprocessing.Process(target=self._process_entry_point, args=(released_event, input_containers))
+    process = multiprocessing.Process(target=self._process_entry_point,
+                                      args=(released_event, input_containers))
     process.start()
     process.join()
     if process.exitcode:
       self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
     else:
-      self.data_state.clean_up_patients([fst for fst, sec in input_containers])
+      patients_to_clean_up = [fst for fst, sec in input_containers]
+      self.logger.info(f"Removing {patients_to_clean_up}'s images")
+      self.data_state.clean_up_patients(patients_to_clean_up)
 
   def _process_entry_point(
       self, released_container, input_containers: List[Tuple[str, InputContainer]] ) -> None:
@@ -496,6 +500,7 @@ class AbstractPipeline():
         type(exception), self.exception_handler_respond_with_dataset
       )
       exception_handler(exception, released_container, patient_input_container)
+      exit(1)
     else:
       self.logger.debug(f"Process {patient_id} Successful, Dispatching output!")
       if self._dispatch(result):
@@ -622,10 +627,13 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
     #self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
+    # I don't know why the type checker is high.
+    event_handlers: List[evt.EventHandlerType] = [ t for t in self.evt_handlers.items() ]
+
     self.dicom_application_entry.start_server(
       (self.ip,self.port),
       block=blocking,
-      evt_handlers=self.evt_handlers)
+      evt_handlers=event_handlers)
 
   def get_processing_directory(self, identifier) -> Optional[Path]:
     if self.processing_directory is None:
@@ -757,6 +765,15 @@ class AbstractPipeline():
 
   }
 
+  evt_handlers: Dict[evt.EventType, Callable ] = {
+      evt.EVT_C_ECHO : handle_c_echo,
+      evt.EVT_CONN_OPEN : handle_connection_opened,
+      evt.EVT_CONN_CLOSE : handle_connection_closed,
+      evt.EVT_C_STORE :  handle_c_store,
+      evt.EVT_ACCEPTED : handle_association_accepted,
+      evt.EVT_REJECTED : handle_association_rejected,
+      evt.EVT_RELEASED : handle_association_released,
+  }
 
 class AbstractQueuedPipeline(AbstractPipeline):
   """A pipeline that processes each object one at a time
@@ -788,6 +805,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
   def handle_association_released(self, event: evt.Event):
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
     released_container = self._association_event_factory.build_association_released(event)
+    self.logger.info("Queued Assocation started")
+
     self.process_queue.put(released_container)
 
   def signal_handler_SIGINT(self, signal, frame):
@@ -815,6 +834,9 @@ class AbstractQueuedPipeline(AbstractPipeline):
     signal.signal(signal.SIGINT, default_sigint_handler)
 
     return super().close()
+
+  evt_handlers = AbstractPipeline.evt_handlers.copy()
+  evt_handlers[evt.EVT_RELEASED] = handle_association_released
 
 
 class AbstractThreadedPipeline(AbstractPipeline):
