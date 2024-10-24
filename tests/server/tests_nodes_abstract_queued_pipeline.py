@@ -34,24 +34,22 @@ series_1 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=1
 series_2 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=10, PatientID=PATIENT_ID_2)])
 series_3 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=10, PatientID=PATIENT_ID_3)])
 
-series_1.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'IS', [-1, 2, 0, 1]))
-series_2.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'IS', [-1, 2, 0, 2]))
-series_3.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'IS', [-1, 2, 0, 3]))
-
-test_array = []
-
+series_1.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.050))
+series_2.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.015))
+series_3.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.005))
 
 class TestPipeline(AbstractQueuedPipeline):
   input = {
     "dicoms" : TestInput
   }
+  log_output=None
 
   def process(self, input_container: InputContainer):
     datasets: List[Dataset] = input_container["dicoms"]
 
     pivot = datasets[0]
-
-    test_array.append(pivot.PatientID)
+    sleep(pivot[0x0011_0100].value)
+    self.logger.info(f"Processed {pivot.PatientID}")
 
     return NoOutput()
 
@@ -64,13 +62,13 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
     self.node.close()
 
   def test_real_dumb(self):
-    self.assertEqual(inspect.getsource(self.node.handle_association_released),
-                     inspect.getsource(self.node.evt_handlers[evt.EVT_RELEASED]))
+    self.assertEqual(inspect.getsource(self.node._handle_association_released),
+                     inspect.getsource(self.node._evt_handlers[evt.EVT_RELEASED]))
 
   def test_queue(self):
     thread_id_1 = 390
-    thread_id_2 = 390
-    thread_id_3 = 390
+    thread_id_2 = 392
+    thread_id_3 = 395
 
     self.node._updated_patients[thread_id_1] = set([PATIENT_ID_1])
     self.node._updated_patients[thread_id_2] = set([PATIENT_ID_2])
@@ -88,7 +86,6 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
         class Helper2:
           abstract_syntax = "1.2.840.10008.5.1.4.1.1"
 
-
         ae_title = "dummy ae title"
         address = "dummy address"
         requested_contexts = [
@@ -100,12 +97,17 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
       def __init__(self, thread_id):
         self.native_id = thread_id
 
+    # Yeah I know, I should mock, but this is easier...
     event_1 = evt.Event(AssociationDummy(thread_id_1), evt.EVT_RELEASED) # type: ignore
     event_2 = evt.Event(AssociationDummy(thread_id_2), evt.EVT_RELEASED) # type: ignore
     event_3 = evt.Event(AssociationDummy(thread_id_3), evt.EVT_RELEASED) # type: ignore
+    with self.assertLogs("dicomnode") as cm:
+      self.node._handle_association_released(event_1)
+      self.node._handle_association_released(event_2)
+      self.node._handle_association_released(event_3)
 
-    self.node.handle_association_released(event_1)
-    self.node.handle_association_released(event_2)
-    self.node.handle_association_released(event_3)
+      self.node.process_queue.join()
 
-    self.node.process_queue.join()
+    self.assertRegexBefore(PATIENT_ID_1, PATIENT_ID_2, cm.output)
+    self.assertRegexBefore(PATIENT_ID_1, PATIENT_ID_3, cm.output)
+    self.assertRegexBefore(PATIENT_ID_2, PATIENT_ID_3, cm.output)

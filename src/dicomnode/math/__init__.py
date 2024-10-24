@@ -23,7 +23,7 @@ from . import types
 
 # Cuda code
 try:
-  from . import _cuda # type: ignore
+  from dicomnode.math import _cuda
   CUDA = True
 except ImportError:
   CUDA = False

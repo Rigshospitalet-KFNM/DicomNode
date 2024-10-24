@@ -94,9 +94,6 @@ class Image:
 
     return cls(image_data, affine)
 
-  def resample_to(self, space: Space):
-    pass
-
   @staticmethod
   def _map_args_coordinates(*args) -> ndarray[Tuple[Literal[4]], Any]:
         # Args manipulation

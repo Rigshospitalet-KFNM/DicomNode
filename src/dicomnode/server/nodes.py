@@ -17,21 +17,21 @@ from enum import Enum
 import logging
 from logging import getLogger
 import multiprocessing
-from os import chdir, getcwd
+from os import chdir, getcwd, kill
 from pathlib import Path
 from queue import Queue, Empty
 import shutil
 import signal
-import sys
 from sys import stdout
 from threading import Thread, Lock
 from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
+from psutil import Process as PS_UTIL_Process
 
 # Third part packages
 from pynetdicom import evt
-from pynetdicom.ae import ApplicationEntity as AE
+from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext,\
   VerificationPresentationContexts
 from pydicom import Dataset
@@ -253,7 +253,7 @@ class AbstractPipeline():
     self._association_event_factory = self.association_container_factory()
 
     # Server validations and creation.
-    self.dicom_application_entry = AE(ae_title = self.ae_title)
+    self.dicom_application_entry = ApplicationEntity(ae_title = self.ae_title)
     # You need VerificationPresentationContexts for ECHOSCU
     # and you want ECHO-SCU
     contexts = VerificationPresentationContexts + self.supported_contexts
@@ -267,29 +267,44 @@ class AbstractPipeline():
     self._updated_patients: Dict[Optional[int], Set[str]] = {}
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
+
+    # It's import that this is initialized here, because otherwise the self
+    # argument is not passed properly.
+    # If you need to replace these handler it's important to call super's init
+    # then overwrite the handler function
+    self._evt_handlers: Dict[evt.EventType, Callable ] = {
+      evt.EVT_C_ECHO     : self._handle_c_echo,
+      evt.EVT_CONN_OPEN  : self._handle_connection_opened,
+      evt.EVT_CONN_CLOSE : self._handle_connection_closed,
+      evt.EVT_C_STORE    : self._handle_c_store,
+      evt.EVT_ACCEPTED   : self._handle_association_accepted,
+      evt.EVT_REJECTED   : self._handle_association_rejected,
+      evt.EVT_RELEASED   : self._handle_association_released,
+    }
+
     self.post_init()
   # End def __init__
   #region logging handlers
 
 
-  def handle_c_echo(self, event: evt.Event):
+  def _handle_c_echo(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} send an echo") #type: ignore
     return 0x0000
 
-  def handle_connection_opened(self, event: evt.Event):
+  def _handle_connection_opened(self, event: evt.Event):
     self.logger.debug(f"Connection {event.address[0]} opened a connection") #type: ignore
 
-  def handle_connection_closed(self, event: evt.Event):
+  def _handle_connection_closed(self, event: evt.Event):
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
 
-  def handle_association_rejected(self, event: evt.Event):
+  def _handle_association_rejected(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} rejected a connection") #type: ignore
 
   # Store dataset process
   # Responsibility's:
   #  - handle_c_store_message - extracts information from event
   #  - control_c_store_function - main function responsible for calling correct functions
-  def handle_association_accepted(self, event: evt.Event):
+  def _handle_association_accepted(self, event: evt.Event):
     """This is main handler for how the pynetdicom.AE should hanlde an
     evt.EVT_ACCEPTED event. You should be careful in overwriting this method.
 
@@ -323,7 +338,7 @@ class AbstractPipeline():
     self._updated_patients[accepted_container.association_id] = set()
 
 
-  def handle_c_store(self, event: evt.Event) -> int:
+  def _handle_c_store(self, event: evt.Event) -> int:
     c_store_container = self._association_event_factory.build_association_c_store(event)
     status = self.consume_c_store_container(c_store_container)
     return status
@@ -418,7 +433,7 @@ class AbstractPipeline():
 
 
   #region handle_association_released
-  def handle_association_released(self, event: evt.Event):
+  def _handle_association_released(self, event: evt.Event):
     """This function is called whenever an association is released
 
     It's the controller function for processing data
@@ -628,7 +643,7 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
     #self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
     # I don't know why the type checker is high.
-    event_handlers: List[evt.EventHandlerType] = [ t for t in self.evt_handlers.items() ]
+    event_handlers: List[evt.EventHandlerType] = [ t for t in self._evt_handlers.items() ]
 
     self.dicom_application_entry.start_server(
       (self.ip,self.port),
@@ -765,16 +780,6 @@ class AbstractPipeline():
 
   }
 
-  evt_handlers: Dict[evt.EventType, Callable ] = {
-      evt.EVT_C_ECHO : handle_c_echo,
-      evt.EVT_CONN_OPEN : handle_connection_opened,
-      evt.EVT_CONN_CLOSE : handle_connection_closed,
-      evt.EVT_C_STORE :  handle_c_store,
-      evt.EVT_ACCEPTED : handle_association_accepted,
-      evt.EVT_REJECTED : handle_association_rejected,
-      evt.EVT_RELEASED : handle_association_released,
-  }
-
 class AbstractQueuedPipeline(AbstractPipeline):
   """A pipeline that processes each object one at a time
 
@@ -797,20 +802,19 @@ class AbstractQueuedPipeline(AbstractPipeline):
         except Exception as exception:
           log_traceback(self.logger, exception, "Process worker encountered exception")
         finally:
-          self.logger.info("Finished queued task")
           self.process_queue.task_done()
       except Empty:
         pass
 
-  def handle_association_released(self, event: evt.Event):
-    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
+  def _handle_association_released(self, event: evt.Event):
     released_container = self._association_event_factory.build_association_released(event)
-    self.logger.info("Queued Assocation started")
-
     self.process_queue.put(released_container)
 
   def signal_handler_SIGINT(self, signal, frame):
     self.running = False
+    current_process = PS_UTIL_Process()
+    for child in current_process.children(recursive=False):
+      child.send_signal(signal)
 
   def __init__(self, master_queue: Optional[Queue[ReleasedEvent]]=None) -> None:
     self.running = True
@@ -823,6 +827,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     # Super is called at the end of the function
     super().__init__()
+    self._evt_handlers[evt.EVT_RELEASED] = self._handle_association_released
 
   def open(self, blocking=True):
     signal.signal(signal.SIGINT, self.signal_handler_SIGINT)
@@ -835,47 +840,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     return super().close()
 
-  evt_handlers = AbstractPipeline.evt_handlers.copy()
-  evt_handlers[evt.EVT_RELEASED] = handle_association_released
-
-
-class AbstractThreadedPipeline(AbstractPipeline):
-  """Pipeline that creates threads to handle storing,
-  """
-  threads: Dict[Optional[int],List[Thread]] = {}
-
-  def handle_c_store(self, event: evt.Event) -> int:
-    thread: Thread = Thread(target=super().handle_c_store, args=[event], daemon=False)
-    thread.start()
-    if event.assoc.native_id in self.threads:
-      self.threads[event.assoc.native_id].append(thread)
-    else:
-      self.threads[event.assoc.native_id] = [thread]
-    return 0x0000
-
-  def join_threads(self, assoc_name:Optional[int] = None) -> None:
-    """closes all storing threads
-
-    Args:
-        assoc_name (Optional[int], optional): _description_. Defaults to None.
-    """
-    if assoc_name is None:
-      for thread_list in self.threads.values():
-        for thread in thread_list: # pragma: no cover
-          thread.join() # pragma: no cover
-      self.threads = {}
-    else:
-      thread_list = self.threads[assoc_name]
-      for thread in thread_list:
-        thread.join()
-      del self.threads[assoc_name]
-
-  def handle_association_released(self, event: evt.Event):
-    self.join_threads(event.assoc.native_id)
-    return super().handle_association_released(event)
-
 __all__ = (
   "AbstractPipeline",
   "AbstractQueuedPipeline",
-  "AbstractThreadedPipeline"
 )

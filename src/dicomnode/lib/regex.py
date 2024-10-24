@@ -1,7 +1,11 @@
 from re import compile, Pattern
 
 def escape_pattern(string: str) -> Pattern:
-  escaped_string = string.replace("[", r"\[").replace("]", r"\]")
+  escaped_string = string.\
+    replace("[", r"\[").\
+    replace("]", r"\]").\
+    replace("*", ".*").\
+    replace("_", r"\_")
 
   return compile(escaped_string)
 
