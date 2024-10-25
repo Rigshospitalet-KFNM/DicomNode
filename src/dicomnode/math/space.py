@@ -17,6 +17,7 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.math.types import RotationAxes
+from dicomnode import dicom
 
 RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float32]]
 
@@ -42,54 +43,24 @@ ROTATION_MATRIX_90_DEG_Z  = array([
 ])
 
 class Space:
-  class Span:
-    def __init__(self,
-                 x: Tuple[float, float],
-                 y: Tuple[float, float],
-                 z: Tuple[float, float]) -> None:
-      self._data = numpy.empty((6), float32)
-      self._data[0] = z[0]
-      self._data[1] = z[1]
-      self._data[2] = y[0]
-      self._data[3] = y[1]
-      self._data[4] = x[0]
-      self._data[5] = x[1]
+  @property
+  def basis(self):
+    return self._basis
 
-    @property
-    def x(self):
-      return self._data[4:6]
+  @property
+  def domain(self):
+    return self._domain
 
-    @property
-    def y(self):
-      return self._data[2:4]
+  @property
+  def start_point(self):
+    return self._start_point
 
-    @property
-    def z(self):
-      return self._data[0:2]
+  def __init__(self, raw: RawBasisMatrix, start_points, domain):
+    self._basis = raw
+    self._inverted_raw = inv(raw)
+    self._start_point = numpy.array(start_points)
+    self._domain = numpy.array(domain)
 
-    def __getitem__(self, key):
-      if key == 1:
-        return self.x[0]
-      if key == -1:
-        return self.x[1]
-      if key == 2:
-        return self.y[0]
-      if key == -2:
-        return self.y[1]
-      if key == 3:
-        return self.z[0]
-      if key == -3:
-        return self.z[1]
-
-      raise KeyError
-
-  basis: RawBasisMatrix
-  span: Span
-
-  def __init__(self, raw: RawBasisMatrix, span: Span):
-    self.basis = raw
-    self.inverted_raw = inv(raw)
-    self.span = span
 
   @classmethod
   def from_nifti(cls, nifti: Nifti1Image):
@@ -97,32 +68,29 @@ class Space:
     data = nifti.get_fdata()
 
     if maybe_affine is not None:
-      affine = maybe_affine
-      span = cls.Span(
-        (affine[0,3], 0.0), # wrong values
-        (affine[1,3], 0.0), # wrong values
-        (affine[2,3], 0.0) # wrong values
-      )
+      affine = maybe_affine[:3, :3]
+      start_point = maybe_affine[:3, 3]
     else:
       affine = identity(3, dtype=float32)
-      span = cls.Span(
-        (0.0, data.shape[2]),
-        (0.0, data.shape[1]),
-        (0.0, data.shape[0])
-      )
+      start_point = [0,0,0]
 
-    return cls(affine, span)
+    if data.flags.f_contiguous:
+      shape = [s for s in data.shape].reverse()
+    else:
+      shape = data.shape
+
+    return cls(affine, start_point, shape)
 
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     try:
-      datasets.sort(key=lambda ds: ds.InstanceNumber)
+      # Note that
+      datasets.sort(key=dicom.sort_datasets)
 
       first_dataset = datasets[0]
-      last_dataset = datasets[-1]
       start_coordinates = first_dataset.ImagePositionPatient
       image_orientation = first_dataset.ImageOrientationPatient
-      end_coordinates = last_dataset.ImagePositionPatient
+
       thickness_x = first_dataset.PixelSpacing[0]
       thickness_y = first_dataset.PixelSpacing[1]
       thickness_z = first_dataset.SliceThickness
@@ -130,22 +98,14 @@ class Space:
       affine_raw = numpy.array([
         [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0],
         [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0],
-        [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z, ],
+        [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z],
       ], dtype=float32)
 
-      end_coordinates = [
-        thickness_x * image_orientation[0] * first_dataset.Columns + start_coordinates[0],
-        thickness_y * image_orientation[4] * first_dataset.Rows + start_coordinates[1],
-        thickness_z * len(datasets) + start_coordinates[2]
-      ]
 
       return cls(
         affine_raw,
-        cls.Span(
-          (start_coordinates[0], end_coordinates[0]),
-          (start_coordinates[1], end_coordinates[1]),
-          (start_coordinates[2], end_coordinates[2]),
-        )
+        start_coordinates,
+        (len(datasets), first_dataset.Columns, first_dataset.Rows)
       )
     except Exception as E:
       print(E)
@@ -155,9 +115,8 @@ class Space:
     y_dim = pivot.Rows
     z_dim = len(datasets)
     return cls(identity(3, dtype=float32),
-               cls.Span((0.0, x_dim),
-                        (0.0, y_dim),
-                        (0.0, z_dim))
+               (0,0,0),
+               (z_dim, y_dim, z_dim)
                )
 
 

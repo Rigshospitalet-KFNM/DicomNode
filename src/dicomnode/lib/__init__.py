@@ -1,5 +1,4 @@
 # Python standard library
-from . import anonymization
 from . import exceptions
 from . import io
 from . import logging
@@ -9,7 +8,6 @@ from . import utils
 from . import validators
 
 __all__ = [
-  'anonymization',
   'exceptions',
   'logging',
   'parser',

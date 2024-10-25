@@ -20,7 +20,7 @@ from dicomnode.lib.exceptions import InvalidDataset
 PRIVATIZATION_VERSION = 1
 
 # Ensure Correct loading
-import dicomnode.math as __math
+#import dicomnode.math as __math
 
 
 class Reserved_Tags(Enum):
@@ -263,7 +263,23 @@ def has_tags(dataset: Dataset, tags: Union[
     return tag in dataset
   return reduce(and_, map(in_, tags), True)
 
-from ..data_structures import image_tree as __image_tree # to prevent circular imports
+def sort_datasets(dataset: Dataset):
+  """Sorting function for a collection of datasets. The order is determined by
+  the instance number
+
+  Args:
+      dataset (Dataset): _description_
+
+  Returns:
+      int: _description_
+  """
+  if 'ImagePositionPatient' in dataset:
+
+
+    return dataset.ImagePositionPatient[2]
+
+  return dataset.InstanceNumber
+
 from . import anonymization
 from . import blueprints
 from . import dicom_factory
@@ -287,5 +303,6 @@ __all__ = [
   'dimse',
   'lazy_dataset',
   'nifti',
+  'sort_datasets',
   'sop_mapping',
 ]

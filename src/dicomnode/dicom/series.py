@@ -8,6 +8,7 @@ https://xkcd.com/927/
 from datetime import datetime
 from functools import reduce
 from enum import Enum
+from logging import getLogger
 from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
   Tuple, TypeAlias, Union
 
@@ -18,31 +19,16 @@ from pydicom import Dataset, DataElement
 from pydicom.datadict import dictionary_VR
 from pydicom.tag import BaseTag
 from nibabel.nifti1 import Nifti1Image
+from nibabel.nifti2 import Nifti2Image
 
 # Dicomnode packages
-from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-
-from dicomnode.dicom import has_tags
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
+from dicomnode.dicom import has_tags, sort_datasets
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import Image, FramedImage
 from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
 
-def sortDatasets(dataset: Dataset):
-  """Sorting function for a collection of datasets. The order is determined by
-  the instance number
-
-  Args:
-      dataset (Dataset): _description_
-
-  Returns:
-      int: _description_
-  """
-  if 'ImagePositionPatient' in dataset:
-
-
-    return dataset.ImagePositionPatient[2]
-
-  return dataset.InstanceNumber
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 def shared_tag(datasets: List[Dataset], tag: BaseTag) -> bool:
   """Determines if tag is shared, meaning that for all datasets the value of the
@@ -131,7 +117,7 @@ class DicomSeries(Series):
     self.datasets = datasets
     self.pivot = self.datasets[0]
     if 'InstanceNumber' in self.pivot:
-      datasets.sort(key=sortDatasets)
+      self.datasets.sort(key=sort_datasets)
     else:
       self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
 
@@ -186,7 +172,7 @@ class DicomSeries(Series):
       dataset[tag] = value
 
   def can_copy_into_image(self, image:ndarray[Tuple[int,int,int],Any]) -> bool:
-    return image.shape[2] == len(self.datasets)
+    return image.shape[0] == len(self.datasets)
 
   def shared_tag(self, tag) -> bool:
     return shared_tag(self.datasets, tag)
@@ -195,6 +181,8 @@ class NiftiSeries(Series):
   def __init__(self, nifti: Nifti1Image) -> None:
     self.nifti = nifti
     image_data = self.nifti.get_fdata()
+    if image_data.flags.f_contiguous:
+      image_data = numpy.transpose(image_data, [i for i in range(image_data.ndim)].reverse())
     affine = Space.from_nifti(self.nifti)
 
     super().__init__(Image(image_data, affine))
@@ -293,6 +281,36 @@ class LargeDynamicPetSeries(Series):
       return super().__getattribute__(name)
     except AttributeError:
       return self._pivot.__getattribute__(name)
+
+ImageContainerType = Union[
+  Image,
+  Nifti1Image,
+  Nifti2Image,
+  List[Dataset],
+  Series
+]
+
+def extract_image(source, frame=None) -> Image:
+  if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
+    source = NiftiSeries(source)
+  if isinstance(source, List):
+    source = DicomSeries(source)
+  if isinstance(source, Series):
+    if isinstance(source.image, FramedImage):
+      if frame is not None:
+        return source.image.frame(frame)
+      error_message = "Underlying Image is a framed image and not an plain image, use the frame to select frame"
+      logger.error(error_message)
+      raise TypeError(error_message)
+    return source.image
+
+  if isinstance(source, Image):
+    return source
+  else:
+    error_message = f"Unable to convert {type(source)} to an Image"
+    logger.error(error_message)
+    raise TypeError(error_message)
+
 
 __all__ = [
   'Series',

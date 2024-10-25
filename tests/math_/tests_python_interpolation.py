@@ -14,8 +14,6 @@ class InterpolationTest(DicomnodeTestCase):
     X, Y, Z = numpy.meshgrid(x, y, z, indexing='ij')
     data = -(((X - 10)/20)**2 + ((Y - 10)/20)**2 + ((Z - 10)/20)**2) + 0.25
 
-    print(data.shape, data.flags.c_contiguous, data.flags.f_contiguous)
-
     # Define original and new coordinate systems
     original_basis = numpy.array([
         [1.0, 0.0, 0.0],    # x basis vector

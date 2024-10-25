@@ -5,12 +5,13 @@ from typing import List
 from unittest import TestCase
 
 # Third party module
+from nibabel.nifti1 import Nifti1Image, Nifti1Header
 from numpy import ndarray
 from pydicom import Dataset, DataElement
 
 # Dicomnode
 from dicomnode.dicom import gen_uid
-from dicomnode.dicom.series import DicomSeries, NiftiSeries, sortDatasets, shared_tag
+from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag
 from dicomnode.math.image import Image
 
 # Test stuff

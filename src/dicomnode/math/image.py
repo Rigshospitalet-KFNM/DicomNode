@@ -82,9 +82,21 @@ class Image:
                image_data: numpy_image,
                space: Space,
                minimum_value=0) -> None:
-    self.raw = image_data
-    self.space = space
-    self.minimum_value = minimum_value
+    self._raw = image_data
+    self._space = space
+    self._minimum_value = minimum_value
+
+  @property
+  def raw(self):
+    return self._raw
+
+  @property
+  def space(self):
+    return self._space
+
+  @property
+  def minimum_value(self):
+    return self._minimum_value
 
 
   @classmethod
@@ -94,122 +106,11 @@ class Image:
 
     return cls(image_data, affine)
 
-  @staticmethod
-  def _map_args_coordinates(*args) -> ndarray[Tuple[Literal[4]], Any]:
-        # Args manipulation
-    input_arg = args[0]
-    if len(input_arg) == 3:
-      i,j,k = input_arg
-      coordinates = array([i,j,k])
-    elif len(args) == 1:
-      if isinstance(input_arg, Tuple) or isinstance(input_arg, List):
-        i,j,k = tuple(input_arg[0])
-        coordinates = array([i,j,k])
-      else:
-        coordinates = args[0]
-    else:
-      error_message = f"Invalid number of args. Must be 1 or 3, but got {len(args)}"
-      raise TypeError(error_message)
-
-    if not isinstance(coordinates, ndarray): #pragma: no cover
-      raise TypeError("Could not converts arguments to a Numpy.ndarray")
-
-    if coordinates.shape != (3,): #pragma: no cover
-      raise ValueError("Input vector is not a coordinate (x,y,z)")
-
-    return coordinates
-
-  @staticmethod
-  def _map_args_point(*args) -> ndarray[Tuple[Literal[3]], Any]:
-        # Args manipulation
-    if len(args) == 3:
-      i,j,k = args
-      coordinates = array([i,j,k])
-    elif len(args) == 1:
-      if isinstance(args[0], Tuple) or isinstance(args[0], List):
-        i,j,k = args[0]
-        coordinates = array([i,j,k])
-      else:
-        coordinates = args[0]
-    else:
-      error_message = f"Invalid number of args. Must be 1 or 3, but got {len(args)}"
-      raise TypeError(error_message)
-
-    if not isinstance(coordinates, ndarray):
-      raise TypeError("Could not converts arguments to a Numpy.ndarray")
-
-    return coordinates
-
-  def _get_value_box_around_index(self, pseudo_index):
-    x,y,z = pseudo_index
-
-    fx, fy, fz = floor(pseudo_index).astype(int32)
-    cx, cy, cz = ceil(pseudo_index).astype(int32)
-
-    dis_fx = (fx - x) ** 2
-    dis_fy = (fy - y) ** 2
-    dis_fz = (fz - z) ** 2
-
-    dis_cx = (cx - x) ** 2
-    dis_cy = (cy - y) ** 2
-    dis_cz = (cz - z) ** 2
-
-    return [
-      (dis_fx + dis_fy + dis_fz, self.value_at_index(fx,fy,fz)),
-      (dis_cx + dis_fy + dis_fz, self.value_at_index(cx,fy,fz)),
-      (dis_fx + dis_cy + dis_fz, self.value_at_index(fx,cy,fz)),
-      (dis_cx + dis_cy + dis_fz, self.value_at_index(cx,cy,fz)),
-      (dis_fx + dis_fy + dis_cz, self.value_at_index(fx,fy,cz)),
-      (dis_cx + dis_fy + dis_cz, self.value_at_index(cx,fy,cz)),
-      (dis_fx + dis_cy + dis_cz, self.value_at_index(fx,cy,cz)),
-      (dis_cx + dis_cy + dis_cz, self.value_at_index(cx,cy,cz)),
-    ]
-
-  def _pseudo_index_at_point(self, *args):
-    """_summary_
-
-    Returns:
-        _type_: _description_
-    """
-    point = self._map_args_point(args)
-    return self.space.inverted_raw @ point
-
-  def value_at_index(self, *args):
-    x, y, z = self._map_args_point(args)
-    columns, rows, slices = self.raw.shape
-
-    if not (0 < x < columns):
-      return self.minimum_value
-
-    if not (0 < y < rows):
-      return self.minimum_value
-
-    if not (0 < z < slices):
-      return self.minimum_value
-
-    return self.raw[x,y,z]
-
-  def value_at_point_nn(self, *args):
-    minimum_distance = 1000
-    return_value = self.minimum_value
-    pseudo_index = self._pseudo_index_at_point(args)
-
-    for (distance, value) in self._get_value_box_around_index(pseudo_index):
-      if distance < minimum_distance:
-        minimum_distance = distance
-        return_value = value
-
-    return return_value
-
-  def center_index(self):
-    columns, rows, slices = self.raw.shape
-
-    return (
-      (columns - 1) // 2,
-      (rows - 1) // 2,
-      (slices - 1) // 2,
-    )
 
 class FramedImage():
-  def __init__(self, frames: raw_image_frames) -> None:
+  def frame(self, frame) -> Image:
+    return Image(self.raw[frame], self.space)
+
+  def __init__(self, frames: raw_image_frames, space: Space) -> None:
     self.raw = frames
+    self.space = space
