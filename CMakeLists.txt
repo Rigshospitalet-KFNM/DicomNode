@@ -23,7 +23,7 @@ find_package(pybind11 REQUIRED)
 
 function(add_py_object_library name source)
   add_library(${name} OBJECT ${source})
-  target_link_libraries(${name} PRIVATE pybind11::module Python::Python)
+  target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(${name} PRIVATE -O3)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -43,6 +43,8 @@ if(CMAKE_CUDA_COMPILER)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 #
   message(status ${PYTHON_INCLUDE_DIRS})
+
+  add_library(utilities low_level_src/python/utilities.cu)
 
   set(CUDA_LIBRARIES
     bounding_box low_level_src/python/python_bounding_box.cu
