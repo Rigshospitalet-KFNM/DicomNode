@@ -48,6 +48,10 @@ class Space:
     return self._basis
 
   @property
+  def inverted_basis(self):
+    return self._inverted_basis
+
+  @property
   def domain(self):
     return self._domain
 
@@ -55,9 +59,9 @@ class Space:
   def start_point(self):
     return self._start_point
 
-  def __init__(self, raw: RawBasisMatrix, start_points, domain):
-    self._basis = raw
-    self._inverted_raw = inv(raw)
+  def __init__(self, basis: RawBasisMatrix, start_points, domain):
+    self._basis = numpy.array(basis)
+    self._inverted_basis = inv(self._basis)
     self._start_point = numpy.array(start_points)
     self._domain = numpy.array(domain)
 

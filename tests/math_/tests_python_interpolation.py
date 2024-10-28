@@ -1,6 +1,6 @@
 import numpy
 
-from dicomnode.math.interpolation import py_interpolate
+from dicomnode.math.interpolation import cpu_interpolate
 
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -35,7 +35,7 @@ class InterpolationTest(DicomnodeTestCase):
     new_shape = (32, 16, 8)
 
     # Act
-    interpolated = py_interpolate(
+    interpolated = cpu_interpolate(
         data,
         original_basis,
         original_start,
