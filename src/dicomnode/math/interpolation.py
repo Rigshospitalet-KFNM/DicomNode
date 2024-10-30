@@ -10,15 +10,11 @@ from typing import Any, Iterable, List, Literal, Tuple, Union
 
 # Third party modules
 import numpy
-from nibabel.nifti1 import Nifti1Image
-from nibabel.nifti2 import Nifti2Image
-from pydicom import Dataset
 from scipy.interpolate import RegularGridInterpolator
 
 # Dicomnode modules
 from dicomnode.dicom.series import extract_image, ImageContainerType
 from dicomnode.math.space import Space
-from dicomnode.math.image import Image, FramedImage
 
 try:
   from dicomnode.math import _cuda
@@ -27,14 +23,11 @@ except ImportError:
   CUDA = False
 
 
-
-def resample(source: ImageContainerType, target: Union[Space, ImageContainerType]):
-  source = extract_image(source)
+def resample(source: ImageContainerType, target: Union[Space, ImageContainerType], frame = None):
+  source = extract_image(source, frame)
 
   if not isinstance(target, Space):
-    target = extract_image(target).space
-
-
+    target = extract_image(target, frame).space
 
 
 def py_interpolate(data: numpy.ndarray,

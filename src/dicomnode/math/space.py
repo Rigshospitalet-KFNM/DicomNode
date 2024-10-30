@@ -75,9 +75,9 @@ class Space:
       start_point = [0,0,0]
 
     if data.flags.f_contiguous:
-      shape = [s for s in data.shape].reverse()
+      shape = numpy.array([s for s in reversed(data.shape)])
     else:
-      shape = data.shape
+      shape = numpy.array(data.shape)
 
     return cls(affine, start_point, shape)
 

@@ -9,7 +9,7 @@ from unittest import TestCase
 
 # Third Party Modules
 import numpy
-from pydicom import DataElement, Dataset
+from pydicom import DataElement, Dataset, Sequence
 from pydicom.tag import Tag
 from pydicom.uid import SecondaryCaptureImageStorage, CTImageStorage
 
@@ -169,6 +169,15 @@ class BlueprintTestCase(TestCase):
 
     self.assertEqual(len(cm.output), 1)
 
+  def test_static_element_string_conversion(self):
+    self.assertEqual(str(StaticElement(0x0010_0010, 'PN',"TestName")),
+                     r"<StaticElement Patient's Name: (0010, 0010) PN TestName>")
+
+  def test_corporealialize_copy_from_nothing(self):
+    copy = CopyElement(0x0010_0010)
+    with self.assertRaises(Exception):
+      copy.corporealialize([])
+
 
 class DicomFactoryTestCase(TestCase):
   def setUp(self) -> None:
@@ -305,6 +314,12 @@ class DicomFactoryTestCase(TestCase):
     dataset = Dataset()
     build_dataset = self.factory.build_instance(dataset, blueprint)
 
+    self.assertIn(0x0011_0050, build_dataset)
+    self.assertIn(0x0011_5000, build_dataset)
+
+    sequence = build_dataset[0x0011_5000][0]
+    self.assertIn(0x00115000,sequence)
+
   def test_factory_build_with_copy(self):
     dataset = Dataset()
     dataset.SOPClassUID = SecondaryCaptureImageStorage
@@ -325,6 +340,7 @@ class DicomFactoryTestCase(TestCase):
     test_blueprint = Blueprint([
       CopyElement(0x00100010),
       StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
+      InstanceCopyElement(0x0020_0032, 'DS'),
       FunctionalElement(0x01115001, 'IS', lambda env: env.instance_number + 34),
     ])
 
@@ -385,3 +401,8 @@ class DicomFactoryTestCase(TestCase):
         continue
       self.assertLess(prev_tag, str_)
       prev_tag = str_
+
+  def build_empty_instance(self):
+    factory = DicomFactory()
+    with self.assertRaises(ValueError):
+      factory.build_instance(Dataset(), Blueprint())

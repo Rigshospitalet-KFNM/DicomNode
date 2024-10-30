@@ -149,7 +149,7 @@ class StaticElement(VirtualElement, Generic[T]):
     return DataElement(self.tag, self.VR, self.value)
 
   def __str__(self):
-    return f"<StaticElement: {self.tag} {self.VR} {self.value}>"
+    return f"<StaticElement {self.name}: {self.tag} {self.VR} {self.value}>"
 
 class SeriesElement(VirtualElement):
   """This virtual element is instantiated when the header is created
@@ -731,7 +731,7 @@ class DicomFactory():
                                             kwargs: Dict) -> List[Dataset]:
     try:
       import pdf2image
-    except ImportError as E: #pragma ignore
+    except ImportError as E: #pragma: ignore
       raise MissingOptionalDependency("Missing package pdf2image", E)
 
     pivot = get_pivot(datasets)

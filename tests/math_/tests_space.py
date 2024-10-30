@@ -15,10 +15,10 @@ class SpaceTestCases(DicomnodeTestCase):
     shape = (5,6,7)
     header = Nifti1Header()
     affine = numpy.array([
-      [3.0,0.0, 0.0, 0.0],
-      [0.0,3.0, 0.0, 0.0],
-      [0.0,0.0, 4.0, 0.0],
-      [0.0,0.0, 0.0, 1.0]
+      [3.0, 0.0, 0.0, 0.0],
+      [0.0, 3.0, 0.0, 0.0],
+      [0.0, 0.0, 4.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     ])
     data = numpy.random.random(shape)
     image = Nifti1Image(data, affine, header)
@@ -43,15 +43,14 @@ class SpaceTestCases(DicomnodeTestCase):
     header = Nifti1Header()
     data = numpy.asfortranarray(numpy.random.random(shape))
     affine = numpy.array([
-      [3.0,0.0, 0.0, 0.0],
-      [0.0,3.0, 0.0, 0.0],
-      [0.0,0.0, 4.0, 0.0],
-      [0.0,0.0, 0.0, 1.0]
+      [3.0, 0.0, 0.0, 0.0],
+      [0.0, 3.0, 0.0, 0.0],
+      [0.0, 0.0, 4.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     ])
     image = Nifti1Image(data, affine, header)
 
     space = Space.from_nifti(image)
 
     # To do asserts
-
-    self.assertTrue((space.domain == numpy.array(reversed(shape)).all()))
+    self.assertTrue((space.domain == numpy.array([s for s in reversed(shape)])).all())
