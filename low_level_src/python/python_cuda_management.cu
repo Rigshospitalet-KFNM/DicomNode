@@ -1,33 +1,10 @@
-#include<string>
-
 // Pybind includes
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
+#include"utilities.cuh"
 
 #include"../gpu_code/dicom_node_gpu.cu"
-
-std::string get_byte_string (size_t bytes){
-  std::stringstream ss;
-  if(bytes < 1024){
-    ss << bytes << " B";
-    return ss.str();
-  }
-  bytes >>= 10;
-  if(bytes < 1024){
-    ss << bytes << " kB";
-    return ss.str();
-  }
-  bytes >>= 10;
-  if(bytes < 1024){
-    ss << bytes << " MB";
-    return ss.str();
-  }
-
-  bytes >>= 10;
-  ss << bytes << " GB";
-  return ss.str();
-}
 
 
 pybind11::object cast_current_device(){

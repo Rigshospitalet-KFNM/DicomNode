@@ -352,23 +352,11 @@ __device__ dicomNodeError_t invertMatrix(
 
 
 template<uint8_t DIMENSIONS, typename T>
-class LinearSpace {
+class Image {
   public:
     Point<DIMENSIONS> starting_point[DIMENSIONS];
     SquareMatrix<DIMENSIONS> basis;
     Domain<DIMENSIONS> space;
     T* data;
     T defaultValue = 0;
-
-  __device__ dicomNodeError_t find_boundary_point(
-    volatile SquareMatrix<DIMENSIONS>* shared_memory_matrix,
-    volatile Point<DIMENSIONS>* point) const {
-      basis.to_shared_memory(shared_memory_matrix);
-      volatile Point<DIMENSIONS>& rPoint = *point;
-      rPoint -= starting_point;
-      dicomNodeError_t error = GaussJordanElemination(shared_memory_matrix, point);
-
-      return error;
-  }
-
 };
