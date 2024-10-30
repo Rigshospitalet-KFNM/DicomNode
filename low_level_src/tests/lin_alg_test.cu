@@ -239,7 +239,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  ASSERT_EQ(hostError, dicomNodeError_t::success);
+  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
 }
 
 template<uint8_t DIMENSION>
@@ -312,7 +312,7 @@ TEST(LIN_ALG, FULL_REDUCTION){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  ASSERT_EQ(hostError, dicomNodeError_t::success);
+  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   ASSERT_FLOAT_EQ(matrix[0], 1.0f);
   ASSERT_FLOAT_EQ(matrix[1], 0.0f);
@@ -376,7 +376,7 @@ TEST(LIN_ALG, FORWARD_INVERSION){
     cudaMemcpyDeviceToHost
   );
   ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::success);
+  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,
@@ -463,7 +463,7 @@ TEST(LIN_ALG, INVERSION_2x2){
     cudaMemcpyDeviceToHost
   );
   ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::success);
+  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,
@@ -565,7 +565,7 @@ TEST(LIN_ALG, INVERSION_3x3){
     cudaMemcpyDeviceToHost
   );
   ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::success);
+  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,

@@ -45,6 +45,8 @@ if(CMAKE_CUDA_COMPILER)
   message(status ${PYTHON_INCLUDE_DIRS})
 
   add_library(utilities low_level_src/python/utilities.cu)
+  target_link_libraries(utilities PRIVATE pybind11::module Python::Python)
+  target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
 
   set(CUDA_LIBRARIES
     bounding_box low_level_src/python/python_bounding_box.cu

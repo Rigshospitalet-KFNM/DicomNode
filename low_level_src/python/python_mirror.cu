@@ -13,7 +13,7 @@
 template<typename OP, typename T>
   requires Mirrors<OP, T, Domain<3>>
 int py_mirror(pybind11::array_t<T, ARRAY_FLAGS> arr){
-  pybind11::buffer_info arr_buffer = arr.request(true);
+  pybind11::buffer_info& arr_buffer = arr.request(true);
   if(arr_buffer.ndim != 3){
     throw std::runtime_error("Input shape must be 3");
   }
@@ -24,13 +24,13 @@ int py_mirror(pybind11::array_t<T, ARRAY_FLAGS> arr){
     }
   }
 
-  const Domain<3> space(
+  const Domain<3> domain(
     arr_buffer.shape[0],
     arr_buffer.shape[1],
     arr_buffer.shape[2]
   );
 
-  cudaError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, space);
+  cudaError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, domain);
 
   return (int)error;
 }

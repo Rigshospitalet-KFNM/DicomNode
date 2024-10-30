@@ -18,6 +18,8 @@ from rt_utils.ds_helper import get_contour_sequence_by_roi_number
 
 # Dicomnode packages
 from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.math.image import Image
+from dicomnode.math.space import Space
 
 def get_contour_sequence_by_name(RT_dataset: Dataset, name: str) -> Sequence:
   if 'StructureSetROISequence' not in RT_dataset:
@@ -29,10 +31,11 @@ def get_contour_sequence_by_name(RT_dataset: Dataset, name: str) -> Sequence:
 
   raise InvalidDataset(f"RT struct doesn't contain any contour named {name}")
 
-def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> numpy.ndarray:
+def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
   contour_sequence = get_contour_sequence_by_name(RT_dataset, name)
   mask = create_empty_series_mask(series)
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
+  print(transformation_matrix)
 
   for i, series_slice in enumerate(series):
     contour_slices = [
@@ -45,7 +48,9 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> numpy.
         series_slice, contour_slices, transformation_matrix
       )
 
-  return mask
+  space = Space.from_datasets(series)
 
-def get_mask(rt_struct: RTStruct, name: str) -> numpy.ndarray:
+  return Image(mask.transpose(), space)
+
+def get_mask(rt_struct: RTStruct, name: str) -> Image:
   return get_mask_ds(rt_struct.series_data, rt_struct.ds, name)

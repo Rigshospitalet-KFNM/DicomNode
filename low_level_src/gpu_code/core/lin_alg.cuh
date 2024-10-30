@@ -84,7 +84,7 @@ struct SquareMatrix {
 
   __device__ void to_shared_memory(volatile SquareMatrix<DIMENSIONS>* other) const {
     if(threadIdx.x < DIMENSIONS*DIMENSIONS){
-      other->point[threadIdx.x] = points[threadIdx.x];
+      other[threadIdx.x] = points[threadIdx.x];
     }
   }
 };
@@ -187,7 +187,7 @@ __device__ dicomNodeError_t ForwardElemination(
     __syncthreads();
   }
 
-  return dicomNodeError_t::success;
+  return dicomNodeError_t::SUCCESS;
 }
 
 template<uint8_t DIMENSION>
@@ -218,7 +218,7 @@ __device__ dicomNodeError_t BackwardsElemination(
     __syncthreads();
   }
 
-  return dicomNodeError_t::success;
+  return dicomNodeError_t::SUCCESS;
 }
 
 template<uint8_t DIMENSION>
@@ -294,7 +294,7 @@ __device__ dicomNodeError_t _invertMatrixForward(
     __syncthreads();
   }
 
-  return dicomNodeError_t::success;
+  return dicomNodeError_t::SUCCESS;
 }
 
 template<uint8_t DIMENSION>
@@ -334,7 +334,7 @@ __device__ dicomNodeError_t _invertMatrixBackwards(
     __syncthreads();
   }
 
-  return dicomNodeError_t::success;
+  return dicomNodeError_t::SUCCESS;
 }
 
 template<uint8_t DIMENSION>
@@ -344,7 +344,7 @@ __device__ dicomNodeError_t invertMatrix(
 ){
   dicomNodeError_t error = _invertMatrixForward<DIMENSION>(matrix, output);
 
-  if(error != dicomNodeError_t::success){
+  if(error != dicomNodeError_t::SUCCESS){
     return error;
   }
   return _invertMatrixBackwards<DIMENSION>(matrix, output);
@@ -356,7 +356,8 @@ class Image {
   public:
     Point<DIMENSIONS> starting_point[DIMENSIONS];
     SquareMatrix<DIMENSIONS> basis;
-    Domain<DIMENSIONS> space;
-    T* data;
+    SquareMatrix<DIMENSIONS> inverted_basis;
+    Domain<DIMENSIONS> domain;
+    T* data = nullptr;
     T defaultValue = 0;
 };

@@ -20,6 +20,7 @@ from pydicom.datadict import dictionary_VR
 from pydicom.tag import BaseTag
 from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
+from rt_utils import RTStruct
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
@@ -192,11 +193,11 @@ class LargeDynamicPetSeries(Series):
     'NumberOfSlices',
     'NumberOfTimeSlices',
     'Rows',
-    'Cols',
+    'Columns',
     'RescaleIntercept',
     'RescaleSlope',
     'PixelData',
-    'ActualFrameTime',
+    'ActualFrameDuration',
     'AcquisitionTime',
     'AcquisitionDate',
     'ImageIndex',
@@ -232,12 +233,23 @@ class LargeDynamicPetSeries(Series):
     frame_times_ms = None
     frame_acquisition_time = None
 
+    first_series = []
+
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
       if not has_tags(dataset, self.REQUIRED_TAGS):
-        raise InvalidDataset(f"Dataset doesn't appear to be large pet")
+        missing_tags = []
+
+        for tag in self.REQUIRED_TAGS:
+          if tag not in dataset:
+            missing_tags.append(str(tag))
+
+        raise InvalidDataset(f"Dataset doesn't appear to be large pet as dataset is missing {' '.join(missing_tags)}")
 
       time_series = dataset.ImageIndex // dataset.NumberOfSlices
       slice_number_in_series = dataset.ImageIndex % dataset.NumberOfSlices
+
+      if time_series == 0:
+        first_series.append(dataset)
 
       raw[time_series, slice_number_in_series, :, :] = \
         dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
@@ -248,7 +260,7 @@ class LargeDynamicPetSeries(Series):
         first_dataset = dataset
 
       if raw_image is None:
-        raw_image = empty((dataset.NumberOfTimeSlices, dataset.NumberOfSlices, dataset.Rows, dataset.Cols), float32)
+        raw_image = empty((dataset.NumberOfTimeSlices, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
 
       if frame_times_ms is None:
         frame_times_ms = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.int32)
@@ -270,7 +282,9 @@ class LargeDynamicPetSeries(Series):
     if frame_acquisition_time is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
 
-    super().__init__(FramedImage(raw_image))
+    space = Space.from_datasets(first_series)
+
+    super().__init__(FramedImage(raw_image, space))
     self._pivot = first_dataset
     self._frame_durations_ms = frame_times_ms
     self._frame_acquisition_time = frame_acquisition_time
@@ -290,7 +304,7 @@ ImageContainerType = Union[
   Series
 ]
 
-def extract_image(source, frame=None) -> Image:
+def extract_image(source, frame=None, mask=None) -> Image:
   if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
     source = NiftiSeries(source)
   if isinstance(source, List):

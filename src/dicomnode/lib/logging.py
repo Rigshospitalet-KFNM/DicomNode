@@ -63,16 +63,16 @@ def __setup_logger() -> Logger:
   if __log_output is None:
     __logger.setLevel(CRITICAL + 1)
     return __logger
-
   elif isinstance(__log_output, TextIO) or isinstance(__log_output, TextIOWrapper):
     handler = StreamHandler(__log_output)
-
   elif isinstance(__log_output, Path):
     handler = TimedRotatingFileHandler(
       __log_output,
       when=__when,
       backupCount=__number_of_backups
     )
+  else:
+    handler = StreamHandler(stdout)
 
   log_formatter = Formatter(fmt=__format, datefmt=__date_format)
   handler.setFormatter(log_formatter)

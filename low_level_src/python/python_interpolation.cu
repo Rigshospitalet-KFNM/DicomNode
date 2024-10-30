@@ -3,27 +3,32 @@
 
 #include<iostream>
 #include<string>
+#include<tuple>
 
 #include"../gpu_code/dicom_node_gpu.cu"
 
 using basis_t = pybind11::array_t<float>;
 using domain_array = pybind11::array_t<int>;
 
-
 template<typename T>
 pybind11::array_t<T> interpolate_linear_templated(
   const pybind11::object& image,
   const pybind11::object& new_space
 ){
+  Image<3, T> *device_image = nullptr;
+  Image<3, T> *out_image = nullptr;
 
 
-  Image<3, T> *device_image;
+  auto error_function = [&](){
+    free_device_memory(device_image, out_image);
+  };
 
-  cudaError_t cuda_error = cudaMalloc(&device_image,sizeof(Image<3, T>));
-  load_image(device_image, image);
+  DicomNodeRunner runner{error_function};
+  runner
+    | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
+    | [&](){ return load_image<T>(device_image, image); }
+    | [&](){ cudaFree(device_image); };
 
-
-  cudaFree(device_image);
 }
 
 pybind11::array interpolate_linear(const pybind11::object& image,
@@ -60,6 +65,7 @@ pybind11::array interpolate_linear(const pybind11::object& image,
   const std::string error_message = "Unsupported dtype:" + dtype;
   throw std::runtime_error(error_message);
 }
+
 
 void apply_interpolation_module(pybind11::module& m){
   pybind11::module sub_module = m.def_submodule(

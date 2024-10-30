@@ -60,10 +60,10 @@ class Space:
     return self._start_point
 
   def __init__(self, basis: RawBasisMatrix, start_points, domain):
-    self._basis = numpy.array(basis)
-    self._inverted_basis = inv(self._basis)
-    self._start_point = numpy.array(start_points)
-    self._domain = numpy.array(domain)
+    self._basis = numpy.array(basis, dtype=float32)
+    self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
+    self._start_point = numpy.array(start_points, dtype=float32)
+    self._domain = numpy.array(domain, dtype=float32)
 
 
   @classmethod

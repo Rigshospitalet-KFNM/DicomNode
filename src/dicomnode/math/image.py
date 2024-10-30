@@ -98,6 +98,12 @@ class Image:
   def minimum_value(self):
     return self._minimum_value
 
+  @property
+  def shape(self):
+    return self.raw.shape
+
+  def __getitem__(self, idx):
+    return self.raw[idx]
 
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):

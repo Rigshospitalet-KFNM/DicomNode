@@ -242,7 +242,6 @@ class TemporaryWorkingDirectory():
 class DicomLazyIterator:
   """This class is for creating a lazy dataset iterator for large datasets
   """
-  @type_corrosion(Path)
   def __init__(self, path: Path, dicom_fileheader="dcm") -> None:
     self._path = path
     self._dicom_fileheader = dicom_fileheader
