@@ -1,4 +1,5 @@
 #include<string>
+#include<cstring>
 #include<sstream>
 
 #include<pybind11/pybind11.h>
@@ -23,3 +24,6 @@ dicomNodeError_t load_image(
   Image<3, T>* dev_out_image,
   const pybind11::object& python_image
 );
+
+template<typename T>
+dicomNodeError_t free_image(Image<3, T> dev_ptr);

@@ -8,7 +8,8 @@ from unittest import TestCase
 
 from dicomnode.dicom.dimse import Address
 from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.server.output import DicomOutput, FileOutput
+from dicomnode.server.output import DicomOutput, FileOutput, MultiOutput,\
+  NoOutput
 from tests.helpers import get_test_ae
 
 
@@ -60,3 +61,12 @@ class OutputTests(TestCase):
       output = DicomOutput([(address, self.datasets)], "PIPELINE_AE")
       self.assertFalse(output.send())
     self.assertIn("ERROR:dicomnode:Could not send to images to WrongAE", cm.output)
+
+  def test_dicom_output_multi_output(self):
+    output = MultiOutput([
+      NoOutput(),
+      NoOutput(),
+      NoOutput()
+    ])
+
+    self.assertTrue(output.send())

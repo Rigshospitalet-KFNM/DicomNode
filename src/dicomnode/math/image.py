@@ -114,9 +114,18 @@ class Image:
 
 
 class FramedImage():
+  @property
+  def space(self):
+    return self._space
+
+  @property
+  def shape(self):
+    return self.raw.shape
+
+
   def frame(self, frame) -> Image:
     return Image(self.raw[frame], self.space)
 
   def __init__(self, frames: raw_image_frames, space: Space) -> None:
     self.raw = frames
-    self.space = space
+    self._space = space

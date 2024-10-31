@@ -17,11 +17,16 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode packages
+from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
 from dicomnode.server.grinders import Grinder
 from dicomnode.server.input import AbstractInput, DynamicInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
+
+#
+from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 SERIES_DESCRIPTION = "Fancy Description"
 
@@ -53,7 +58,7 @@ class TestInput1(AbstractInput):
     return True
 
 class TestInput2(AbstractInput):
-  required_tags: List[int] = [0x00100010]
+  required_tags: List[int] = [0x0010_0010]
   required_values: Dict[int, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
@@ -72,7 +77,7 @@ class TestDynamicInput(DynamicInput):
     return True
 
 
-class PipelineTestCase(TestCase):
+class PipelineTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
     self.options = PipelineTree.Options(
@@ -338,3 +343,15 @@ class PatientNodeTestCase(TestCase):
       'arg_1' : TestInput1,
       'arg_2' : TestInput2,
     })
+
+    node.creation_time = datetime.datetime(2020,6,10,10,20,30,125912)
+
+    series = DicomSeries([ds for ds in generate_numpy_datasets(10, Rows=10, Cols=10)])
+    series[0x0008103E] = SERIES_DESCRIPTION
+
+    node.add_images(series)
+
+    self.assertEqual(str(node),
+                     "PatientNode created at 2020-06-10 10:20:30.125912\n"
+                     "  TestInput1 - 10 images - Valid: True\n"
+                     "  TestInput2 - 0 images - Valid: True")

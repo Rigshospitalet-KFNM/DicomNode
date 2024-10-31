@@ -17,7 +17,7 @@ import numpy
 from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
 from pydicom.tag import Tag
-from pydicom.datadict import dictionary_VR, dictionary_keyword
+from pydicom.datadict import dictionary_VR, keyword_dict
 from pydicom.tag import BaseTag
 from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
@@ -87,14 +87,13 @@ class Series:
 
   It's a
   """
-
   @property
   def image(self):
     if self._image is None:
       if isinstance(self._image_constructor, Callable): #pragma: no cover
         self._image = self._image_constructor()
       else:
-        raise IncorrectlyConfigured("An Image must have an image or ")
+        raise IncorrectlyConfigured("An Image must have an image or constructor")
     return self._image
 
   # Constructors
@@ -146,7 +145,9 @@ class DicomSeries(Series):
     try:
       return super().__getattribute__(name)
     except AttributeError:
-        return self.datasets[0].__getattribute__(name)
+      tag = keyword_dict[name]
+
+      return self.datasets[0][tag].value
 
   def __setitem__(self, tag: Union[int, str], value):
     if isinstance(tag, str):

@@ -6,12 +6,13 @@ from unittest import TestCase
 
 # Third party module
 from nibabel.nifti1 import Nifti1Image, Nifti1Header
-from numpy import ndarray
+import numpy
 from pydicom import Dataset, DataElement
 
 # Dicomnode
+from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.dicom import gen_uid
-from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag
+from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag, Series
 from dicomnode.math.image import Image
 
 # Test stuff
@@ -22,7 +23,7 @@ class DicomSeriesTestCase(TestCase):
     self.num_datasets = 3
 
     self.datasets = [ds for ds in generate_numpy_datasets(
-      self.num_datasets, Cols=3, Rows=3
+      self.num_datasets, Cols=3, Rows=3, PatientID="Blah"
     )]
 
   def test_create_empty_dicom_series(self):
@@ -91,7 +92,41 @@ class DicomSeriesTestCase(TestCase):
     with self.assertRaises(TypeError):
       ds[0x0008_0018] = gen_uid()
 
+  def test_get_tag_attribute_from_series(self):
+    ds = DicomSeries(self.datasets)
+    self.assertEqual(ds.PatientID, "Blah")
+
+
 class SharedTagsTestCase(TestCase):
   def test_empty_list(self):
     with self.assertRaises(ValueError):
-      shared_tag([],0x0010_0010)
+      shared_tag([], 0x0010_0010)
+
+class BaseSeriesTestCase(DicomSeriesTestCase):
+  def test_fault_constructor(self):
+    series = Series(None) # type: ignore
+    with self.assertRaises(IncorrectlyConfigured):
+      series.image
+
+class NiftiSeriesTestCase(DicomSeriesTestCase):
+  def test_nifti(self):
+    shape = (7,6,5)
+    header = Nifti1Header()
+    data = numpy.asfortranarray(numpy.random.random(shape))
+    affine = numpy.array([
+      [3.0, 0.0, 0.0, 10.0],
+      [0.0, 3.0, 0.0, 20.0],
+      [0.0, 0.0, 4.0, 30.0],
+      [0.0, 0.0, 0.0, 1.0]
+    ])
+    image = Nifti1Image(data, affine, header)
+
+    series = NiftiSeries(image)
+
+    self.assertEqual(series.image.shape[0], 5)
+    self.assertEqual(series.image.shape[1], 6)
+    self.assertEqual(series.image.shape[2], 7)
+
+    self.assertEqual(series.image.space.start_point[0], [10])
+    self.assertEqual(series.image.space.start_point[1], [20])
+    self.assertEqual(series.image.space.start_point[2], [30])

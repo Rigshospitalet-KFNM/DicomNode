@@ -555,7 +555,8 @@ class AbstractPipeline():
 
     if released_container.association_ae in self.known_endpoints:
       input_container.responding_address = self.known_endpoints[
-        released_container.association_ae]
+        released_container.association_ae
+      ]
     elif released_container.association_id in self._associations_responds_addresses:
       input_container.responding_address = self._associations_responds_addresses[
         released_container.association_id]
