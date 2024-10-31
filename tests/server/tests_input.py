@@ -24,7 +24,7 @@ from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 
 from dicomnode.dicom.dimse import Address, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
-from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
+from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
@@ -81,7 +81,7 @@ class HistoricInput(HistoricAbstractInput):
   address = Address('localhost', 51211, "ENDPOINT")
   query_level = QueryLevels.PATIENT
 
-  def get_message_dataset(added_dataset: Dataset) -> Dataset:
+  def get_message_dataset(self, added_dataset: Dataset) -> Dataset:
     ds = Dataset()
 
     return ds
@@ -373,3 +373,15 @@ class InputTestCase(TestCase):
     self.assertIsInstance(dynamic_leaf, DynamicLeaf)
 
     self.assertRaises(IncorrectlyConfigured, dynamic_leaf.get_path, dataset)  #type: ignore
+
+  def test_input_to_string(self):
+    input_ = TestInput()
+
+    images = 10
+
+    series = DicomSeries([ds for ds in generate_numpy_datasets(images, Rows=10, Cols=10)])
+    series[0x0008_103E] = SERIES_DESCRIPTION
+
+    input_.add_images(series)
+
+    self.assertEqual(str(input_), f"TestInput - {images} images - Valid: True")

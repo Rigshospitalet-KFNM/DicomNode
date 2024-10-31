@@ -10,7 +10,7 @@ from typing import Optional, List, Literal, Tuple, TypeAlias
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
 import numpy
-from numpy import array, absolute, dtype, float32, identity, ndarray
+from numpy import array, absolute, dtype, float32, identity, ndarray, int32
 from numpy.linalg import inv
 from pydicom import Dataset
 
@@ -63,7 +63,7 @@ class Space:
     self._basis = numpy.array(basis, dtype=float32)
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
     self._start_point = numpy.array(start_points, dtype=float32)
-    self._domain = numpy.array(domain, dtype=float32)
+    self._domain = numpy.array(domain, dtype=int32)
 
 
   @classmethod

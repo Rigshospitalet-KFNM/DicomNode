@@ -16,7 +16,8 @@ from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
 import numpy
 from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
 from pydicom import Dataset, DataElement
-from pydicom.datadict import dictionary_VR
+from pydicom.tag import Tag
+from pydicom.datadict import dictionary_VR, dictionary_keyword
 from pydicom.tag import BaseTag
 from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
@@ -147,20 +148,22 @@ class DicomSeries(Series):
     except AttributeError:
         return self.datasets[0].__getattribute__(name)
 
-  def __setitem__(self, tag: int, value):
+  def __setitem__(self, tag: Union[int, str], value):
+    if isinstance(tag, str):
+      tag = Tag(tag)
+
     if tag in SERIES_VARYING_TAGS:
       if not isinstance(value, List):
         error_message = f"The tag is a varying dicom tag. The correct type is a list of length {len(self)}"
         raise TypeError(error_message)
       self.set_individual_tag(tag, value)
     else:
-      if not isinstance(value, DataElement):
-        value = DataElement(tag, dictionary_VR(tag), value)
-
       self.set_shared_tag(tag, value)
 
-  def set_shared_tag(self, tag: int, value: DataElement):
+  def set_shared_tag(self, tag: int, value: Any):
     for dataset in self.datasets:
+      if not isinstance(value, DataElement):
+        value = DataElement(tag, dictionary_VR(tag), value)
       dataset[tag] = value
 
   def set_individual_tag(self, tag: int, values: List[Union[DataElement, Any]]):

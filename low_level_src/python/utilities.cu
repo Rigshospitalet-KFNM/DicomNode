@@ -51,9 +51,7 @@ dicomNodeError_t load_image(
     i++;
   }
 
-  memccpy()
-
-  CudaRunner runner{[&](){free_device_memory(host_image.data);}};
+  DicomNodeRunner runner{[&](){free_device_memory(host_image.data);}};
 
   runner
     | [&](){ return cudaMalloc(&host_image.data, image_size); }
@@ -69,6 +67,8 @@ template<typename T>
 void free_image(Image<3, T>* dev_out_image){
   T* data_pointer = nullptr;
   cudaMemcpy(data_pointer, &(dev_out_image->data), sizeof(T*), cudaMemcpyDefault);
+
+  // Note that
   cudaFree(data_pointer);
   cudaFree(dev_out_image);
 }

@@ -209,6 +209,11 @@ class PatientNode(ImageTreeInterface):
         lazy=self.options.lazy
       )
 
+  def __str__(self):
+    sub_strings = [f"PatientNode created at {self.creation_time}"] + [f"  {input_}" for input_ in self.data.values()]
+    return "\n".join(sub_strings)
+
+
 
 class PipelineTree(ImageTreeInterface):
   """A more specialized ImageTree, which is used by a dicom node to keep track
@@ -483,6 +488,22 @@ class PipelineTree(ImageTreeInterface):
         lazy=self.options.lazy,
         input_container_type=self.options.input_container_type,
       )
+
+  def __str__(self) -> str:
+    sub_strings = [f"Pipeline Tree - {len(self.data)} Patients - {self.images} images total"]
+    for id_, patient_node in self.data.items():
+      patient_node_lines = str(patient_node).split("\n")
+      lines_to_be_added = []
+      for i, line in enumerate(patient_node_lines):
+        if i == 0:
+          # This is Abstract Input
+          lines_to_be_added.append(f"  {id_} - {line}")
+        else:
+          # This is string representing an Abstract Input
+          lines_to_be_added.append(f"    {line}")
+      sub_strings += lines_to_be_added
+
+    return "\n".join(sub_strings)
 
 __all__ = [
   'InputContainer',

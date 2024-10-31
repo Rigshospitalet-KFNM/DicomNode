@@ -219,6 +219,9 @@ class AbstractInput(ImageTreeInterface, ABC):
     self.images += 1
     return 1
 
+  def __str__(self):
+    return f"{self.__class__.__name__} - {self.images} images - Valid: {self.validate()}"
+
 class DynamicLeaf(ImageTreeInterface):
   """Subclass to DynamicInput, each instance is a separate series"""
   def __init__(self,

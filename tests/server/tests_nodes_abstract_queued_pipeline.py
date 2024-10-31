@@ -34,9 +34,10 @@ series_1 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=1
 series_2 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=10, PatientID=PATIENT_ID_2)])
 series_3 = DicomSeries([ds for ds in generate_numpy_datasets(10, Cols=10, Rows=10, PatientID=PATIENT_ID_3)])
 
-series_1.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.050))
-series_2.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.015))
-series_3.set_shared_tag(0x0011_0100, DataElement(0x0011_0100, 'FT', 0.005))
+#
+series_1[0x0011_0100] = DataElement(0x0011_0100, 'FT', 0.050)
+series_2[0x0011_0100] = DataElement(0x0011_0100, 'FT', 0.015)
+series_3[0x0011_0100] = DataElement(0x0011_0100, 'FT', 0.005)
 
 class TestPipeline(AbstractQueuedPipeline):
   input = {

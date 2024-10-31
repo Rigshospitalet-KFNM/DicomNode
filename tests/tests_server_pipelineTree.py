@@ -332,3 +332,9 @@ class PatientNodeTestCase(TestCase):
     patient_dynamic_node.add_image(dataset_2)
 
     input_container = patient_dynamic_node.extract_input_container()
+
+  def test_patient_node(self):
+    node = PatientNode({
+      'arg_1' : TestInput1,
+      'arg_2' : TestInput2,
+    })

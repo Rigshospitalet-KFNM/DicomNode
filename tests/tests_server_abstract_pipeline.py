@@ -72,7 +72,7 @@ DATASETS = DicomSeries([ds for ds in generate_numpy_datasets(
   PatientID=TEST_CPR
 )])
 
-DATASETS.set_shared_tag(0x0010_0040, DataElement(0x0010_0040, 'CS', 'M'))
+DATASETS[0x0010_0040] = 'M'
 
 class TestInput(AbstractInput):
   required_values = {

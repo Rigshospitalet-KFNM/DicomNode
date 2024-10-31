@@ -21,8 +21,8 @@ from dicomnode.math.image import Image
 try:
   from dicomnode.math import _cuda
   CUDA = True
-except ImportError:
-  CUDA = False
+except ImportError: #pragma: no cover
+  CUDA = False #pragma: no cover
 
 class RESAMPLE_METHODS(Enum):
   LINEAR = "linear"

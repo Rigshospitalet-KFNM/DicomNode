@@ -1,5 +1,7 @@
 import numpy
 
+from dicomnode.math.image import Image
+from dicomnode.math.space import Space
 from dicomnode.math.interpolation import cpu_interpolate
 
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
@@ -34,14 +36,15 @@ class InterpolationTest(DicomnodeTestCase):
     new_start = numpy.array([5.0, 5.0, 5.0])
     new_shape = (32, 16, 8)
 
+    new_space = Space(new_basis, new_start, new_shape)
+
+    original_space = Space(original_basis, original_start, shape)
+    original_image = Image(data, original_space)
+
     # Act
     interpolated = cpu_interpolate(
-        data,
-        original_basis,
-        original_start,
-        new_basis,
-        new_start,
-        new_shape
+        original_image,
+        new_space
     )
 
     # Assert
@@ -49,7 +52,7 @@ class InterpolationTest(DicomnodeTestCase):
     self.assertEqual(interpolated.shape, new_shape)
     self.assertTrue(interpolated.flags.c_contiguous)
 
-    # Visualize middle slices
+        # Visualize middle slices
     import matplotlib.pyplot as plt
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))

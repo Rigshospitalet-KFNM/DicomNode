@@ -83,7 +83,7 @@ def colomn_to_row_major_order(input: numpy.ndarray[Tuple[int,int,int], Any]) -> 
   """
   # I should test this function on some real data.
 
-  if len(input.shape) != 3:
+  if input.ndim != 3:
     raise TypeError("Invalid Shape, accepts only three dimensional arrays")
 
   return_array = numpy.empty(tuple(reversed(input.shape)), order='C')
@@ -96,8 +96,8 @@ def colomn_to_row_major_order(input: numpy.ndarray[Tuple[int,int,int], Any]) -> 
 def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None:
   """Drops privileges of program to run as a user
 
-  An issue with this is that you have to open the socket / files and then drop the privileges
-  and sadly you need to go deep in the pynetdicom library.
+  An issue with this is that you have to open the socket / files and then drop
+  the privileges and sadly you need to go deep in the pynetdicom library.
 
   Args:
   """
@@ -117,6 +117,10 @@ def deprecation_message(deprecated_module_path, new_module_path) -> None:
   warn(f"{deprecated_module_path} has been moved to {new_module_path}", DeprecationWarning)
 
 def type_corrosion(*types: Type):
+  """This decorator doesn't really work with class methods, because the self
+  arg is not implicitly added. I guess you could figure this out from the
+  inspect module.
+  """
   def decorator(func):
     def wrapper(*args, **kwargs):
       if len(args) != len(types):
