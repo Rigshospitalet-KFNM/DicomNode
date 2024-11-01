@@ -1,9 +1,9 @@
 #include"python_constants.cuh"
-
 #include"../gpu_code/dicom_node_gpu.cu"
+#include"utilities.cuh"
 
 template<typename T,  uint8_t CHUNK>
-pybind11::list bounding_box(pybind11::array_t<T, ARRAY_FLAGS> arr){
+pybind11::list bounding_box(python_array<T>& arr){
   const pybind11::buffer_info& buffer = arr.request(false);
   if (buffer.ndim != 3){
     throw std::runtime_error("This function requires 3 dimensional input!");

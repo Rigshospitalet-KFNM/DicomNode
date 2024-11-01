@@ -11,6 +11,12 @@ pybind11::object cast_current_device(){
   return pybind11::cast(get_current_device());
 }
 
+pybind11::object load_image_into_cpp(pybind11::object& python_image){
+  auto image = std::make_unique<Image<3, float>>();
+  load_image<float>(image.get(), python_image);
+  return pybind11::cast(std::move(image));
+}
+
 void apply_cuda_management_module(pybind11::module& m){
   pybind11::class_<cudaDeviceProp>(m, "DeviceProperties")
     .def_readonly("major", &cudaDeviceProp::major)
@@ -39,7 +45,12 @@ void apply_cuda_management_module(pybind11::module& m){
          << "Registers per block: " << get_byte_string(prop.regsPerBlock) << "\n"
          << "Registers per multiprocessor: " << get_byte_string(prop.regsPerMultiprocessor);
       return ss.str();
-    });
+    })
+    .def(pybind11::init<>(&get_current_device));
+
+  pybind11::class_<Image<3, float>>(m, "cpp_image");
+
+  m.def("load_into_cpp_image", &load_image_into_cpp);
 
   m.def("get_device_properties", &cast_current_device);
 }

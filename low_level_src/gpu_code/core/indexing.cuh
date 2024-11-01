@@ -20,6 +20,12 @@ struct Index {
     }
   }
 
+  __device__ __host__ Index(){
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      coordinates[i] = 0;
+    }
+  }
+
   template<typename... Args>
   __device__ __host__ Index(const Args... args){
     static_assert(sizeof...(args) == DIMENSIONS);
@@ -42,7 +48,7 @@ struct Index {
     }
   }
 
-  __device__ __host__  const int32_t& operator[](const uint8_t idx){
+  __device__ __host__  int32_t& operator[](const uint8_t idx){
     // you can't put a static assert in here :(
     return coordinates[idx];
   }
@@ -75,6 +81,12 @@ struct Domain {
   static_assert(DIMENSIONS > 0);
   uint32_t sizes[DIMENSIONS];
 
+  __device__ __host__ Domain(){
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      sizes[i] = 0;
+    }
+  }
+
   template<typename... Args>
   __device__ __host__ Domain(Args... args){
     static_assert(sizeof...(args) == DIMENSIONS);
@@ -86,11 +98,15 @@ struct Domain {
     }
   };
 
-  __device__ __host__ const uint32_t& operator[](const int i) const {
+  __device__ __host__ uint32_t& operator[](const uint8_t i) {
     return sizes[i];
   }
 
-  __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const{
+  __device__ __host__ const uint32_t& operator[](const uint8_t i) const {
+    return sizes[i];
+  }
+
+  __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const {
     bool in = true;
     #pragma unroll
     for(uint8_t i = 0; i < DIMENSIONS; i++){

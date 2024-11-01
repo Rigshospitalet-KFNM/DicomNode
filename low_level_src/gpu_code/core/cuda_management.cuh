@@ -75,18 +75,9 @@ class DicomNodeRunner{
     return *this;
   }
 
-  DicomNodeRunner& operator|(std::function<void()> func){
-    if(m_error == dicomNodeError_t::SUCCESS){
-      func();
-    }
-    return *this;
-  }
-
   dicomNodeError_t error() const {
     return m_error;
   }
-
-
 
   private:
     std::function<void(dicomNodeError_t)> m_error_function;

@@ -5,7 +5,7 @@
 
 # Python standard library
 from enum import Enum
-from typing import Optional, List, Literal, Tuple, TypeAlias
+from typing import List, Literal, Tuple, TypeAlias
 
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
@@ -14,13 +14,8 @@ from numpy import array, absolute, dtype, float32, identity, ndarray, int32
 from numpy.linalg import inv
 from pydicom import Dataset
 
-
 # Dicomnode packages
-from dicomnode.math.types import RotationAxes
-from dicomnode import dicom
-
 RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float32]]
-
 
 # Rotation matrix can be found here:
 # https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
@@ -56,13 +51,13 @@ class Space:
     return self._domain
 
   @property
-  def start_point(self):
-    return self._start_point
+  def starting_point(self):
+    return self._starting_point
 
   def __init__(self, basis: RawBasisMatrix, start_points, domain):
     self._basis = numpy.array(basis, dtype=float32)
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
-    self._start_point = numpy.array(start_points, dtype=float32)
+    self._starting_point = numpy.array(start_points, dtype=float32)
     self._domain = numpy.array(domain, dtype=int32)
 
 
@@ -88,8 +83,6 @@ class Space:
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     try:
-      # Note that
-      datasets.sort(key=dicom.sort_datasets)
 
       first_dataset = datasets[0]
       start_coordinates = first_dataset.ImagePositionPatient

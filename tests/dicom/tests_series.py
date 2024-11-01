@@ -127,6 +127,6 @@ class NiftiSeriesTestCase(DicomSeriesTestCase):
     self.assertEqual(series.image.shape[1], 6)
     self.assertEqual(series.image.shape[2], 7)
 
-    self.assertEqual(series.image.space.start_point[0], [10])
-    self.assertEqual(series.image.space.start_point[1], [20])
-    self.assertEqual(series.image.space.start_point[2], [30])
+    self.assertEqual(series.image.space.starting_point[0], [10])
+    self.assertEqual(series.image.space.starting_point[1], [20])
+    self.assertEqual(series.image.space.starting_point[2], [30])

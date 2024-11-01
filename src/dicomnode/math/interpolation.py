@@ -61,12 +61,12 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   # Convert new indices to world coordinates
   new_coords = numpy.stack([new_I, new_J, new_K], axis=-1)
   new_coords = new_coords.reshape(-1, source.raw.ndim)
-  world_coords_new = target.start_point + new_coords @ target.basis
+  world_coords_new = target.starting_point + new_coords @ target.basis
 
   # Transform world coordinates back to original basis indices for interpolation
   # Solve: world_coords = original_start + coords @ original_basis
   # Therefore: coords = (world_coords - original_start) @ inv(original_basis)
-  orig_indices = (world_coords_new - source.space.start_point) @ source.space.inverted_basis
+  orig_indices = (world_coords_new - source.space.starting_point) @ source.space.inverted_basis
 
   # Interpolate
   interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.domain) # type: ignore

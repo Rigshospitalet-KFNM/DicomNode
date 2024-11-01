@@ -39,7 +39,7 @@ struct Point {
     __syncthreads();
   }
 
-  Index<DIMENSIONS> lower_bound() const {
+  __device__ Index<DIMENSIONS> lower_bound() const {
     int tmp[DIMENSIONS];
     #pragma unroll
     for(int i=0; i<DIMENSIONS;i++){
@@ -360,4 +360,11 @@ class Image {
     Domain<DIMENSIONS> domain;
     T* data = nullptr;
     T defaultValue = 0;
+
+    ~Image(){
+      printf("Destroying Host Image\n");
+      if(data != nullptr){
+        printf("Uuugh somebody should clean this up... \n");
+      }
+    }
 };

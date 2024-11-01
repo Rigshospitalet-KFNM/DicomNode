@@ -44,9 +44,12 @@ if(CMAKE_CUDA_COMPILER)
 #
   message(status ${PYTHON_INCLUDE_DIRS})
 
-  add_library(utilities low_level_src/python/utilities.cu)
+  add_library(utilities OBJECT low_level_src/python/utilities.cu)
   target_link_libraries(utilities PRIVATE pybind11::module Python::Python)
   target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
+  target_compile_options(utilities PRIVATE -O3)
+  set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
+  set_property(TARGET utilities PROPERTY CUDA_ARCHITECTURES native)
 
   set(CUDA_LIBRARIES
     bounding_box low_level_src/python/python_bounding_box.cu
@@ -69,6 +72,7 @@ if(CMAKE_CUDA_COMPILER)
 
   pybind11_add_module(_cuda SHARED
                       low_level_src/python_entry_point.cu
+                      $<TARGET_OBJECTS:utilities>
                       ${OBJECT_TARGETS}
   )
 

@@ -6,6 +6,7 @@
 #include<tuple>
 
 #include"../gpu_code/dicom_node_gpu.cu"
+#include"utilities.cuh"
 
 using basis_t = pybind11::array_t<float>;
 using domain_array = pybind11::array_t<int>;
@@ -19,16 +20,19 @@ pybind11::array_t<T> interpolate_linear_templated(
   Image<3, T> *out_image = nullptr;
 
 
-  auto error_function = [&](){
-    free_device_memory(device_image, out_image);
+  auto error_function = [&](dicomNodeError_t error){
+    free_device_memory(&device_image, &out_image);
   };
 
   DicomNodeRunner runner{error_function};
   runner
     | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
     | [&](){ return load_image<T>(device_image, image); }
-    | [&](){ cudaFree(device_image); };
+    | [&](){ free_device_memory(&device_image);
+      return dicomNodeError_t::SUCCESS;
+    };
 
+  return pybind11::array_t<T>(1 * 1 * 1);
 }
 
 pybind11::array interpolate_linear(const pybind11::object& image,

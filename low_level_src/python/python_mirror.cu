@@ -6,14 +6,15 @@
 #include"python_constants.cuh"
 #include"../gpu_code/dicom_node_gpu.cu"
 
+#include"utilities.cuh"
 
 // py::array::c_style | py::array::forcecast ensures that the array is a dense
 // C style array, I should consider overloading to F style as it's just indexing
 // And the depth is O(1)
 template<typename OP, typename T>
   requires Mirrors<OP, T, Domain<3>>
-int py_mirror(pybind11::array_t<T, ARRAY_FLAGS> arr){
-  pybind11::buffer_info& arr_buffer = arr.request(true);
+int py_mirror(python_array<T> arr){
+  const pybind11::buffer_info& arr_buffer = arr.request(true);
   if(arr_buffer.ndim != 3){
     throw std::runtime_error("Input shape must be 3");
   }
