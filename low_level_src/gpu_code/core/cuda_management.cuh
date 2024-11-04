@@ -51,6 +51,8 @@ class CudaRunner{
 
 class DicomNodeRunner{
   public:
+    DicomNodeRunner() : m_error_function([](dicomNodeError_t _){}){}
+
     DicomNodeRunner(std::function<void(dicomNodeError_t)> error_funciton)
     : m_error_function(error_funciton) {}
 

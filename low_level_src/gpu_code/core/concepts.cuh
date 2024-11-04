@@ -25,3 +25,8 @@ concept MappingBinaryOperator = (
   CBinaryOperator<OP, T_OUT> &&
   Mapping<OP, T_IN, T_OUT, Args...>
 );
+
+template<typename Container>
+concept dicomnodeContainer = requires(Container t) {
+  { t.elements() } noexcept -> std::same_as<size_t>;
+};

@@ -11,10 +11,22 @@ pybind11::object cast_current_device(){
   return pybind11::cast(get_current_device());
 }
 
-pybind11::object load_image_into_cpp(pybind11::object& python_image){
-  auto image = std::make_unique<Image<3, float>>();
-  load_image<float>(image.get(), python_image);
-  return pybind11::cast(std::move(image));
+void print_device_image(const pybind11::object& python_image){
+  Image<3, float> host_image;
+  dicomNodeError_t error = load_image(&host_image, python_image);
+
+  if(error){
+    std::cout << "Encoutered dicomnode Error:" << error << "\n";
+  } else {
+    std::cout << "Starting Point: (" << host_image.space.starting_point[0] << ", "
+                                     << host_image.space.starting_point[1] << ", "
+                                     << host_image.space.starting_point[2] << ")\n";
+    std::cout << "Domain: (" << host_image.space.domain[0] << ", "
+                             << host_image.space.domain[1] << ", "
+                             << host_image.space.domain[2] << ")\n";
+  }
+
+  delete[] host_image.data;
 }
 
 void apply_cuda_management_module(pybind11::module& m){
@@ -48,9 +60,7 @@ void apply_cuda_management_module(pybind11::module& m){
     })
     .def(pybind11::init<>(&get_current_device));
 
-  pybind11::class_<Image<3, float>>(m, "cpp_image");
-
-  m.def("load_into_cpp_image", &load_image_into_cpp);
+  m.def("print_device_image", &print_device_image);
 
   m.def("get_device_properties", &cast_current_device);
 }

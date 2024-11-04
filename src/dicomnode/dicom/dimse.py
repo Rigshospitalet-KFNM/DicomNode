@@ -115,10 +115,7 @@ def send_images(SCU_AE: str,
   )
   if assoc.is_established:
     for dataset in dicom_images:
-      if not hasattr(dataset, 'file_meta'):
-        make_meta(dataset)
-      if 0x00020010 not in dataset.file_meta:
-        make_meta(dataset)
+      make_meta(dataset)
       response = assoc.send_c_store(dataset)
       if(response.Status != 0x0000):
         if error_callback_func is None:

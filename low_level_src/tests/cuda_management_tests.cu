@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 #include"../gpu_code/dicom_node_gpu.cu"
 
+#include<pybind11/pybind11.h>
+#include<pybind11/numpy.h>
+
 #include<iostream>
 
 TEST(CUDA_MANAGEMENT_TESTS, Free_Device_memory) {

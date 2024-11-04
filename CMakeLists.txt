@@ -25,7 +25,10 @@ function(add_py_object_library name source)
   add_library(${name} OBJECT ${source})
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
-  target_compile_options(${name} PRIVATE -O3)
+  target_compile_options(${name} PRIVATE
+    -O3
+    -pg
+  )
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
   set_property(TARGET ${name} PROPERTY CUDA_ARCHITECTURES native)
 endfunction()
@@ -76,7 +79,7 @@ if(CMAKE_CUDA_COMPILER)
                       ${OBJECT_TARGETS}
   )
 
-  target_compile_options(_cuda PRIVATE -O3)
+  target_compile_options(_cuda PRIVATE -O3 -pg -g -G)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
 
 
@@ -97,6 +100,9 @@ if(CMAKE_CUDA_COMPILER)
       target_link_libraries(
         cu_tests
         GTest::gtest_main
+        pybind11::module
+        Python::Python
+        utilities
       )
       include(GoogleTest)
       gtest_discover_tests(cu_tests)

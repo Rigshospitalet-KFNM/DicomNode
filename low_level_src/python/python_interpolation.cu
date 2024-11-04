@@ -17,10 +17,10 @@ pybind11::array_t<T> interpolate_linear_templated(
   const pybind11::object& new_space
 ){
   Image<3, T> *device_image = nullptr;
-  Image<3, T> *out_image = nullptr;
+  T* out_image = nullptr;
+  size_t image_size = 0;
 
-
-  auto error_function = [&](dicomNodeError_t error){
+  auto error_function = [&](dicomNodeError_t _){
     free_device_memory(&device_image, &out_image);
   };
 
@@ -28,7 +28,12 @@ pybind11::array_t<T> interpolate_linear_templated(
   runner
     | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
     | [&](){ return load_image<T>(device_image, image); }
-    | [&](){ free_device_memory(&device_image);
+    | [&](){
+       get_image_size(image);
+      return cudaMalloc(out_image)}
+    | [&](){
+      free_image(device_image);
+      free_device_memory(&out_image);
       return dicomNodeError_t::SUCCESS;
     };
 

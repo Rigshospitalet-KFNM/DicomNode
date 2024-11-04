@@ -8,7 +8,7 @@ from unittest import TestCase, skip
 
 from tests.helpers import generate_numpy_datasets, bench
 
-from dicomnode.dicom import gen_uid
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.io import load_dicom
 from dicomnode.data_structures.image_tree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
 
@@ -47,7 +47,7 @@ class lib_imageTree(TestCase):
     self.dataset_1.StudyInstanceUID = self.studyUID_1
     self.dataset_1.PatientID = self.patientID_1
     self.dataset_1.PatientName = self.patientName_1
-    self.dataset_1.fix_meta_info()
+
 
 
     self.dataset_2 = get_test_dataset()
@@ -57,7 +57,7 @@ class lib_imageTree(TestCase):
     self.dataset_2.StudyInstanceUID = self.studyUID_1
     self.dataset_2.PatientID = self.patientID_1
     self.dataset_2.PatientName = self.patientName_1
-    self.dataset_2.fix_meta_info()
+
 
     self.dataset_3 = get_test_dataset()
     self.dataset_3_SOPInstanceUID = gen_uid()
@@ -67,7 +67,7 @@ class lib_imageTree(TestCase):
     self.dataset_3.StudyInstanceUID = self.studyUID_1
     self.dataset_3.PatientID = self.patientID_1
     self.dataset_3.PatientName = self.patientName_1
-    self.dataset_3.fix_meta_info()
+
 
     self.dataset_4 = get_test_dataset()
     self.dataset_4_SOPInstanceUID = gen_uid()
@@ -77,7 +77,7 @@ class lib_imageTree(TestCase):
     self.dataset_4.PatientID = self.patientID_1
     self.dataset_4.PatientName = self.patientName_1
     self.dataset_4.StudyDescription = "Test Study Description"
-    self.dataset_4.fix_meta_info()
+
 
     self.dataset_5 = get_test_dataset()
     self.dataset_5_SOPInstanceUID = gen_uid()
@@ -86,7 +86,6 @@ class lib_imageTree(TestCase):
     self.dataset_5.StudyInstanceUID = self.studyUID_3
     self.dataset_5.PatientID = self.patientID_2
     self.dataset_5.PatientName = self.patientName_2
-    self.dataset_5.fix_meta_info()
 
     self.dataset_6 = get_test_dataset()
     self.dataset_6_SOPInstanceUID = gen_uid()
@@ -95,9 +94,9 @@ class lib_imageTree(TestCase):
     self.dataset_6.StudyInstanceUID = self.studyUID_4
     self.dataset_6.PatientID = self.patientID_2
     self.dataset_6.PatientName = self.patientName_2
-    self.dataset_6.fix_meta_info()
 
     self.datasets = [self.dataset_1, self.dataset_2, self.dataset_3, self.dataset_4, self.dataset_5, self.dataset_6]
+    [make_meta(ds) for ds in self.datasets]
     self.SOPInstanceUIDs = [
       self.dataset_1_SOPInstanceUID,
       self.dataset_2_SOPInstanceUID,

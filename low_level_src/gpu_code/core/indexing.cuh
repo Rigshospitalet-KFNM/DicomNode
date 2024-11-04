@@ -193,4 +193,8 @@ struct Domain {
 
     return size;
   }
+
+  static constexpr __host__ __device__ size_t elements() {
+    return DIMENSIONS;
+  }
 };

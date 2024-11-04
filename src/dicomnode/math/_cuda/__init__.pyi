@@ -1,7 +1,7 @@
 # This is a interface file for the pybind11 library created from:
 # low_level_src/python_entry_point.cu
 
-from typing import List
+from typing import Any, List
 from numpy import ndarray
 
 # low_level_src/python/python_mirror.cu
@@ -15,5 +15,8 @@ def mirror_xyz(arr: ndarray) -> ndarray: ...
 
 # low_level_src/python/python_bounding_box.cu
 def bounding_box(arr: ndarray) -> List[int]: ...
+
+
+def print_device_image(image) -> Any: ...
 
 from . import interpolation

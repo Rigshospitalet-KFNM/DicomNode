@@ -4,7 +4,9 @@
 
 #include<assert.h>
 #include<stdint.h>
+
 #include"indexing.cuh"
+#include"cuda_management.cuh"
 
 template<uint32_t DIMENSIONS>
 struct Point {
@@ -23,6 +25,7 @@ struct Point {
   __host__ __device__ float& operator[](const int32_t i){
     return points[i];
   }
+
 
   __device__ volatile float& operator[](const uint32_t i) volatile {
     return points[i];
@@ -47,6 +50,10 @@ struct Point {
     }
 
     return Index(tmp);
+  }
+
+  static constexpr __host__ __device__ size_t elements() {
+    return DIMENSIONS;
   }
 };
 
@@ -86,6 +93,10 @@ struct SquareMatrix {
     if(threadIdx.x < DIMENSIONS*DIMENSIONS){
       other[threadIdx.x] = points[threadIdx.x];
     }
+  }
+
+  static constexpr __host__ __device__ size_t elements() {
+    return DIMENSIONS * DIMENSIONS;
   }
 };
 
@@ -350,21 +361,21 @@ __device__ dicomNodeError_t invertMatrix(
   return _invertMatrixBackwards<DIMENSION>(matrix, output);
 }
 
+template<uint8_t DIMENSIONS>
+class Space {
+  public:
+    Point<DIMENSIONS> starting_point;
+    SquareMatrix<DIMENSIONS> basis;
+    SquareMatrix<DIMENSIONS> inverted_basis;
+    Domain<DIMENSIONS> domain;
+};
+
+
 
 template<uint8_t DIMENSIONS, typename T>
 class Image {
   public:
-    Point<DIMENSIONS> starting_point[DIMENSIONS];
-    SquareMatrix<DIMENSIONS> basis;
-    SquareMatrix<DIMENSIONS> inverted_basis;
-    Domain<DIMENSIONS> domain;
+    Space<DIMENSIONS> space;
     T* data = nullptr;
     T defaultValue = 0;
-
-    ~Image(){
-      printf("Destroying Host Image\n");
-      if(data != nullptr){
-        printf("Uuugh somebody should clean this up... \n");
-      }
-    }
 };
