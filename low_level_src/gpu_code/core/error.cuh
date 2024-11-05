@@ -8,8 +8,8 @@ enum dicomNodeError_t: uint32_t {
   INPUT_TYPE_ERROR = 2,
   NON_POSITIVE_SHAPE = 3,
   POINTER_IS_NOT_A_DEVICE_PTR = 4,
-  UNABLE_TO_AQUIRE_BUFFER = 5,
-  INPUT_SIZE_MISS_MATCH = 6,
+  UNABLE_TO_ACQUIRE_BUFFER = 5,
+  INPUT_SIZE_MISMATCH = 6,
 
   // Note that the specific cuda error is encoded
   cudaError = cudaErrorFlag

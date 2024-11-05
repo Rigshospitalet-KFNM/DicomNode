@@ -16,21 +16,29 @@ pybind11::array_t<T> interpolate_linear_templated(
   const pybind11::object& image,
   const pybind11::object& new_space
 ){
+  Space<3> host_space;
+  const size_t image_size = get_image_elements<T>(image);
+  const size_t out_image_size = get_image_elements<T>(new_space);
+
   Image<3, T> *device_image = nullptr;
   T* out_image = nullptr;
-  size_t image_size = 0;
 
   auto error_function = [&](dicomNodeError_t _){
-    free_device_memory(&device_image, &out_image);
+    free_image(device_image);
+    free_device_memory(&out_image);
   };
 
   DicomNodeRunner runner{error_function};
   runner
+    | [&](){ return load_space(&host_space, new_space); }
     | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
     | [&](){ return load_image<T>(device_image, image); }
-    | [&](){
-       get_image_size(image);
-      return cudaMalloc(out_image)}
+    | [&](){ return cudaMalloc(&out_image, image_size);} 
+    | [&](){ return gpu_interpolation_linear(
+      device_image,
+      host_space,
+      out_image,
+    );}
     | [&](){
       free_image(device_image);
       free_device_memory(&out_image);
