@@ -22,8 +22,6 @@ from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
   dataset.SOPClassUID = SecondaryCaptureImageStorage
-  dataset.is_little_endian = True
-  dataset.is_implicit_VR = True
 
   return dataset
 

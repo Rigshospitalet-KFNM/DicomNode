@@ -15,8 +15,6 @@ from dicomnode.data_structures.image_tree import DicomTree, SeriesTree, StudyTre
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
   dataset.SOPClassUID = SecondaryCaptureImageStorage
-  dataset.is_little_endian = True
-  dataset.is_implicit_VR = True
 
   return dataset
 

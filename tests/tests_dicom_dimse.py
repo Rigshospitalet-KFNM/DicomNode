@@ -33,8 +33,6 @@ class DIMSETestCases(TestCase):
     self.address = Address('localhost', self.endpoint_port, "PYNETDICOM")
 
     self.dataset = Dataset()
-    self.dataset.is_little_endian = True
-    self.dataset.is_implicit_VR = True
     self.dataset.PatientID = "1235971155"
     self.dataset.SOPClassUID = SecondaryCaptureImageStorage
     self.dataset.add_new(0x00080052, 'CS', 'PATIENT')
@@ -70,5 +68,3 @@ class DIMSETestCases(TestCase):
 
     with self.assertLogs(logger, DEBUG) as log_records:
       self.assertRaises(CouldNotCompleteDIMSEMessage,send_move,"Dummy", address, dataset)
-
-
