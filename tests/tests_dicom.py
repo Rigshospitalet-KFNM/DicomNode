@@ -3,7 +3,8 @@ from unittest import TestCase
 
 # Thrid party packages
 from pydicom import Dataset
-from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian, CTImageStorage
+
+from pydicom.uid import UID, ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian, CTImageStorage
 from pydicom.valuerep import PersonName
 
 # Dicomnode packages
@@ -25,35 +26,12 @@ class DicomTestCase(TestCase):
     ds = Dataset()
     self.assertRaises(InvalidDataset, make_meta, ds)
 
-  def test_make_meta_ImplicitVRLittleEndian(self):
-    ds = Dataset()
-    ds.SOPClassUID = CTImageStorage
-    ds.is_implicit_VR = True
-    ds.is_little_endian = True
-    make_meta(ds)
-    self.assertEqual(ds.file_meta.TransferSyntaxUID, ImplicitVRLittleEndian)
-
-  def test_make_meta_ExplicitVRLittleEndian(self):
-    ds = Dataset()
-    ds.SOPClassUID = CTImageStorage
-    ds.is_implicit_VR = False
-    ds.is_little_endian = True
-    make_meta(ds)
-    self.assertEqual(ds.file_meta.TransferSyntaxUID, ExplicitVRLittleEndian)
-
-  def test_make_meta_ExplicitVRBigEndian(self):
-    ds = Dataset()
-    ds.SOPClassUID = CTImageStorage
-    ds.is_implicit_VR = False
-    ds.is_little_endian = False
-    make_meta(ds)
-    self.assertEqual(ds.file_meta.TransferSyntaxUID, ExplicitVRBigEndian)
 
   def test_make_meta_ImplicitVRBigEndian(self):
     ds = Dataset()
     ds.SOPClassUID = CTImageStorage
-    ds.is_implicit_VR = True
-    ds.is_little_endian = False
+    ds.ensure_file_meta()
+    ds.file_meta.TransferSyntaxUID = UID("1.2.840.10008.1.2.2")
     self.assertRaises(InvalidDataset, make_meta, ds)
 
   def test_extrapolate_image_position_patient(self):
