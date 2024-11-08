@@ -28,7 +28,7 @@ from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.logging import get_logger
-from dicomnode.lib.exceptions import MissingPivotDataset
+from dicomnode.lib.exceptions import MissingPivotDataset, HeaderConstructionFailure
 
 logger = get_logger()
 
@@ -553,13 +553,42 @@ class DicomFactory():
                          blueprint: Blueprint,
                          kwargs : Dict[Any,Any]
                          ) -> DicomSeries:
+    """Builds a Dicom series from a nifti series and a blueprint
+    Note that the following tags doesn't need to be included
+
+
+    Args:
+        nifti (Union[Nifti1Image, Nifti2Image, NiftiSeries]): _description_
+        blueprint (Blueprint): _description_
+        kwargs (Dict[Any,Any]): _description_
+
+    Returns:
+        DicomSeries: _description_
+
+    Throws:
+      HeaderConstructionFailure : If a CopyVirtualElement is inside of the
+                                  blueprint. As there's no parent series to copy
+                                  from
+    """
     if not isinstance(nifti, NiftiSeries):
       nifti = NiftiSeries(nifti)
 
+    corporealialized_blueprint = [virtual_tag.corporealialize([]) for virtual_tag in blueprint]
+
     datasets = []
     if nifti.image.raw.ndim == 3:
-      for slice in nifti.image:
+      for i, slice_ in enumerate(nifti.image):
         ds = Dataset()
+
+        for corporealialized_tag in corporealialized_blueprint:
+          if isinstance(corporealialized_tag, DataElement):
+            ds[corporealialized_tag.tag] = corporealialized_tag
+          elif isinstance(corporealialized_tag, InstanceVirtualElement):
+            instance_environment = InstanceEnvironment(i + 1, self, image=slice_)
+
+            ds[corporealialized_tag.tag] = corporealialized_tag.produce(
+              instance_environment
+            )
 
         datasets.append(ds)
 

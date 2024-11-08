@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import List
 
 # Third party packages
+from pydicom.tag import Tag
+from pydicom.datadict import dictionary_VR
+from pydicom.uid import PositronEmissionTomographyImageStorage
 from nibabel.loadsave import load as load_nifti
 
 # Dicomnode packages
@@ -87,16 +90,17 @@ def gatify_series(series: List[DicomSeries], config):
     gate[0x0010_1020] = 1.7
 
     gate[0x0018_1060] = trigger_time # Trigger Time
-    gate[0x0018_1061] = "EKG"
+    #gate[0x0018_1061] = "EKG"
     gate[0x0018_1062] = 582
     gate[0x0018_1063] = frame_time # Frame time
     gate[0x0018_1064] = "PHASED"
 
     # R-R values
-    gate[0x0018_1080] = 'N'
+    gate[0x0018_1080] = 'Y'
     gate[0x0018_1081] = 389
     gate[0x0018_1082] = 1016
     gate[0x0018_1083] = 325
+    gate[0x0018_1084] = 3
     gate[0x0018_1086] = 15
     gate[0x0018_1088] = 102
 
@@ -142,10 +146,40 @@ def handle_dicom(paths: List[Path], config, output_destination: Path):
 
   for gate in series:
     for dataset in gate:
-      gate = (dataset.ImageIndex - 1)  // dataset.NumberOfSlices
-      local_image_index = dataset.ImageIndex % (dataset.NumberOfSlices + 1)
-      dataset_destination = output_destination / f"gate_{gate}_image_{local_image_index:03}.dcm"
+      zImageIndex = dataset.ImageIndex - 1
+
+      gate = zImageIndex  // (dataset.NumberOfSlices)
+      local_image_index = (zImageIndex % dataset.NumberOfSlices) +1
+      dataset_destination = output_destination / f"gate_{gate + 1}_image_{local_image_index:03}.dcm"
       save_dicom(dataset_destination, dataset)
+
+BASE_BLUEPRINT = Blueprint([
+  StaticElement(0x0008_0005, 'CS', 'ISO_IR 100'),
+  StaticElement(0x0008_0005, 'CS', ['ORIGINAL', 'PRIMARY']),
+  StaticElement(0x0008_0016, 'UI', PositronEmissionTomographyImageStorage),
+
+])
+
+
+def get_blueprint_for_nifti(i, config, nifti_series, num_series):
+  if 'dicom_tags' not in config:
+    raise Exception("You need dicom_tags in your config to construct dicom series from nifti")
+
+  blueprint = Blueprint(BASE_BLUEPRINT)
+
+  for str_tag, value in config['dicom_tags']:
+    tag = Tag(str_tag)
+    vr = dictionary_VR(tag)
+
+    if isinstance(value, List) and len(value) == num_series:
+      element = StaticElement(tag, vr, value[i])
+    else:
+      element = StaticElement(tag, vr, value)
+
+    blueprint.add_virtual_element(element)
+
+  return blueprint
+
 
 def handle_nifti(paths: List[Path], config, output_directory):
   nifti_s = [load_nifti(path) for path in paths]
@@ -154,10 +188,19 @@ def handle_nifti(paths: List[Path], config, output_directory):
 
   factory = DicomFactory()
 
-  Blueprint([
+  blueprints = [
+    get_blueprint_for_nifti(i, config, series_, len(series)) for i, series_ in enumerate(series)
+  ]
 
-  ])
+  dicom_series = [
+    factory.build_nifti_series(series_, blueprint, {"series" : i}) for i, (series_, blueprint) in enumerate(zip(series, blueprints))
+  ]
 
+  for gate_num, dicom_series in enumerate(dicom_series):
+    for image_num, dicom_slice in enumerate(dicom_series):
+      image_index = image_num + 1
+      dataset_destination = output_directory / f"gate_{gate_num + 1}_image_{image_index}.dcm"
+      save_dicom(dataset_destination, dicom_slice)
 
 
 def get_parser(subparser: _SubParsersAction):

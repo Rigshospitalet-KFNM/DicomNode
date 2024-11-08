@@ -41,7 +41,6 @@ DICOMNODE_VERSION = "0.0.6"
 """Version of the library"""
 
 
-
 UNSIGNED_ARRAY_ENCODING: Dict[int, type] = {
   8 :  uint8,
   16 : uint16,
