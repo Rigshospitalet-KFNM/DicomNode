@@ -5,14 +5,18 @@
 from random import randint
 from argparse import ArgumentParser, _SubParsersAction, Namespace
 import json
+from math import log10, floor
 from pathlib import Path
 from typing import List
 
 # Third party packages
+from nibabel.loadsave import load as load_nifti
 
 # Dicomnode packages
 from dicomnode.dicom import gen_uid
-from dicomnode.dicom.series import DicomSeries
+from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, StaticElement
+
+from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.lib.io import discover_files, load_dicom, save_dicom
 
@@ -27,7 +31,7 @@ dicom_formats = [
 ]
 
 def sort_series_description(series_tree : DicomSeries):
-  return series_tree[0x0008_103E]
+  return series_tree[0x0008_103E].value # type: ignore
 
 sorting_algorithms = {
   'series_description' : sort_series_description
@@ -65,34 +69,47 @@ def gatify_series(series: List[DicomSeries], config):
     if len(gate) != gate_num_images:
       raise Exception(f"Gate: {i} has {len(gate)} images while other have {gate_num_images} images.")
 
+  frame_of_reference_uid = gen_uid()
+
   trigger_time = 0
   image_index = 0
   new_series_uid = gen_uid()
   new_series_number = randint(5000, 100000)
+
   for (gate, frame_time) in zip(series, config['frame_time']):
     if not isinstance(frame_time, float) and not isinstance(frame_time, int):
       raise Exception("One of the frame times is not a number!")
 
-    image_indexes = [image_index + i for i in range(gate_num_images)]
-    new_sop_uid = [gen_uid() for i in range(gate_num_images)]
+    image_indexes = [image_index + i + 1 for i in range(gate_num_images)]
+    new_sop_uid = [gen_uid() for _ in range(gate_num_images)]
 
-    gate[0x0008_0018] = new_sop_uid
+    gate[0x0008_0018] = new_sop_uid # SOPInstanceUID
+    gate[0x0010_1020] = 1.7
 
-    gate[0x0018_1060] = trigger_time
-    gate[0x0018_1063] = frame_time
+    gate[0x0018_1060] = trigger_time # Trigger Time
+    gate[0x0018_1061] = "EKG"
+    gate[0x0018_1062] = 582
+    gate[0x0018_1063] = frame_time # Frame time
+    gate[0x0018_1064] = "PHASED"
 
     # R-R values
     gate[0x0018_1080] = 'N'
+    gate[0x0018_1081] = 389
+    gate[0x0018_1082] = 1016
+    gate[0x0018_1083] = 325
+    gate[0x0018_1086] = 15
+    gate[0x0018_1088] = 102
 
     gate[0x0020_000E] = new_series_uid
     gate[0x0020_0011] = new_series_number
-    gate[0x0020_0013] = image_indexes
+    gate[0x0020_0013] = image_indexes # Instance Numbers
 
-    gate[0x0054_0061] = 1
-    gate[0x0054_0071] = len(series)
-    gate[0x0054_1000] = 'GATED'
+    #gate[0x0020_0052] = frame_of_reference_uid # Frame of Reference UID
 
-    gate[0x0054_1330] = image_indexes
+    gate[0x0054_0061] = 1           # Number of R-R Intervals
+    gate[0x0054_0071] = len(series) # Number of Time Slots
+    gate[0x0054_1000] = ['GATED', "IMAGE"] # Series type
+    gate[0x0054_1330] = image_indexes # image Index
 
     trigger_time += frame_time
     image_index += gate_num_images
@@ -109,14 +126,14 @@ def handle_dicom(paths: List[Path], config, output_destination: Path):
   else:
     sorting_algorithm = sorting_algorithms['series_description']
 
-  series = sorted([DicomSeries(series) for series in dicom_tree.series()],
-                  key=sorting_algorithm)
+  series = [DicomSeries([ds for ds in series]) for series in dicom_tree.series()]
+  series = sorted(series, key=sorting_algorithm) # type: ignore
 
   if 'frame_time' not in config :
     raise Exception("Frame times need to be in json config file")
 
   if len(series) != len(config['frame_time']):
-    raise Exception("Need more frame times!")
+    raise Exception(f"There's {len(series)} Series, and {len(config['frame_time'])} frame_times!")
 
   series = gatify_series(series=series, config=config)
 
@@ -125,14 +142,22 @@ def handle_dicom(paths: List[Path], config, output_destination: Path):
 
   for gate in series:
     for dataset in gate:
-      gate = dataset.ImageIndex // len(series)
-
-      local_image_index = dataset.ImageIndex % dataset.NumberOfTimeSlots
-      dataset_destination = output_destination / f"image_{local_image_index:05}_gate_{gate}.dcm"
+      gate = (dataset.ImageIndex - 1)  // dataset.NumberOfSlices
+      local_image_index = dataset.ImageIndex % (dataset.NumberOfSlices + 1)
+      dataset_destination = output_destination / f"gate_{gate}_image_{local_image_index:03}.dcm"
       save_dicom(dataset_destination, dataset)
 
 def handle_nifti(paths: List[Path], config, output_directory):
-  pass
+  nifti_s = [load_nifti(path) for path in paths]
+
+  series = [NiftiSeries(nifti) for nifti in nifti_s] # type: ignore
+
+  factory = DicomFactory()
+
+  Blueprint([
+
+  ])
+
 
 
 def get_parser(subparser: _SubParsersAction):

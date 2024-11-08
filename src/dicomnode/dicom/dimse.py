@@ -37,8 +37,6 @@ class DIMSE_StatusCodes(Enum):
   OUT_OF_RESOURCES  =0xA700
   FAILED = 0xC000 # Note that this is a Range from 0xC000 to 0xCFFF
 
-
-
 @dataclass
 class Address:
   ip: str

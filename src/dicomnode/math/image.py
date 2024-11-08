@@ -86,6 +86,10 @@ class Image:
     self._space = space
     self._minimum_value = minimum_value
 
+  def __iter__(self):
+    for slice_ in self.raw:
+      yield slice_
+
   @property
   def raw(self):
     return self._raw
@@ -129,3 +133,8 @@ class FramedImage():
   def __init__(self, frames: raw_image_frames, space: Space) -> None:
     self.raw = frames
     self._space = space
+
+  def __iter__(self):
+    for frame in self.raw:
+      for slice_ in frame:
+        yield slice_

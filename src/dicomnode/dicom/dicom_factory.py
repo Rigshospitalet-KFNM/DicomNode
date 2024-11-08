@@ -13,6 +13,8 @@ from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
     Optional,Sequence as TypingSequence, Tuple, TypeVar, Union
 
 # Third Party Library
+from nibabel.nifti1 import Nifti1Image
+from nibabel.nifti2 import Nifti2Image
 from numpy import ndarray, zeros_like
 from pydicom import DataElement, Dataset, Sequence
 from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage
@@ -22,7 +24,7 @@ from sortedcontainers import SortedDict
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.dicom import make_meta
-from dicomnode.dicom.series import DicomSeries
+from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.logging import get_logger
@@ -545,6 +547,23 @@ class DicomFactory():
       make_meta(dataset)
 
     return series
+
+  def build_nifti_series(self,
+                         nifti: Union[Nifti1Image, Nifti2Image, NiftiSeries],
+                         blueprint: Blueprint,
+                         kwargs : Dict[Any,Any]
+                         ) -> DicomSeries:
+    if not isinstance(nifti, NiftiSeries):
+      nifti = NiftiSeries(nifti)
+
+    datasets = []
+    if nifti.image.raw.ndim == 3:
+      for slice in nifti.image:
+        ds = Dataset()
+
+        datasets.append(ds)
+
+    return DicomSeries(datasets)
 
   def build_series_without_image_encoding(self,
                                           images: TypingSequence,

@@ -1,6 +1,6 @@
 [MAIN]
 
-ignore-paths=venv/*
+ignore-paths=venv/*, docs/*
 
 disable=duplicate-code, too-few-public-methods, broad-exception-caught
 

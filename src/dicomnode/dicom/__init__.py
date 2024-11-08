@@ -57,12 +57,16 @@ def make_meta(dicom: Dataset) -> None:
     dicom.file_meta.MediaStorageSOPClassUID = dicom.SOPClassUID
   if 'MediaStorageSOPInstanceUID' not in dicom.file_meta:
     dicom.file_meta.MediaStorageSOPInstanceUID = dicom.SOPInstanceUID
+  if hasattr(dicom, 'is_little_endian') and dicom.is_little_endian is not None:
+    dicom.is_little_endian = None
+  if hasattr(dicom , 'is_implicit_VR') and dicom.is_implicit_VR is not None:
+    dicom.is_implicit_VR = None
+
   if 'TransferSyntaxUID' not in dicom.file_meta:
     dicom.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
     # ImplicitVRBigEndian which is not supported pydicom
   elif dicom.file_meta.TransferSyntaxUID == "1.2.840.10008.1.2.2":
     raise InvalidDataset("ImplicitVRBigEndian is not support by dicomnode")
-
 
   validate_file_meta(dicom.file_meta)
 

@@ -3,3 +3,4 @@ from . import show
 from . import store
 from . import anonymize
 from . import gating
+from . import compare
