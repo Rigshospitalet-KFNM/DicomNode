@@ -3,7 +3,7 @@
 // This is strictly not needed
 #include<functional>
 #include<iostream>
-
+#include<tuple>
 #include"error.cuh"
 
 template<typename... Ts>
@@ -29,6 +29,9 @@ class CudaRunner{
   public:
     CudaRunner(std::function<void(cudaError_t)> error_function)
       : m_error_function(error_function){}
+
+    CudaRunner()
+      : m_error_function([](cudaError_t error){}){}
 
     cudaError_t error() const {
       return m_error;
@@ -86,19 +89,23 @@ class DicomNodeRunner{
     dicomNodeError_t m_error = dicomNodeError_t::SUCCESS;
 };
 
-
-static cudaDeviceProp get_current_device(){
+static std::tuple<cudaError_t, cudaDeviceProp> get_current_device(){
+  CudaRunner runner;
   cudaDeviceProp prop;
   int current_device;
-  cudaGetDevice(&current_device);
-  cudaGetDeviceProperties(&prop, current_device);
-  return prop;
+  runner
+    | [&](){
+      return cudaGetDevice(&current_device);
+    } | [&](){
+      return cudaGetDeviceProperties(&prop, current_device);
+    };
+  return {runner.error(), prop};
 }
 
 template<class R, class... Args>
 int32_t maximize_shared_memory(R (kernel)(Args...)){
-  cudaDeviceProp dev_prop = get_current_device();
-  if (dev_prop.major >= 7){
+  auto [error, dev_prop] = get_current_device();
+  if (error == cudaSuccess && dev_prop.major >= 7){
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, dev_prop.sharedMemPerBlockOptin);
   }
   return dev_prop.sharedMemPerBlockOptin;

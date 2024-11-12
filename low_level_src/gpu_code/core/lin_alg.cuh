@@ -12,12 +12,6 @@ template<uint32_t DIMENSIONS>
 struct Point {
   float points[DIMENSIONS];
 
-  __device__ Point<DIMENSIONS>& operator-=(const Point<DIMENSIONS>& other) volatile {
-    points[threadIdx.x] -= other[threadIdx.x];
-
-    return *this;
-  }
-
   __host__ __device__ float& operator[](const uint32_t i){
     return points[i];
   }
@@ -87,12 +81,6 @@ struct SquareMatrix {
 
   __host__ __device__ const float& operator[](const uint32_t i) const {
     return points[i];
-  }
-
-  __device__ void to_shared_memory(volatile SquareMatrix<DIMENSIONS>* other) const {
-    if(threadIdx.x < DIMENSIONS*DIMENSIONS){
-      other[threadIdx.x] = points[threadIdx.x];
-    }
   }
 
   static constexpr __host__ __device__ size_t elements() {

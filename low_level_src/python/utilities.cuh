@@ -9,7 +9,7 @@
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 
 constexpr int PYBIND_ARRAY_FLAGS = pybind11::array::c_style | pybind11::array::forcecast;
 
@@ -19,6 +19,12 @@ using python_array = pybind11::array_t<T, PYBIND_ARRAY_FLAGS>;
 cudaError_t extract_cuda_error(dicomNodeError_t error);
 
 std::string get_byte_string (size_t bytes);
+
+dicomNodeError_t is_instance(
+  const pybind11::object& python_object,
+  const char* module_name,
+  const char* instance_type
+);
 
 dicomNodeError_t _load_into_host_space(
   Space<3>* host_space,
@@ -125,30 +131,23 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
  */
 template<typename T>
 dicomNodeError_t load_image(Image<3, T>* image, const pybind11::object& python_image){
-  // RVO
-  dicomNodeError_t ret;
-  // Note that these can throw, if somebody fuck with the python installation...
-  const pybind11::module_& image_module = pybind11::module_::import("dicomnode.math.image");
-  const pybind11::object& image_class = image_module.attr("Image");
-
-  if(!pybind11::isinstance(python_image, image_class)){
-    ret = dicomNodeError_t::INPUT_TYPE_ERROR;
-    return ret;
-  }
-
   cudaPointerAttributes attr;
-  cudaError_t error = cudaPointerGetAttributes(&attr, image);
-  if(error){
-    return encode_cuda_error(error);
-  }
+  DicomNodeRunner runner;
 
-  if(attr.type == cudaMemoryType::cudaMemoryTypeUnregistered || attr.type == cudaMemoryType::cudaMemoryTypeHost){
-    ret = _load_into_host_image(image, python_image);
-  } else {
-    ret = _load_into_dev_image(image, python_image);
-  }
+  runner
+    | [&](){
+    return is_instance(python_image, "dicomnode.math.image", "Image");
+  } | [&](){
+    return cudaPointerGetAttributes(&attr, image);
+  } | [&](){
+    if(attr.type == cudaMemoryType::cudaMemoryTypeUnregistered || attr.type == cudaMemoryType::cudaMemoryTypeHost){
+      return _load_into_host_image(image, python_image);
+    } else {
+      return _load_into_dev_image(image, python_image);
+    }
+  };
 
-  return ret;
+  return runner.error();
 }
 
 /**

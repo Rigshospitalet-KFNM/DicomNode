@@ -6,15 +6,13 @@ namespace {
   template<typename T>
   __global__ void kernel_interpolation_linear(
     const Image<3, T>* src_image,
-    const Space<3> dst_space,
+    const Space<3>* dst_space,
     T* dst_data
   ){
     const T* src_data = src_image->data;
 
   }
 }
-
-
 
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear(
@@ -26,7 +24,7 @@ dicomNodeError_t gpu_interpolation_linear(
   Space<3>* device_space = nullptr;
 
   DicomNodeRunner runner{[&](dicomNodeError_t _){
-    free_device_memory(&device_space)
+    free_device_memory(&device_space);
   }};
 
   size_t block_count = 1;
@@ -44,9 +42,7 @@ dicomNodeError_t gpu_interpolation_linear(
     | [&](){
       free_device_memory(&device_space);
       return dicomNodeError_t::SUCCESS;
-    }
+    };
 
-
-
-  return dicomNodeError_t::SUCCESS;
+  return runner.error();
 }

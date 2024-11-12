@@ -24,7 +24,13 @@ from . import types
 # Cuda code
 try:
   from dicomnode.math import _cuda
-  CUDA = True
+
+  cudaError, device_prop = _cuda.get_device_properties()
+  if not cudaError:
+    CUDA = True
+  else:
+    CUDA = False
+
 except ImportError:
   CUDA = False
 
@@ -134,7 +140,10 @@ def _bounding_box_cpu(array : numpy.ndarray):
   return bounding_box_list
 
 def _bounding_box_gpu(array):
-  x_min, x_max, y_min, y_max, z_min, z_max = _cuda.bounding_box(array)
+  error, (x_min, x_max, y_min, y_max, z_min, z_max) = _cuda.bounding_box(array)
+  if error:
+    raise CudaException(CudaErrorEnum(int(error)))
+
   return (x_min, x_max), (y_min, y_max), (z_min, z_max)
 
 def bounding_box(array):

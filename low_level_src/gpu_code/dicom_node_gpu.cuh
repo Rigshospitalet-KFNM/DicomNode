@@ -4,3 +4,4 @@
 #include"map.cuh"
 #include"bounding_box.cuh"
 #include"mirror.cuh"
+#include"linear_interpolation.cuh"

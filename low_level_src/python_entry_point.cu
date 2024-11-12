@@ -13,8 +13,8 @@ PYBIND11_MODULE(_cuda, m){
  to import this, as there's wrappers for most of these functions";
   m.attr("__name__") = "dicomnode.math._cuda";
 
-  apply_mirror_module(m);
   apply_cuda_management_module(m);
+  apply_mirror_module(m);
   apply_bounding_box_module(m);
   apply_interpolation_module(m);
 }

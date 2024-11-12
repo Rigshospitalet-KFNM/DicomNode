@@ -3,7 +3,7 @@
 #include<stdint.h>
 
 #include <gtest/gtest.h>
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 
 TEST(BOUNDING_BOX, Box_25x25x25_with_10_11_12_20_19_18){
   cudaError_t status;

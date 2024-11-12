@@ -5,14 +5,14 @@
 #include<string>
 #include<tuple>
 
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 #include"utilities.cuh"
 
 using basis_t = pybind11::array_t<float>;
 using domain_array = pybind11::array_t<int>;
 
 template<typename T>
-pybind11::array_t<T> interpolate_linear_templated(
+std::tuple<dicomNodeError_t, pybind11::array_t<T>> interpolate_linear_templated(
   const pybind11::object& image,
   const pybind11::object& new_space
 ){
@@ -33,11 +33,11 @@ pybind11::array_t<T> interpolate_linear_templated(
     | [&](){ return load_space(&host_space, new_space); }
     | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
     | [&](){ return load_image<T>(device_image, image); }
-    | [&](){ return cudaMalloc(&out_image, image_size);} 
-    | [&](){ return gpu_interpolation_linear(
+    | [&](){ return cudaMalloc(&out_image, image_size);}
+    | [&](){ return gpu_interpolation_linear<T>(
       device_image,
       host_space,
-      out_image,
+      out_image
     );}
     | [&](){
       free_image(device_image);
@@ -45,10 +45,10 @@ pybind11::array_t<T> interpolate_linear_templated(
       return dicomNodeError_t::SUCCESS;
     };
 
-  return pybind11::array_t<T>(1 * 1 * 1);
+  return {dicomNodeError_t.error(), pybind11::array_t<T>(1 * 1 * 1)};
 }
 
-pybind11::array interpolate_linear(const pybind11::object& image,
+std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11::object& image,
                                    const pybind11::object& new_space
   ){
   const pybind11::array& raw_image = image.attr("raw");

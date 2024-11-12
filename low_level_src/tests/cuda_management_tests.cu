@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>

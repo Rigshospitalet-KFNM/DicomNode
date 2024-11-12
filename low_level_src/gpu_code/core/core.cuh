@@ -8,3 +8,4 @@
 #include"grid.cuh"
 #include"indexing.cuh"
 #include"lin_alg.cuh"
+#include"texture.cuh"

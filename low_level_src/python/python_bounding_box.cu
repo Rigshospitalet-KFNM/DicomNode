@@ -1,9 +1,11 @@
 #include"python_constants.cuh"
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 #include"utilities.cuh"
 
+#include<tuple>
+
 template<typename T,  uint8_t CHUNK>
-pybind11::list bounding_box(python_array<T>& arr){
+std::tuple<cudaError_t, pybind11::list> bounding_box(python_array<T>& arr){
   const pybind11::buffer_info& buffer = arr.request(false);
   if (buffer.ndim != 3){
     throw std::runtime_error("This function requires 3 dimensional input!");
@@ -27,11 +29,6 @@ pybind11::list bounding_box(python_array<T>& arr){
     space
   );
 
-  if(error != cudaSuccess){
-    std::cout << cudaGetErrorName(error) << "\n";
-    std::cout << cudaGetErrorString(error) << "\n";
-  }
-
   pybind11::list returnList(6);
   returnList[0] = out.x_min;
   returnList[1] = out.x_max;
@@ -39,7 +36,7 @@ pybind11::list bounding_box(python_array<T>& arr){
   returnList[3] = out.y_max;
   returnList[4] = out.z_min;
   returnList[5] = out.z_max;
-  return returnList;
+  return {error, returnList};
 }
 
 void apply_bounding_box_module(pybind11::module& m){

@@ -86,6 +86,19 @@ dicomNodeError_t _load_into_device_space(
   return runner.error();
 }
 
+dicomNodeError_t is_instance(
+  const pybind11::object& python_object,
+  const char* module_name,
+  const char* instance_type){
+  const pybind11::module_& space_module = pybind11::module_::import(module_name);
+  const pybind11::object& space_class = space_module.attr(instance_type);
+
+  if(!pybind11::isinstance(python_object, space_class)){
+    return dicomNodeError_t::INPUT_TYPE_ERROR;
+  }
+  return dicomNodeError_t::SUCCESS;
+}
+
 
 dicomNodeError_t check_buffer_pointers(
   const pybind11::buffer_info& buffer, const size_t elements
@@ -124,27 +137,39 @@ std::string get_byte_string (size_t bytes){
 }
 
 dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_space){
-  dicomNodeError_t ret;
-  // Note that these can throw, if somebody fuck with the python installation...
-  const pybind11::module_& space_module = pybind11::module_::import("dicomnode.math.space");
-  const pybind11::object& space_class = space_module.attr("Space");
-
-  if(!pybind11::isinstance(python_space, space_class)){
-    ret = dicomNodeError_t::INPUT_TYPE_ERROR;
-    return ret;
-  }
-
   cudaPointerAttributes attr;
-  cudaError_t error = cudaPointerGetAttributes(&attr, space);
-  if(error){
-    return encode_cuda_error(error);
-  }
+  DicomNodeRunner runner;
+  runner
+    | [&](){
+      return is_instance(python_space, "dicomnode.math.space", "Space");
+    } | [&](){
+      return cudaPointerGetAttributes(&attr, space);
+    } | [&](){
+      if(attr.type == cudaMemoryType::cudaMemoryTypeUnregistered || attr.type == cudaMemoryType::cudaMemoryTypeHost){
+        return _load_into_host_space(space, python_space);
+      } else {
+        return _load_into_device_space(space, python_space);
+      }
+    };
 
-  if(attr.type == cudaMemoryType::cudaMemoryTypeUnregistered || attr.type == cudaMemoryType::cudaMemoryTypeHost){
-    ret = _load_into_host_space(space, python_space);
-  } else {
-    ret = _load_into_device_space(space, python_space);
-  }
+  return runner.error();
+}
 
-  return ret;
+dicomNodeError_t load_python_texture(Texture* texture, const pybind11::object& python_image){
+  DicomNodeRunner runner;
+  Space<3> space;
+
+  runner
+    | [&](){
+      return is_instance(python_image, "dicomnode.math.image", "Image");
+    } | [&](){
+      const pybind11::object& python_space = python_image.attr("space");
+      return load_space(&space, python_space);
+    } | [&](){
+      const pybind11::object& python_space = python_image.attr("space");
+      return load_space(&texture->space, python_space);
+    };
+
+
+  return runner.error();
 }

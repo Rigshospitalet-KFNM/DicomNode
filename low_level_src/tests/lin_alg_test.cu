@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
-#include"../gpu_code/dicom_node_gpu.cu"
+#include"../gpu_code/dicom_node_gpu.cuh"
 
 #include<iostream>
+
+constexpr float EPSILON = 0.0005f;
 
 template<uint8_t DIMENSION>
 __global__ void swapRowKernel(
@@ -473,27 +475,10 @@ TEST(LIN_ALG, INVERSION_2x2){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  for(int i = 0; i < DIM; i++){
-    for(int j = 0; j < DIM; j++){
-      std::cout << matrix[DIM * i + j];
-      if(j != DIM - 1){
-        std::cout << ", ";
-      }
-    }
-    std::cout << "\n";
-  }
-
-  /*
   ASSERT_FLOAT_EQ(matrix[0], 1.0f);
   ASSERT_FLOAT_EQ(matrix[1], 0.0f);
   ASSERT_FLOAT_EQ(matrix[2], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[4], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[5], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[7], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[8], 1.0f);
-  */
+  ASSERT_FLOAT_EQ(matrix[3], 1.0f);
 
   ASSERT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
@@ -504,27 +489,10 @@ TEST(LIN_ALG, INVERSION_2x2){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  for(int i = 0; i < DIM; i++){
-    for(int j = 0; j < DIM; j++){
-      std::cout << matrix[DIM * i + j];
-      if(j != DIM - 1){
-        std::cout << ", ";
-      }
-    }
-    std::cout << "\n";
-  }
-/*
-  ASSERT_FLOAT_EQ(matrix[0],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[1],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[2],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], -0.5f);
-  ASSERT_FLOAT_EQ(matrix[4],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[5],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], -1.0f);
-  ASSERT_FLOAT_EQ(matrix[7],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[8],  1.0f);
-
-*/
+  ASSERT_NEAR(matrix[0], 0.333333f, EPSILON);
+  ASSERT_NEAR(matrix[1], -0.666667f, EPSILON);
+  ASSERT_NEAR(matrix[2], 0.0f, EPSILON);
+  ASSERT_NEAR(matrix[3], 0.5f, EPSILON);
 }
 
 TEST(LIN_ALG, INVERSION_3x3){
@@ -575,17 +543,6 @@ TEST(LIN_ALG, INVERSION_3x3){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  for(int i = 0; i < 3; i++){
-    for(int j = 0; j < 3; j++){
-      std::cout << matrix[3 * i + j];
-      if(j != 2){
-        std::cout << ", ";
-      }
-    }
-    std::cout << "\n";
-  }
-
-  /*
   ASSERT_FLOAT_EQ(matrix[0], 1.0f);
   ASSERT_FLOAT_EQ(matrix[1], 0.0f);
   ASSERT_FLOAT_EQ(matrix[2], 0.0f);
@@ -595,7 +552,6 @@ TEST(LIN_ALG, INVERSION_3x3){
   ASSERT_FLOAT_EQ(matrix[6], 0.0f);
   ASSERT_FLOAT_EQ(matrix[7], 0.0f);
   ASSERT_FLOAT_EQ(matrix[8], 1.0f);
-  */
 
   ASSERT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
@@ -606,25 +562,13 @@ TEST(LIN_ALG, INVERSION_3x3){
   );
   ASSERT_EQ(status, cudaSuccess);
 
-  for(int i = 0; i < 3; i++){
-    for(int j = 0; j < 3; j++){
-      std::cout << matrix[3 * i + j];
-      if(j != 2){
-        std::cout << ", ";
-      }
-    }
-    std::cout << "\n";
-  }
-/*
-  ASSERT_FLOAT_EQ(matrix[0],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[1],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[2],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], -0.5f);
-  ASSERT_FLOAT_EQ(matrix[4],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[5],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], -1.0f);
-  ASSERT_FLOAT_EQ(matrix[7],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[8],  1.0f);
-
-*/
+  ASSERT_NEAR(matrix[0],  0.666667f, EPSILON);
+  ASSERT_NEAR(matrix[1],  3.0f, EPSILON);
+  ASSERT_NEAR(matrix[2],  -1.66667f, EPSILON);
+  ASSERT_NEAR(matrix[3],  -0.0f, EPSILON);
+  ASSERT_NEAR(matrix[4],  -2.0f, EPSILON);
+  ASSERT_NEAR(matrix[5],  1.0f, EPSILON);
+  ASSERT_NEAR(matrix[6], -0.3333333f, EPSILON);
+  ASSERT_NEAR(matrix[7],  0.0f, EPSILON);
+  ASSERT_NEAR(matrix[8],  0.3333333f, EPSILON);
 }
