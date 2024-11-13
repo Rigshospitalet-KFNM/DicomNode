@@ -34,11 +34,11 @@ In my own overinflated opinion, there are two axes of qualifiers to describe the
 overall difficulty of a task.
 
 * Easy to hard: A task is easy if it require little effort by the user and is
-hard to fuck up. Where as hard things require effort or is easy to fuck up, and
-therefore precision to complete successfully.
+    hard to fuck up. Where as hard things require effort or is easy to fuck up,
+    and therefore precision to complete successfully.
 * Simple to complex. This axis describe how many factors have an influence over
-the result, how many outcomes are possible, and how many fail states and their
-resolution exists.
+    the result, how many outcomes are possible, and how many fail states and
+    their resolution exists.
 
 There is not an international standard designating the difficulty of a task,
 but these axes are pylons to navigate against when comparing different functions

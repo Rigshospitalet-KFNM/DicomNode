@@ -71,7 +71,7 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   };
 
   local_space.starting_point = Point<3>{
-    .points={0.0f,0.0f,0.0f}
+    0.0f,0.0f,0.0f
   };
 
   local_space.domain = Domain<3>{z,y,x};
@@ -99,7 +99,6 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   interpolation_tests<<<1,threads>>>(texture, out, out_space, coords);
   cuda_error = cudaGetLastError();
   ASSERT_EQ(cuda_error, cudaSuccess);
-
 
   float out_calced[threads];
   cuda_error = cudaMemcpy(out_calced, out, threads * sizeof(float), cudaMemcpyDefault);

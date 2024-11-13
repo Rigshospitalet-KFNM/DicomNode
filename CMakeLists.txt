@@ -79,7 +79,7 @@ if(CMAKE_CUDA_COMPILER)
                       ${OBJECT_TARGETS}
   )
 
-  target_compile_options(_cuda PRIVATE -O3 -pg -g -G)
+  target_compile_options(_cuda PRIVATE -O3 -g)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
 
 

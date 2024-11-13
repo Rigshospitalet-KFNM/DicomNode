@@ -15,14 +15,12 @@ from scipy.interpolate import RegularGridInterpolator
 
 # Dicomnode modules
 from dicomnode.dicom.series import extract_image, ImageContainerType
+from dicomnode.math import CUDA
 from dicomnode.math.space import Space
 from dicomnode.math.image import Image
 
-try:
+if CUDA:
   from dicomnode.math import _cuda
-  CUDA = True
-except ImportError: #pragma: no cover
-  CUDA = False #pragma: no cover
 
 class RESAMPLE_METHODS(Enum):
   LINEAR = "linear"
@@ -36,10 +34,10 @@ def resample(source: ImageContainerType,
   if not isinstance(target, Space):
     target = extract_image(target).space
 
-  return cpu_interpolate(source, target, method)
-  #if CUDA:
-  #  return _cuda.interpolation.linear(source, target)
-  #else:
+  if CUDA:
+    return _cuda.interpolation.linear(source, target)
+  else:
+    return cpu_interpolate(source, target, method)
 
 
 def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):

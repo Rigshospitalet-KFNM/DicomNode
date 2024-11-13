@@ -1,5 +1,8 @@
+from unittest import skipIf
+
 import numpy
 
+from dicomnode.math import CUDA
 from dicomnode.math.image import Image
 from dicomnode.math.space import Space
 from dicomnode.math.interpolation import cpu_interpolate
@@ -53,16 +56,45 @@ class InterpolationTest(DicomnodeTestCase):
     self.assertTrue(interpolated.flags.c_contiguous)
 
         # Visualize middle slices
-    import matplotlib.pyplot as plt
+    #import matplotlib.pyplot as plt
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-    im = ax1.imshow(data[:, :, data.shape[2]//2])
-    ax1.set_title('Original Data (middle z slice)')
+    #im = ax1.imshow(data[:, :, data.shape[2]//2])
+    #ax1.set_title('Original Data (middle z slice)')
 
-    im = ax2.imshow(interpolated[:, :, interpolated.shape[2]//2])
-    ax2.set_title('Interpolated Data (middle z slice)')
+    #im = ax2.imshow(interpolated[:, :, interpolated.shape[2]//2])
+    #ax2.set_title('Interpolated Data (middle z slice)')
 
-    fig.colorbar(im, ax=[ax1, ax2])
+    #fig.colorbar(im, ax=[ax1, ax2])
 
-    fig.savefig("interpolation")
+    #fig.savefig("interpolation")
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_gpu(self):
+    from dicomnode.math import _cuda
+
+    shape = (3,4,3)
+
+    data = numpy.array([
+      10.0, 30.0, 40.0,
+      20.0, 50.0, 70.0,
+      310.0, 130.0, 240.0,
+      320.0, 150.0, 270.0,
+      110.0, 130.0, 140.0,
+      120.0, 150.0, 170.0,
+      10.0, 30.0, 40.0,
+      20.0, 50.0, 70.0,
+      -10.0, 160.0, -40.0,
+      -20.0, 150.0, -720.0,
+      -5.0, 350.0, 40.0,
+      -50.0, -150.0,-720.0,
+    ], dtype=numpy.float32).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+
+    image = Image(data, space)
+
+    error, arr = _cuda.interpolation.linear(image, space)
+
+    print(error)
+    print(arr)

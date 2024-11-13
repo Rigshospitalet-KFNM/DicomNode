@@ -1,0 +1,25 @@
+<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg">
+  <rect
+    x="50" y="50" rx="0" width="50" height="50"
+    style="fill:rgba(0,0,0,0);stroke-width:1;stroke:black"
+  />
+  <rect
+    x="100" y="50" rx="0" width="50" height="50"
+    style="fill:rgba(0,0,0,0);stroke-width:1;stroke:black"
+  />
+  <rect
+    x="50" y="100" rx="0" width="50" height="50"
+    style="fill:rgba(0,0,0,0);stroke-width:1;stroke:black"
+  />
+  <rect x="100" y="100" rx="0" width="50" height="50"
+    style="fill:rgba(0,0,0,0);stroke-width:1;stroke:black"
+  />
+  <text x="5", y="45" > (0,0) </text>
+  <text x="75", y="45" > (1,0) </text>
+  <text x="5", y="100" > (0,1) </text>
+
+  <circle cx="75"  cy="75"  r="2" fill="red"/>
+  <circle cx="125" cy="75"  r="2" fill="red"/>
+  <circle cx="75"  cy="125" r="2" fill="red"/>
+  <circle cx="125" cy="125" r="2" fill="red"/>
+</svg>

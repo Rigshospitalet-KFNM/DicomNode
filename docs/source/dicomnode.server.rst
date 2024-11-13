@@ -4,14 +4,6 @@ dicomnode.server package
 Submodules
 ----------
 
-dicomnode.server.assocation\_container module
----------------------------------------------
-
-.. automodule:: dicomnode.server.assocation_container
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 dicomnode.server.grinders module
 --------------------------------
 

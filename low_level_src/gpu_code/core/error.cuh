@@ -15,14 +15,14 @@ enum dicomNodeError_t: uint32_t {
   cudaError = cudaErrorFlag
 };
 
-static inline cudaError_t extract_cuda_error(dicomNodeError_t error){
+static inline cudaError_t extract_cuda_error(const dicomNodeError_t error){
   return (cudaError_t)(error ^ cudaErrorFlag);
 }
 
-static inline dicomNodeError_t encode_cuda_error(cudaError_t error){
+static inline dicomNodeError_t encode_cuda_error(const cudaError_t error){
   return (dicomNodeError_t)(error | cudaErrorFlag);
 }
 
-static inline bool is_cuda_error(dicomNodeError_t error){
+static inline bool is_cuda_error(const dicomNodeError_t error){
   return error & cudaErrorFlag;
 }

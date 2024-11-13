@@ -7,11 +7,18 @@ class Texture {
     cudaTextureObject_t texture;
     Space<3> space;
 
-  __device__ float operator()(Point<3> point) const {
-    return tex3D<float>(texture, point[0] + 0.5f, point[1] + 0.5f, point[2] + 0.5f);
+  __device__ float operator()(const Point<3>& point) const {
+    Point<3> interpolated_coordinate = space.inverted_basis * (point - space.starting_point);
+
+    return tex3D<float>(texture,
+      interpolated_coordinate[0] + 0.5f,
+      interpolated_coordinate[1] + 0.5f,
+      interpolated_coordinate[2] + 0.5f
+    );
   }
 
   __device__ float operator()(float3 point) const {
+
     return tex3D<float>(texture, point.x + 0.5f, point.y + 0.5f, point.z + 0.5f);
   }
 };
@@ -88,6 +95,10 @@ dicomNodeError_t load_texture(
 }
 
 static void free_texture(Texture** texture){
+  if(!(*texture)){
+    return;
+  }
+
   cudaPointerAttributes attr;
   Texture* ptr = *texture;
   cudaPointerGetAttributes(&attr, ptr);
@@ -101,5 +112,4 @@ static void free_texture(Texture** texture){
   } else {
     cudaDestroyTextureObject((*texture)->texture);
   }
-
 }

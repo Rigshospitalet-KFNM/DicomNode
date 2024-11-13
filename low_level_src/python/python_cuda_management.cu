@@ -2,6 +2,8 @@
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
+#include<tuple>
+
 #include"utilities.cuh"
 
 #include"../gpu_code/dicom_node_gpu.cuh"
@@ -58,6 +60,8 @@ void apply_cuda_management_module(pybind11::module& m){
     .def_readonly("totalGlobalMem", &cudaDeviceProp::totalGlobalMem)
     .def_readonly("totalConstMem", &cudaDeviceProp::totalConstMem)
     .def_readonly("name", &cudaDeviceProp::name)
+    .def_readonly("multiProcessorCount", &cudaDeviceProp::multiProcessorCount)
+    .def_readonly("maxThreadsPerMultiProcessor", &cudaDeviceProp::maxThreadsPerMultiProcessor)
     .def_readonly("mangedMemory", &cudaDeviceProp::managedMemory)
     .def_readonly("sharedMemPerBlock", &cudaDeviceProp::sharedMemPerBlock)
     .def_readonly("sharedMemPerBlockOptin", &cudaDeviceProp::sharedMemPerBlockOptin)
@@ -67,6 +71,13 @@ void apply_cuda_management_module(pybind11::module& m){
     .def_readonly("concurrentKernels", &cudaDeviceProp::concurrentKernels)
     .def_readonly("concurrentManagedAccess", &cudaDeviceProp::concurrentManagedAccess)
     .def_readonly("directManagedMemAccessFromHost", &cudaDeviceProp::directManagedMemAccessFromHost)
+    .def_property_readonly("maxTexture3D", [](const cudaDeviceProp& prop){
+      return pybind11::make_tuple(
+        prop.maxTexture3D[0],
+        prop.maxTexture3D[1],
+        prop.maxTexture3D[2]
+      );
+    })
     .def("__repr__",
     [](const cudaDeviceProp& prop){
       std::stringstream ss;
@@ -98,9 +109,16 @@ void apply_cuda_management_module(pybind11::module& m){
   pybind11::class_<dicomNodeError_t>(m, "DicomnodeError")
     .def("__repr__", [](const dicomNodeError_t& error){
       if(!error){
-        return "Success";
+        return std::string("Success");
       }
-      return "ERROR, raise this as a value!";
+      if(is_cuda_error(error)) {
+        std::stringstream ss;
+        cudaError_t cuda_error = extract_cuda_error(error);
+        ss << "Encoutered cuda error:" << cudaGetErrorName(cuda_error) << " - " << cudaGetErrorString(cuda_error);
+        return ss.str();
+      }
+
+      return std::string("ERROR, raise this as a value!");
     })
     .def("__int__", [](const dicomNodeError_t& error){
       return static_cast<uint32_t>(error);

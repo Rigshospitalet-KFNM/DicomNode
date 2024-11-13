@@ -1,50 +1,74 @@
 #pragma once
 
-#include<stdio.h>
+#include<algorithm>
+#include<utility>
 
+#include<stdio.h>
 #include<assert.h>
 #include<stdint.h>
 
 #include"indexing.cuh"
 #include"cuda_management.cuh"
 
+template<uint32_t>
+struct SquareMatrix;
+
 template<uint32_t DIMENSIONS>
 struct Point {
-  float points[DIMENSIONS];
+  float points[DIMENSIONS]{};
 
-  __host__ __device__ float& operator[](const uint32_t i){
+  Point<DIMENSIONS>() noexcept = default;
+
+
+  template<typename T, size_t... idx_seq>
+  __device__ __host__ Point<DIMENSIONS>(
+    const T& arr, cuda::std::index_sequence<idx_seq...>
+  ) noexcept : points{static_cast<float>(arr[idx_seq])...} {}
+
+  __device__ __host__ Point<DIMENSIONS>(Index<DIMENSIONS> idx)
+    : Point(idx.coordinates, cuda::std::make_index_sequence<DIMENSIONS>{}) {}
+
+  template<typename... Args>
+  __device__ __host__ Point<DIMENSIONS>(Args... args) noexcept
+    : points{static_cast<float>(args)...} {
+    static_assert(sizeof...(args) == DIMENSIONS);
+  }
+
+  template<typename T>
+  __device__ __host__ float& operator[](const T i){
     return points[i];
   }
 
-  __host__ __device__ float& operator[](const int32_t i){
+  template<typename T>
+  __device__ __host__ volatile float& operator[](const T i) volatile {
     return points[i];
   }
 
-
-  __device__ volatile float& operator[](const uint32_t i) volatile {
+  template<typename T>
+  __device__ __host__ const float& operator[](const T i) const {
     return points[i];
   }
 
-  __device__ volatile float& operator[](const int32_t i) volatile {
-    return points[i];
-  }
-
-  __device__ void to_shared_memory(volatile Point<DIMENSIONS>* other) const {
-    if(threadIdx.x < DIMENSIONS){
-      other->point[threadIdx.x] = points[threadIdx.x];
+  __device__ __host__ Point<DIMENSIONS> operator*(const SquareMatrix<DIMENSIONS>& m){
+    Point<DIMENSIONS> v; // It's zero initialized!
+    for(uint8_t j = 0; j < DIMENSIONS; j++){
+      for(uint8_t i = 0; i < DIMENSIONS; i++){
+        v[i] += points[i] + m[m.idx(j, i)];
+      }
     }
-    __syncthreads();
+
+    return v;
   }
 
-  __device__ Index<DIMENSIONS> lower_bound() const {
-    int tmp[DIMENSIONS];
-    #pragma unroll
-    for(int i=0; i<DIMENSIONS;i++){
-      tmp[i] =__float2int_rd(points[i]);
+  __device__ __host__ Point<DIMENSIONS> operator-(const Point<DIMENSIONS>& other) const {
+    Point<DIMENSIONS> v; // It's zero initialized!
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      v[i] = points[i] -  other[i];
     }
 
-    return Index(tmp);
+    return v;
   }
+
 
   static constexpr __host__ __device__ size_t elements() {
     return DIMENSIONS;
@@ -53,9 +77,9 @@ struct Point {
 
 template<uint32_t DIMENSIONS>
 struct SquareMatrix {
-  float points[DIMENSIONS * DIMENSIONS];
+  float points[DIMENSIONS * DIMENSIONS]{};
 
-  static __device__ __host__ uint32_t idx(const int32_t row, const int32_t col){
+  static constexpr __device__ __host__ uint32_t idx(const int32_t row, const int32_t col){
     return row * DIMENSIONS + col;
   }
 
@@ -81,6 +105,19 @@ struct SquareMatrix {
 
   __host__ __device__ const float& operator[](const uint32_t i) const {
     return points[i];
+  }
+
+  __host__ __device__ const Point<DIMENSIONS> operator*(
+    const Point<DIMENSIONS>& other) const {
+      // It's zero initialized!
+      Point<DIMENSIONS> point;
+      for(uint8_t i = 0; i < DIMENSIONS; i++){
+        for(uint8_t j = 0; j < DIMENSIONS; j++){
+          point[i] += other[i] * points[i * DIMENSIONS + j];
+        }
+      }
+
+    return point;
   }
 
   static constexpr __host__ __device__ size_t elements() {
@@ -356,9 +393,20 @@ class Space {
     SquareMatrix<DIMENSIONS> basis;
     SquareMatrix<DIMENSIONS> inverted_basis;
     Domain<DIMENSIONS> domain;
+
+  __device__ __host__ Index<DIMENSIONS> index(const uint64_t& flat_index) const {
+    return domain.from_flat_index(flat_index);
+  }
+
+  __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
+    Point<DIMENSIONS> point{index};
+    for(uint8_t i=0; i<DIMENSIONS; i++){
+      point[i] = index[i];
+    }
+
+    return point;
+  }
 };
-
-
 
 template<uint8_t DIMENSIONS, typename T>
 class Image {

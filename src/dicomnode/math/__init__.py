@@ -96,14 +96,14 @@ def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_im
   """Provides a view of the data mirrored with respect to the input
 
   Args:
-      arr (image.image_type): This is the image data that needs to be mirrored
-      direction (MirrorDirection): This is the direction
+    arr (image.image_type): This is the image data that needs to be mirrored
+    direction (MirrorDirection): This is the direction
 
   Raises:
-      ValueError: Raised if the input array is not an image
+    ValueError: Raised if the input array is not an image
 
   Returns:
-      _type_: _description_
+    _type_: _description_
   """
   if len(arr.shape) != 3:
     raise ValueError("Mirror is only supported for 3 dimensional volumes")
@@ -140,6 +140,9 @@ def _bounding_box_cpu(array : numpy.ndarray):
   return bounding_box_list
 
 def _bounding_box_gpu(array):
+  if not CUDA:
+    raise Exception("GPU code call without working GPU driver")
+
   error, (x_min, x_max, y_min, y_max, z_min, z_max) = _cuda.bounding_box(array)
   if error:
     raise CudaException(CudaErrorEnum(int(error)))

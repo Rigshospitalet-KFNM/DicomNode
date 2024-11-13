@@ -5,6 +5,7 @@
 #include<sstream>
 #include<tuple>
 #include<vector>
+#include<iostream>
 
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
@@ -132,7 +133,11 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
 template<typename T>
 dicomNodeError_t load_image(Image<3, T>* image, const pybind11::object& python_image){
   cudaPointerAttributes attr;
-  DicomNodeRunner runner;
+  DicomNodeRunner runner{
+    [](const dicomNodeError_t& error){
+      std::cout << "Load Image encountered error: " << (uint32_t)error << "\n";
+    }
+  };
 
   runner
     | [&](){
@@ -159,7 +164,7 @@ dicomNodeError_t load_image(Image<3, T>* image, const pybind11::object& python_i
  * @return size_t
  */
 template<typename T>
-size_t get_image_elements(const pybind11::object& python_object){
+size_t get_image_size(const pybind11::object& python_object){
   const pybind11::module_& space_module = pybind11::module_::import("dicomnode.math.space");
   const pybind11::object& space_class = space_module.attr("Space");
 
@@ -180,7 +185,7 @@ size_t get_image_elements(const pybind11::object& python_object){
   }
 
   const pybind11::module_& image_module = pybind11::module_::import("dicomnode.math.image");
-  const pybind11::object& image_class = space_module.attr("Image");
+  const pybind11::object& image_class = image_module.attr("Image");
 
   if(pybind11::isinstance(python_object, image_class)){
     const python_array<T>& raw_image = python_object.attr("raw").cast<python_array<T>>();
@@ -188,6 +193,37 @@ size_t get_image_elements(const pybind11::object& python_object){
   }
 
   return 0;
+}
+
+template<typename T>
+dicomNodeError_t get_image_pointer(
+  const pybind11::object& image,
+  T** out
+){
+  DicomNodeRunner runner{
+    [](const dicomNodeError_t& error){
+      std::cout << "Get Image pointer encountered error: " << (uint32_t)error << "\n";
+    }
+  };
+  runner
+    | [&](){
+      return is_instance(image, "dicomnode.math.image", "Image");
+    } | [&](){
+      const python_array<T>& raw_image = image.attr("raw").cast<python_array<T>>();
+      const pybind11::buffer_info& buffer = raw_image.request();
+
+      dicomNodeError_t error = check_buffer_pointers(
+        std::cref(buffer), buffer.size
+      );
+
+      if(!error){
+        *out = (T*)buffer.ptr;
+      }
+
+      return error;
+    };
+
+  return runner.error();
 }
 
 

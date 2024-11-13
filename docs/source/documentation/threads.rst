@@ -22,8 +22,8 @@ requests at the same time.
 
 However that also means that you have multiple threads manipulating the state of
 the program at the same time. If a programmer is not careful, then two threads
-may modify the same object with a not associative operation. In other words the state
-is dependant on the execution order of the threads. This is called a
+may modify the same object with a not associative operation. In other words the
+state is dependant on the execution order of the threads. This is called a
 **race condition**, and you need the greatest wizard hat in existence to say
 isn't undefined behavior.
 
@@ -93,8 +93,7 @@ a few events. We'll only go through the default used events however you can see
 the full list at `InterventionEvent`_ and `NotificationEvent`_
 
 When a tcp connection is made, a thread is spawned. It is the plan that this
-thread should perform everything or more specific: 
-
+thread should perform everything or more specific:
 
 * Filtering out unused dataset
 * Adding valid ones
@@ -103,16 +102,12 @@ thread should perform everything or more specific:
 * Export the result from the processing
 * Clean up after a processing
 
-
-
 For a dicomnode, where should caution be around the data state or the pipeline
 tree. This is the place where datasets are added
 
 .. toctree::
     :hidden:
 
-
-.. _Threading: https://docs.python.org/3.9/library/threading.html
+.. _Threading: https://docs.python.org/3.10/library/threading.html
 .. _InterventionEvent: https://pydicom.github.io/pynetdicom/stable/reference/generated/pynetdicom.events.InterventionEvent.html#pynetdicom.events.InterventionEvent
 .. _NotificationEvent: https://pydicom.github.io/pynetdicom/stable/reference/generated/pynetdicom.events.NotificationEvent.html#pynetdicom.events.NotificationEvent
-

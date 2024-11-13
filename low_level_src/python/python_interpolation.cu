@@ -16,36 +16,57 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> interpolate_linear_templated(
   const pybind11::object& image,
   const pybind11::object& new_space
 ){
-  Space<3> host_space;
-  const size_t image_size = get_image_elements<T>(image);
-  const size_t out_image_size = get_image_elements<T>(new_space);
+  Space<3> destination_space;
+  Space<3> image_space;
+  const size_t image_size = get_image_size<T>(image);
+  const size_t out_image_size = get_image_size<T>(new_space);
 
-  Image<3, T> *device_image = nullptr;
+  if(!out_image_size){
+    return {dicomNodeError_t::INPUT_TYPE_ERROR, pybind11::array_t<T>(1)};
+  }
+  const size_t out_image_elements = out_image_size / sizeof(T);
+
+  pybind11::array_t<T> out_array(out_image_elements);
+  pybind11::buffer_info out_buffer = out_array.request(true);
+
+  T* image_data = nullptr;
+  Texture *device_texture = nullptr;
   T* out_image = nullptr;
 
   auto error_function = [&](dicomNodeError_t _){
-    free_image(device_image);
+    free_texture(&device_texture);
     free_device_memory(&out_image);
   };
 
   DicomNodeRunner runner{error_function};
   runner
-    | [&](){ return load_space(&host_space, new_space); }
-    | [&](){ return cudaMalloc(&device_image,sizeof(Image<3, T>)); }
-    | [&](){ return load_image<T>(device_image, image); }
+    | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
+    | [&](){ return load_space(&destination_space, new_space); }
+    | [&](){ return get_image_pointer<T>(image, &image_data);}
+    | [&](){ return cudaMalloc(&device_texture, sizeof(Texture)); }
+    | [&](){
+      return load_texture<T>(
+        device_texture,
+        image_data,
+        std::cref(destination_space)
+      );
+    }
     | [&](){ return cudaMalloc(&out_image, image_size);}
     | [&](){ return gpu_interpolation_linear<T>(
-      device_image,
-      host_space,
+      device_texture,
+      std::cref(destination_space),
       out_image
     );}
     | [&](){
-      free_image(device_image);
+      return cudaMemcpy(out_buffer.ptr, out_image, out_image_size, cudaMemcpyDefault);
+    }
+    | [&](){
+      free_texture(&device_texture);
       free_device_memory(&out_image);
       return dicomNodeError_t::SUCCESS;
     };
 
-  return {dicomNodeError_t.error(), pybind11::array_t<T>(1 * 1 * 1)};
+  return {runner.error(), out_array};
 }
 
 std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11::object& image,
@@ -90,5 +111,5 @@ void apply_interpolation_module(pybind11::module& m){
     "This module contains functions for resampling and interpolation.\n"
   );
 
-  sub_module.def("linear_interpolate", &interpolate_linear);
+  sub_module.def("linear", &interpolate_linear);
 }

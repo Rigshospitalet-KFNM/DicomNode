@@ -11,5 +11,6 @@ guides that better explain what is going on.
 .. toctree::
     :maxdepth: 1
 
-    Threads
+    threads
     design_dicomnode
+    responsibilities_of_a_abstractpipeline
