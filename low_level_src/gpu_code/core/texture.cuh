@@ -10,16 +10,13 @@ class Texture {
   __device__ float operator()(const Point<3>& point) const {
     Point<3> interpolated_coordinate = space.inverted_basis * (point - space.starting_point);
 
+    printf("thread: %u: %f,%f,%f\n", threadIdx.x, interpolated_coordinate[0], interpolated_coordinate[1], interpolated_coordinate[2]);
+
     return tex3D<float>(texture,
       interpolated_coordinate[0] + 0.5f,
       interpolated_coordinate[1] + 0.5f,
       interpolated_coordinate[2] + 0.5f
     );
-  }
-
-  __device__ float operator()(float3 point) const {
-
-    return tex3D<float>(texture, point.x + 0.5f, point.y + 0.5f, point.z + 0.5f);
   }
 };
 

@@ -96,5 +96,23 @@ class InterpolationTest(DicomnodeTestCase):
 
     error, arr = _cuda.interpolation.linear(image, space)
 
-    print(error)
+    self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
+    self.assertTrue((arr == data).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_gpu_large(self):
+    from dicomnode.math import _cuda
+
+    shape = (3, 3, 16)
+
+    data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+
+    image = Image(data, space)
+
+    error, arr = _cuda.interpolation.linear(image, space)
+
+    self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
     print(arr)
+    self.assertTrue((arr == data).all())

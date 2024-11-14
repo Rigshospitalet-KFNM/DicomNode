@@ -7,7 +7,7 @@ dicomNodeError_t _load_into_host_space(
   const python_array<float>& starting_point = space.attr("starting_point").cast<python_array<float>>();
   const python_array<float>& basis = space.attr("basis").cast<python_array<float>>();
   const python_array<float>& inv_basis = space.attr("inverted_basis").cast<python_array<float>>();
-  const python_array<float>& domain = space.attr("domain").cast<python_array<int>>();
+  const python_array<uint32_t>& domain = space.attr("domain").cast<python_array<uint32_t>>();
 
   const pybind11::buffer_info& starting_point_buffer = starting_point.request();
   const pybind11::buffer_info& basis_buffer = basis.request();
@@ -37,10 +37,10 @@ dicomNodeError_t _load_into_host_space(
         std::cref(domain_buffer), host_space->domain.elements()
       );
     } | [&](){
-      std::memcpy(&host_space->basis.points, basis_buffer.ptr, host_space->basis.elements() * sizeof(float));
-      std::memcpy(&host_space->inverted_basis.points, inv_basis_buffer.ptr, host_space->inverted_basis.elements() * sizeof(float));
-      std::memcpy(&host_space->starting_point.points, starting_point_buffer.ptr, host_space->starting_point.elements() * sizeof(float));
-      std::memcpy(&host_space->domain.sizes, domain_buffer.ptr, host_space->domain.elements() * sizeof(int));
+      std::memcpy(host_space->basis.points, basis_buffer.ptr, host_space->basis.elements() * sizeof(float));
+      std::memcpy(host_space->inverted_basis.points, inv_basis_buffer.ptr, host_space->inverted_basis.elements() * sizeof(float));
+      std::memcpy(host_space->starting_point.points, starting_point_buffer.ptr, host_space->starting_point.elements() * sizeof(float));
+      std::memcpy(host_space->domain.sizes, domain_buffer.ptr, host_space->domain.elements() * sizeof(uint32_t));
 
       return dicomNodeError_t::SUCCESS;
     };
@@ -55,7 +55,7 @@ dicomNodeError_t _load_into_device_space(
   const python_array<float>& starting_point = space.attr("starting_point").cast<python_array<float>>();
   const python_array<float>& inv_basis = space.attr("inverted_basis").cast<python_array<float>>();
   const python_array<float>& basis = space.attr("basis").cast<python_array<float>>();
-  const python_array<float>& domain = space.attr("domain").cast<python_array<int>>();
+  const python_array<uint32_t>& domain = space.attr("domain").cast<python_array<uint32_t>>();
 
   const pybind11::buffer_info& starting_point_buffer = starting_point.request();
   const pybind11::buffer_info& basis_buffer = basis.request();
@@ -88,25 +88,25 @@ dicomNodeError_t _load_into_device_space(
         std::cref(domain_buffer), device_space->domain.elements()
       );
     } | [&](){ return cudaMemcpy(
-      &device_space->basis.points,
+      device_space->basis.points,
       basis_buffer.ptr,
       device_space->basis.elements() * sizeof(float),
       cudaMemcpyDefault);
     }
     | [&](){ return cudaMemcpy(
-      &device_space->inverted_basis.points,
+      device_space->inverted_basis.points,
       inv_basis_buffer.ptr,
       device_space->inverted_basis.elements() * sizeof(float),
       cudaMemcpyDefault);
     }
     | [&](){ return cudaMemcpy(
-      &device_space->starting_point.points,
+      device_space->starting_point.points,
       starting_point_buffer.ptr,
       device_space->starting_point.elements() * sizeof(float),
       cudaMemcpyDefault);
     }
     | [&](){ return cudaMemcpy(
-      &device_space->domain.sizes,
+      device_space->domain.sizes,
       domain_buffer.ptr,
       device_space->domain.elements() * sizeof(int),
       cudaMemcpyDefault);};
