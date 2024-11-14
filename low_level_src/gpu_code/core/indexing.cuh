@@ -7,6 +7,11 @@
 template<uint8_t>
 struct Domain;
 
+/**
+ * @brief An index it's X,Y,Z in coordinates
+ *
+ * @tparam DIMENSIONS
+ */
 template<uint8_t DIMENSIONS>
 struct Index {
   static_assert(DIMENSIONS > 0);

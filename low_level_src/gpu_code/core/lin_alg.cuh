@@ -401,7 +401,7 @@ class Space {
   __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
     for(uint8_t i=0; i<DIMENSIONS; i++){
-      point[i] = index[i];
+      point[i] = index[DIMENSIONS - (i + 1)];
     }
 
     return point;
