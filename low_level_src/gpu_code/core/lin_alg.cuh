@@ -411,14 +411,9 @@ class Space {
     return domain.from_flat_index(flat_index);
   }
 
-  __device__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
+  __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
-    for(uint8_t i=0; i<DIMENSIONS; i++){
-      point[i] = index[i];
-    }
-    point = basis * index + starting_point;
-
-    return point;
+    return basis * point + starting_point;
   }
 
   __device__ __host__ Point<DIMENSIONS> interpolate_point(const Point<DIMENSIONS>& point) const {
