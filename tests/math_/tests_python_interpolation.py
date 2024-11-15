@@ -55,7 +55,7 @@ class InterpolationTest(DicomnodeTestCase):
     self.assertEqual(interpolated.shape, new_shape)
     self.assertTrue(interpolated.flags.c_contiguous)
 
-        # Visualize middle slices
+    # Visualize middle slices
     #import matplotlib.pyplot as plt
 
     #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
@@ -114,5 +114,28 @@ class InterpolationTest(DicomnodeTestCase):
     error, arr = _cuda.interpolation.linear(image, space)
 
     self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
-    print(arr)
     self.assertTrue((arr == data).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_different_starting_point(self):
+    from dicomnode.math import _cuda
+
+    shape = (3, 3, 16)
+
+    data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+
+    image = Image(data, space)
+
+    out_shape = (2,2,15)
+
+    out_space = Space(numpy.eye(3, dtype=float), [1,1,1], out_shape)
+
+    error, arr = _cuda.interpolation.linear(image, out_space)
+
+    self.assertFalse(error)
+    print(arr)
+    print(data)
+    self.assertEqual(arr.shape, out_shape)
+    self.assertTrue((arr==data[1:,1:,1:]).all())

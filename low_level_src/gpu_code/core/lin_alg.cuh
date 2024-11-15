@@ -13,6 +13,11 @@
 template<uint32_t>
 struct SquareMatrix;
 
+/**
+ * @brief A point in a N-dimensional Space
+ *
+ * @tparam DIMENSIONS - The number of
+ */
 template<uint32_t DIMENSIONS>
 struct Point {
   float points[DIMENSIONS]{};
@@ -69,6 +74,14 @@ struct Point {
     return v;
   }
 
+  __device__ __host__ Point<DIMENSIONS> operator+(const Point<DIMENSIONS>& other) const {
+    Point<DIMENSIONS> v; // It's zero initialized!
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      v[i] = points[i] + other[i];
+    }
+
+    return v;
+  }
 
   static constexpr __host__ __device__ size_t elements() {
     return DIMENSIONS;
@@ -401,8 +414,10 @@ class Space {
   __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
     for(uint8_t i=0; i<DIMENSIONS; i++){
-      point[i] = index[DIMENSIONS - (i + 1)];
+      point[i] = index[i];
     }
+
+    point = basis * index + starting_point;
 
     return point;
   }

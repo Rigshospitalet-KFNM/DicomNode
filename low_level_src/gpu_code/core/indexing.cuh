@@ -71,7 +71,7 @@ struct Index {
 
 /**
  * @brief Struct containing the size information of an image
- *
+ *  Data is stored in Z,Y,X
  */
 template<uint8_t DIMENSIONS>
 struct Domain {
@@ -152,16 +152,17 @@ struct Domain {
 
     #pragma unroll
     for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = (flat_index % (dimension_temp * sizes[dim]))
+      const uint32_t& extent = sizes[DIMENSIONS - (dim + 1)];
+      coordinates[dim] = (flat_index % (dimension_temp * extent))
         / dimension_temp;
-      dimension_temp *= sizes[dim];
+      dimension_temp *= extent;
     }
 
     return Index<DIMENSIONS>(coordinates);
   }
 
   __device__ __host__ const uint32_t& x() const noexcept {
-    return sizes[0];
+    return sizes[2];
   }
 
   __device__ __host__ const uint32_t& y() const noexcept{
@@ -171,7 +172,7 @@ struct Domain {
 
   __device__ __host__ const uint32_t& z() const noexcept {
     static_assert(DIMENSIONS > 2);
-    return sizes[2];
+    return sizes[0];
   }
 
   __device__ __host__ constexpr uint32_t* begin() noexcept{
