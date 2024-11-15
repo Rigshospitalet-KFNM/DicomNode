@@ -21,7 +21,6 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   if (error){
     return {error , python_array<T>(1)};
   }
-  Space<3> image_space;
   const size_t image_size = get_image_size<T>(image);
   const size_t out_image_size = get_image_size<T>(new_space);
 
@@ -44,7 +43,6 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   pybind11::array_t<T> out_array(shape, strides);
   pybind11::buffer_info out_buffer = out_array.request(true);
 
-  T* image_data = nullptr;
   Texture *device_texture = nullptr;
   T* device_out_image = nullptr;
 
@@ -56,13 +54,11 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   DicomNodeRunner runner{error_function};
   runner
     | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
-    | [&](){ return get_image_pointer<T>(image, &image_data);}
     | [&](){ return cudaMalloc(&device_texture, sizeof(Texture)); }
     | [&](){
-      return load_texture<T>(
+      return load_texture_from_python_image<T>(
         device_texture,
-        image_data,
-        std::cref(destination_space)
+        image
       );
     }
     | [&](){ return cudaMalloc(&device_out_image, image_size);}

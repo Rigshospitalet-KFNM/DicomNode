@@ -187,26 +187,3 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
 
   return runner.error();
 }
-
-dicomNodeError_t load_python_texture(Texture* texture, const pybind11::object& python_image){
-  DicomNodeRunner runner{
-    [](const dicomNodeError_t& error){
-      std::cout << "load_python_texture encountered error: " << (uint32_t)error << "\n";
-    }
-  };
-  Space<3> space;
-
-  runner
-    | [&](){
-      return is_instance(python_image, "dicomnode.math.image", "Image");
-    } | [&](){
-      const pybind11::object& python_space = python_image.attr("space");
-      return load_space(&space, python_space);
-    } | [&](){
-      const pybind11::object& python_space = python_image.attr("space");
-      return load_space(&texture->space, python_space);
-    };
-
-
-  return runner.error();
-}

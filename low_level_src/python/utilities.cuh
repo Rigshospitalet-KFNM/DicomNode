@@ -56,7 +56,6 @@ dicomNodeError_t check_buffer_pointers(
   return ret;
 }
 
-
 namespace {
   template<typename T>
   dicomNodeError_t _load_into_host_image(
@@ -226,6 +225,33 @@ dicomNodeError_t get_image_pointer(
   return runner.error();
 }
 
+template<typename T>
+dicomNodeError_t load_texture_from_python_image(
+  Texture* texture,
+  const pybind11::object& python_image
+){
+  DicomNodeRunner runner{
+    [](const dicomNodeError_t& error){
+      std::cout << "load_python_texture encountered error: " << (uint32_t)error << "\n";
+    }
+  };
+
+  T* data = nullptr;
+  Space<3> space;
+
+  runner
+    | [&](){
+      return is_instance(python_image, "dicomnode.math.image", "Image");
+    } | [&](){
+      const pybind11::object& python_space = python_image.attr("space");
+      return load_space(&space, python_space);
+    } | [&](){
+      return get_image_pointer(python_image, &data);
+    } | [&](){
+      return load_texture(texture, data, space);
+    };
+  return runner.error();
+}
 
 template<typename T>
 void free_image(Image<3, T>* dev_out_image){

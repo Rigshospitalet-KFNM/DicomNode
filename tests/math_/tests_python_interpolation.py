@@ -102,8 +102,8 @@ class InterpolationTest(DicomnodeTestCase):
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_gpu_large(self):
     from dicomnode.math import _cuda
-
-    shape = (3, 3, 16)
+    # This is ~0.1s on my machine, dedicated hardware ftw
+    shape = (100, 400, 400)
 
     data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
 
@@ -117,7 +117,7 @@ class InterpolationTest(DicomnodeTestCase):
     self.assertTrue((arr == data).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
-  def test_interpolation_different_starting_point(self):
+  def test_interpolationDifferentStartingPoint(self):
     from dicomnode.math import _cuda
 
     shape = (3, 3, 16)
@@ -135,7 +135,5 @@ class InterpolationTest(DicomnodeTestCase):
     error, arr = _cuda.interpolation.linear(image, out_space)
 
     self.assertFalse(error)
-    print(arr)
-    print(data)
     self.assertEqual(arr.shape, out_shape)
     self.assertTrue((arr==data[1:,1:,1:]).all())
