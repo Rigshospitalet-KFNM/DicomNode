@@ -90,7 +90,7 @@ class InterpolationTest(DicomnodeTestCase):
       -50.0, -150.0,-720.0,
     ], dtype=numpy.float32).reshape(shape)
 
-    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
 
     image = Image(data, space)
 
@@ -98,6 +98,12 @@ class InterpolationTest(DicomnodeTestCase):
 
     self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
     self.assertTrue((arr == data).all())
+
+    cpu_version = cpu_interpolate(
+        image,
+        space
+    )
+    self.assertTrue((arr == cpu_version).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_gpu_large(self):
@@ -107,7 +113,7 @@ class InterpolationTest(DicomnodeTestCase):
 
     data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
 
-    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
 
     image = Image(data, space)
 
@@ -124,16 +130,98 @@ class InterpolationTest(DicomnodeTestCase):
 
     data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
 
-    space = Space(numpy.eye(3, dtype=float), [0,0,0], shape)
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
 
     image = Image(data, space)
 
     out_shape = (2,2,15)
 
-    out_space = Space(numpy.eye(3, dtype=float), [1,1,1], out_shape)
+    out_space = Space(numpy.eye(3, dtype=numpy.float32), [1,1,1], out_shape)
 
     error, arr = _cuda.interpolation.linear(image, out_space)
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
     self.assertTrue((arr==data[1:,1:,1:]).all())
+    cpu_version = cpu_interpolate(
+        image,
+        out_space
+    )
+    self.assertTrue((arr == cpu_version).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_middle_of_point(self):
+    from dicomnode.math import _cuda
+
+    shape = (3, 3, 16)
+    # These are odd numbers
+    data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
+    image = Image(data, space)
+
+    out_shape = (3,3,15)
+    out_space = Space(numpy.eye(3, dtype=numpy.float32), [0.5,0,0], out_shape)
+
+    error, arr = _cuda.interpolation.linear(image, out_space)
+
+    self.assertFalse(error)
+    self.assertEqual(arr.shape, out_shape)
+    self.assertTrue((arr==data[:,:,1:] - 1).all())
+    cpu_version = cpu_interpolate(
+        image,
+        out_space
+    )
+    self.assertTrue((arr == cpu_version).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_change_of_basis(self):
+    from dicomnode.math import _cuda
+
+    shape = (8, 8, 8)
+    # These are odd numbers
+    data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
+    image = Image(data, space)
+
+    out_shape = (4,4,4)
+    out_space = Space((numpy.eye(3, dtype=numpy.float32) * 2), [0.0,0.0,0.0], out_shape)
+
+    error, arr = _cuda.interpolation.linear(image, out_space)
+
+    self.assertFalse(error)
+    self.assertEqual(arr.shape, out_shape)
+    self.assertTrue((arr==data[0::2, 0::2,0::2]).all())
+    cpu_version = cpu_interpolate(
+        image,
+        out_space
+    )
+    self.assertTrue((arr == cpu_version).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_change_of_both_basis(self):
+    from dicomnode.math import _cuda
+
+    shape = (8, 8, 8)
+    # These are odd numbers
+    data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
+
+    space = Space((1/2 * numpy.eye(3, dtype=numpy.float32)), [0,0,0], shape)
+    image = Image(data, space)
+
+    out_shape = (4,4,4)
+    out_space = Space((numpy.eye(3, dtype=numpy.float32) * 2), [0.0,0.0,0.0], out_shape)
+
+    error, arr = _cuda.interpolation.linear(image, out_space)
+
+    cpu_version = cpu_interpolate(
+        image,
+        out_space
+    )
+
+    self.assertFalse(error)
+    self.assertEqual(arr.shape, out_shape)
+    print(arr, cpu_version)
+
+    self.assertTrue((arr==cpu_version).all())

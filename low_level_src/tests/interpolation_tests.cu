@@ -218,7 +218,6 @@ TEST(INTERPOLATION, Manual_interpolation){
 
   manual_interpolation<<<1, {out_x, out_y, out_z}>>>(texObj, out, coords);
 
-
   float out_calced[threads];
   cuda_error = cudaMemcpy(out_calced, out, threads * sizeof(float), cudaMemcpyDefault);
   ASSERT_EQ(cuda_error, cudaSuccess);
