@@ -9,8 +9,8 @@ from dicomnode.math.interpolation import cpu_interpolate
 
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class InterpolationTest(DicomnodeTestCase):
-  def test_basic_interpolation(self):
+class CPUInterpolationTests(DicomnodeTestCase):
+  def test_basicInterpolation(self):
     # Assemble
     shape = (10, 20, 30)
     x = numpy.linspace(0, shape[0] - 1, shape[0])
@@ -55,20 +55,23 @@ class InterpolationTest(DicomnodeTestCase):
     self.assertEqual(interpolated.shape, new_shape)
     self.assertTrue(interpolated.flags.c_contiguous)
 
-    # Visualize middle slices
-    #import matplotlib.pyplot as plt
+  def test_incrementByInterpolation(self):
+    shape = (4,4,4)
+    data = (2 * numpy.arange(numpy.prod(shape)) + 1).reshape(shape)
 
-    #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
 
-    #im = ax1.imshow(data[:, :, data.shape[2]//2])
-    #ax1.set_title('Original Data (middle z slice)')
+    out_shape = (3,3,3)
+    out_space = Space(numpy.eye(3, dtype=numpy.float32), (0.5,0,0), out_shape)
 
-    #im = ax2.imshow(interpolated[:, :, interpolated.shape[2]//2])
-    #ax2.set_title('Interpolated Data (middle z slice)')
+    image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
 
-    #fig.colorbar(im, ax=[ax1, ax2])
+    out = cpu_interpolate(image, out_space)
 
-    #fig.savefig("interpolation")
+    self.assertTrue((out==(data[:3,:3,:3] + 1)).all())
+
+
+class GPUInterpolationTest(DicomnodeTestCase):
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_gpu(self):
     from dicomnode.math import _cuda
@@ -153,14 +156,14 @@ class InterpolationTest(DicomnodeTestCase):
   def test_interpolation_middle_of_point(self):
     from dicomnode.math import _cuda
 
-    shape = (3, 3, 16)
+    shape = (3, 3, 6)
     # These are odd numbers
     data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
 
     space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
     image = Image(data, space)
 
-    out_shape = (3,3,15)
+    out_shape = (3,3, 5)
     out_space = Space(numpy.eye(3, dtype=numpy.float32), [0.5,0,0], out_shape)
 
     error, arr = _cuda.interpolation.linear(image, out_space)
@@ -172,6 +175,7 @@ class InterpolationTest(DicomnodeTestCase):
         image,
         out_space
     )
+
     self.assertTrue((arr == cpu_version).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
@@ -207,11 +211,11 @@ class InterpolationTest(DicomnodeTestCase):
     # These are odd numbers
     data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
 
-    space = Space((1/2 * numpy.eye(3, dtype=numpy.float32)), [0,0,0], shape)
+    space = Space((2 * numpy.eye(3, dtype=numpy.float32)), [0,0,0], shape)
     image = Image(data, space)
 
     out_shape = (4,4,4)
-    out_space = Space((numpy.eye(3, dtype=numpy.float32) * 2), [0.0,0.0,0.0], out_shape)
+    out_space = Space((numpy.eye(3, dtype=numpy.float32) / (1/2)), [0.0,0.0,0.0], out_shape)
 
     error, arr = _cuda.interpolation.linear(image, out_space)
 
@@ -222,6 +226,5 @@ class InterpolationTest(DicomnodeTestCase):
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
-    print(arr, cpu_version)
 
     self.assertTrue((arr==cpu_version).all())

@@ -14,7 +14,7 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.dicom import gen_uid
-from dicomnode.lib.utils import str2bool, colomn_to_row_major_order
+from dicomnode.lib.utils import str2bool
 
 # Testing helpers
 from tests.helpers import bench
@@ -68,23 +68,3 @@ class pydicomTestCases(TestCase):
       dataset.add_new(0x00080016,'UI',gen_uid())
       dataset.add_new(0x00100020,'LO',"Helloworld")
       datasets.append(dataset)
-
-
-  def test_row_to_column(self):
-    input_array = numpy.arange(4*3*2).reshape((4,3,2))
-    test_array = colomn_to_row_major_order(input_array)
-
-    self.assertEqual(test_array.shape, (2,3,4))
-    to_list = [[[ elem for elem in subsublist] # Convert to build-in lists
-                for subsublist in sublist]
-                for sublist in test_array ]
-    self.assertListEqual(to_list, [
-      [[ 0.0,  6.0,  12.0, 18.0],
-       [ 2.0,  8.0, 14.0, 20.0],
-       [ 4.0, 10.0, 16.0, 22.0],
-      ],
-      [[ 1.0,  7.0, 13.0, 19.0],
-       [ 3.0,  9.0, 15.0, 21.0],
-       [ 5.0, 11.0, 17.0, 23.0],
-      ]
-    ])

@@ -43,6 +43,22 @@ def sum_1_to_n(n: int) -> int:
 def sum_n_to_m(n:int, m:int):
   return sum_1_to_n(m) - sum_1_to_n(n)
 
+def switch_ordering(input_data: numpy.ndarray) -> numpy.ndarray:
+  """Creates an index over the data in another ordering
+
+  See https://en.wikipedia.org/wiki/Row-_and_column-major_order
+
+  Note that
+
+  Args:
+    input_data (numpy.ndarray):
+
+  Returns:
+    (numpy.ndarray): A view of the data
+  """
+
+  return input_data.transpose(tuple(reversed(range(0, input_data.ndim))))
+
 def center_of_gravity(data: numpy.ndarray):
     ndims = data.ndim
     imadim = data.shape

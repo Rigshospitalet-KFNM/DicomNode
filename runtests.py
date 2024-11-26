@@ -3,8 +3,10 @@ import sys
 import argparse
 import os
 import shutil
+import re
 from pathlib import Path
-from unittest import TextTestRunner, TestSuite, TestLoader
+from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
+from typing import  Union
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
@@ -13,6 +15,17 @@ os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTOR
 from tests.helpers import testing_logs
 
 PYTHON_3_12_PLUS = 12 <= sys.version_info.minor
+
+def handle_tests(running_suite: TestSuite, tests: Union[TestCase, TestSuite], pattern: str):
+  if isinstance(tests, TestSuite):
+    for sub_tests in tests:
+      handle_tests(running_suite, sub_tests, pattern)
+  else:
+    test_regex = re.compile(pattern)
+
+    if test_regex.search(tests._testMethodName.lower()):
+      running_suite.addTest(tests)
+
 
 
 if __name__ == "__main__":
@@ -38,11 +51,16 @@ if __name__ == "__main__":
     runner = TextTestRunner(verbosity=args.verbose)
 
   loader = TestLoader()
-  suite: TestSuite = loader.discover("tests", pattern=f"*{args.test_regex}*.py")
+  running_suite = TestSuite()
+
+  all_suite: TestSuite = loader.discover("tests")
   if args.performance:
     loader.testMethodPrefix = "performance"
     performance_tests = loader.discover("tests")
-    suite.addTests(performance_tests)
+    all_suite.addTests(performance_tests)
+
+  for file_suite in all_suite:
+    handle_tests(running_suite, file_suite, args.test_regex)
 
   cwd = os.getcwd()
   tmpDirPath = Path(TESTING_TEMPORARY_DIRECTORY)
@@ -50,7 +68,7 @@ if __name__ == "__main__":
   tmpDirPath.mkdir(mode=0o777, exist_ok=True)
 
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
-  result = runner.run(suite)
+  result = runner.run(running_suite)
   os.chdir(cwd)
 
   if not args.no_clean_up:

@@ -54,3 +54,35 @@ class SpaceTestCases(DicomnodeTestCase):
 
     # To do asserts
     self.assertTrue((space.domain == numpy.array([s for s in reversed(shape)])).all())
+
+  def test_coordinates(self):
+    shape = (2,3,4)
+
+    space = Space(numpy.eye(3, dtype=numpy.float32),[0,0,0], shape)
+
+    coords = numpy.array([i for i in space.coords()])
+
+    self.assertTrue((coords[0] ==  [0,0,0]).all())
+    self.assertTrue((coords[1] ==  [1,0,0]).all())
+    self.assertTrue((coords[2] ==  [2,0,0]).all())
+    self.assertTrue((coords[3] ==  [3,0,0]).all())
+    self.assertTrue((coords[4] ==  [0,1,0]).all())
+    self.assertTrue((coords[5] ==  [1,1,0]).all())
+    self.assertTrue((coords[6] ==  [2,1,0]).all())
+    self.assertTrue((coords[7] ==  [3,1,0]).all())
+    self.assertTrue((coords[8] ==  [0,2,0]).all())
+    self.assertTrue((coords[9] ==  [1,2,0]).all())
+    self.assertTrue((coords[10] == [2,2,0]).all())
+    self.assertTrue((coords[11] == [3,2,0]).all())
+    self.assertTrue((coords[12] == [0,0,1]).all())
+    self.assertTrue((coords[13] == [1,0,1]).all())
+    self.assertTrue((coords[14] == [2,0,1]).all())
+    self.assertTrue((coords[15] == [3,0,1]).all())
+    self.assertTrue((coords[16] == [0,1,1]).all())
+    self.assertTrue((coords[17] == [1,1,1]).all())
+    self.assertTrue((coords[18] == [2,1,1]).all())
+    self.assertTrue((coords[19] == [3,1,1]).all())
+    self.assertTrue((coords[20] == [0,2,1]).all())
+    self.assertTrue((coords[21] == [1,2,1]).all())
+    self.assertTrue((coords[22] == [2,2,1]).all())
+    self.assertTrue((coords[23] == [3,2,1]).all())

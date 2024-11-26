@@ -58,7 +58,7 @@ struct Point {
     Point<DIMENSIONS> v; // It's zero initialized!
     for(uint8_t j = 0; j < DIMENSIONS; j++){
       for(uint8_t i = 0; i < DIMENSIONS; i++){
-        v[i] += points[i] + m[m.idx(j, i)];
+        v[j] += points[i] * m[m.idx(j, i)];
       }
     }
 
@@ -68,7 +68,7 @@ struct Point {
   __device__ __host__ Point<DIMENSIONS> operator-(const Point<DIMENSIONS>& other) const {
     Point<DIMENSIONS> v; // It's zero initialized!
     for(uint8_t i = 0; i < DIMENSIONS; i++){
-      v[i] = points[i] -  other[i];
+      v[i] = points[i] - other[i];
     }
 
     return v;
@@ -81,6 +81,14 @@ struct Point {
     }
 
     return v;
+  }
+
+  __device__ __host__ bool operator==(const Point<DIMENSIONS> other) const {
+    bool ret = true;
+    for(uint8_t i = 0; i < DIMENSIONS; i++){
+      ret = ret && points[i] == other[i];
+    }
+    return ret;
   }
 
   static constexpr __host__ __device__ size_t elements() {
@@ -124,9 +132,9 @@ struct SquareMatrix {
     const Point<DIMENSIONS>& other) const {
       // It's zero initialized!
       Point<DIMENSIONS> point;
-      for(uint8_t i = 0; i < DIMENSIONS; i++){
-        for(uint8_t j = 0; j < DIMENSIONS; j++){
-          point[i] += other[i] * points[i * DIMENSIONS + j];
+      for(uint8_t j = 0; j < DIMENSIONS; j++){
+        for(uint8_t i = 0; i < DIMENSIONS; i++){
+          point[j] += other[i] * points[idx(i,j)];
         }
       }
 
@@ -413,11 +421,11 @@ class Space {
 
   __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
-    return basis * point + starting_point;
+    return point * basis + starting_point;
   }
 
   __device__ __host__ Point<DIMENSIONS> interpolate_point(const Point<DIMENSIONS>& point) const {
-    return inverted_basis * point - starting_point;
+    return (point - starting_point) * inverted_basis;
   }
 };
 

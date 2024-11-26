@@ -60,6 +60,18 @@ class Space:
     self._starting_point = numpy.array(start_points, dtype=float32)
     self._domain = numpy.array(domain, dtype=uint32)
 
+  def coords(self):
+    index = 0
+    points = numpy.prod(self.domain)
+
+    while index < points:
+      x = index % self.domain[2]
+      y = (index // self.domain[2]) % self.domain[1]
+      z = index // (self.domain[1] * self.domain[2])
+
+      yield numpy.array([x,y,z])
+
+      index += 1
 
   @classmethod
   def from_nifti(cls, nifti: Nifti1Image):

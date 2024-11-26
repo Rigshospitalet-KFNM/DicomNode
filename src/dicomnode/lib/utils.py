@@ -70,29 +70,6 @@ class ThreadWithReturnValue(Thread):
     Thread.join(self, *args)
     return self._return
 
-def colomn_to_row_major_order(input: numpy.ndarray[Tuple[int,int,int], Any]) -> numpy.ndarray:
-  """Converts an array from a Column major to row major
-
-  See https://en.wikipedia.org/wiki/Row-_and_column-major_order
-
-  Args:
-    input (numpy.ndarray): An three dimensional array of dimensions (x,y,z)
-
-  Returns:
-    (numpy.ndarray): An three dimensional array of dimensions (z,y,x) containing the data
-  """
-  # I should test this function on some real data.
-
-  if input.ndim != 3:
-    raise TypeError("Invalid Shape, accepts only three dimensional arrays")
-
-  return_array = numpy.empty(tuple(reversed(input.shape)), order='C')
-
-  for index in range(input.shape[2]):
-    return_array[index, :, :] = input[:,:,index].T
-
-  return return_array
-
 def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None:
   """Drops privileges of program to run as a user
 

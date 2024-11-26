@@ -572,3 +572,25 @@ TEST(LIN_ALG, INVERSION_3x3){
   ASSERT_NEAR(matrix[7],  0.0f, EPSILON);
   ASSERT_NEAR(matrix[8],  0.3333333f, EPSILON);
 }
+
+TEST(LIN_ALG, MATRIX_MULTIPLICATION_ORDERING){
+  SquareMatrix<2> matrix{1.0f,2.0f,3.0f,4.0f};
+  Point<2> point{5.0f,6.0f};
+
+  Point<2> one_way = point * matrix;
+  Point<2> other_way = matrix * point;
+
+  Point<2> answer_1{17.0f, 39.0f};
+  Point<2> answer_2{23.0f, 34.0f};
+
+  ASSERT_TRUE(one_way == answer_1);
+  ASSERT_TRUE(other_way == answer_2);
+}
+
+TEST(LIN_ALG, POINTS_ARE_ZERO_INITIALIZED){
+  Point<16> p;
+
+  for(int i = 0; i < 16; i++){
+    ASSERT_FLOAT_EQ(p[i], 0.0f);
+  }
+}

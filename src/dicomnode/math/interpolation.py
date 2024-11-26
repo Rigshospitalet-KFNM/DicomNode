@@ -15,7 +15,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 # Dicomnode modules
 from dicomnode.dicom.series import extract_image, ImageContainerType
-from dicomnode.math import CUDA
+from dicomnode.math import CUDA, switch_ordering
 from dicomnode.math.space import Space
 from dicomnode.math.image import Image
 
@@ -41,29 +41,25 @@ def resample(source: ImageContainerType,
 
 
 def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):
-  original_grid = [numpy.arange(s) for s in source.space.domain]
+  original_grid = [numpy.arange(s) for s in reversed(source.space.domain)]
+
+
 
   # Create interpolator for original data
   interpolator = RegularGridInterpolator(
       tuple(original_grid),
-      source.raw,
+      switch_ordering(source.raw),
       method=method.value,
       bounds_error=False,
       fill_value=0
   )
 
   # Create new grid coordinates
-  new_grid = [numpy.arange(s) for s in target.domain]
-  new_I, new_J, new_K = numpy.meshgrid(*new_grid, indexing='ij')
+  new_coords = numpy.array([i for i in target.coords()])
 
-  # Convert new indices to world coordinates
-  new_coords = numpy.stack([new_I, new_J, new_K], axis=-1)
-  new_coords = new_coords.reshape(-1, source.raw.ndim)
   world_coords_new = target.starting_point + new_coords @ target.basis
 
   # Transform world coordinates back to original basis indices for interpolation
-  # Solve: world_coords = original_start + coords @ original_basis
-  # Therefore: coords = (world_coords - original_start) @ inv(original_basis)
   orig_indices = (world_coords_new - source.space.starting_point) @ source.space.inverted_basis
 
   # Interpolate

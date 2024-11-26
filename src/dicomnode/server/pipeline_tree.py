@@ -92,8 +92,6 @@ class PatientNode(ImageTreeInterface):
 
     input_container_type: Type[InputContainer] = InputContainer
 
-
-
   def __init__(self,
                args: Dict[str, Type[AbstractInput]],
                options: Options = Options(),
