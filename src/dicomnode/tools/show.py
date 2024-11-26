@@ -7,7 +7,7 @@ from argparse import _SubParsersAction, Namespace
 from pprint import pprint
 from pathlib import Path
 from dicomnode.lib.utils import str2bool
-from dicomnode.lib.io import load_dicom, load_private_tags_from_args
+from dicomnode.lib.io import load_dicom
 
 
 def get_parser(subparser: _SubParsersAction):
@@ -24,15 +24,6 @@ def get_parser(subparser: _SubParsersAction):
                              type=Path,
                              nargs='*',
                              help="Path to dicom file to be shown")
-  module_parser.add_argument('--privatetags',
-                             type=Path,
-                             help="Path to .dlc file with private tags")
-  module_parser.add_argument('--strictParsing',
-                             type=str2bool,
-                             nargs='?',
-                             const=False,
-                             default=False,
-                             help="Stop if a private tag is not parsed correctly")
 
 def entry_func(args : Namespace):
   """This is the function that should does the work of the tool.
@@ -41,6 +32,5 @@ def entry_func(args : Namespace):
       args (Namespace): The user arguments
 
   """
-  private_tags = load_private_tags_from_args(args)
   for dicomfile in args.dicomfile:
     pprint(load_dicom(dicomfile))

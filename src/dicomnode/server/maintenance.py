@@ -11,12 +11,12 @@ from threading import Thread, Event
 from typing import Any, Iterable, Mapping, Optional
 
 # Thrid party Packages
+import psutil
 
 # Dicomnode packages
+from dicomnode.lib.utils import human_readable_byte_count
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.pipeline_tree import PipelineTree
-
-
 
 class MaintenanceThread(Thread):
   """This thread ensures that old studies are removed from the input
@@ -31,7 +31,7 @@ class MaintenanceThread(Thread):
                study_expiration_days: int,
                group: None = None,
                name: Optional[str] = None,
-               args: Iterable[Any] = ...,
+               args: Iterable[Any] = [],
                kwargs: Optional[Mapping[str, Any]] = None,
                *,
                daemon: Optional[bool]= None) -> None:
@@ -84,12 +84,24 @@ class MaintenanceThread(Thread):
     """
     if input_now is None:
       now = datetime.now()
+    else:
+      now = input_now
+
 
     # Note this might cause some bug,
     # where a patient is being processed, and at the same time removed
     # This is considered so unlikely, that it's a bug I accept in the code
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.pipeline_tree.remove_expired_studies(expiry_datetime)
+    self.logger.info("Performed Maintenance, current pipeline tree is:")
+    self.logger.info(str(self.pipeline_tree))
+
+    process = psutil.Process()
+    with process.oneshot():
+      mem_info = process.memory_info()
+      self.logger.info(f"Process is using {human_readable_byte_count(mem_info.rss)} Memory")
+
+
 
 __all__ = [
   'MaintenanceThread'

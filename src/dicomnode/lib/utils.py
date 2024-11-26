@@ -8,7 +8,8 @@ __author__ = "Christoffer Vilstrup Jensen"
 from argparse import ArgumentTypeError
 from threading import Thread
 from logging import Logger
-from typing import Any, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Optional, Type, Union
+
 try:
   from os import getuid, setuid
   UNIX = True
@@ -18,8 +19,6 @@ except ImportError:
 from warnings import warn
 
 # Third party packages
-import numpy
-
 
 # Dicomnode Packages
 # This module is imported first, therefore DO NOT PLACE ANY DICOMNODE MODULES IN HERE
@@ -27,7 +26,7 @@ import numpy
 # End of imports
 
 
-def str2bool(v:Union[str, bool]) -> bool:
+def str2bool(v: Union[str, bool]) -> bool:
   """This function convert commons strings to their respective boolean values
 
   Args:
@@ -89,7 +88,6 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
       else:
         logger.info("Cannot drop privileges, Not on a unix system")
 
-
 def deprecation_message(deprecated_module_path, new_module_path) -> None:
   warn(f"{deprecated_module_path} has been moved to {new_module_path}", DeprecationWarning)
 
@@ -111,3 +109,33 @@ def type_corrosion(*types: Type):
       return func(*new_args, **kwargs)
     return wrapper
   return decorator
+
+def human_readable_byte_count(number_of_bytes: int):
+  """
+    Convert bytes to human-readable format (kB, MB, GB, TB).
+
+    Args:
+        bytes_number (int): Number of bytes to convert
+
+    Returns:
+        str: Converted size with appropriate unit
+  """
+
+  units = [
+    (1024**3, 'TB'),  # Terabytes
+    (1024**2, 'GB'),  # Gigabytes
+    (1024, 'MB'),     # Megabytes
+    (1, 'kB')         # Kilobytes
+  ]
+
+  if number_of_bytes <= 0:
+    return "0 KB"
+
+  # Find the appropriate unit
+  for factor, unit in units:
+    if factor <= number_of_bytes:
+      converted = number_of_bytes / factor
+      return f"{converted:.2f} {unit}"
+
+  # If less than 1 KB
+  return f"{number_of_bytes} bytes"

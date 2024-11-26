@@ -209,6 +209,34 @@ class PipelineTestCase(DicomnodeTestCase):
     self.assertIn(CPR_3, self.pipeline_tree.data)
     self.assertEqual(self.pipeline_tree.images, 1)
 
+  def test_empty_dataset_raises_exception(self):
+    dataset = Dataset()
+    dataset.PatientID = None
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    make_meta(dataset)
+
+    self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+
+  def test_pipeline_tree_to_string(self):
+    class DummyInput(AbstractInput):
+      def validate(self) -> bool:
+        return False
+
+    tree = PipelineTree(0x0010_0020, {
+      "dummy_1" : DummyInput,
+      "dummy_2" : DummyInput
+    })
+
+    tree.add_images(
+      generate_numpy_datasets(10, Rows=10, Cols=10, PatientID="p1")
+    )
+
+    tree.add_images(
+      generate_numpy_datasets(10, Rows=10, Cols=10, PatientID="p2")
+    )
+
+    self.assertRegexIn("Pipeline Tree - 2 Patients - 40 images total", [str(tree)])
+
 class PatientNodeTestCase(TestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
@@ -338,7 +366,7 @@ class PatientNodeTestCase(TestCase):
 
     input_container = patient_dynamic_node.extract_input_container()
 
-  def test_patient_node(self):
+  def test_patient_node_to_string(self):
     node = PatientNode({
       'arg_1' : TestInput1,
       'arg_2' : TestInput2,

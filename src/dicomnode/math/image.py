@@ -14,13 +14,6 @@ from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.math.space import Space
 
-try:
-  from dicomnode.math import _cuda # type: ignore
-  CUDA = True
-except ImportError:
-  CUDA = False
-
-
 numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
 raw_image_frames: TypeAlias = ndarray[Tuple[int,int,int,int], Any]
 

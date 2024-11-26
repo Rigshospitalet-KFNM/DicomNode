@@ -7,7 +7,7 @@ It's mostly a wrapper around scipy / calling the cuda functions
 
 # Python standard library
 from enum import Enum
-from typing import Any, Iterable, List, Literal, Tuple, Union
+from typing import Union
 
 # Third party modules
 import numpy
@@ -43,15 +43,13 @@ def resample(source: ImageContainerType,
 def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):
   original_grid = [numpy.arange(s) for s in reversed(source.space.domain)]
 
-
-
   # Create interpolator for original data
   interpolator = RegularGridInterpolator(
       tuple(original_grid),
       switch_ordering(source.raw),
       method=method.value,
       bounds_error=False,
-      fill_value=0
+      fill_value=source.minimum_value
   )
 
   # Create new grid coordinates
