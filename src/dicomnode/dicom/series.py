@@ -110,7 +110,7 @@ class Series:
       yield slice_
 
 class DicomSeries(Series):
-  """This represenst
+  """This represent a series of dicom, that contains an image
   """
   pivot: Dataset
   datasets: List[Dataset]

@@ -62,7 +62,7 @@ dicomNodeError_t gpu_interpolation_linear(
         device_space,
         device_out_data
       );
-      return cudaDeviceSynchronize();
+      return cudaGetLastError();
     }
     | [&](){
       free_device_memory(&device_space);

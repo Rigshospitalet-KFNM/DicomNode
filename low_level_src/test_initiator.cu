@@ -5,3 +5,4 @@
 #include"tests/bounding_box_test.cu"
 #include"tests/lin_alg_test.cu"
 #include"tests/interpolation_tests.cu"
+#include"tests/space_test.cu"

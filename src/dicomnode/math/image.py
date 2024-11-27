@@ -109,6 +109,9 @@ class Image:
 
     return cls(image_data, affine)
 
+  def __str__(self) -> str:
+    return f"An Image over the space:\n{self.space}"
+
 
 class FramedImage():
   @property
@@ -118,7 +121,6 @@ class FramedImage():
   @property
   def shape(self):
     return self.raw.shape
-
 
   def frame(self, frame) -> Image:
     return Image(self.raw[frame], self.space)

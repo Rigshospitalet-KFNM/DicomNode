@@ -9,16 +9,22 @@
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
   ([&]{
+    if(!(*device_pointer)){
+      return;
+    }
+
     cudaPointerAttributes attr;
     cudaError_t error = cudaPointerGetAttributes(&attr, *device_pointer);
     if(error != cudaSuccess){
-      std::cout << "something went wrong!\n";
+      printf("Unable to get cudaPointerGetAttribute for pointer %p\n", *device_pointer);
       return;
     }
     if(attr.type == cudaMemoryType::cudaMemoryTypeDevice || attr.type == cudaMemoryType::cudaMemoryTypeManaged){
       error = cudaFree(*device_pointer);
       if(error != cudaSuccess){
-        std::cout << "freeing failed!";
+        const char* error_name = cudaGetErrorName(error);
+        const char* error_desc = cudaGetErrorString(error);
+        printf("Freeing %p failed with %s - %s\n", *device_pointer, error_name, error_desc);
       }
       *device_pointer = nullptr;
     }

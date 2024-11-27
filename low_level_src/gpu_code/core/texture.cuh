@@ -91,22 +91,54 @@ dicomNodeError_t load_texture(
   return runner.error();
 }
 
-static void free_texture(Texture** texture){
+static cudaError_t free_texture(Texture** texture){
   if(!(*texture)){
-    return;
+    return cudaSuccess;
   }
 
   cudaPointerAttributes attr;
   Texture* ptr = *texture;
-  cudaPointerGetAttributes(&attr, ptr);
+  cudaError_t error = cudaPointerGetAttributes(&attr, ptr);
+
+  if(error){
+    const char* error_name = cudaGetErrorName(error);
+    printf("Encountered %s not get pointer info of %p\n", error_name, ptr);
+    return error;
+  }
 
   if(attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged){
-    cudaTextureObject_t host_texture;
-    cudaMemcpy(&host_texture, &ptr->texture, sizeof(cudaTextureObject_t), cudaMemcpyDefault);
-    cudaDestroyTextureObject(host_texture);
-    cudaFree(ptr);
+    Texture host_texture;
+    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture), cudaMemcpyDefault);
+    if(error){
+      const char* error_name = cudaGetErrorName(error);
+      printf("ptr: %p\n", ptr);
+      printf("ptr->texture: %p\n", &(ptr->texture));
+
+      printf("Encountered %s while copying %p to %p\n", error_name, ptr, &host_texture);
+      return error;
+    }
+
+    error = cudaDestroyTextureObject(host_texture.texture);
+    if(error){
+      const char* error_name = cudaGetErrorName(error);
+      printf("Encountered %s while destroying the texture object\n", error_name);
+      return error;
+    }
+
+    error = cudaFree(ptr);
+    if(error){
+      const char* error_name = cudaGetErrorName(error);
+      printf("Encountered %s while freeing %p\n", error_name, ptr);
+      return error;
+    }
     *texture = nullptr;
   } else {
-    cudaDestroyTextureObject((*texture)->texture);
+    error = cudaDestroyTextureObject((*texture)->texture);
+    if(error){
+      const char* error_name = cudaGetErrorName(error);
+      printf("Encountered %s while destroying the texture object\n", error_name);
+    }
   }
+
+  return error;
 }

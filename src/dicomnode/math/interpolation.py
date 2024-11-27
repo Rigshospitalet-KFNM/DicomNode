@@ -35,7 +35,9 @@ def resample(source: ImageContainerType,
     target = extract_image(target).space
 
   if CUDA:
-    return _cuda.interpolation.linear(source, target)
+    success, interpolated =  _cuda.interpolation.linear(source, target)
+
+    return interpolated
   else:
     return cpu_interpolate(source, target, method)
 

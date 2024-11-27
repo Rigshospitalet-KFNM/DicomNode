@@ -47,6 +47,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   T* device_out_image = nullptr;
 
   auto error_function = [&](dicomNodeError_t _){
+    std::cout << "Error Trigger!\n";
     free_texture(&device_texture);
     free_device_memory(&device_out_image);
   };
@@ -61,7 +62,8 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
         image
       );
     }
-    | [&](){ return cudaMalloc(&device_out_image, image_size);}
+    | [&](){
+      return cudaMalloc(&device_out_image, out_image_size);}
     | [&](){ return gpu_interpolation_linear<T>(
       device_texture,
       std::cref(destination_space),
@@ -71,7 +73,8 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
       return cudaMemcpy(out_buffer.ptr, device_out_image, out_image_size, cudaMemcpyDefault);
     }
     | [&](){
-      free_texture(&device_texture);
+      return free_texture(&device_texture);}
+    | [&](){
       free_device_memory(&device_out_image);
       return dicomNodeError_t::SUCCESS;
     };
@@ -113,7 +116,6 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11:
   const std::string error_message = "Unsupported dtype:" + dtype;
   throw std::runtime_error(error_message);
 }
-
 
 void apply_interpolation_module(pybind11::module& m){
   pybind11::module sub_module = m.def_submodule(

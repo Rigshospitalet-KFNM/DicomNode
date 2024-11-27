@@ -95,8 +95,8 @@ class Space:
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     try:
-
       first_dataset = datasets[0]
+      number_of_datasets = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
       start_coordinates = first_dataset.ImagePositionPatient
       image_orientation = first_dataset.ImageOrientationPatient
 
@@ -114,7 +114,7 @@ class Space:
       return cls(
         affine_raw,
         start_coordinates,
-        (len(datasets), first_dataset.Columns, first_dataset.Rows)
+        (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
       )
     except Exception as E:
       print(E)
@@ -127,6 +127,17 @@ class Space:
                (0,0,0),
                (z_dim, y_dim, z_dim)
                )
+
+  def __str__(self):
+    return (f"Space over extend x: {self.domain[2]}, y: {self.domain[1]} z: {self.domain[0]}\n"
+            f"Starting point at ({self.starting_point[0]},{self.starting_point[1]}, {self.starting_point[2]})\n"
+            f"Basis:\n"
+            f"{self.basis[0,0]} {self.basis[0,1]} {self.basis[0,2]}\n"
+            f"{self.basis[1,0]} {self.basis[1,1]} {self.basis[1,2]}\n"
+            f"{self.basis[2,0]} {self.basis[2,1]} {self.basis[2,2]}")
+
+  def __repr__(self) -> str:
+    return str(self)
 
 
   def correct_rotation(self) -> bool:

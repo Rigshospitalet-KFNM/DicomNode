@@ -283,15 +283,14 @@ class RTStructGrinder(Grinder):
     if rt_struct is None:
       raise MissingPivotDataset
 
-    return RTStruct(rt_series, rt_struct) # pragma: type ignore
+    return RTStruct(rt_series, rt_struct) #type: ignore
 
 class LargeDynamicPetSeriesGrinder(Grinder):
-  def __init__(self, save_dataset=True) -> None:
+  def __init__(self) -> None:
     super().__init__()
-    self.save_dataset = save_dataset
 
   def __call__(self, image_generator: Iterable[Dataset]):
-    return LargeDynamicPetSeries(image_generator, save_datasets=self.save_dataset)
+    return LargeDynamicPetSeries(image_generator)
 
 
 __all__ = [
