@@ -8,7 +8,7 @@ class Texture {
     Space<3> space;
 
   __device__ float operator()(const Point<3>& point) const {
-    Point<3> interpolated_coordinate = space.interpolate_point(point);
+    const Point<3> interpolated_coordinate = space.interpolate_point(point);
 
     //printf("thread: %u: %f,%f,%f\n", threadIdx.x, interpolated_coordinate[0], interpolated_coordinate[1], interpolated_coordinate[2]);
 

@@ -19,8 +19,8 @@ namespace {
     const uint64_t gid = blockDim.x * blockIdx.x + threadIdx.x;
 
     if(gid < destination_elements){
-      Index<3> index = destination_space.index(gid);
-      Point<3> point = destination_space.at_index(index);
+      const Index<3> index = destination_space.index(gid);
+      const Point<3> point = destination_space.at_index(index);
       destination_data[gid] = texture(point);
     }
   }
@@ -35,7 +35,7 @@ dicomNodeError_t gpu_interpolation_linear(
   Space<3>* device_space = nullptr;
 
   int cudaDevice;
-  cudaDeviceProp prop;
+  cudaDeviceProp prop; // This is to calculate the "wave size" for the device
 
   size_t block_count;
   constexpr size_t threads = 1024;
