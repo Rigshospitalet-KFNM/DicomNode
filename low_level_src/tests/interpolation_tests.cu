@@ -133,6 +133,89 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   cudaFree(coords);
 }
 
+#ifdef PERFORMANCE
+
+TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
+  constexpr size_t z = 354;
+  constexpr size_t y = 512;
+  constexpr size_t x = 512;
+  constexpr size_t data_elements = x * y * z;
+  constexpr size_t data_size = data_elements * sizeof(float);
+
+  float* data_host = new float[data_elements];
+
+  for(int64_t i = 0; i < data_elements; i++){
+    data_host[i] = i;
+  }
+
+  Space<3> local_space;
+
+  local_space.basis = SquareMatrix<3>{
+    .points={
+      1.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 1.0f
+    }
+  };
+
+  local_space.inverted_basis = SquareMatrix<3>{
+    .points={
+      1.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 1.0f
+    }
+  };
+
+  local_space.starting_point = Point<3>{
+    0.0f,0.0f,0.0f
+  };
+
+  local_space.domain = Domain<3>{z,y,x};
+
+  float *out = nullptr;
+  cudaError_t cuda_error = cudaMalloc(&out, data_size);
+  ASSERT_EQ(cuda_error, cudaSuccess);
+
+  Texture* texture=nullptr;
+  Space<3>* out_space = nullptr;
+  float3* coords = nullptr;
+
+  cuda_error = cudaMalloc(&texture, sizeof(Texture));
+  ASSERT_EQ(cuda_error, cudaSuccess);
+
+  cuda_error = cudaMalloc(&out_space, sizeof(Space<3>));
+  ASSERT_EQ(cuda_error, cudaSuccess);
+
+
+  dicomNodeError_t dicomnode_error = load_texture<float>(texture, data_host, local_space);
+  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+
+  dicomnode_error = gpu_interpolation_linear<float>(
+    texture, local_space, out
+  );
+  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+
+  float* interpolated = new float[data_elements];
+
+  cuda_error = cudaMemcpy(interpolated, out, data_size, cudaMemcpyDefault);
+  ASSERT_EQ(cuda_error, cudaSuccess);
+
+  for(int64_t i = 0; i < data_elements; i++){
+    ASSERT_FLOAT_EQ(interpolated[i], data_host[i]);
+  }
+
+  delete[] interpolated;
+  delete[] data_host;
+
+  free_texture(&texture);
+  cudaFree(out);
+  cudaFree(texture);
+  cudaFree(out_space);
+  cudaFree(coords);
+}
+
+#endif
+
 constexpr size_t z = 4;
 constexpr size_t y = 4;
 constexpr size_t x = 4;
@@ -160,6 +243,17 @@ __global__ void manual_interpolation(cudaTextureObject_t tex, float* out, float3
 }
 
 TEST(INTERPOLATION, Manual_interpolation){
+  constexpr size_t z = 4;
+  constexpr size_t y = 4;
+  constexpr size_t x = 4;
+
+  constexpr size_t data_elements = z * y * x;
+
+  constexpr size_t out_z = 3;
+  constexpr size_t out_y = 3;
+  constexpr size_t out_x = 3;
+
+
   constexpr size_t threads = out_x * out_y * out_z;
 
   float data[data_elements];
