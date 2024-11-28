@@ -13,16 +13,16 @@ TEST(BOUNDING_BOX, Box_25x25x25_with_10_11_12_20_19_18){
     return k * 25 * 25 + j * 25 + i;
   };
 
-  const size_t datasize = elements * sizeof(uint8_t);
-  uint8_t* host_data = (uint8_t*)malloc(datasize);
+  const size_t data_size = elements * sizeof(uint8_t);
+  uint8_t* host_data = (uint8_t*)malloc(data_size);
   EXPECT_NE(host_data, (void*)NULL);
-  memset(host_data, (uint8_t)0, datasize);
+  memset(host_data, (uint8_t)0, data_size);
   host_data[idx(10,11,12)] = 1;
   host_data[idx(20,19,18)] = 1;
   BoundingBox_3D out;
 
   status = reduce<1, BoundingBoxOP_3D<uint8_t>, uint8_t, BoundingBox_3D, Domain<3>>(
-    host_data, datasize, &out, {25,25,25}
+    host_data, data_size, &out, {25,25,25}
   );
 
   EXPECT_EQ(status, cudaSuccess);

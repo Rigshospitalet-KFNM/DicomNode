@@ -198,7 +198,7 @@ __device__ void swapVector(volatile Point<DIMENSION>* vector,
 }
 
 template<uint8_t DIMENSION>
-__device__ dicomNodeError_t ForwardElemination(
+__device__ dicomNodeError_t ForwardElimination(
    volatile SquareMatrix<DIMENSION>* matrix,
    volatile Point<DIMENSION>* vector
 ){
@@ -207,7 +207,7 @@ __device__ dicomNodeError_t ForwardElemination(
   const bool vectorThread = threadIdx.x < DIMENSION;
   const bool activeThread = threadIdx.x < (DIMENSION * DIMENSION);
 
-  // Forward elemination
+  // Forward elimination
   #pragma unroll
   for(uint8_t i=0; i < DIMENSION - 1; i++){
     float pivot = matrix->points[DIMENSION * i + i];
@@ -217,7 +217,7 @@ __device__ dicomNodeError_t ForwardElemination(
       while(newPivotRow == 0.0f){
         j++;
         if(j == DIMENSION){
-          return dicomNodeError_t::NotLinearIndependant;
+          return dicomNodeError_t::NotLinearIndependent;
         }
         newPivotRow = matrix->points[DIMENSION * j + i];
       }
@@ -248,7 +248,7 @@ __device__ dicomNodeError_t ForwardElemination(
 }
 
 template<uint8_t DIMENSION>
-__device__ dicomNodeError_t BackwardsElemination(
+__device__ dicomNodeError_t BackwardsElimination(
   volatile SquareMatrix<DIMENSION>* matrix,
   volatile Point<DIMENSION>* point
 ){
@@ -279,18 +279,18 @@ __device__ dicomNodeError_t BackwardsElemination(
 }
 
 template<uint8_t DIMENSION>
-__device__ dicomNodeError_t GaussJordanElemination(
+__device__ dicomNodeError_t GaussJordanElimination(
    volatile SquareMatrix<DIMENSION>* matrix,
    volatile Point<DIMENSION>* point
   ){
   static_assert(DIMENSION <= 32);
   dicomNodeError_t error;
 
-  error = ForwardElemination<DIMENSION>(matrix, point);
+  error = ForwardElimination<DIMENSION>(matrix, point);
   if(error){
     return error;
   }
-  error = BackwardsElemination<DIMENSION>(matrix, point);
+  error = BackwardsElimination<DIMENSION>(matrix, point);
 
   return error;
 }
@@ -304,14 +304,14 @@ __device__ dicomNodeError_t _invertMatrixForward(
   const uint32_t matrixCol = threadIdx.x % DIMENSION;
   const uint32_t matrixRow = (threadIdx.x / DIMENSION) % DIMENSION;
   const bool outputThread = active && DIMENSION * DIMENSION <= threadIdx.x;
-  const uint32_t otidx = threadIdx.x % (DIMENSION * DIMENSION);
+  const uint32_t output_thread_idx = threadIdx.x % (DIMENSION * DIMENSION);
 
   if(outputThread){
-    output[otidx] = static_cast<float>(matrixCol == matrixRow); //
+    output[output_thread_idx] = static_cast<float>(matrixCol == matrixRow); //
   }
   __syncthreads();
 
-  // Forward elemination
+  // Forward elimination
   #pragma unroll
   for(uint8_t i=0; i < DIMENSION - 1; i++){
     float pivot = matrix[DIMENSION * i + i];
@@ -321,7 +321,7 @@ __device__ dicomNodeError_t _invertMatrixForward(
       while(newPivotRow == 0.0f){
         j++;
         if(j == DIMENSION){
-          return dicomNodeError_t::NotLinearIndependant;
+          return dicomNodeError_t::NotLinearIndependent;
         }
         newPivotRow = matrix[DIMENSION * j + i];
       }
@@ -337,14 +337,14 @@ __device__ dicomNodeError_t _invertMatrixForward(
     const float row_value = outputThread ? output[DIMENSION * i + matrixCol] :
                             active ? matrix[DIMENSION * i + matrixCol] : 0.0f;
 
-    const float thread_value = outputThread ? output[otidx] :
+    const float thread_value = outputThread ? output[output_thread_idx] :
                                active ? matrix[threadIdx.x] : 0.0f;
 
 
     __syncthreads();
     // Write back
     if(outputThread && i < matrixRow){
-      output[otidx] = thread_value - row_value * ratio;
+      output[output_thread_idx] = thread_value - row_value * ratio;
     } else if (active && i < matrixRow) {
       matrix[threadIdx.x] = thread_value - row_value * ratio;
     }
@@ -377,8 +377,8 @@ __device__ dicomNodeError_t _invertMatrixBackwards(
     __syncthreads();
     // write back
     if(matrixRow == i){
-      const float writeback_value = output_value / pivot;
-      output[threadIdx.x] = writeback_value;
+      const float write_back_value = output_value / pivot;
+      output[threadIdx.x] = write_back_value;
       if(matrixCol == i){
         matrix[threadIdx.x] = 1;
       }

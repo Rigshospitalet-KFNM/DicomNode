@@ -4,7 +4,7 @@ constexpr uint32_t cudaErrorFlag = 0x80000000;
 
 enum dicomNodeError_t: uint32_t {
   SUCCESS = 0,
-  NotLinearIndependant = 1,
+  NotLinearIndependent = 1,
   INPUT_TYPE_ERROR = 2,
   NON_POSITIVE_SHAPE = 3,
   POINTER_IS_NOT_A_DEVICE_PTR = 4,
