@@ -10,8 +10,6 @@ class Texture {
   __device__ float operator()(const Point<3>& point) const {
     const Point<3> interpolated_coordinate = space.interpolate_point(point);
 
-    //printf("thread: %u: %f,%f,%f\n", threadIdx.x, interpolated_coordinate[0], interpolated_coordinate[1], interpolated_coordinate[2]);
-
     return tex3D<float>(texture,
       interpolated_coordinate[0] + 0.5f,
       interpolated_coordinate[1] + 0.5f,
@@ -33,7 +31,11 @@ dicomNodeError_t load_texture(
   const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<float>();
   cudaTextureObject_t host_texture;
 
-
+  const cudaExtent extent = make_cudaExtent(
+      space.domain[2],
+      space.domain[1],
+      space.domain[0]
+  );
 
   DicomNodeRunner runner;
 
@@ -41,11 +43,6 @@ dicomNodeError_t load_texture(
     | [&](){
       return cudaMemcpy(&(texture->space), &space, sizeof(Space<3>), cudaMemcpyDefault);
   } | [&](){
-      const cudaExtent extent = make_cudaExtent(
-        space.domain[2] * sizeof(T),
-        space.domain[1],
-        space.domain[0]
-      );
       resourceDescription.resType = cudaResourceTypeArray;
       return cudaMalloc3DArray(
         &(resourceDescription.res.array.array),
@@ -54,13 +51,6 @@ dicomNodeError_t load_texture(
         cudaArrayDefault
       );
   } | [&](){
-    // So this is figured out through trail and error :(
-    const cudaExtent extent = make_cudaExtent(
-      space.domain[2],
-      space.domain[1],
-      space.domain[0]
-    );
-
     cudaMemcpy3DParms params = { 0 };
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(

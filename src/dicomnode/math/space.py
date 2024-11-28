@@ -94,39 +94,27 @@ class Space:
 
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
-    try:
-      first_dataset = datasets[0]
-      number_of_datasets = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
-      start_coordinates = first_dataset.ImagePositionPatient
-      image_orientation = first_dataset.ImageOrientationPatient
+    first_dataset = datasets[0]
+    number_of_datasets = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
+    start_coordinates = first_dataset.ImagePositionPatient
+    image_orientation = first_dataset.ImageOrientationPatient
 
-      thickness_x = first_dataset.PixelSpacing[0]
-      thickness_y = first_dataset.PixelSpacing[1]
-      thickness_z = first_dataset.SliceThickness
+    thickness_x = first_dataset.PixelSpacing[0]
+    thickness_y = first_dataset.PixelSpacing[1]
+    thickness_z = first_dataset.SliceThickness
 
-      affine_raw = numpy.array([
-        [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0],
-        [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0],
-        [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z],
-      ], dtype=float32)
+    affine_raw = numpy.array([
+      [thickness_x * image_orientation[0], thickness_y * image_orientation[3], 0],
+      [thickness_x * image_orientation[1], thickness_y * image_orientation[4], 0],
+      [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z],
+    ], dtype=float32)
 
 
-      return cls(
-        affine_raw,
-        start_coordinates,
-        (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
-      )
-    except Exception as E:
-      print(E)
-
-    pivot = datasets[0]
-    x_dim = pivot.Columns
-    y_dim = pivot.Rows
-    z_dim = len(datasets)
-    return cls(identity(3, dtype=float32),
-               (0,0,0),
-               (z_dim, y_dim, z_dim)
-               )
+    return cls(
+      affine_raw,
+      start_coordinates,
+      (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
+    )
 
   def __str__(self):
     return (f"Space over extend x: {self.domain[2]}, y: {self.domain[1]} z: {self.domain[0]}\n"
