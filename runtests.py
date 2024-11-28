@@ -27,7 +27,7 @@ def handle_tests(running_suite: TestSuite,
     test_regex = re.compile(pattern)
 
     if test_regex.search(tests._testMethodName.lower()):
-      key = tests._testMethodName.lower() # this is gonna pwn me later :(
+      key = tests.__class__.__name__ + tests._testMethodName.lower() # this is gonna pwn me later :(
       if key not in  added_set:
         running_suite.addTest(tests)
         added_set.add(key)

@@ -14,7 +14,7 @@ from pydicom.tag import Tag
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag,\
-  Series, extract_image
+  Series, extract_image, FramedDicomSeries
 from dicomnode.math.image import Image
 
 # Test stuff
@@ -113,19 +113,16 @@ class DicomSeriesTestCase(TestCase):
     for dataset in ds:
       self.assertEqual(dataset.PatientName, "Hello world")
 
-
-class SharedTagsTestCase(TestCase):
   def test_empty_list(self):
     with self.assertRaises(ValueError):
       shared_tag([], Tag(0x0010_0010))
 
-class BaseSeriesTestCase(DicomSeriesTestCase):
+
   def test_fault_constructor(self):
     series = Series(None) # type: ignore
     with self.assertRaises(IncorrectlyConfigured):
       series.image
 
-class NiftiSeriesTestCase(DicomSeriesTestCase):
   def test_nifti(self):
     shape = (7,6,5)
     header = Nifti1Header()
@@ -148,7 +145,6 @@ class NiftiSeriesTestCase(DicomSeriesTestCase):
     self.assertEqual(series.image.space.starting_point[1], [20])
     self.assertEqual(series.image.space.starting_point[2], [30])
 
-class SeriesUtilitiesTestCases(DicomSeriesTestCase):
   def test_extract_image(self):
     series = DicomSeries([ds for ds in generate_numpy_datasets(
       10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
@@ -168,3 +164,17 @@ class SeriesUtilitiesTestCases(DicomSeriesTestCase):
     )]
 
     self.assertIsInstance(extract_image(datasets),Image)
+
+  def create_dynamic_pet_series(self):
+    frame_1 = DicomSeries([ds for ds in generate_numpy_datasets(
+      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0]
+    )])
+    frame_2 = DicomSeries([ds for ds in generate_numpy_datasets(
+      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0]
+    )])
+    frame_3 = DicomSeries([ds for ds in generate_numpy_datasets(
+      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0]
+    )])

@@ -31,6 +31,11 @@ class Reserved_Tags(Enum):
 
 
 def gen_uid() -> UID:
+  """Generates a Unique identifier with Dicomnode's UID prefix
+
+  Returns:
+      UID: A Unique identifier with Dicomnode's prefix.
+  """
   return generate_uid(prefix=DICOMNODE_IMPLEMENTATION_UID + '.')
 
 def make_meta(dicom: Dataset) -> None:

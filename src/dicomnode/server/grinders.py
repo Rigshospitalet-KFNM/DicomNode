@@ -31,7 +31,7 @@ from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicom node package
 from dicomnode.data_structures.image_tree import DicomTree
-from dicomnode.dicom.series import DicomSeries, LargeDynamicPetSeries
+from dicomnode.dicom.series import DicomSeries, FramedDicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, MissingPivotDataset
 from dicomnode.lib.logging import get_logger
 
@@ -290,7 +290,7 @@ class LargeDynamicPetSeriesGrinder(Grinder):
     super().__init__()
 
   def __call__(self, image_generator: Iterable[Dataset]):
-    return LargeDynamicPetSeries(image_generator)
+    return FramedDicomSeries(image_generator)
 
 
 __all__ = [

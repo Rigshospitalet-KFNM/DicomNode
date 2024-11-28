@@ -25,7 +25,7 @@ from rt_utils import RTStruct
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
-from dicomnode.dicom import has_tags, sort_datasets
+from dicomnode.dicom import has_tags, sort_datasets, gen_uid
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import Image, FramedImage
 from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
@@ -193,10 +193,9 @@ class NiftiSeries(Series):
 
     super().__init__(Image(image_data, affine))
 
-class LargeDynamicPetSeries(Series):
+class FramedDicomSeries(Series):
   REQUIRED_TAGS = [
     'NumberOfSlices',
-    'NumberOfTimeSlices',
     'Rows',
     'Columns',
     'RescaleIntercept',
@@ -207,6 +206,11 @@ class LargeDynamicPetSeries(Series):
     'AcquisitionDate',
     'ImageIndex',
   ]
+
+  class FRAME_TYPE(Enum):
+    GATED = 1
+    DYNAMIC = 2
+    RR_INTERVALS = 3
 
   @property
   def image(self) -> FramedImage:
@@ -238,7 +242,16 @@ class LargeDynamicPetSeries(Series):
     frame_times_ms = None
     frame_acquisition_time = None
 
-    first_series = []
+    self.datasets: Dict[int, List[Dataset]] = {}
+
+    def add_dataset(dataset: Dataset):
+      frame = dataset.ImageIndex // dataset.NumberOfSlices
+
+      if frame in self.datasets:
+        self.datasets[frame].append(dataset)
+      else:
+        self.datasets[frame] = [dataset]
+
 
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
       if not has_tags(dataset, self.REQUIRED_TAGS):
@@ -250,28 +263,27 @@ class LargeDynamicPetSeries(Series):
 
         raise InvalidDataset(f"Dataset doesn't appear to be large pet as dataset is missing {' '.join(missing_tags)}")
 
-      time_series = dataset.ImageIndex // dataset.NumberOfSlices
+      frame = dataset.ImageIndex // dataset.NumberOfSlices
       slice_number_in_series = dataset.ImageIndex % dataset.NumberOfSlices
 
-      if time_series == 0:
-        first_series.append(dataset)
-
-      raw[time_series, slice_number_in_series, :, :] = \
+      raw[frame, slice_number_in_series, :, :] = \
         dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
           + dataset.RescaleIntercept
 
     for dataset in datasets:
+      frames = dataset.NumberOfTimeSlices if 'NumberOfTimeSlices' in dataset else dataset.NumberOfTimeSlots
       if first_dataset is None:
         first_dataset = dataset
 
+
       if raw_image is None:
-        raw_image = empty((dataset.NumberOfTimeSlices, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
+        raw_image = empty((frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
 
       if frame_times_ms is None:
-        frame_times_ms = numpy.ones((dataset.NumberOfTimeSlices), dtype=numpy.int32)
+        frame_times_ms = numpy.ones((frames), dtype=numpy.int32)
 
       if frame_acquisition_time is None:
-        frame_acquisition_time = numpy.ones((dataset.NumberOfTimeSlices), dtype='datetime64[ms]')
+        frame_acquisition_time = numpy.ones((frames), dtype='datetime64[ms]')
 
       frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
       insert_image(raw_image, dataset)
@@ -287,7 +299,7 @@ class LargeDynamicPetSeries(Series):
     if frame_acquisition_time is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
 
-    space = Space.from_datasets(first_series)
+    space = Space.from_datasets(self.datasets[0])
 
     super().__init__(FramedImage(raw_image, space))
     self._pivot = first_dataset
@@ -329,6 +341,40 @@ def extract_image(source, frame=None, mask=None) -> Image:
     error_message = f"Unable to convert {type(source)} to an Image"
     logger.error(error_message)
     raise TypeError(error_message)
+
+def frame_unrelated_series(*frame_series: DicomSeries,
+                           frame_type = FramedDicomSeries.FRAME_TYPE.DYNAMIC):
+  """If you have multiple series, that you wish to unite in a single series
+
+  Raises:
+      ValueError: _description_
+  """
+  number_of_frames = len(frame_series)
+  number_of_datasets = None
+  series_uid = gen_uid()
+  index = 0
+
+  datasets = []
+
+  if number_of_frames == 0:
+    raise ValueError("Cannot Relate zero series")
+
+  for i, series in enumerate(frame_series):
+    if number_of_datasets is None:
+      number_of_datasets = len(series.datasets)
+    elif number_of_datasets != len(series.datasets):
+      raise ValueError(f"Series {i + 1} doesn't contain {number_of_datasets} which the other datasets do!")
+
+    indexes = [i + 1 for i in range(index, index + number_of_datasets)]
+
+    series["SeriesInstanceUID"] = series_uid
+    series["ImageIndex"] = indexes
+    series["NumberOfTimeSlices"] = number_of_frames
+    series["NumberOfSlices"] = number_of_datasets
+
+    datasets.extend(series.datasets)
+
+  return FramedDicomSeries(datasets)
 
 
 __all__ = [
