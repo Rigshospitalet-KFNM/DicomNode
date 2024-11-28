@@ -43,13 +43,13 @@ TEST(SPACE_INDEXING, REAL_LIFE_1){
   const float host_y = 256.0f * host_basis_xy_length + -573.23828125f;
   const float host_z = 177.0f * 3.0f + -1133.0f;
 
-  ASSERT_FLOAT_EQ(host_x, host_central_point[0]);
-  ASSERT_FLOAT_EQ(host_y, host_central_point[1]);
-  ASSERT_FLOAT_EQ(host_z, host_central_point[2]);
+  EXPECT_FLOAT_EQ(host_x, host_central_point[0]);
+  EXPECT_FLOAT_EQ(host_y, host_central_point[1]);
+  EXPECT_FLOAT_EQ(host_z, host_central_point[2]);
 
   const Point3 inverse_index = host_space.interpolate_point(host_central_point);
 
-  ASSERT_FLOAT_EQ(256.0f, inverse_index[0]);
-  ASSERT_FLOAT_EQ(256.0f, inverse_index[1]);
-  ASSERT_FLOAT_EQ(177.0f, inverse_index[2]);
+  EXPECT_FLOAT_EQ(256.0f, inverse_index[0]);
+  EXPECT_FLOAT_EQ(256.0f, inverse_index[1]);
+  EXPECT_FLOAT_EQ(177.0f, inverse_index[2]);
 }

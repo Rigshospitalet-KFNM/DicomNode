@@ -24,13 +24,13 @@ TEST(LIN_ALG, ROW_SLAP){
 
   SquareMatrix<5>* gpuMatrix;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<5>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 25,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   swapRowKernel<5><<<1,1024>>>(gpuMatrix, 1, 3);
   status = cudaMemcpy(
     matrix,
@@ -39,11 +39,11 @@ TEST(LIN_ALG, ROW_SLAP){
     cudaMemcpyDeviceToHost
   );
 
-  ASSERT_FLOAT_EQ(matrix[0],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[5],  16.0f);
-  ASSERT_FLOAT_EQ(matrix[10], 11.0f);
-  ASSERT_FLOAT_EQ(matrix[15], 6.0f);
-  ASSERT_FLOAT_EQ(matrix[20], 21.0f);
+  EXPECT_FLOAT_EQ(matrix[0],  1.0f);
+  EXPECT_FLOAT_EQ(matrix[5],  16.0f);
+  EXPECT_FLOAT_EQ(matrix[10], 11.0f);
+  EXPECT_FLOAT_EQ(matrix[15], 6.0f);
+  EXPECT_FLOAT_EQ(matrix[20], 21.0f);
 
   cudaFree(gpuMatrix);
 }
@@ -73,26 +73,26 @@ TEST(LIN_ALG, FORWARD_ELEMINATION){
   Point<3>* gpuPoint;
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuPoint, sizeof(Point<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 9,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(gpuPoint->points,
                       point,
                       sizeof(float) * 3,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   forwardEleminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrix->points,
@@ -107,19 +107,19 @@ TEST(LIN_ALG, FORWARD_ELEMINATION){
     cudaMemcpyDeviceToHost
   );
 
-  ASSERT_FLOAT_EQ(point[0], 4.0f);
-  ASSERT_FLOAT_EQ(point[1], -12.0f);
-  ASSERT_FLOAT_EQ(point[2], 15.0f);
+  EXPECT_FLOAT_EQ(point[0], 4.0f);
+  EXPECT_FLOAT_EQ(point[1], -12.0f);
+  EXPECT_FLOAT_EQ(point[2], 15.0f);
 
-  ASSERT_FLOAT_EQ(matrix[0], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 3.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[4], 2.0f);
-  ASSERT_FLOAT_EQ(matrix[5], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[6], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[7], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[8], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 3.0f);
+  EXPECT_FLOAT_EQ(matrix[3], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[4], 2.0f);
+  EXPECT_FLOAT_EQ(matrix[5], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[6], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[7], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[8], 1.0f);
 
   cudaFree(gpuMatrix);
   cudaFree(gpuPoint);
@@ -141,26 +141,26 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
   Point<2>* gpuPoint;
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<2>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuPoint, sizeof(Point<2>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 4,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(gpuPoint->points,
                       point,
                       sizeof(float) * 2,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   forwardEleminationKernel<2><<<1,4>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrix->points,
@@ -168,7 +168,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
     cudaMemcpyDeviceToHost
   );
 
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     point,
     gpuPoint->points,
@@ -176,13 +176,13 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
     cudaMemcpyDeviceToHost
   );
 
-  ASSERT_FLOAT_EQ(point[0], 6.0f);
-  ASSERT_FLOAT_EQ(point[1], -5.0f);
+  EXPECT_FLOAT_EQ(point[0], 6.0f);
+  EXPECT_FLOAT_EQ(point[1], -5.0f);
 
-  ASSERT_FLOAT_EQ(matrix[0], 2.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 3.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], -1.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 2.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 3.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[3], -1.0f);
 
   cudaFree(gpuMatrix);
   cudaFree(gpuPoint);
@@ -204,33 +204,33 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
   SquareMatrix<3>* gpuMatrix;
   Point<3>* gpuPoint;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuPoint, sizeof(Point<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 9,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(gpuPoint->points,
                       point,
                       sizeof(float) * 3,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   forwardEleminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrix->points,
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(
     point,
@@ -238,7 +238,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
     sizeof(float) * 3,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   dicomNodeError_t hostError;
   status = cudaMemcpy(
@@ -247,9 +247,9 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
     sizeof(dicomNodeError_t),
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   cudaFree(gpuMatrix);
   cudaFree(gpuPoint);
@@ -281,33 +281,33 @@ TEST(LIN_ALG, FULL_REDUCTION){
   Point<3>* gpuPoint;
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuPoint, sizeof(Point<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 9,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(gpuPoint->points,
                       point,
                       sizeof(float) * 3,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   full_reduction_kernel<3><<<1,1024>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrix->points,
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(
     point,
@@ -315,7 +315,7 @@ TEST(LIN_ALG, FULL_REDUCTION){
     sizeof(float) * 3,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   dicomNodeError_t hostError;
   status = cudaMemcpy(
@@ -324,23 +324,23 @@ TEST(LIN_ALG, FULL_REDUCTION){
     sizeof(dicomNodeError_t),
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
-  ASSERT_FLOAT_EQ(matrix[0], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[4], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[5], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[7], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[8], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[3], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[4], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[5], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[6], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[7], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[8], 1.0f);
 
-  ASSERT_FLOAT_EQ(point[0], -27.5f);
-  ASSERT_FLOAT_EQ(point[1], -13.5f);
-  ASSERT_FLOAT_EQ(point[2],  15.0f);
+  EXPECT_FLOAT_EQ(point[0], -27.5f);
+  EXPECT_FLOAT_EQ(point[1], -13.5f);
+  EXPECT_FLOAT_EQ(point[2],  15.0f);
 
   cudaFree(error);
   cudaFree(gpuMatrix);
@@ -369,22 +369,22 @@ TEST(LIN_ALG, FORWARD_INVERSION){
 
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuMatrixOutput, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 9,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   FORWARD_INVERSION_KERNEL<3><<<1,1024>>>(gpuMatrix, gpuMatrixOutput, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   dicomNodeError_t hostError;
   status = cudaMemcpy(
@@ -393,8 +393,8 @@ TEST(LIN_ALG, FORWARD_INVERSION){
     sizeof(dicomNodeError_t),
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(status, cudaSuccess);
+  EXPECT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,
@@ -402,36 +402,36 @@ TEST(LIN_ALG, FORWARD_INVERSION){
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_FLOAT_EQ(matrix[0], 2.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 3.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[4], -0.5f);
-  ASSERT_FLOAT_EQ(matrix[5], 1.5f);
-  ASSERT_FLOAT_EQ(matrix[6], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[7], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[8], 3.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 2.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 3.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[3], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[4], -0.5f);
+  EXPECT_FLOAT_EQ(matrix[5], 1.5f);
+  EXPECT_FLOAT_EQ(matrix[6], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[7], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[8], 3.0f);
 
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrixOutput->points,
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_FLOAT_EQ(matrix[0],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[1],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[2],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], -0.5f);
-  ASSERT_FLOAT_EQ(matrix[4],  1.0f);
-  ASSERT_FLOAT_EQ(matrix[5],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], -1.0f);
-  ASSERT_FLOAT_EQ(matrix[7],  0.0f);
-  ASSERT_FLOAT_EQ(matrix[8],  1.0f);
+  EXPECT_FLOAT_EQ(matrix[0],  1.0f);
+  EXPECT_FLOAT_EQ(matrix[1],  0.0f);
+  EXPECT_FLOAT_EQ(matrix[2],  0.0f);
+  EXPECT_FLOAT_EQ(matrix[3], -0.5f);
+  EXPECT_FLOAT_EQ(matrix[4],  1.0f);
+  EXPECT_FLOAT_EQ(matrix[5],  0.0f);
+  EXPECT_FLOAT_EQ(matrix[6], -1.0f);
+  EXPECT_FLOAT_EQ(matrix[7],  0.0f);
+  EXPECT_FLOAT_EQ(matrix[8],  1.0f);
 
   cudaFree(error);
   cudaFree(gpuMatrix);
@@ -460,22 +460,22 @@ TEST(LIN_ALG, INVERSION_2x2){
 
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<DIM>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuMatrixOutput, sizeof(SquareMatrix<DIM>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * DIM_SQ,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   matrix_inversion<DIM><<<1,1024>>>(gpuMatrix, gpuMatrixOutput, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   dicomNodeError_t hostError;
   status = cudaMemcpy(
@@ -484,8 +484,8 @@ TEST(LIN_ALG, INVERSION_2x2){
     sizeof(dicomNodeError_t),
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(status, cudaSuccess);
+  EXPECT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,
@@ -493,26 +493,26 @@ TEST(LIN_ALG, INVERSION_2x2){
     sizeof(float) * DIM_SQ,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_FLOAT_EQ(matrix[0], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[3], 1.0f);
 
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrixOutput->points,
     sizeof(float) * DIM_SQ,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_NEAR(matrix[0], 0.333333f, EPSILON);
-  ASSERT_NEAR(matrix[1], -0.666667f, EPSILON);
-  ASSERT_NEAR(matrix[2], 0.0f, EPSILON);
-  ASSERT_NEAR(matrix[3], 0.5f, EPSILON);
+  EXPECT_NEAR(matrix[0], 0.333333f, EPSILON);
+  EXPECT_NEAR(matrix[1], -0.666667f, EPSILON);
+  EXPECT_NEAR(matrix[2], 0.0f, EPSILON);
+  EXPECT_NEAR(matrix[3], 0.5f, EPSILON);
 
   cudaFree(error);
   cudaFree(gpuMatrix);
@@ -532,22 +532,22 @@ TEST(LIN_ALG, INVERSION_3x3){
 
   dicomNodeError_t* error;
   cudaError_t status = cudaMalloc(&gpuMatrix, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMalloc(&gpuMatrixOutput, sizeof(SquareMatrix<3>));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMalloc(&error, sizeof(dicomNodeError_t));
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   status = cudaMemcpy(gpuMatrix->points,
                       matrix,
                       sizeof(float) * 9,
                       cudaMemcpyHostToDevice);
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   matrix_inversion<3><<<1,1024>>>(gpuMatrix, gpuMatrixOutput, error);
   status = cudaGetLastError();
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
   dicomNodeError_t hostError;
   status = cudaMemcpy(
@@ -556,8 +556,8 @@ TEST(LIN_ALG, INVERSION_3x3){
     sizeof(dicomNodeError_t),
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
-  ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(status, cudaSuccess);
+  EXPECT_EQ(hostError, dicomNodeError_t::SUCCESS);
 
   status = cudaMemcpy(
     matrix,
@@ -565,36 +565,36 @@ TEST(LIN_ALG, INVERSION_3x3){
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_FLOAT_EQ(matrix[0], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[1], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[2], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[3], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[4], 1.0f);
-  ASSERT_FLOAT_EQ(matrix[5], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[6], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[7], 0.0f);
-  ASSERT_FLOAT_EQ(matrix[8], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[0], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[1], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[2], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[3], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[4], 1.0f);
+  EXPECT_FLOAT_EQ(matrix[5], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[6], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[7], 0.0f);
+  EXPECT_FLOAT_EQ(matrix[8], 1.0f);
 
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
     matrix,
     gpuMatrixOutput->points,
     sizeof(float) * 9,
     cudaMemcpyDeviceToHost
   );
-  ASSERT_EQ(status, cudaSuccess);
+  EXPECT_EQ(status, cudaSuccess);
 
-  ASSERT_NEAR(matrix[0],  0.666667f, EPSILON);
-  ASSERT_NEAR(matrix[1],  3.0f, EPSILON);
-  ASSERT_NEAR(matrix[2],  -1.66667f, EPSILON);
-  ASSERT_NEAR(matrix[3],  -0.0f, EPSILON);
-  ASSERT_NEAR(matrix[4],  -2.0f, EPSILON);
-  ASSERT_NEAR(matrix[5],  1.0f, EPSILON);
-  ASSERT_NEAR(matrix[6], -0.3333333f, EPSILON);
-  ASSERT_NEAR(matrix[7],  0.0f, EPSILON);
-  ASSERT_NEAR(matrix[8],  0.3333333f, EPSILON);
+  EXPECT_NEAR(matrix[0],  0.666667f, EPSILON);
+  EXPECT_NEAR(matrix[1],  3.0f, EPSILON);
+  EXPECT_NEAR(matrix[2],  -1.66667f, EPSILON);
+  EXPECT_NEAR(matrix[3],  -0.0f, EPSILON);
+  EXPECT_NEAR(matrix[4],  -2.0f, EPSILON);
+  EXPECT_NEAR(matrix[5],  1.0f, EPSILON);
+  EXPECT_NEAR(matrix[6], -0.3333333f, EPSILON);
+  EXPECT_NEAR(matrix[7],  0.0f, EPSILON);
+  EXPECT_NEAR(matrix[8],  0.3333333f, EPSILON);
 
   cudaFree(error);
   cudaFree(gpuMatrix);
@@ -611,14 +611,14 @@ TEST(LIN_ALG, MATRIX_MULTIPLICATION_ORDERING){
   Point<2> answer_1{17.0f, 39.0f};
   Point<2> answer_2{23.0f, 34.0f};
 
-  ASSERT_TRUE(one_way == answer_1);
-  ASSERT_TRUE(other_way == answer_2);
+  EXPECT_TRUE(one_way == answer_1);
+  EXPECT_TRUE(other_way == answer_2);
 }
 
 TEST(LIN_ALG, POINTS_ARE_ZERO_INITIALIZED){
   Point<16> p;
 
   for(int i = 0; i < 16; i++){
-    ASSERT_FLOAT_EQ(p[i], 0.0f);
+    EXPECT_FLOAT_EQ(p[i], 0.0f);
   }
 }

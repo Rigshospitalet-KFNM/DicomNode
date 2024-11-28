@@ -105,9 +105,6 @@ class Series:
       self._image = None
       self._image_constructor = image
 
-  def __iter__(self):
-    for slice_ in self.image:
-      yield slice_
 
 class DicomSeries(Series):
   """This represent a series of dicom, that contains an image

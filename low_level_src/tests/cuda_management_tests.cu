@@ -9,9 +9,9 @@
 TEST(CUDA_MANAGEMENT_TESTS, Free_Device_memory) {
   int* ptr;
   cudaError_t error = cudaMalloc(&ptr, sizeof(int) * 10);
-  ASSERT_EQ(error, cudaSuccess);
+  EXPECT_EQ(error, cudaSuccess);
   free_device_memory(&ptr);
-  ASSERT_EQ(ptr, nullptr);
+  EXPECT_EQ(ptr, nullptr);
 }
 
 TEST(CUDA_MANAGEMENT_TESTS, CUDA_RUNNER_TEST){
@@ -33,7 +33,7 @@ TEST(CUDA_MANAGEMENT_TESTS, CUDA_RUNNER_TEST){
       return cudaSuccess;
     };
 
-  ASSERT_TRUE(function_flag == 1);
-  ASSERT_TRUE(error_flag == cudaErrorInitializationError);
-  ASSERT_TRUE(runner.error() == cudaErrorInitializationError);
+  EXPECT_TRUE(function_flag == 1);
+  EXPECT_TRUE(error_flag == cudaErrorInitializationError);
+  EXPECT_TRUE(runner.error() == cudaErrorInitializationError);
 }

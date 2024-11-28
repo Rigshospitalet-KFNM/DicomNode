@@ -6,7 +6,7 @@ import shutil
 import re
 from pathlib import Path
 from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
-from typing import  Union
+from typing import  Set,  Union
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
@@ -16,16 +16,21 @@ from tests.helpers import testing_logs
 
 PYTHON_3_12_PLUS = 12 <= sys.version_info.minor
 
-def handle_tests(running_suite: TestSuite, tests: Union[TestCase, TestSuite], pattern: str):
+def handle_tests(running_suite: TestSuite,
+                 tests: Union[TestCase, TestSuite],
+                 pattern: str,
+                 added_set: Set[str]):
   if isinstance(tests, TestSuite):
     for sub_tests in tests:
-      handle_tests(running_suite, sub_tests, pattern)
+      handle_tests(running_suite, sub_tests, pattern, added_set)
   else:
     test_regex = re.compile(pattern)
 
     if test_regex.search(tests._testMethodName.lower()):
-      running_suite.addTest(tests)
-
+      key = tests._testMethodName.lower() # this is gonna pwn me later :(
+      if key not in  added_set:
+        running_suite.addTest(tests)
+        added_set.add(key)
 
 
 if __name__ == "__main__":
@@ -53,6 +58,8 @@ if __name__ == "__main__":
   loader = TestLoader()
   running_suite = TestSuite()
 
+  added_tests = set()
+
   all_suite: TestSuite = loader.discover("tests")
   if args.performance:
     loader.testMethodPrefix = "performance"
@@ -60,7 +67,7 @@ if __name__ == "__main__":
     all_suite.addTests(performance_tests)
 
   for file_suite in all_suite:
-    handle_tests(running_suite, file_suite, args.test_regex)
+    handle_tests(running_suite, file_suite, args.test_regex, added_tests)
 
   cwd = os.getcwd()
   tmpDirPath = Path(TESTING_TEMPORARY_DIRECTORY)

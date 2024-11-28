@@ -78,40 +78,40 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
 
   float *out = nullptr;
   cudaError_t cuda_error = cudaMalloc(&out, threads * sizeof(float));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   Texture* texture=nullptr;
   Space<3>* out_space = nullptr;
   float3* coords = nullptr;
 
   cuda_error = cudaMalloc(&texture, sizeof(Texture));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   cuda_error = cudaMalloc(&out_space, sizeof(Space<3>));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   cuda_error = cudaMalloc(&coords, sizeof(float3) * threads);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   dicomNodeError_t dn_error = load_texture<float>(texture, data, local_space);
-  ASSERT_EQ(dn_error, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(dn_error, dicomNodeError_t::SUCCESS);
 
   interpolation_tests<<<1,threads>>>(texture, out, out_space, coords);
   cuda_error = cudaGetLastError();
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   float out_calced[threads];
   cuda_error = cudaMemcpy(out_calced, out, threads * sizeof(float), cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   Space<3> out_host_space;
 
   cuda_error = cudaMemcpy(&out_host_space, out_space, sizeof(Space<3>), cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   float3 out_coords[threads];
   cuda_error = cudaMemcpy(&out_coords, coords, sizeof(float3) * threads, cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   for(size_t idx = 0; idx < threads; idx++){
     const size_t lx = idx % x;
@@ -120,10 +120,10 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
 
     float3 c = out_coords[idx];
 
-    ASSERT_EQ(c.x, lx);
-    ASSERT_EQ(c.y, ly);
-    ASSERT_EQ(c.z, lz);
-    ASSERT_EQ(out_calced[idx], data[idx]);
+    EXPECT_EQ(c.x, lx);
+    EXPECT_EQ(c.y, ly);
+    EXPECT_EQ(c.z, lz);
+    EXPECT_EQ(out_calced[idx], data[idx]);
   }
 
   free_texture(&texture);
@@ -174,34 +174,34 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
 
   float *out = nullptr;
   cudaError_t cuda_error = cudaMalloc(&out, data_size);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   Texture* texture=nullptr;
   Space<3>* out_space = nullptr;
   float3* coords = nullptr;
 
   cuda_error = cudaMalloc(&texture, sizeof(Texture));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   cuda_error = cudaMalloc(&out_space, sizeof(Space<3>));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
 
   dicomNodeError_t dicomnode_error = load_texture<float>(texture, data_host, local_space);
-  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
 
   dicomnode_error = gpu_interpolation_linear<float>(
     texture, local_space, out
   );
-  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+  EXPECT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
 
   float* interpolated = new float[data_elements];
 
   cuda_error = cudaMemcpy(interpolated, out, data_size, cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   for(int64_t i = 0; i < data_elements; i++){
-    ASSERT_FLOAT_EQ(interpolated[i], data_host[i]);
+    EXPECT_FLOAT_EQ(interpolated[i], data_host[i]);
   }
 
   delete[] interpolated;
@@ -268,7 +268,7 @@ TEST(INTERPOLATION, Manual_interpolation){
   cudaArray_t cuArray;
 
   cudaError_t error = cudaMalloc3DArray(&cuArray, &chdsc, extent, cudaArrayDefault);
-  ASSERT_EQ(error, cudaSuccess);
+  EXPECT_EQ(error, cudaSuccess);
 
   cudaMemcpy3DParms params = {0};
 
@@ -281,7 +281,7 @@ TEST(INTERPOLATION, Manual_interpolation){
   params.kind = cudaMemcpyHostToDevice;
 
   error = cudaMemcpy3D(&params);
-  ASSERT_EQ(error, cudaSuccess);
+  EXPECT_EQ(error, cudaSuccess);
 
   cudaResourceDesc resDesc = {};
   memset(&resDesc, 0, sizeof(resDesc));
@@ -301,40 +301,26 @@ TEST(INTERPOLATION, Manual_interpolation){
   cudaTextureObject_t texObj;
 
   error = cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
-  ASSERT_EQ(error, cudaSuccess);
+  EXPECT_EQ(error, cudaSuccess);
 
   float *out = nullptr;
   cudaError_t cuda_error = cudaMalloc(&out, threads * sizeof(float));
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   float3 *coords = nullptr;
   error = cudaMalloc(&coords, sizeof(float3) * threads);
-  ASSERT_EQ(error, cudaSuccess);
+  EXPECT_EQ(error, cudaSuccess);
 
   manual_interpolation<<<1, {out_x, out_y, out_z}>>>(texObj, out, coords);
 
   float out_calced[threads];
   cuda_error = cudaMemcpy(out_calced, out, threads * sizeof(float), cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
   float3 out_coords[threads];
   cuda_error = cudaMemcpy(out_coords, coords, threads * sizeof(float3), cudaMemcpyDefault);
-  ASSERT_EQ(cuda_error, cudaSuccess);
+  EXPECT_EQ(cuda_error, cudaSuccess);
 
-  /*
-  for(size_t idx = 0; idx < threads; idx++){
-    const size_t lx = idx % out_x;
-    const size_t ly = (idx / out_x) % out_y;
-    const size_t lz = idx / (out_x * out_y);
-
-    float3 l = out_coords[idx];
-    float o =  out_calced[idx];
-
-    std::cout << "Thread (" << lx << ", " << ly << ", " << lz << ") value: "
-      << o << " at coord: (" << l.x << ", " << l.y << ", " << l.z << ")"<< "\n";
-  }
-
-  */
   cudaFreeArray(cuArray);
   cudaFree(coords);
   cudaFree(out);
