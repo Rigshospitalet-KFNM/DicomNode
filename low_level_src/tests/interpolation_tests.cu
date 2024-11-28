@@ -130,6 +130,7 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   cudaFree(out);
   cudaFree(texture);
   cudaFree(out_space);
+  cudaFree(coords);
 }
 
 constexpr size_t z = 4;
@@ -240,7 +241,7 @@ TEST(INTERPOLATION, Manual_interpolation){
   }
 
   */
-
+  cudaFreeArray(cuArray);
   cudaFree(coords);
   cudaFree(out);
   cudaDestroyTextureObject(texObj);

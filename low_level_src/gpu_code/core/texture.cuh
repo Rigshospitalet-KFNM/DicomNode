@@ -30,14 +30,10 @@ dicomNodeError_t load_texture(
   memset(&textureDescription, 0, sizeof(textureDescription));
   cudaResourceDesc resourceDescription;
   memset(&resourceDescription, 0, sizeof(resourceDescription));
-  const cudaChannelFormatDesc channelFormatDecription = cudaCreateChannelDesc<float>();
+  const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<float>();
   cudaTextureObject_t host_texture;
 
-  const cudaExtent extent = make_cudaExtent(
-    space.domain[2],
-    space.domain[1],
-    space.domain[0]
-  );
+
 
   DicomNodeRunner runner;
 
@@ -45,14 +41,26 @@ dicomNodeError_t load_texture(
     | [&](){
       return cudaMemcpy(&(texture->space), &space, sizeof(Space<3>), cudaMemcpyDefault);
   } | [&](){
+      const cudaExtent extent = make_cudaExtent(
+        space.domain[2] * sizeof(T),
+        space.domain[1],
+        space.domain[0]
+      );
       resourceDescription.resType = cudaResourceTypeArray;
       return cudaMalloc3DArray(
         &(resourceDescription.res.array.array),
-        &channelFormatDecription,
+        &channelFormatDescription,
         extent,
         cudaArrayDefault
       );
   } | [&](){
+    // So this is figured out through trail and error :(
+    const cudaExtent extent = make_cudaExtent(
+      space.domain[2],
+      space.domain[1],
+      space.domain[0]
+    );
+
     cudaMemcpy3DParms params = { 0 };
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(
@@ -118,11 +126,26 @@ static cudaError_t free_texture(Texture** texture){
       return error;
     }
 
+    cudaResourceDesc res;
+    error = cudaGetTextureObjectResourceDesc(&res, host_texture.texture);
+
+    if(error){
+      const char* error_name = cudaGetErrorName(error);
+      printf("Encountered %s while destroying the texture object\n", error_name);
+      return error;
+    }
+
     error = cudaDestroyTextureObject(host_texture.texture);
     if(error){
       const char* error_name = cudaGetErrorName(error);
       printf("Encountered %s while destroying the texture object\n", error_name);
       return error;
+    }
+
+    if(res.resType == cudaResourceTypeArray){
+      cudaFreeArray(res.res.array.array);
+    } else {
+      printf("To do\n");
     }
 
     error = cudaFree(ptr);

@@ -120,6 +120,10 @@ TEST(LIN_ALG, FORWARD_ELEMINATION){
   ASSERT_FLOAT_EQ(matrix[6], 0.0f);
   ASSERT_FLOAT_EQ(matrix[7], 0.0f);
   ASSERT_FLOAT_EQ(matrix[8], 1.0f);
+
+  cudaFree(gpuMatrix);
+  cudaFree(gpuPoint);
+  cudaFree(error);
 }
 
 
@@ -179,6 +183,10 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
   ASSERT_FLOAT_EQ(matrix[1], 3.0f);
   ASSERT_FLOAT_EQ(matrix[2], 0.0f);
   ASSERT_FLOAT_EQ(matrix[3], -1.0f);
+
+  cudaFree(gpuMatrix);
+  cudaFree(gpuPoint);
+  cudaFree(error);
 }
 
 
@@ -242,6 +250,10 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
   ASSERT_EQ(status, cudaSuccess);
 
   ASSERT_EQ(hostError, dicomNodeError_t::SUCCESS);
+
+  cudaFree(gpuMatrix);
+  cudaFree(gpuPoint);
+  cudaFree(error);
 }
 
 template<uint8_t DIMENSION>
@@ -329,6 +341,10 @@ TEST(LIN_ALG, FULL_REDUCTION){
   ASSERT_FLOAT_EQ(point[0], -27.5f);
   ASSERT_FLOAT_EQ(point[1], -13.5f);
   ASSERT_FLOAT_EQ(point[2],  15.0f);
+
+  cudaFree(error);
+  cudaFree(gpuMatrix);
+  cudaFree(gpuPoint);
 }
 
 template<uint8_t DIMENSIONS>
@@ -416,6 +432,10 @@ TEST(LIN_ALG, FORWARD_INVERSION){
   ASSERT_FLOAT_EQ(matrix[6], -1.0f);
   ASSERT_FLOAT_EQ(matrix[7],  0.0f);
   ASSERT_FLOAT_EQ(matrix[8],  1.0f);
+
+  cudaFree(error);
+  cudaFree(gpuMatrix);
+  cudaFree(gpuMatrixOutput);
 }
 
 template<uint8_t DIMENSION>
@@ -493,6 +513,10 @@ TEST(LIN_ALG, INVERSION_2x2){
   ASSERT_NEAR(matrix[1], -0.666667f, EPSILON);
   ASSERT_NEAR(matrix[2], 0.0f, EPSILON);
   ASSERT_NEAR(matrix[3], 0.5f, EPSILON);
+
+  cudaFree(error);
+  cudaFree(gpuMatrix);
+  cudaFree(gpuMatrixOutput);
 }
 
 TEST(LIN_ALG, INVERSION_3x3){
@@ -571,6 +595,10 @@ TEST(LIN_ALG, INVERSION_3x3){
   ASSERT_NEAR(matrix[6], -0.3333333f, EPSILON);
   ASSERT_NEAR(matrix[7],  0.0f, EPSILON);
   ASSERT_NEAR(matrix[8],  0.3333333f, EPSILON);
+
+  cudaFree(error);
+  cudaFree(gpuMatrix);
+  cudaFree(gpuMatrixOutput);
 }
 
 TEST(LIN_ALG, MATRIX_MULTIPLICATION_ORDERING){
