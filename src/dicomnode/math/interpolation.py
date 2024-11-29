@@ -27,7 +27,7 @@ class RESAMPLE_METHODS(Enum):
 
 def resample(source: ImageContainerType,
              target: Union[Space, ImageContainerType],
-             method=RESAMPLE_METHODS.LINEAR
+             method= RESAMPLE_METHODS.LINEAR
              ):
   source = extract_image(source)
 

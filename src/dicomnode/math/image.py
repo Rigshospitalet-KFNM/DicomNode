@@ -5,7 +5,8 @@ data"""
 from typing import Any, List, Literal, Tuple, TypeAlias, Union
 
 # Third party Packages
-from numpy import append, array, ceil, empty, float32, float64, floor, identity, int32, ndarray, zeros_like
+import numpy
+from numpy import array, empty, float32, float64, ndarray, zeros_like
 from numpy.linalg import inv
 from pydicom import Dataset
 
@@ -75,7 +76,7 @@ class Image:
                image_data: numpy_image,
                space: Space,
                minimum_value=0) -> None:
-    self._raw = image_data
+    self._raw = numpy.array(image_data, dtype=float32)
     self._space = space
     self._minimum_value = minimum_value
 

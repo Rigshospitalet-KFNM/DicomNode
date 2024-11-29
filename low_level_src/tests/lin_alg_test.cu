@@ -49,16 +49,16 @@ TEST(LIN_ALG, ROW_SLAP){
 }
 
 template<uint8_t DIMENSION>
-__global__ void forwardEleminationKernel(
+__global__ void forwardEliminationKernel(
   volatile SquareMatrix<DIMENSION> *matrix,
   volatile Point<DIMENSION> *vector,
   dicomNodeError_t* error
 ){
-  *error = ForwardElemination<DIMENSION>(matrix, vector);
+  *error = ForwardElimination<DIMENSION>(matrix, vector);
 }
 
 
-TEST(LIN_ALG, FORWARD_ELEMINATION){
+TEST(LIN_ALG, FORWARD_ELIMINATION){
   float matrix[] = {
     1.0f, 1.0f, 3.0f,
     3.0f, 5.0f, 10.0f,
@@ -90,7 +90,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION){
                       cudaMemcpyHostToDevice);
   EXPECT_EQ(status, cudaSuccess);
 
-  forwardEleminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
+  forwardEliminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
   EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
@@ -127,7 +127,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION){
 }
 
 
-TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
+TEST(LIN_ALG, FORWARD_ELIMINATION_2x2){
   float matrix[] = {
     2.0f, 3.0f,
     4.0f, 5.0f
@@ -158,7 +158,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_2x2){
                       cudaMemcpyHostToDevice);
   EXPECT_EQ(status, cudaSuccess);
 
-  forwardEleminationKernel<2><<<1,4>>>(gpuMatrix, gpuPoint, error);
+  forwardEliminationKernel<2><<<1,4>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
   EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
@@ -221,7 +221,7 @@ TEST(LIN_ALG, FORWARD_ELEMINATION_SWAP){
                       cudaMemcpyHostToDevice);
   EXPECT_EQ(status, cudaSuccess);
 
-  forwardEleminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
+  forwardEliminationKernel<3><<<1,9>>>(gpuMatrix, gpuPoint, error);
   status = cudaGetLastError();
   EXPECT_EQ(status, cudaSuccess);
   status = cudaMemcpy(
@@ -262,9 +262,8 @@ __global__ void full_reduction_kernel(
   volatile Point<DIMENSION>* point,
   dicomNodeError_t *error
 ){
-  *error = GaussJordanElemination<DIMENSION>(matrix, point);
+  *error = GaussJordanElimination<DIMENSION>(matrix, point);
 }
-
 
 TEST(LIN_ALG, FULL_REDUCTION){
   float matrix[] = {

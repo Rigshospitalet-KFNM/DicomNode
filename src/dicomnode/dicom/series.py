@@ -287,6 +287,7 @@ class FramedDicomSeries(Series):
 
       frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
       insert_image(raw_image, dataset)
+      add_dataset(dataset)
       frame_times_ms[frameIndex] = dataset.ActualFrameDuration
       frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
 
@@ -318,29 +319,48 @@ ImageContainerType = Union[
   Nifti1Image,
   Nifti2Image,
   List[Dataset],
-  Series
+  Series,
+  FramedImage
 ]
 
-def extract_image(source, frame=None, mask=None) -> Image:
+def extract_image(source: ImageContainerType, frame=None, mask=None) -> Image:
   if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
     source = NiftiSeries(source)
   if isinstance(source, List):
     source = DicomSeries(source)
   if isinstance(source, Series):
-    if isinstance(source.image, FramedImage):
-      if frame is not None:
-        return source.image.frame(frame)
-      error_message = "Underlying Image is a framed image and not an plain image, use the frame to select frame"
-      logger.error(error_message)
-      raise TypeError(error_message)
-    return source.image
+    source = source.image
 
-  if isinstance(source, Image):
-    return source
-  else:
-    error_message = f"Unable to convert {type(source)} to an Image"
+  if isinstance(source, FramedImage):
+    if frame is not None:
+      return source.frame(frame)
+    error_message = "Underlying Image is a framed image and not an plain image, use the frame to select frame"
     logger.error(error_message)
     raise TypeError(error_message)
+  elif isinstance(source, Image):
+    return source
+
+  error_message = f"Unable to convert {type(source)} to an Image"
+  logger.error(error_message)
+  raise TypeError(error_message)
+
+def extract_space(source: ImageContainerType) -> Space:
+  if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
+    source = NiftiSeries(source)
+  if isinstance(source, List):
+    source = DicomSeries(source)
+
+  if isinstance(source, Series):
+    return source.image.space
+
+  if isinstance(source, Image):
+    return source.space
+
+  if isinstance(source, FramedImage):
+    return source.space
+
+  raise TypeError(f"Cannot extract space from object of type {type(source)}")
+
 
 def frame_unrelated_series(*frame_series: DicomSeries,
                            frame_type = FramedDicomSeries.FRAME_TYPE.DYNAMIC):

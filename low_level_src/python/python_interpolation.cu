@@ -91,27 +91,10 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11:
   //Switch statement doesn't work because I am comparing strings
   if(dtype == "float32"){
     return interpolate_linear_templated<float>(image, new_space);
-  } else if (dtype == "float64"){
-    return interpolate_linear_templated<double>(image, new_space);
-  } else if (dtype == "int8"){
-    return interpolate_linear_templated<int8_t>(image, new_space);
-  } else if (dtype == "int16"){
-    return interpolate_linear_templated<int16_t>(image, new_space);
-  } else if (dtype == "int32"){
-    return interpolate_linear_templated<int32_t>(image, new_space);
-  } else if (dtype == "int64"){
-    return interpolate_linear_templated<int64_t>(image, new_space);
-  } else if (dtype == "uint8"){
-    return interpolate_linear_templated<uint8_t>(image, new_space);
-  } else if (dtype == "uint16"){
-    return interpolate_linear_templated<uint16_t>(image, new_space);
-  } else if (dtype == "uint32"){
-    return interpolate_linear_templated<uint32_t>(image, new_space);
-  } else if (dtype == "uint64"){
-    return interpolate_linear_templated<uint64_t>(image, new_space);
-  } else if (dtype == "bool") {
-    return interpolate_linear_templated<bool>(image, new_space);
   }
+
+  // The other types are not supported by the hardware :(
+  // Well int32 are
 
   const std::string error_message = "Unsupported dtype:" + dtype;
   throw std::runtime_error(error_message);

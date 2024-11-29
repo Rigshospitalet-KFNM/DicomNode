@@ -145,29 +145,29 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
   float* data_host = new float[data_elements];
 
   for(int64_t i = 0; i < data_elements; i++){
-    data_host[i] = i;
+    data_host[i] = -1.0f/(float)((i + 1));
   }
 
   Space<3> local_space;
 
   local_space.basis = SquareMatrix<3>{
     .points={
-      1.0f, 0.0f, 0.0f,
-      0.0f, 1.0f, 0.0f,
-      0.0f, 0.0f, 1.0f
+      1.5234375f, 0.0f, 0.0f,
+      0.0f, 1.5234375f, 0.0f,
+      0.0f, 0.0f, 3.0f
     }
   };
 
   local_space.inverted_basis = SquareMatrix<3>{
     .points={
-      1.0f, 0.0f, 0.0f,
-      0.0f, 1.0f, 0.0f,
-      0.0f, 0.0f, 1.0f
+      0.6564103f, 0.0f, 0.0f,
+      0.0f, 0.6564103f, 0.0f,
+      0.0f, 0.0f, 0.33333333f
     }
   };
 
   local_space.starting_point = Point<3>{
-    0.0f,0.0f,0.0f
+    -389.23828125f, -573.23828125f, -1133.0f
   };
 
   local_space.domain = Domain<3>{z,y,x};
