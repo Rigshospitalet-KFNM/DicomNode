@@ -46,4 +46,3 @@ class AnatomicalPlot(Plot):
       raise Exception
     self._axes = self.figure.add_axes((5,5,5,5))
     self.plot_axes(self.figure.axes[0], image_data, plane, options.selector, options.transform)
-

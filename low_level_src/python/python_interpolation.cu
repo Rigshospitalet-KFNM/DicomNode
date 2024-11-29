@@ -43,19 +43,19 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   pybind11::array_t<T> out_array(shape, strides);
   pybind11::buffer_info out_buffer = out_array.request(true);
 
-  Texture *device_texture = nullptr;
+  Texture<T> *device_texture = nullptr;
   T* device_out_image = nullptr;
 
   auto error_function = [&](dicomNodeError_t _){
     std::cout << "Error Trigger!\n";
-    free_texture(&device_texture);
+    free_texture<T>(&device_texture);
     free_device_memory(&device_out_image);
   };
 
   DicomNodeRunner runner{error_function};
   runner
     | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
-    | [&](){ return cudaMalloc(&device_texture, sizeof(Texture)); }
+    | [&](){ return cudaMalloc(&device_texture, sizeof(Texture<T>)); }
     | [&](){
       return load_texture_from_python_image<T>(
         device_texture,
@@ -73,7 +73,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
       return cudaMemcpy(out_buffer.ptr, device_out_image, out_image_size, cudaMemcpyDefault);
     }
     | [&](){
-      return free_texture(&device_texture);}
+      return free_texture<T>(&device_texture);}
     | [&](){
       free_device_memory(&device_out_image);
       return dicomNodeError_t::SUCCESS;
@@ -91,6 +91,18 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11:
   //Switch statement doesn't work because I am comparing strings
   if(dtype == "float32"){
     return interpolate_linear_templated<float>(image, new_space);
+  } else if (dtype == "uint8") {
+    return interpolate_linear_templated<uint8_t>(image, new_space);
+  } if (dtype == "uint16") {
+    return interpolate_linear_templated<uint16_t>(image, new_space);
+  } if (dtype == "uint32") {
+    return interpolate_linear_templated<uint32_t>(image, new_space);
+  } else if (dtype == "int8") {
+    return interpolate_linear_templated<int8_t>(image, new_space);
+  } if (dtype == "int16") {
+    return interpolate_linear_templated<int16_t>(image, new_space);
+  } if (dtype == "int32") {
+    return interpolate_linear_templated<int32_t>(image, new_space);
   }
 
   // The other types are not supported by the hardware :(

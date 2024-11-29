@@ -7,8 +7,8 @@
 
 #include"../gpu_code/dicom_node_gpu.cuh"
 
-__global__ void interpolation_tests(const Texture* texture, float* out, Space<3>* out_space, float3* coords){
-  const Texture& refTexture = *texture;
+__global__ void interpolation_tests(const Texture<float>* texture, float* out, Space<3>* out_space, float3* coords){
+  const Texture<float>& refTexture = *texture;
   const uint32_t x = texture->space.domain[2];
   const uint32_t y = texture->space.domain[1];
 
@@ -80,11 +80,11 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   cudaError_t cuda_error = cudaMalloc(&out, threads * sizeof(float));
   EXPECT_EQ(cuda_error, cudaSuccess);
 
-  Texture* texture=nullptr;
+  Texture<float>* texture=nullptr;
   Space<3>* out_space = nullptr;
   float3* coords = nullptr;
 
-  cuda_error = cudaMalloc(&texture, sizeof(Texture));
+  cuda_error = cudaMalloc(&texture, sizeof(Texture<float>));
   EXPECT_EQ(cuda_error, cudaSuccess);
 
   cuda_error = cudaMalloc(&out_space, sizeof(Space<3>));
@@ -126,7 +126,7 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
     EXPECT_EQ(out_calced[idx], data[idx]);
   }
 
-  free_texture(&texture);
+  free_texture<float>(&texture);
   cudaFree(out);
   cudaFree(texture);
   cudaFree(out_space);
@@ -176,7 +176,7 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
   cudaError_t cuda_error = cudaMalloc(&out, data_size);
   EXPECT_EQ(cuda_error, cudaSuccess);
 
-  Texture* texture=nullptr;
+  Texture<float>* texture=nullptr;
   Space<3>* out_space = nullptr;
   float3* coords = nullptr;
 
@@ -207,7 +207,7 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
   delete[] interpolated;
   delete[] data_host;
 
-  free_texture(&texture);
+  free_texture<float>(&texture);
   cudaFree(out);
   cudaFree(texture);
   cudaFree(out_space);
@@ -325,4 +325,120 @@ TEST(INTERPOLATION, Manual_interpolation){
   cudaFree(coords);
   cudaFree(out);
   cudaDestroyTextureObject(texObj);
+}
+
+TEST(INTERPOLATION, INTERPOLATE_UINT8){
+  constexpr uint32_t x = 10;
+  constexpr uint32_t y = 10;
+  constexpr uint32_t z = 10;
+
+  constexpr uint32_t ux = x - 1;
+  constexpr uint32_t uy = x - 1;
+  constexpr uint32_t uz = x - 1;
+
+
+  uint8_t* host_data = new uint8_t[ x * y * z];
+
+  for(int i = 0; i < x * y * z; i++){
+    const uint32_t lx = i % x;
+    const uint32_t ly = (i / x) % y;
+    const uint32_t lz = i / (x * y);
+
+    host_data[i] = std::max(std::max(lx, ly), lz) + 1;
+  }
+
+  const Space<3> source_space {
+    .starting_point = Point<3>{
+      0.0f, 0.0f, 0.0f
+    },
+
+    .basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      }
+    },
+   .inverted_basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      },
+    },
+    .domain = Domain<3>{z,y,x}
+  };
+
+  const Space<3> target_space {
+    .starting_point = Point<3>{
+     1.0f, 1.0f, 1.0f
+    },
+    .basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0, 0.0f,
+        0.0f, 0.0f, 1.0f
+      }
+    },
+   .inverted_basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      },
+    },
+    .domain = Domain<3>{uz, uy, ux}
+  };
+
+  constexpr size_t out_elements = uz * uy * ux;
+  constexpr size_t out_size = out_elements * sizeof(uint8_t);
+
+  cudaError_t error;
+
+  Texture<uint8_t>* texture = nullptr;
+  error = cudaMalloc(&texture, sizeof(Texture<uint8_t>));
+
+  ASSERT_EQ(error, cudaSuccess);
+  uint8_t* device_interpolated_image = nullptr;
+  error = cudaMalloc(&device_interpolated_image, out_size);
+  ASSERT_EQ(error, cudaSuccess);
+
+  dicomNodeError_t dicomnode_error = load_texture<uint8_t>(texture, host_data, source_space);
+  if(dicomnode_error){
+    error = extract_cuda_error(dicomnode_error);
+    const char* error_name = cudaGetErrorName(error);
+    printf("Encountered %s while creating the texture\n", error_name);
+  }
+  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+
+  dicomnode_error = gpu_interpolation_linear<uint8_t>(
+    texture, target_space, device_interpolated_image
+  );
+  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+
+
+  uint8_t* host_result = new uint8_t[out_elements];
+
+  error = cudaMemcpy(host_result, device_interpolated_image, out_size, cudaMemcpyDefault);
+  ASSERT_EQ(error, cudaSuccess);
+
+  for(uint32_t i = 0; i < out_elements; i++ ){
+    const uint32_t lux = i % ux;
+    const uint32_t luy = (i / ux) % uy;
+    const uint32_t luz = i / (ux * uy);
+
+    const uint32_t lx = lux + 1;
+    const uint32_t ly = luy + 1;
+    const uint32_t lz = luz + 1;
+
+    EXPECT_EQ(
+      host_result[i], host_data[ lz * y * x + ly * x + lx]
+    );
+  }
+
+  cudaFree(texture);
+  cudaFree(device_interpolated_image);
+
+  delete[] host_data;
+  delete[] host_result;
 }

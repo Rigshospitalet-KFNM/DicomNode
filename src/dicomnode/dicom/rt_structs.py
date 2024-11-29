@@ -33,7 +33,12 @@ def get_contour_sequence_by_name(RT_dataset: Dataset, name: str) -> Sequence:
 
 def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
   contour_sequence = get_contour_sequence_by_name(RT_dataset, name)
-  mask = create_empty_series_mask(series)
+
+  first_ds = series[0]
+
+  mask = numpy.empty(
+    (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.uint8
+  )
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
   print(transformation_matrix)
 
@@ -44,13 +49,13 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
           if len(slice_contour_data) > 3 # This is the line that prevent the error from happening
     ]
     if len(contour_slices):
-      mask[:,:,i] = get_slice_mask_from_slice_contour_data(
+      mask[i,:,:] = get_slice_mask_from_slice_contour_data(
         series_slice, contour_slices, transformation_matrix
       )
 
   space = Space.from_datasets(series)
 
-  return Image(mask.transpose(), space)
+  return Image(mask, space)
 
 def get_mask(rt_struct: RTStruct, name: str) -> Image:
   return get_mask_ds(rt_struct.series_data, rt_struct.ds, name)

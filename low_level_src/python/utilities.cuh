@@ -227,7 +227,7 @@ dicomNodeError_t get_image_pointer(
 
 template<typename T>
 dicomNodeError_t load_texture_from_python_image(
-  Texture* texture,
+  Texture<T>* texture,
   const pybind11::object& python_image
 ){
   DicomNodeRunner runner{

@@ -14,7 +14,8 @@ import numpy
 from scipy.interpolate import RegularGridInterpolator
 
 # Dicomnode modules
-from dicomnode.dicom.series import extract_image, ImageContainerType
+from dicomnode.lib.logging import get_logger
+from dicomnode.dicom.series import extract_image, ImageContainerType, extract_space
 from dicomnode.math import CUDA, switch_ordering
 from dicomnode.math.space import Space
 from dicomnode.math.image import Image
@@ -28,21 +29,48 @@ class RESAMPLE_METHODS(Enum):
 def resample(source: ImageContainerType,
              target: Union[Space, ImageContainerType],
              method= RESAMPLE_METHODS.LINEAR
-             ):
+             ) -> Image:
+  """Creates an image with the target space, where the data is interpolated /
+  resamples from the source.
+
+  Args:
+      source (ImageContainerType): _description_
+      target (Union[Space, ImageContainerType]): _description_
+      method (RESAMPLE_METHODS, optional): _description_. Defaults to RESAMPLE_METHODS.LINEAR.
+
+  Returns:
+      Image: _description_
+  """
+
   source = extract_image(source)
 
   if not isinstance(target, Space):
-    target = extract_image(target).space
+    target = extract_space(target)
 
   if CUDA:
     success, interpolated =  _cuda.interpolation.linear(source, target)
 
-    return interpolated
+    return Image(interpolated, target)
   else:
     return cpu_interpolate(source, target, method)
 
 
 def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):
+  """Creates an image with the target space, where the data is interpolated /
+  resamples from the source.
+
+  Forces to run the cpu.
+
+  Note that this function
+
+  Args:
+      source (Image): _description_
+      target (Space): _description_
+      method (_type_, optional): _description_. Defaults to RESAMPLE_METHODS.LINEAR.
+
+  Returns:
+      _type_: _description_
+  """
   original_grid = [numpy.arange(s) for s in reversed(source.space.domain)]
 
   # Create interpolator for original data
@@ -65,4 +93,4 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   # Interpolate
   interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.domain) # type: ignore
 
-  return interpolated
+  return Image(interpolated, target)

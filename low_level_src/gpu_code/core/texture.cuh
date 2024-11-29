@@ -2,15 +2,17 @@
 
 #include"lin_alg.cuh"
 
+
+template<typename T>
 class Texture {
   public:
     cudaTextureObject_t texture;
     Space<3> space;
 
-  __device__ float operator()(const Point<3>& point) const {
+  __device__ T operator()(const Point<3>& point) const {
     const Point<3> interpolated_coordinate = space.interpolate_point(point);
 
-    return tex3D<float>(texture,
+    return tex3D<T>(texture,
       interpolated_coordinate[0] + 0.5f,
       interpolated_coordinate[1] + 0.5f,
       interpolated_coordinate[2] + 0.5f
@@ -20,7 +22,7 @@ class Texture {
 
 template<typename T>
 dicomNodeError_t load_texture(
-  Texture* texture,
+  Texture<T>* texture,
   const T* data,
   const Space<3>& space
 ){
@@ -28,7 +30,7 @@ dicomNodeError_t load_texture(
   memset(&textureDescription, 0, sizeof(textureDescription));
   cudaResourceDesc resourceDescription;
   memset(&resourceDescription, 0, sizeof(resourceDescription));
-  const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<float>();
+  const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<T>();
   cudaTextureObject_t host_texture;
 
   const cudaExtent extent = make_cudaExtent(
@@ -63,9 +65,12 @@ dicomNodeError_t load_texture(
     params.kind = cudaMemcpyDefault;
     return cudaMemcpy3D(&params);
 
-  } | [&](){
+  } | [&]() {
+      constexpr cudaTextureFilterMode filtermode = std::is_same_v<T, float>
+        ? cudaFilterModeLinear
+        : cudaFilterModePoint;
       textureDescription.normalizedCoords = 0;
-      textureDescription.filterMode = cudaFilterModeLinear;
+      textureDescription.filterMode = filtermode;
       textureDescription.addressMode[0] = cudaAddressModeClamp;
       textureDescription.addressMode[1] = cudaAddressModeClamp;
       textureDescription.addressMode[2] = cudaAddressModeClamp;
@@ -89,13 +94,14 @@ dicomNodeError_t load_texture(
   return runner.error();
 }
 
-static cudaError_t free_texture(Texture** texture){
+template<typename T>
+cudaError_t free_texture(Texture<T>** texture){
   if(!(*texture)){
     return cudaSuccess;
   }
 
   cudaPointerAttributes attr;
-  Texture* ptr = *texture;
+  Texture<T>* ptr = *texture;
   cudaError_t error = cudaPointerGetAttributes(&attr, ptr);
 
   if(error){
@@ -105,8 +111,8 @@ static cudaError_t free_texture(Texture** texture){
   }
 
   if(attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged){
-    Texture host_texture;
-    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture), cudaMemcpyDefault);
+    Texture<T> host_texture;
+    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture<T>), cudaMemcpyDefault);
     if(error){
       const char* error_name = cudaGetErrorName(error);
       printf("ptr: %p\n", ptr);
