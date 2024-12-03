@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
 
 # Third party packages
 import numpy
-from numpy import zeros_like, ndarray, dtype, float64, float32, empty, absolute
+from numpy import ndarray, float32
 from pydicom import Dataset, DataElement
 from pydicom.tag import Tag
 from pydicom.datadict import dictionary_VR, keyword_dict
@@ -85,7 +85,8 @@ class Series:
   """Base class for a Collection of images, that together form a series or a
   cubic volume that contains an tomographic image.
 
-  It's a
+  It's a lazy wrapper for image class, providing the image construction on use
+  rather than on construction.
   """
   @property
   def image(self):
@@ -107,7 +108,9 @@ class Series:
 
 
 class DicomSeries(Series):
-  """This represent a series of dicom, that contains an image
+  """This represent a series of dicom, that contains an image.
+
+  Note that the image is constructed lazily, so that
   """
   pivot: Dataset
   datasets: List[Dataset]
@@ -135,6 +138,13 @@ class DicomSeries(Series):
       yield dataset
 
   def __len__(self):
+    """Returns the number of datasets in the series
+
+    Returns:
+        int : Returns the number of datasets in the series
+    """
+    # This Docs string is kinda pointless, or rather it doesn't show up in
+    # various linting. :(
     return len(self.datasets)
 
   def __getitem__(self, tag) -> Optional[Union[DataElement, List[DataElement]]]:
@@ -194,6 +204,28 @@ class NiftiSeries(Series):
     super().__init__(Image(image_data, affine))
 
 class FramedDicomSeries(Series):
+  """A Series constructed from dicom datasets, which contains frames such as
+  gates or dynamic series. Each frame is a 3 dimensional image of float32
+  points which share a coordinate system.
+
+  Each frame have identical Dimensions.
+
+  Args:
+    datasets (List[Dataset]): A non empty list of datasets where each dataset
+      have the following tags:
+      * NumberOfSlices
+      * Rows
+      * Columns
+      * RescaleIntercept
+      * RescaleSlope
+      * PixelData
+      * ActualFrameDuration
+      * AcquisitionTime
+      * AcquisitionDate
+      * ImageIndex
+      * PixelData
+  """
+
   REQUIRED_TAGS = [
     'NumberOfSlices',
     'Rows',
@@ -205,6 +237,7 @@ class FramedDicomSeries(Series):
     'AcquisitionTime',
     'AcquisitionDate',
     'ImageIndex',
+    'PixelData',
   ]
 
   class FRAME_TYPE(Enum):
@@ -217,8 +250,10 @@ class FramedDicomSeries(Series):
     image = super().image
     if not isinstance(image, FramedImage):
       raise IncorrectlyConfigured
-
     return image
+
+  def frame(self, frame_number:int):
+    return self.image.frame(frame_number)
 
   @property
   def raw(self):
@@ -242,15 +277,15 @@ class FramedDicomSeries(Series):
     frame_times_ms = None
     frame_acquisition_time = None
 
-    self.datasets: Dict[int, List[Dataset]] = {}
+    datasets_dict: Dict[int, List[Dataset]] = {}
 
     def add_dataset(dataset: Dataset):
       frame = dataset.ImageIndex // dataset.NumberOfSlices
 
-      if frame in self.datasets:
-        self.datasets[frame].append(dataset)
+      if frame in datasets_dict:
+        datasets_dict[frame].append(dataset)
       else:
-        self.datasets[frame] = [dataset]
+        datasets_dict[frame] = [dataset]
 
 
     def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
@@ -275,9 +310,8 @@ class FramedDicomSeries(Series):
       if first_dataset is None:
         first_dataset = dataset
 
-
       if raw_image is None:
-        raw_image = empty((frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
+        raw_image = numpy.empty((frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
 
       if frame_times_ms is None:
         frame_times_ms = numpy.ones((frames), dtype=numpy.int32)
@@ -300,9 +334,10 @@ class FramedDicomSeries(Series):
     if frame_acquisition_time is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
 
-    space = Space.from_datasets(self.datasets[0])
+    space = Space.from_datasets(datasets_dict[0])
 
     super().__init__(FramedImage(raw_image, space))
+    self.datasets = datasets_dict
     self._pivot = first_dataset
     self._frame_durations_ms = frame_times_ms
     self._frame_acquisition_time = frame_acquisition_time
@@ -363,8 +398,12 @@ def extract_space(source: ImageContainerType) -> Space:
 
 
 def frame_unrelated_series(*frame_series: DicomSeries,
-                           frame_type = FramedDicomSeries.FRAME_TYPE.DYNAMIC):
-  """If you have multiple series, that you wish to unite in a single series
+                           frame_type = FramedDicomSeries.FRAME_TYPE.DYNAMIC) -> FramedDicomSeries:
+  """If you have multiple series, that you wish to unite in a single series,
+  recreates SOPInstanceUID
+
+  Args:
+    *
 
   Raises:
       ValueError: _description_
@@ -381,21 +420,20 @@ def frame_unrelated_series(*frame_series: DicomSeries,
 
   for i, series in enumerate(frame_series):
     if number_of_datasets is None:
-      number_of_datasets = len(series.datasets)
-    elif number_of_datasets != len(series.datasets):
+      number_of_datasets = len(series)
+    elif number_of_datasets != len(series):
       raise ValueError(f"Series {i + 1} doesn't contain {number_of_datasets} which the other datasets do!")
 
     indexes = [i + 1 for i in range(index, index + number_of_datasets)]
 
     series["SeriesInstanceUID"] = series_uid
     series["ImageIndex"] = indexes
-    series["NumberOfTimeSlices"] = number_of_frames
     series["NumberOfSlices"] = number_of_datasets
+    series["NumberOfTimeSlices"] = number_of_frames
 
     datasets.extend(series.datasets)
 
   return FramedDicomSeries(datasets)
-
 
 __all__ = [
   'Series',

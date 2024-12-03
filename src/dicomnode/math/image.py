@@ -123,7 +123,7 @@ class FramedImage():
   def shape(self):
     return self.raw.shape
 
-  def frame(self, frame) -> Image:
+  def frame(self, frame: int) -> Image:
     return Image(self.raw[frame], self.space)
 
   def __init__(self, frames: raw_image_frames, space: Space) -> None:

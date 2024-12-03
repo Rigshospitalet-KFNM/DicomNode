@@ -282,8 +282,6 @@ def sort_datasets(dataset: Dataset):
       int: _description_
   """
   if 'ImagePositionPatient' in dataset:
-
-
     return dataset.ImagePositionPatient[2]
 
   return dataset.InstanceNumber

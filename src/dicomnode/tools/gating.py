@@ -40,6 +40,31 @@ sorting_algorithms = {
   'series_description' : sort_series_description
 }
 
+FRAME_TIME_KEY = "frame_time"
+NOMINAL_INTERVAL_KEY = "nominal_interval"
+LOW_RR_VALUE_KEY = "low_rr_value"
+HIGH_RR_VALUE_KEY = "high_rr_value"
+INTERVALS_ACQUIRED_KEY = "intervals_acquired"
+INTERVALS_REJECTED_KEY = "intervals_rejected"
+BEAT_REJECTION_FLAG_KEY = "beat_rejection_flag"
+CARDIAC_FRAMING_TYPE_KEY = "cardiac_framing_type"
+SKIP_BEATS_KEY = "skip_beats"
+HEART_RATE_KEY = "heart_rate"
+
+required_config_tags = [
+  FRAME_TIME_KEY,
+  NOMINAL_INTERVAL_KEY,
+  LOW_RR_VALUE_KEY,
+  HIGH_RR_VALUE_KEY,
+  INTERVALS_ACQUIRED_KEY,
+  INTERVALS_REJECTED_KEY,
+  BEAT_REJECTION_FLAG_KEY,
+  CARDIAC_FRAMING_TYPE_KEY,
+  SKIP_BEATS_KEY,
+  HEART_RATE_KEY,
+]
+
+
 file_formats = nifti_formats + dicom_formats
 
 def filterFormats(formats):
@@ -79,41 +104,42 @@ def gatify_series(series: List[DicomSeries], config):
   new_series_uid = gen_uid()
   new_series_number = randint(5000, 100000)
 
-  for (gate, frame_time) in zip(series, config['frame_time']):
+  for (gate, frame_time) in zip(series, config[FRAME_TIME_KEY]):
     if not isinstance(frame_time, float) and not isinstance(frame_time, int):
       raise Exception("One of the frame times is not a number!")
 
     image_indexes = [image_index + i + 1 for i in range(gate_num_images)]
     new_sop_uid = [gen_uid() for _ in range(gate_num_images)]
 
-    gate[0x0008_0018] = new_sop_uid # SOPInstanceUID
-    gate[0x0010_1020] = 1.7
+    gate["NumberOfSlices"] = gate_num_images
 
-    gate[0x0018_1060] = trigger_time # Trigger Time
+    gate["SOPInstanceUID"] = new_sop_uid # SOPInstanceUID
+
+    gate["TriggerTime"] = trigger_time # Trigger Time
     #gate[0x0018_1061] = "EKG"
-    gate[0x0018_1062] = 582
-    gate[0x0018_1063] = frame_time # Frame time
-    gate[0x0018_1064] = "PHASED"
+    gate["NominalInterval"] = config[NOMINAL_INTERVAL_KEY]
+    gate["FrameTime"] = frame_time # Frame time
+    gate["CardiacFramingType"] = config[CARDIAC_FRAMING_TYPE_KEY]
 
     # R-R values
-    gate[0x0018_1080] = 'Y'
-    gate[0x0018_1081] = 389
-    gate[0x0018_1082] = 1016
-    gate[0x0018_1083] = 325
-    gate[0x0018_1084] = 3
-    gate[0x0018_1086] = 15
-    gate[0x0018_1088] = 102
+    gate["BeatRejectionFlag"] = config[BEAT_REJECTION_FLAG_KEY]
+    gate["LowRRValue"] = config[LOW_RR_VALUE_KEY]
+    gate["HighRRValue"] = config[HIGH_RR_VALUE_KEY]
+    gate["IntervalsAcquired"] = config[INTERVALS_ACQUIRED_KEY]
+    gate["IntervalsRejected"] = config[INTERVALS_REJECTED_KEY]
+    gate["SkipBeats"] = config[SKIP_BEATS_KEY]
+    gate["HeartRate"] = config[HEART_RATE_KEY]
 
-    gate[0x0020_000E] = new_series_uid
-    gate[0x0020_0011] = new_series_number
-    gate[0x0020_0013] = image_indexes # Instance Numbers
+    gate["SeriesInstanceUID"] = new_series_uid
+    gate["SeriesNumber"] = new_series_number
+    gate["InstanceNumber"] = image_indexes # Instance Numbers
 
     #gate[0x0020_0052] = frame_of_reference_uid # Frame of Reference UID
 
-    gate[0x0054_0061] = 1           # Number of R-R Intervals
-    gate[0x0054_0071] = len(series) # Number of Time Slots
-    gate[0x0054_1000] = ['GATED', "IMAGE"] # Series type
-    gate[0x0054_1330] = image_indexes # image Index
+    gate["NumberOfRRIntervals"] = len(series) # Number of R-R Intervals
+    gate["NumberOfTimeSlots"] = 1 # Number of Time Slots
+    gate["SeriesType"] = ['GATED', "IMAGE"] # Series type
+    gate["ImageIndex"] = image_indexes # image Index
 
     trigger_time += frame_time
     image_index += gate_num_images
