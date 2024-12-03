@@ -243,7 +243,6 @@ class FramedDicomSeries(Series):
   class FRAME_TYPE(Enum):
     GATED = 1
     DYNAMIC = 2
-    RR_INTERVALS = 3
 
   @property
   def image(self) -> FramedImage:
@@ -413,7 +412,7 @@ def frame_unrelated_series(*frame_series: DicomSeries,
   series_uid = gen_uid()
   index = 0
 
-  datasets = []
+  datasets: List[Dataset] = []
 
   if number_of_frames == 0:
     raise ValueError("Cannot Relate zero series")
@@ -425,11 +424,16 @@ def frame_unrelated_series(*frame_series: DicomSeries,
       raise ValueError(f"Series {i + 1} doesn't contain {number_of_datasets} which the other datasets do!")
 
     indexes = [i + 1 for i in range(index, index + number_of_datasets)]
-
+    series["SOPInstanceUID"] = [gen_uid() for _ in series]
     series["SeriesInstanceUID"] = series_uid
+    series["InstanceNumber"] = indexes
     series["ImageIndex"] = indexes
     series["NumberOfSlices"] = number_of_datasets
-    series["NumberOfTimeSlices"] = number_of_frames
+    if frame_type == FramedDicomSeries.FRAME_TYPE.DYNAMIC:
+      series["NumberOfTimeSlices"] = number_of_frames
+    elif frame_type == FramedDicomSeries.FRAME_TYPE.GATED:
+      series['NumberOfRRIntervals'] = 1
+      series['NumberOfTimeSlots'] = number_of_frames
 
     datasets.extend(series.datasets)
 
