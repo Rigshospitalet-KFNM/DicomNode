@@ -136,8 +136,8 @@ def gatify_series(series: List[DicomSeries], config):
 
     #gate[0x0020_0052] = frame_of_reference_uid # Frame of Reference UID
 
-    gate["NumberOfRRIntervals"] = len(series) # Number of R-R Intervals
-    gate["NumberOfTimeSlots"] = 1 # Number of Time Slots
+    gate["NumberOfRRIntervals"] = 1 # Number of R-R Intervals
+    gate["NumberOfTimeSlots"] = len(series) # Number of Time Slots
     gate["SeriesType"] = ['GATED', "IMAGE"] # Series type
     gate["ImageIndex"] = image_indexes # image Index
 
