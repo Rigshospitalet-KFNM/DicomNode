@@ -21,6 +21,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 
+# Create object libraries for each source file
 function(add_py_object_library name source)
   add_library(${name} OBJECT ${source})
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
@@ -33,7 +34,6 @@ function(add_py_object_library name source)
   set_property(TARGET ${name} PROPERTY CUDA_ARCHITECTURES native)
 endfunction()
 
-# Create object libraries for each source file
 
 # -----------------------------------------------------------------------
 # Checking for CUDA

@@ -1,0 +1,80 @@
+<svg width="650" height="1000" xmlns="http://www.w3.org/2000/svg">
+  <rect
+    x="225"
+    y="10"
+    height="50"
+    width="200"
+    style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+  <text x="250" y="30">Header Only library</text>
+  <text x="245" y="50">(dicom_node_gpu.cuh)</text>
+
+
+  <rect x="250"
+        y="135"
+        width="150"
+        height="50"
+        style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+
+  <path d="M 325 60 325 135" stroke="green"/>
+  <path d="M 325 135 315 125 335 125 Z" stroke="green" fill="green"/>
+
+  <text x="285" y="155">Utilities</text>
+  <text x="270" y="175">(utilities.cu)</text>
+
+  <rect x="50"
+        y="275"
+        width="100"
+        height="50"
+        style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+
+  <rect x="200"
+        y="275"
+        width="100"
+        height="50"
+        style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+
+  <rect x="350"
+        y="275"
+        width="100"
+        height="50"
+        style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+
+  <rect x="500"
+        y="275"
+        width="100"
+        height="50"
+        style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"
+  />
+
+  <text x="69"  y="305">Module 1</text>
+  <text x="219" y="305">Module 2</text>
+  <text x="369" y="305">Module 3</text>
+  <text x="519" y="305">Module 4</text>
+
+
+  <path d="M 325 185 100 275" stroke="red"/>
+  <path d="M 325 185 250 275" stroke="red"/>
+  <path d="M 325 185 400 275" stroke="red"/>
+  <path d="M 325 185 550 275" stroke="red"/>
+
+  <path d="M 325 60 q -275 75 -225 215" stroke="green" fill="none"/>
+  <path d="M 325 60 q -225 100 -75 215" stroke="green" fill="none"/>
+  <path d="M 325 60 q 225 100 75 215" stroke="green" fill="none"/>
+  <path d="M 325 60 q 275 75 225 215" stroke="green" fill="none"/>
+
+  <rect x="225" y="400" height="50" width="200" style="fill:rgba(0,0,0,0);stroke-width:3;stroke:black"/>
+  <text x="270" y="430">Python library</text>
+
+  <path d="M 100 325 325 400" stroke="red"/>
+  <path d="M 250 325 325 400" stroke="red"/>
+  <path d="M 400 325 325 400" stroke="red"/>
+  <path d="M 550 325 325 400" stroke="red"/>
+
+
+
+</svg>

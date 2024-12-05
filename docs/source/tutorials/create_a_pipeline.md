@@ -25,7 +25,7 @@ stages:
 5. Export data
 6. Clean up data, move to step 1.
 
-This library heavily uses inheritance, to allow users flexibility and replace
+This library uses inheritance allowing users flexibility and replace
 any functionality that is unwanted or insufficient.
 
 # Building the your first pipeline
