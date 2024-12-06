@@ -49,7 +49,9 @@ Now that I have convinced GPU programming is important what are the options:
       meaning that there could be version conflicts between the dicomnode's
       dependency and the projects dependency.
 
-    * It's not compiled, which will produce slower code.
+    * It's not compiled, which will produce slower code. Well I know that they
+      have compilation, but I doubt it can reach the same level of speed as nvcc
+      and gcc / g++
 
     * It's at a very high level of abstraction, which will cost performance.
       Now this is sorta something I am pulling out of my ass as I do not know how
@@ -144,8 +146,8 @@ directory:
 * python - Python contains some objects with the responsibility of extracting
   the data from python objects and then with the extracted data call some
   functions inside of *gpu_code* and then taking that result and putting it back
-  into python objects that the python process can use. All the objects should have
-  a method hooking it's function to the *_cuda* module. See below:
+  into python objects that the python process can use. All the objects should
+  have a method hooking it's function to the *_cuda* module.
 
 .. code-block:: cpp
 
@@ -168,6 +170,190 @@ corresponding CUDA object. there's a compile diagram:
 
 .. image:: /_static/compile_tree.svg
   :target: /_static/compile_tree.svg
+
+This structure isn't ideal, because most of the code changes are in the header
+library which in turn causes recompilation of all the modules. This can properly
+be fixed by a better separation of submodules but this my first c++ project so
+cut me some slack.
+
+Actually Code
+*************
+
+Okay so after a 1000 words, we are finally at the actual C++ / CUDA code.
+Pybind handles the conversion of objects from python to C++ and back again.
+
+In general build-in types can be transformed to their C++ equivalent without
+much brain power, but sadly we need to pass custom classes to the C++ code
+because the data only really make sense in a collection. I could just ask the
+user pass all the attributes of an object or create a python wrapper function,
+but that idea seams kinda stupid.
+
+Python is a dynamically typed language, while C++ is a Static typed language.
+So in C++ you have to declare all the types where as In python, you just go and
+throw an exception if things don't line up. Everything is an "object."
+It's the root of pythons inheritance tree. (I don't even thing you can
+meta-class your way out of that.)
+
+So the first thing you need to do is handle that dynamism. The way I do that is
+by the function:
+
+.. code-block:: cpp
+
+  dicomNodeError_t is_instance(
+    const pybind11::object& python_object,
+    const char* module_name,
+    const char* instance_type) {
+    const pybind11::module_& space_module = pybind11::module_::import(module_name);
+    const pybind11::object& space_class = space_module.attr(instance_type);
+    if(!pybind11::isinstance(python_object, space_class)){
+      return dicomNodeError_t::INPUT_TYPE_ERROR;
+    }
+      return dicomNodeError_t::SUCCESS;
+  }
+
+I am big fan of errors as values, because they allow pretty cool programming
+patterns. Also known as monads. (DUN DUN DUN, something something monads is just
+a monoid in category of endofunctors)
+Rather than embarking some useless monad tutorial I would much rather show you
+some CUDA code:
+
+.. code-block:: cpp
+
+  void some_cuda_function(float* host_float){
+
+  cudaError_t error;
+  float* device_float;
+
+  error = cudaMalloc(&device_float, sizeof(float));
+  if(error){
+    // Do some error handling also stop execution
+    return;
+  }
+  error = cudaMemcpy(
+    device_float,
+    host_float,
+    sizeof(float),
+    cudaMemcpyDefault
+  );
+
+  if(error){
+    // Do some error handling, free resources also stop execution
+    return;
+  }
+
+  some_kernel<<<1,1>>>(device_float);
+
+  error = cudaGetLastError();
+
+  if(error){
+    // Do some error handling, free resources also stop execution
+    return;
+  }
+
+  error = cudaMemcpy(
+    host_float,
+    device_float,
+    sizeof(float),
+    cudaMemcpyDefault
+  );
+
+  if(error){
+    // Do some error handling, free resources also stop execution
+    return;
+  }
+
+  error = cudaFree(device_float);
+  if(error){
+    // Do some error handling, free resources also stop execution
+    return;
+  }
+
+  }
+
+So as programmers, your DRY (don't repeat yourself) sense, should be tickling.
+You can see there's multiple "if error return"-statements. The way to get rid
+them is by using a monad:
+
+.. code-block:: cpp
+
+  class CudaRunner{
+    public:
+      CudaRunner(std::function<void(cudaError_t)> error_function)
+        : m_error_function(error_function){}
+
+      CudaRunner()
+        : m_error_function([](cudaError_t error){}){}
+
+      cudaError_t error() const {
+        return m_error;
+      }
+
+      CudaRunner& operator|(std::function<cudaError_t()> func) {
+        if(m_error == cudaSuccess){
+          m_error = func();
+          if (m_error != cudaSuccess){
+            m_error_function(m_error);
+          }
+        }
+        return *this;
+      };
+
+    private:
+      std::function<void(cudaError_t)> m_error_function;
+      cudaError_t m_error = cudaSuccess;
+  };
+
+What this class does is run lambda functions, if the success value is still
+success, and runs an error function if it fails. The above code example becomes:
+
+.. code-block:: cpp
+
+  void some_cuda_function(float* host_float){
+
+  float* device_float;
+  cudaRunner runner{[&](cudaError_t error){
+    // Do something clean up?
+  }};
+
+  runner | [&](){ return cudaMalloc(&device_float, sizeof(float)); }
+         | [&](){ return cudaMemcpy(
+                            device_float,
+                            host_float,
+                            sizeof(float),
+                            cudaMemcpyDefault);
+       } | [&](){
+        some_kernel<<<1,1>>>(device_float);
+        return cudaGetLastError();
+       } | [&](){
+        return cudaMemcpy(
+                  host_float,
+                  device_float,
+                  sizeof(float),
+                  cudaMemcpyDefault);
+       } | [&](){
+        return cudaFree(device_float);
+       };
+  }
+
+While I will agree this code looks funky at first, especially if you're not used
+to C++ lambda syntax. But it allows you to focus on the happy path and the error
+path when applicable.
+
+This concept is a "maybe"-monad if you squint at it sides ways. But that really
+doesn't matter what some imaginary haskell lecture from Yale thinks about the
+classification of the runner class. What matter is that this works, and it does.
+
+So Instead using the cudaError class I created my own error class, which is
+returned from all of dicomnode's C++ functions, that can fail. It also encodes
+all cudaError_t by flipping the 32'th bit.
+
+Conclusion
+**********
+
+Honestly I don't really know what else is relevant information, for the GPU
+programming.
+
+Yay speed ups!
 
 .. toctree::
     :hidden:
