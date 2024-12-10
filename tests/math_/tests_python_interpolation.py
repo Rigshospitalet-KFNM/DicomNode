@@ -51,9 +51,9 @@ class CPUInterpolationTests(DicomnodeTestCase):
     )
 
     # Assert
-    self.assertIsInstance(interpolated, numpy.ndarray)
-    self.assertEqual(interpolated.shape, new_shape)
-    self.assertTrue(interpolated.flags.c_contiguous)
+    self.assertIsInstance(interpolated.raw, numpy.ndarray)
+    self.assertEqual(interpolated.raw.shape, new_shape)
+    self.assertTrue(interpolated.raw.flags.c_contiguous)
 
   def test_incrementByInterpolation(self):
     shape = (4,4,4)
@@ -68,7 +68,7 @@ class CPUInterpolationTests(DicomnodeTestCase):
 
     out = cpu_interpolate(image, out_space)
 
-    self.assertTrue((out==(data[:3,:3,:3] + 1)).all())
+    self.assertTrue((out.raw==(data[:3,:3,:3] + 1)).all())
 
 
 class GPUInterpolationTest(DicomnodeTestCase):
@@ -106,7 +106,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
         image,
         space
     )
-    self.assertTrue((arr == cpu_version).all())
+    self.assertTrue((arr == cpu_version.raw).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_gpu_large(self):
@@ -150,7 +150,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
         image,
         out_space
     )
-    self.assertTrue((arr == cpu_version).all())
+    self.assertTrue((arr == cpu_version.raw).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_middle_of_point(self):
@@ -176,7 +176,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
         out_space
     )
 
-    self.assertTrue((arr == cpu_version).all())
+    self.assertTrue((arr == cpu_version.raw).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_change_of_basis(self):
@@ -201,7 +201,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
         image,
         out_space
     )
-    self.assertTrue((arr == cpu_version).all())
+    self.assertTrue((arr == cpu_version.raw).all())
 
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_change_of_both_basis(self):
@@ -227,4 +227,4 @@ class GPUInterpolationTest(DicomnodeTestCase):
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
 
-    self.assertTrue((arr==cpu_version).all())
+    self.assertTrue((arr==cpu_version.raw).all())
