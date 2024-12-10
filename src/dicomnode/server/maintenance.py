@@ -85,7 +85,7 @@ class MaintenanceThread(Thread):
     if input_now is None:
       now = datetime.now()
     else:
-      now = input_now
+      now = input_now # pragma: no cover
 
 
     # Note this might cause some bug,

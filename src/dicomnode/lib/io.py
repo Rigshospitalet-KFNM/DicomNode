@@ -18,7 +18,6 @@ from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Pydicom have some fancy import stuff.
 
 # Dicomnode Library
-from dicomnode.lib.parser import read_private_tag, PrivateTagParserReadException
 from dicomnode.lib.utils import type_corrosion
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
@@ -172,38 +171,6 @@ def save_dicom(
     dicom_path.parent.mkdir(parents=True)
 
   dicom.save_as(dicom_path, write_like_original=False)
-
-
-def load_private_tags(dicPath : Path, strict=False) -> Dict[int, Tuple[str, str, str, str, str]]:
-  private_tags = {}
-  with dicPath.open() as f:
-    while line := f.readline():
-      try:
-        parsedTags = read_private_tag(line)
-        if parsedTags:
-          (tag, data) = parsedTags
-          private_tags[tag] = data
-
-      except PrivateTagParserReadException as E:
-        if not strict:
-          raise E
-        else:
-          print(f"Line: {line} could not be parsed")
-  return private_tags
-
-def load_private_tags_from_args(
-    args : Namespace) -> Dict[int, Tuple[str,str,str,str,str]]:
-  """Wrapper function to load_private_tags that extracts arguments from a
-  namespace
-
-  Args:
-    args (Namespace): _description_
-  """
-  private_tags = {}
-  if args.privatetags:
-    private_tags = load_private_tags(args.privatetags, args.strictParsing)
-  return private_tags
-
 
 class TemporaryWorkingDirectory():
   """Creating a temporary directory for work to be done in

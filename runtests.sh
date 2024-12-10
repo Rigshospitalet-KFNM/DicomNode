@@ -29,6 +29,9 @@ fi
 
 export DICOMNODE_ENV_REPORT_DATA_PATH="$current_directory/report_data/"
 
+# Note that this have approx 6 seconds of overhead :(
+# Pretty sure there's something wrong with it's discover algorithm such that
+# it takes venv into account.
 coverage run runtests.py $@
 coverage report --omit=tests/*,venv/*
 

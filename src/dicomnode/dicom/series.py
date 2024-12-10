@@ -248,7 +248,8 @@ class FramedDicomSeries(Series):
   def image(self) -> FramedImage:
     image = super().image
     if not isinstance(image, FramedImage):
-      raise IncorrectlyConfigured
+      # I do not accountability if you for some reason decide to reassign ._image
+      raise IncorrectlyConfigured # pragma: no cover
     return image
 
   def frame(self, frame_number:int):
@@ -267,8 +268,14 @@ class FramedDicomSeries(Series):
     return self._frame_acquisition_time
 
   @property
-  def pixel_volume(self):
-    return self._pixel_volume
+  def pixel_volume(self) -> ndarray[Tuple[Literal[3]], numpy.float32]: # type: ignore # type checker is high
+    """Triplet of pixel dimension (x,y,z) in millimeters
+
+    Returns:
+        ndarray[Tuple[Literal[3]], numpy.float32]:
+          Triplet of pixel dimension (x,y,z) in millimeters
+    """
+    return self._pixel_volume # type: ignore # type checker is high
 
   def __init__(self, datasets: Iterable[Dataset]):
     first_dataset = None
@@ -322,16 +329,16 @@ class FramedDicomSeries(Series):
       insert_image(raw_image, dataset)
       add_dataset(dataset)
       frame_times_ms[frameIndex] = dataset.ActualFrameDuration
-      frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
+      frame_acquisition_time[frameIndex] = datetime.combine(dataset.AcquisitionDate, dataset.AcquisitionTime)
 
     if first_dataset is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
     if raw_image is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets")
+      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
     if frame_times_ms is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets")
+      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
     if frame_acquisition_time is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets")
+      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
 
     space = Space.from_datasets(datasets_dict[0])
 
@@ -340,7 +347,12 @@ class FramedDicomSeries(Series):
     self._pivot = first_dataset
     self._frame_durations_ms = frame_times_ms
     self._frame_acquisition_time = frame_acquisition_time
-    self._pixel_volume = numpy.array([first_dataset.SliceThickness, first_dataset.PixelSpacing[1], first_dataset.PixelSpacing[0]])
+    self._pixel_volume = numpy.array(
+      [first_dataset.PixelSpacing[0],
+       first_dataset.PixelSpacing[1],
+       first_dataset.SliceThickness
+       ],
+       dtype=numpy.float32)
 
   def __getattribute__(self, name: str) -> Any:
     try:
@@ -357,7 +369,7 @@ ImageContainerType = Union[
   FramedImage
 ]
 
-def extract_image(source: ImageContainerType, frame=None, mask=None) -> Image:
+def extract_image(source: ImageContainerType, frame=None) -> Image:
   if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
     source = NiftiSeries(source)
   if isinstance(source, List):

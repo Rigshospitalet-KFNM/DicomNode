@@ -79,6 +79,11 @@ class GeneratorTestCase(TestCase):
       ["Hello", "World", "I should put a grafic in here", 'Bla?', "Bla!"],
     ])
 
+    table_2 = Table(Table.TableStyle.BORDER,withHeader=False, Alignment=['l', 'c', 'r', 'X', 'X'], Rows=[
+      ["Hello", "World", "I should put a grafic in here", 'Bla?', "Bla!"],
+      ["Hello", "World", "I should put a grafic in here", 'Bla?', "Bla!"],
+    ])
+
     dicom_frame = DicomFrame()
 
     dicom_frame.append("Bla bla bla")
@@ -91,8 +96,12 @@ class GeneratorTestCase(TestCase):
     report.append(patient_header)
     report.append(triple_plot)
     report.append(table)
+    report.append(table_2)
     report.append(dicom_frame)
     report.generate_tex()
+
+    with dicom_frame.create(Section("Created section")) as created_section:
+      created_section.append("Blah blah blah")
 
     report.generate_pdf()
     factory = DicomFactory()
