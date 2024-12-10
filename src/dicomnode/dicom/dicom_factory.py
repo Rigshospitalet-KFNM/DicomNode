@@ -28,7 +28,7 @@ from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.logging import get_logger
-from dicomnode.lib.exceptions import MissingPivotDataset, HeaderConstructionFailure
+from dicomnode.lib.exceptions import MissingPivotDataset, ConstructionFailure
 
 logger = get_logger()
 
@@ -220,7 +220,7 @@ class SequenceElement(InstanceVirtualElement):
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     if self._partial_initialized_sequences is None:
       logger.error("You are attempting to produce from an uninitialized sequence element")
-      raise Exception
+      raise ConstructionFailure
 
     sequence_datasets = []
     for partial_initialized_sequence in self._partial_initialized_sequences:
@@ -269,7 +269,7 @@ class InstanceCopyElement(InstanceVirtualElement):
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     if instance_environment.instance_dataset is None:
-      raise InvalidDataset
+      raise ConstructionFailure
 
     return instance_environment.instance_dataset.get(self.tag,
                                                      DataElement(self.tag, self.VR, None))
@@ -518,7 +518,7 @@ class DicomFactory():
         if can_copy_instances:
           envs = [
             InstanceEnvironment(
-              instance_number=i,
+              instance_number=i + 1, # InstanceNumbers are 1 indexed
               factory=self,
               kwargs=kwargs,
               instance_dataset=dataset,
@@ -566,9 +566,9 @@ class DicomFactory():
         DicomSeries: _description_
 
     Throws:
-      HeaderConstructionFailure : If a CopyVirtualElement is inside of the
-                                  blueprint. As there's no parent series to copy
-                                  from
+      ConstructionFailure : If a CopyVirtualElement is inside of the
+                            blueprint. As there's no parent series to copy
+                            from
     """
     if not isinstance(nifti, NiftiSeries):
       nifti = NiftiSeries(nifti)
@@ -584,7 +584,7 @@ class DicomFactory():
           if isinstance(corporealialized_tag, DataElement):
             ds[corporealialized_tag.tag] = corporealialized_tag
           elif isinstance(corporealialized_tag, InstanceVirtualElement):
-            instance_environment = InstanceEnvironment(i + 1, self, image=slice_)
+            instance_environment = InstanceEnvironment(i + 1, self, image=slice_, kwargs=kwargs)
 
             ds[corporealialized_tag.tag] = corporealialized_tag.produce(
               instance_environment
@@ -616,7 +616,7 @@ class DicomFactory():
         if can_copy_instances:
           envs = [
             InstanceEnvironment(
-              instance_number=i,
+              instance_number=i + 1,
               factory=self,
               kwargs=kwargs,
               instance_dataset=dataset,
@@ -626,7 +626,7 @@ class DicomFactory():
         else:
           envs = [
             InstanceEnvironment(
-              instance_number=i,
+              instance_number=i + 1,
               factory=self,
               kwargs=kwargs,
               image=slice_,

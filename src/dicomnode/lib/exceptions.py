@@ -10,8 +10,9 @@ class InvalidRootDataDirectory(Exception):
 class BlueprintConstructionFailure(Exception):
   """Blueprint contains a tag reserved by Dicomnode"""
 
-class HeaderConstructionFailure(Exception):
-  """When a DicomFactory fails to construct a header"""
+class ConstructionFailure(Exception):
+  """When a DicomFactory fails to construct a series because impossible
+  requirements from blueprint, input series, and input image"""
 
 class InvalidDataset(Exception):
   """Adding a dataset, which doesn't fulfil some requirements"""

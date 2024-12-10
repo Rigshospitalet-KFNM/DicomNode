@@ -16,14 +16,16 @@ from pydicom.uid import SecondaryCaptureImageStorage, CTImageStorage
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.logging import get_logger
+from dicomnode.lib.exceptions import IncorrectlyConfigured,\
+  ConstructionFailure, MissingPivotDataset
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement,\
-  Blueprint, SeriesElement, StaticElement, InstanceCopyElement, \
+  Blueprint, SeriesElement, StaticElement, InstanceCopyElement,\
   InstanceEnvironment, SequenceElement, get_pivot
-from dicomnode.dicom.blueprints import add_UID_tag
+from dicomnode.dicom.blueprints import add_UID_tag, general_image_blueprint
 from dicomnode.dicom.series import DicomSeries
 
-from dicomnode.lib.exceptions import IncorrectlyConfigured
+from tests.helpers import generate_numpy_datasets
 
 class BlueprintTestCase(TestCase):
   def setUp(self) -> None:
@@ -337,11 +339,37 @@ class DicomFactoryTestCase(TestCase):
     self.assertIn(0x00100020, build_dataset)
 
   def test_build_a_series_with_rescaling(self):
-    test_blueprint = Blueprint([
+    test_blueprint = general_image_blueprint + Blueprint([
       CopyElement(0x00100010),
       StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
       InstanceCopyElement(0x0020_0032, 'DS'),
-      FunctionalElement(0x01115001, 'IS', lambda env: env.instance_number + 34),
+    ])
+
+    # Note that images are store z,y,x
+    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11))
+
+    produced_series = self.factory.build_series(
+      test_image,
+      test_blueprint,
+      self.parent_series.datasets
+    )
+
+    self.assertEqual(len(produced_series), 13)
+    for i, dataset in enumerate(produced_series.datasets):
+      self.assertEqual(dataset.Columns,11)
+      self.assertEqual(dataset.Rows,12)
+      self.assertEqual(dataset.PatientName, self.patient_name)
+      self.assertIn(0x7fe00010, dataset)
+      self.assertEqual(dataset.SmallestImagePixelValue, 0)
+      self.assertEqual(dataset.InstanceNumber, i + 1)
+      # Some numeric unstably might cause Numpy to round down.
+      #self.assertGreaterEqual(dataset.LargestImagePixelValue, 65534)
+
+  def test_build_a_series_from_list_with_rescaling(self):
+    test_blueprint = general_image_blueprint + Blueprint([
+      CopyElement(0x00100010),
+      StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
+      InstanceCopyElement(0x0020_0032, 'DS'),
     ])
 
     # Note that images are store z,y,x
@@ -354,12 +382,13 @@ class DicomFactoryTestCase(TestCase):
     )
 
     self.assertEqual(len(produced_series), 13)
-    for dataset in produced_series.datasets:
+    for i, dataset in enumerate(produced_series.datasets):
       self.assertEqual(dataset.Columns,11)
       self.assertEqual(dataset.Rows,12)
       self.assertEqual(dataset.PatientName, self.patient_name)
       self.assertIn(0x7fe00010, dataset)
       self.assertEqual(dataset.SmallestImagePixelValue, 0)
+      self.assertEqual(dataset.InstanceNumber, i + 1)
       # Some numeric unstably might cause Numpy to round down.
       #self.assertGreaterEqual(dataset.LargestImagePixelValue, 65534)
 
@@ -402,7 +431,53 @@ class DicomFactoryTestCase(TestCase):
       self.assertLess(prev_tag, str_)
       prev_tag = str_
 
-  def build_empty_instance(self):
+  def test_build_empty_instance(self):
     factory = DicomFactory()
     with self.assertRaises(ValueError):
       factory.build_instance(Dataset(), Blueprint())
+
+  def test_building_with_an_instance_copy_when_cant_copy_fails(self):
+    blueprint = Blueprint([
+      InstanceCopyElement(
+        0x0020_1041, 'DS'
+      )
+    ])
+
+    series = DicomSeries([ds for ds in generate_numpy_datasets(
+      10, Rows=10, Cols=10, image_orientation=[1,0,0,0,1,0],
+      starting_image_position=[0,0,0], slice_thickness=1
+    )])
+
+    factory = DicomFactory()
+    image = numpy.arange(numpy.prod((3,4,5))).reshape((3,4,5))
+
+    self.assertRaises(
+      ConstructionFailure,
+      factory.build_series,
+      image,
+      blueprint,
+      series
+    )
+
+  def test_sequence_must_be_corporialized_before_production(self):
+    sequence_element = SequenceElement(
+      0x0011_5011, [Blueprint([])]
+    )
+
+    self.assertRaises(ConstructionFailure, sequence_element.produce,
+                      InstanceEnvironment(1, DicomFactory()))
+
+  def test_encoding_with_no_dataset_fails(self):
+    factory = DicomFactory()
+
+    self.assertRaises(MissingPivotDataset,
+                      factory._build_pdf_in_encapsulated_document,
+                      [],
+                      Blueprint([]), bytes([0,0,0,0]), {}
+                    )
+
+    self.assertRaises(MissingPivotDataset,
+                      factory._build_pdf_in_secondary_image_capture,
+                      [],
+                      Blueprint([]), bytes([0,0,0,0]), {}
+    )
