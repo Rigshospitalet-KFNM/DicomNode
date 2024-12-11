@@ -37,10 +37,9 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
   first_ds = series[0]
 
   mask = numpy.empty(
-    (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.uint8
+    (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.bool_
   )
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
-  print(transformation_matrix)
 
   for i, series_slice in enumerate(series):
     contour_slices = [
