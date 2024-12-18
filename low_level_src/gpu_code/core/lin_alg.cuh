@@ -407,9 +407,21 @@ __device__ dicomNodeError_t invertMatrix(
   return _invertMatrixBackwards<DIMENSION>(matrix, output);
 }
 
+/**
+ * @brief A space is description of a linear space of n Dimensions where the
+ * starting point is the coordinate at Index (0,0,0, ...). The space extents out
+ * to defined by the domain.
+ *
+ * @tparam DIMENSIONS
+ */
 template<uint8_t DIMENSIONS>
 class Space {
   public:
+
+    /**
+     * @brief The coordinates for the Index (0,0,0,...)
+     *
+     */
     Point<DIMENSIONS> starting_point;
     SquareMatrix<DIMENSIONS> basis;
     SquareMatrix<DIMENSIONS> inverted_basis;

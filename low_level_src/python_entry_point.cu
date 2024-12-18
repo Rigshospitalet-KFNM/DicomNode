@@ -1,3 +1,15 @@
+/**
+ * @file python_entry_point.cu
+ * @author Demiguard (cjen0668@regionh.dk)
+ * @brief This file is the entry point from for the python module
+ * @version 0.1
+ * @date 2024-12-18
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
+
+
 // Third party
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>

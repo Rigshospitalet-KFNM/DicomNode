@@ -8,9 +8,9 @@ template<uint8_t>
 struct Domain;
 
 /**
- * @brief An index it's X,Y,Z in coordinates
+ * @brief An index in X,Y,Z,... coordinates
  *
- * @tparam DIMENSIONS
+ * @tparam DIMENSIONS - Number of Dimension of the index
  */
 template<uint8_t DIMENSIONS>
 struct Index {
@@ -101,7 +101,7 @@ struct Domain {
     bool in = true;
     #pragma unroll
     for(uint8_t i = 0; i < DIMENSIONS; i++){
-      in &= 0 <= index[i] && index[i] < sizes[i];
+      in &= 0 <= index[i] && index[i] < sizes[DIMENSIONS - (i + 1)];
     }
 
     return in;
@@ -110,15 +110,7 @@ struct Domain {
   template<typename... Args>
   __device__ __host__ bool contains(const Args... args) const {
     static_assert(sizeof...(args) == DIMENSIONS);
-    int32_t temp[] = {static_cast<int32_t>(args)...};
-
-    bool in = true;
-    #pragma unroll
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
-      in &= 0 <= temp[i] && temp[i] < sizes[i];
-    }
-
-    return in;
+    return contains(Index({static_cast<int32_t>(args)...}));
   }
 
   __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Index<DIMENSIONS> index) const {
@@ -132,7 +124,7 @@ struct Domain {
     #pragma unroll
     for(uint8_t i = 0; i < DIMENSIONS; i++){
       return_val += index[i] * dimension_temp;
-      dimension_temp *= sizes[i];
+      dimension_temp *= sizes[DIMENSIONS - (i + 1)];
     }
 
     return return_val;
