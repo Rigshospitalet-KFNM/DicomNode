@@ -294,7 +294,7 @@ class FramedDicomSeries(Series):
         datasets_dict[frame] = [dataset]
 
 
-    def insert_image(raw:ndarray[Tuple[int,int,int,int], Any], dataset: Dataset):
+    for dataset in datasets:
       if not has_tags(dataset, self.REQUIRED_TAGS):
         missing_tags = []
 
@@ -304,32 +304,26 @@ class FramedDicomSeries(Series):
 
         raise InvalidDataset(f"Dataset doesn't appear to be large pet as dataset is missing {' '.join(missing_tags)}")
 
-      frame = dataset.ImageIndex // dataset.NumberOfSlices
-      slice_number_in_series = dataset.ImageIndex % dataset.NumberOfSlices
-
-      raw[frame, slice_number_in_series, :, :] = \
-        dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
-          + dataset.RescaleIntercept
-
-    for dataset in datasets:
-      frames = dataset.NumberOfTimeSlices if 'NumberOfTimeSlices' in dataset else dataset.NumberOfTimeSlots
+      self.frames = dataset.NumberOfTimeSlices if 'NumberOfTimeSlices' in dataset else dataset.NumberOfTimeSlots
       if first_dataset is None:
         first_dataset = dataset
 
       if raw_image is None:
-        raw_image = numpy.empty((frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
+        raw_image = numpy.empty((self.frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
 
       if frame_times_ms is None:
-        frame_times_ms = numpy.ones((frames), dtype=numpy.int32)
+        frame_times_ms = numpy.ones((self.frames), dtype=numpy.int32)
 
       if frame_acquisition_time is None:
-        frame_acquisition_time = numpy.ones((frames), dtype='datetime64[ms]')
+        frame_acquisition_time = numpy.ones((self.frames), dtype='datetime64[ms]')
 
       frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
-      insert_image(raw_image, dataset)
       add_dataset(dataset)
       frame_times_ms[frameIndex] = dataset.ActualFrameDuration
-      frame_acquisition_time[frameIndex] = datetime.combine(dataset.AcquisitionDate, dataset.AcquisitionTime)
+      if isinstance(dataset.AcquisitionDate, str):
+        frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
+      else:
+        frame_acquisition_time[frameIndex] = datetime.combine(dataset.AcquisitionDate, dataset.AcquisitionTime)
 
     if first_dataset is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
@@ -341,6 +335,17 @@ class FramedDicomSeries(Series):
       raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
 
     space = Space.from_datasets(datasets_dict[0])
+
+    def construct_frame(raw:ndarray[Tuple[int,int,int,int], Any], frame: int):
+      frame_datasets = sorted(datasets_dict[frame], key=sort_datasets)
+
+      for slice_number_in_series, dataset in enumerate(frame_datasets):
+        raw[frame, slice_number_in_series, :, :] = \
+          dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
+            + dataset.RescaleIntercept
+
+    for frame in range(self.frames):
+      construct_frame(raw_image, frame)
 
     super().__init__(FramedImage(raw_image, space))
     self.datasets = datasets_dict

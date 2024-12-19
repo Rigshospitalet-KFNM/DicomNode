@@ -1,4 +1,5 @@
 # Python Standard library
+from copy import deepcopy
 from unittest import TestCase
 
 # Third party modules
@@ -62,3 +63,15 @@ class ImageTestCase(TestCase):
     ])
 
     self.assertTrue((image.space.basis==expected_affine).all())
+
+  def test_image_directional_irrelevant_instance_number(self):
+    datasets = [ds for ds in generate_numpy_datasets(10, Cols=10, Rows=10)]
+    copy_datasets = deepcopy(datasets)
+
+    for i,dataset in enumerate(copy_datasets):
+      dataset.InstanceNumber = len(datasets) - i
+
+    image = Image.from_datasets(datasets)
+    copy_image = Image.from_datasets(copy_datasets)
+
+    self.assertTrue((image.raw == copy_image.raw).all())

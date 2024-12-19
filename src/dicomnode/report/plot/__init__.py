@@ -3,30 +3,23 @@
 various displays for a standardized way to present the reports"""
 
 # Python3 Standard Library
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from enum import Enum
-import os
 from pathlib import Path
-from typing import Any, Optional, Sequence, Union, Dict, Tuple
+from typing import Optional, Sequence
 from uuid import uuid4
 
 # Third party packages
 import numpy
 from numpy import ndarray
-import nibabel
-from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import FuncFormatter, LinearLocator
-from pylatex import StandAloneGraphic, MiniPage, NoEscape, LineBreak
+from matplotlib.pyplot import close as close_figure
+from pylatex import StandAloneGraphic, LineBreak
 
 # Dicomnode packages
 from dicomnode import library_paths
 from dicomnode.lib.logging import get_logger
 from dicomnode.report import Report
-from dicomnode.report.base_classes import LaTeXComponent, Selector
-from dicomnode.report.plot.selector import PercentageSelector
+from dicomnode.report.base_classes import LaTeXComponent
 
 def rotate_image_90(image: ndarray):
   return numpy.rot90(image, 3)
@@ -89,6 +82,9 @@ class Plot(LaTeXComponent):
   def figure(self):
     return self._figure
 
+  def show(self):
+    self._figure.show() #pragma: no cover
+
   @property
   def file_path(self) -> Path:
     if self._file_path is None:
@@ -99,20 +95,16 @@ class Plot(LaTeXComponent):
 
   def append_to(self, document: Report):
     self.save()
+    close_figure(self.figure)
     document.append(StandAloneGraphic(filename=self.file_path))
     document.append(LineBreak())
 
 
   def save(self):
-    self._figure.savefig(self.file_path)
+    self.figure.savefig(self.file_path)
+
 
 # Package imports
 from . import selector
 from .anatomical_plot import AnatomicalPlot # Depends on Plot
 from .triple_plot import TriplePlot # Depends on Plot And AnatomicalPlot
-
-
-
-
-
-
