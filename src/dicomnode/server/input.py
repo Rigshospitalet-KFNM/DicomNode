@@ -7,11 +7,10 @@ number of classes which you should use to define your input for your process fun
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
-from abc import abstractmethod, ABC
+from abc import abstractmethod, ABC, ABCMeta
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from re import Pattern
 from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
 
 # Third party packages
@@ -30,7 +29,25 @@ from dicomnode.lib.validators import get_validator_for_value
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
-class AbstractInput(ImageTreeInterface, ABC):
+# Baby here we go!
+class AbstractInputMetaClass(ABCMeta):
+  """# Behold my infinite job security.
+
+  Jokes aside, this class just enable the or operation between
+  AbstractInputTypes
+
+  So the user can go:
+    UserAbstractInput_1 or UserAbstractInput_2
+  In their type declaration.
+  """
+  def __or__(self, value: Any):
+    class ProxyClass(AbstractInputProxy):
+      type_options = [self, value]
+
+    return ProxyClass
+
+
+class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   """Container for dicom sets fulfilling the validate image function.
 
     Args:
@@ -90,7 +107,6 @@ class AbstractInput(ImageTreeInterface, ABC):
         dcm = load_dicom(image_path)
         self.add_image(dcm)
 
-
   @abstractmethod
   def validate(self) -> bool:
     """Checks if the input have sufficient data, to start processing
@@ -149,10 +165,12 @@ class AbstractInput(ImageTreeInterface, ABC):
 
     return self.path / image_name
 
-  def _validate_value(self, value, target):
+  @classmethod
+  def _validate_value(cls, value, target):
     return get_validator_for_value(value)(target)
 
-  def validate_image(self, dicom: Dataset) -> bool:
+  @classmethod
+  def validate_image(cls, dicom: Dataset) -> bool:
     """Checks if an image belongs in the input
 
     Args:
@@ -162,7 +180,7 @@ class AbstractInput(ImageTreeInterface, ABC):
         bool: True if the image can be added, False if not
     """
     # Dataset Validation
-    for required_tag in self.required_tags:
+    for required_tag in cls.required_tags:
       if isinstance(required_tag, str):
         required_tag = tag_for_keyword(required_tag)
         if required_tag is None:
@@ -172,7 +190,7 @@ class AbstractInput(ImageTreeInterface, ABC):
         #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
 
-    for required_tag, required_value in self.required_values.items():
+    for required_tag, required_value in cls.required_values.items():
       if isinstance(required_tag, str):
         required_tag = tag_for_keyword(required_tag)
         if required_tag is None:
@@ -181,7 +199,7 @@ class AbstractInput(ImageTreeInterface, ABC):
       if required_tag not in dicom:
         #self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
-      if not self._validate_value(dicom[required_tag].value, required_value):
+      if not cls._validate_value(dicom[required_tag].value, required_value):
         #self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
         return False
 
@@ -317,7 +335,7 @@ class DynamicInput(AbstractInput):
     return ret_value
 
 
-class HistoricAbstractInput(AbstractInput, ABC):
+class HistoricAbstractInput(AbstractInput):
   """This input sends a DIMSE C-MOVE to location on creation
 
   An Example could be that your node receives a pet image, then this input can
@@ -341,7 +359,7 @@ class HistoricAbstractInput(AbstractInput, ABC):
       raise IncorrectlyConfigured("Historic datasets needs an Address and query level defined")
 
   @abstractmethod
-  def get_message_dataset(added_dataset: Dataset) -> Dataset:
+  def get_message_dataset(self, added_dataset: Dataset) -> Dataset:
     raise NotImplemented # pragma: type ignore
 
   def add_image(self, dataset: Dataset) -> int:
@@ -355,6 +373,33 @@ class HistoricAbstractInput(AbstractInput, ABC):
         address=self.address,
         dataset=message,
       )
+
+    return 1
+
+
+class AbstractInputProxy(AbstractInput):
+  """
+
+  Args:
+      AbstractInput (_type_): _description_
+  """
+  type_options: List[Type[AbstractInput]]
+
+  def validate(self) -> bool:
+      return False
+
+  def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
+    self.input_options = options
+
+  def add_image(self, dicom: Dataset) -> int:
+    for type_option in self.type_options:
+      if type_option.validate_image(dicom):
+        self.__class__ = type_option
+        type_option.__init__(self, options=self.input_options)
+        return self.add_image(dicom)
+    raise InvalidDataset
+
+
 
 __all__ = [
   'AbstractInput',

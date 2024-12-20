@@ -317,7 +317,7 @@ class FramedDicomSeries(Series):
       if frame_acquisition_time is None:
         frame_acquisition_time = numpy.ones((self.frames), dtype='datetime64[ms]')
 
-      frameIndex = dataset.ImageIndex // dataset.NumberOfSlices
+      frameIndex = (dataset.ImageIndex - 1) // dataset.NumberOfSlices
       add_dataset(dataset)
       frame_times_ms[frameIndex] = dataset.ActualFrameDuration
       if isinstance(dataset.AcquisitionDate, str):
@@ -440,7 +440,9 @@ def frame_unrelated_series(*frame_series: DicomSeries,
     elif number_of_datasets != len(series):
       raise ValueError(f"Series {i + 1} doesn't contain {number_of_datasets} which the other datasets do!")
 
+
     indexes = [i + 1 for i in range(index, index + number_of_datasets)]
+    index += number_of_datasets
     series["SOPInstanceUID"] = [gen_uid() for _ in series]
     series["SeriesInstanceUID"] = series_uid
     series["InstanceNumber"] = indexes

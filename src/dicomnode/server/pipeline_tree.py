@@ -45,6 +45,9 @@ class InputContainer:
       raise KeyError(key)
     return self.__data[key]
 
+  def __contains__(self, key):
+    return key in self.__data
+
 
 class PatientNode(ImageTreeInterface):
   """This is an ImageTree node, where each subnode contains related images.

@@ -208,6 +208,7 @@ class DicomSeriesTestCase(TestCase):
     frame_durations = [1000, 1000, 1000]
 
     for i,frame in enumerate(frames):
+      frame["ImageIndex"] = [i * len(frame) + j for j in range(len(frame))]
       frame["ActualFrameDuration"] = frame_durations[i]
       frame["AcquisitionDate"] = date(2020, 5, 20)
       frame["AcquisitionTime"] = time(10, 14, 13 + i, 63122)

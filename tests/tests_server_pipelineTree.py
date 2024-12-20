@@ -20,7 +20,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
-from dicomnode.server.grinders import Grinder
+from dicomnode.server.grinders import Grinder, ListGrinder
 from dicomnode.server.input import AbstractInput, DynamicInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 
@@ -383,3 +383,37 @@ class PatientNodeTestCase(TestCase):
                      "PatientNode created at 2020-06-10 10:20:30.125912\n"
                      "  TestInput1 - 10 images - Valid: True\n"
                      "  TestInput2 - 0 images - Valid: True")
+
+  def test_patient_node_with_proxy_arg(self):
+    class PETInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "PT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class CTInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "CT"
+      }
+
+      image_grinder = ListGrinder()
+
+
+      def validate(self) -> bool:
+        return True
+
+    node = PipelineTree(0x0010_0020,{
+      "test" : PETInput | CTInput
+    })
+
+    series = DicomSeries([ds for ds in generate_numpy_datasets(10, Rows=10, Cols=10, PatientID="test")])
+    series["Modality"] = "CT"
+
+    added_images = node.add_images(series)
+    self.assertEqual(added_images, 10)
+
+    input_container = node.get_patient_input_container("test")
+    self.assertIn("test", input_container)
+    self.assertIsInstance(input_container["test"], List)

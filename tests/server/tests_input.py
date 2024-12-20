@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 import shutil
 from sys import stdout
-from unittest import TestCase
+from unittest import TestCase, mock
 
 #Third Party libs
 
@@ -28,7 +28,7 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
-from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf, AbstractInputProxy
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -385,3 +385,56 @@ class InputTestCase(TestCase):
     input_.add_images(series)
 
     self.assertEqual(str(input_), f"TestInput - {images} images - Valid: True")
+
+  def test_infinite_job_security(self):
+    a_mock = mock.Mock()
+
+    class PETInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "PT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class CTInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "CT"
+      }
+
+      def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        a_mock()
+
+      def validate(self) -> bool:
+        return True
+
+    test = PETInput | CTInput
+
+    self.assertIsInstance(test, type)
+    self.assertTrue(issubclass(test, AbstractInputProxy))
+
+    test_instance = test()
+
+    self.assertIsInstance(test_instance, AbstractInputProxy)
+    self.assertIsInstance(test_instance, AbstractInput)
+    self.assertFalse(test_instance.validate())
+
+    test_dataset = Dataset()
+    test_dataset.SOPInstanceUID = gen_uid()
+    test_dataset.Modality = 'CT'
+
+    a_mock.assert_not_called()
+    added_images = test_instance.add_image(test_dataset)
+    a_mock.assert_called_once()
+
+    self.assertEqual(added_images, 1)
+    # HAHAHAHAHAHAHAHAHAHAHAHAHAHA
+    self.assertIsInstance(test_instance, CTInput)
+
+    test_dataset_2 = Dataset()
+    test_dataset_2.SOPInstanceUID = gen_uid()
+    test_dataset_2.Modality = 'CT'
+
+    self.assertEqual(test_instance.add_image(test_dataset_2), 1)
+    a_mock.assert_called_once()
