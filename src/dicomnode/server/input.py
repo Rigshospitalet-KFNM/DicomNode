@@ -11,6 +11,7 @@ from abc import abstractmethod, ABC, ABCMeta
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
+from types import UnionType
 from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
 
 # Third party packages
@@ -40,7 +41,19 @@ class AbstractInputMetaClass(ABCMeta):
     UserAbstractInput_1 or UserAbstractInput_2
   In their type declaration.
   """
-  def __or__(self, value: Any):
+  def __or__(self: Union[Type['AbstractInput'], Type['AbstractInputProxy']],
+             value: Union[Type['AbstractInput'], Type['AbstractInputProxy']]
+             ) -> Type['AbstractInputProxy']:
+    if issubclass(self, AbstractInputProxy) and issubclass(value, AbstractInputProxy):
+      self.type_options += value.type_options
+      return self
+    elif issubclass(self, AbstractInputProxy):
+      self.type_options.append(value)
+      return self
+    elif issubclass(value, AbstractInputProxy):
+      value.type_options.append(value)
+      return value
+
     class ProxyClass(AbstractInputProxy):
       type_options = [self, value]
 

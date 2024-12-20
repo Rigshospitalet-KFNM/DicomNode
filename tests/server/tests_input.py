@@ -438,3 +438,44 @@ class InputTestCase(TestCase):
 
     self.assertEqual(test_instance.add_image(test_dataset_2), 1)
     a_mock.assert_called_once()
+
+  def test_infinite_job_security_operations_2_electric_bogalo(self):
+    class PETInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "PT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class CTInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "CT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class MRInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "CT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class RTInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "RT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    proxy_class = PETInput | CTInput | MRInput | RTInput
+    self.assertEqual(proxy_class.type_options, [PETInput, CTInput, MRInput, RTInput])
+    proxy_class_2 = (PETInput | CTInput) | (MRInput | RTInput)
+    self.assertEqual(proxy_class_2.type_options, [PETInput, CTInput, MRInput, RTInput])
+    self.assertIsNot(proxy_class, proxy_class_2)
+    proxy_class_3 = PETInput | (CTInput | (MRInput | RTInput))
+    self.assertEqual(proxy_class_3.type_options, [PETInput, CTInput, MRInput, RTInput])
