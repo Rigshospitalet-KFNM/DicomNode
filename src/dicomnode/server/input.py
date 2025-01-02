@@ -394,10 +394,15 @@ class HistoricAbstractInput(AbstractInput):
 
 
 class AbstractInputProxy(AbstractInput):
-  """
+  """Internal library Class, that is constructed from an or operation between
+  two inputs. Despite using the or operator, it's actually a xor operation.
 
-  Args:
-      AbstractInput (_type_): _description_
+  Note that the operation create a superclass of this class, that then gets
+  instantiated.
+
+  Note that once proxy can determine what input it is, it evolves into the
+  input
+
   """
   type_options: List[Type[AbstractInput]]
 

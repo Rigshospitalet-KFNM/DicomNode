@@ -479,3 +479,38 @@ class InputTestCase(TestCase):
     self.assertIsNot(proxy_class, proxy_class_2)
     proxy_class_3 = PETInput | (CTInput | (MRInput | RTInput))
     self.assertEqual(proxy_class_3.type_options, [PETInput, CTInput, MRInput, RTInput])
+
+  def test_infinite_job_security_pokemon_evolving(self):
+    class PETInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "PT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    class CTInput(AbstractInput):
+      required_values = {
+        0x0008_0060 : "CT"
+      }
+
+      def validate(self) -> bool:
+        return True
+
+    HeHeHeHe = PETInput | CTInput
+
+    dataset_PET = Dataset()
+    dataset_PET.SOPInstanceUID = gen_uid()
+    dataset_PET.Modality = 'PET'
+
+    dataset_CT = Dataset()
+    dataset_CT.SOPInstanceUID = gen_uid()
+    dataset_CT.Modality = 'PET'
+
+    HiHiHiHi = HeHeHeHe()
+
+    self.assertRaises(
+      InvalidDataset,
+      HiHiHiHi.add_images,
+      [dataset_PET, dataset_CT]
+    )
