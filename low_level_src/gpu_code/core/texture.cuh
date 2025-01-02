@@ -96,7 +96,7 @@ dicomNodeError_t load_texture(
 
 template<typename T>
 cudaError_t free_texture(Texture<T>** texture){
-  if(!(*texture)){
+  if(texture && !(*texture)){
     return cudaSuccess;
   }
 

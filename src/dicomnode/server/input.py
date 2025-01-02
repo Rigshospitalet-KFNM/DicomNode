@@ -381,6 +381,9 @@ class HistoricAbstractInput(AbstractInput):
     if not self.send_historic_message and 0 < images:
       self.send_historic_message = True
       message = self.get_message_dataset(dataset)
+      if self.options.ae_title is None:
+        raise IncorrectlyConfigured
+
       send_move_thread(
         SCU_AE=self.options.ae_title,
         address=self.address,

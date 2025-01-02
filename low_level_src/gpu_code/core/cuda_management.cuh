@@ -53,6 +53,19 @@ class CudaRunner{
       return *this;
     };
 
+    template<typename F>
+      requires std::invocable<F> &&
+               std::same_as<std::invoke_result_t<F>, cudaError_t>
+    CudaRunner& operator|(F&& func) {
+      if(m_error == cudaSuccess){
+        m_error = func();
+        if (m_error != cudaSuccess){
+          m_error_function(m_error);
+        }
+      }
+      return *this;
+    };
+
   private:
     std::function<void(cudaError_t)> m_error_function;
     cudaError_t m_error = cudaSuccess;
@@ -77,6 +90,19 @@ class DicomNodeRunner{
   }
 
   DicomNodeRunner& operator|(std::function<dicomNodeError_t()> func){
+    if(m_error == dicomNodeError_t::SUCCESS){
+      m_error = func();
+      if(m_error != dicomNodeError_t::SUCCESS){
+        m_error_function(m_error);
+      }
+    }
+    return *this;
+  }
+
+  template<typename F>
+    requires std::invocable<F> &&
+             std::same_as<std::invoke_result_t<F>, dicomNodeError_t>
+  DicomNodeRunner& operator|(F&& func){
     if(m_error == dicomNodeError_t::SUCCESS){
       m_error = func();
       if(m_error != dicomNodeError_t::SUCCESS){

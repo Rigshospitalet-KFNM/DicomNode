@@ -14,6 +14,12 @@
 namespace {
   template<typename T>
   __global__ void label_kernel(T* image, Domain<3> domain){
+    // Size is sizeof(T) * block_size (1024 * sizeof(T))
+    extern __shared__ char shared_memory[];
+
+
+
+
 
   }
 
