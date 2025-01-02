@@ -51,7 +51,7 @@ class AbstractInputMetaClass(ABCMeta):
       self.type_options.append(value)
       return self
     elif issubclass(value, AbstractInputProxy):
-      value.type_options.append(value)
+      value.type_options.insert(0, self)
       return value
 
     class ProxyClass(AbstractInputProxy):
