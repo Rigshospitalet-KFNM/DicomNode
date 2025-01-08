@@ -179,50 +179,50 @@ namespace {
   		g_labels[id] = (g_image[id] > 0) ? g_labels[id]+1 : 0;
   	}
   }
-
-
-  template<typename T>
-  dicomNodeError_t connectedComponentLabeling2D(
-    uint32_t* device_output_labels,
-    T* inputImg,
-    size_t numCols,
-    size_t numRows
-  ){
-    // I should do some testing with different sizes but ooh well
-    constexpr uint32_t BLOCK_SIZE_X = 32;
-    constexpr uint32_t BLOCK_SIZE_Y = 4;
-
-  	// Create Grid/Block
-  	dim3 block (BLOCK_SIZE_X, BLOCK_SIZE_Y);
-  	dim3 grid ((numCols+BLOCK_SIZE_X-1)/BLOCK_SIZE_X,
-  			(numRows+BLOCK_SIZE_Y-1)/BLOCK_SIZE_Y);
-
-    DicomNodeRunner runner;
-
-    runner
-      |   [&](){
-        // Initialise labels
-  	    init_labels<<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
-        return cudaGetLastError();
-      } | [&](){
-        // Analysis
-      	resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
-        return cudaGetLastError();
-      } | [&](){
-        // Label Reduction
-      	label_reduction <<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
-        return cudaGetLastError();
-      } | [&](){
-        // Analysis
-      	resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
-        return cudaGetLastError();
-      } | [&](){
-        // Force background to have label zero;
-      	resolve_background<<<grid, block>>>(device_output_labels, inputImg, numCols, numRows);
-      };
-
-
-    return runner.error();
-  }
-  // End of "Stolen" functions
 }
+
+template<typename T>
+dicomNodeError_t connectedComponentLabeling2D(
+	uint32_t* device_output_labels,
+	T* inputImg,
+	size_t numCols,
+	size_t numRows
+){
+	// I should do some testing with different sizes but ooh well
+	constexpr uint32_t BLOCK_SIZE_X = 32;
+	constexpr uint32_t BLOCK_SIZE_Y = 4;
+
+	// Create Grid/Block
+	dim3 block (BLOCK_SIZE_X, BLOCK_SIZE_Y);
+	dim3 grid ((numCols+BLOCK_SIZE_X-1)/BLOCK_SIZE_X,
+			(numRows+BLOCK_SIZE_Y-1)/BLOCK_SIZE_Y);
+
+	DicomNodeRunner runner;
+
+	runner
+		|   [&](){
+			// Initialise labels
+			init_labels<<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
+			return cudaGetLastError();
+		} | [&](){
+			// Analysis
+			resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
+			return cudaGetLastError();
+		} | [&](){
+			// Label Reduction
+			label_reduction <<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
+			return cudaGetLastError();
+		} | [&](){
+			// Analysis
+			resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
+			return cudaGetLastError();
+		} | [&](){
+			// Force background to have label zero;
+			resolve_background<<<grid, block>>>(device_output_labels, inputImg, numCols, numRows);
+			return cudaGetLastError();
+		};
+
+
+	return runner.error();
+}
+// End of "Stolen" functions

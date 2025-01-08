@@ -7,3 +7,4 @@
 #include"tests/interpolation_tests.cu"
 #include"tests/space_test.cu"
 #include"tests/indexing_test.cu"
+#include"tests/label_tests.cu"
