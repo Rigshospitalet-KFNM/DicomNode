@@ -134,8 +134,8 @@ __device__ inline T scan_inclusive_warp_kogge_stone(volatile T* data, const size
 
 template<typename T, CBinaryOperator<T> OP>
 __device__ inline T scan_inclusive_block(volatile T* shared_memory, const uint32_t index){
-    const unsigned int lane   = index & (WARP_SIZE-1);
-    const unsigned int warpid = index >> LOG_WARP;
+    const uint32_t lane   = index & (WARP_SIZE-1);
+    const uint32_t warpid = index >> LOG_WARP;
 
     // 1. perform scan at warp level
     T result = scan_inclusive_warp_kogge_stone<T, OP>(shared_memory, index);
@@ -169,8 +169,8 @@ __device__ inline T scan_inclusive_block(volatile T* shared_memory, const uint32
 
 template<typename T, CBinaryOperator<T> OP>
 __device__ inline T reduce_inclusive_block(volatile T* shared_memory, const uint32_t index){
-  const unsigned int lane   = index & (WARP_SIZE-1);
-  const unsigned int warpid = index >> LOG_WARP;
+  const uint32_t lane   = index & (WARP_SIZE-1);
+  const uint32_t warpid = index >> LOG_WARP;
 
     // 1. perform scan at warp level
     T result = scan_inclusive_warp_kogge_stone<T, OP>(shared_memory, index);

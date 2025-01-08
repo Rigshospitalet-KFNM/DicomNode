@@ -58,3 +58,12 @@ Then run the tests with:
 ## Windows support
 
 [For windows support](https://ubuntu.com/tutorials/install-ubuntu-desktop)
+
+## Citations
+
+<a id="1">[1]</a>
+D. P. Playne and K. Hawick
+"A New Algorithm for Parallel Connected-Component Labelling on GPUs"
+in IEEE Transactions on Parallel and Distributed Systems, vol. 29, no. 6, pp. 1217-1230,
+1 June 2018,
+doi: 10.1109/TPDS.2018.2799216.
