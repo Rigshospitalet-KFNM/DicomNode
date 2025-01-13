@@ -1,6 +1,9 @@
 #pragma once
 #include<iostream>
+#include<array>
 
+
+#include"../gpu_code/dicom_node_gpu.cuh"
 
 #include<gtest/gtest.h>
 
@@ -23,6 +26,7 @@ namespace {
     return (a || b) && !(a && b);
   }
 }
+
 
 TEST(LABELS, SPIRAL_LABEL_TEST){
   constexpr uint32_t width = 64;
@@ -121,4 +125,52 @@ TEST(LABELS, SPIRAL_LABEL_TEST){
   delete[] spiral_out;
   cudaFree(dev_image);
   cudaFree(dev_labels);
+}
+
+TEST(LABELS, CROSS_TEST){
+  constexpr uint32_t width = 64;
+  constexpr uint32_t height = 64;
+  constexpr uint32_t pixels = height * width;
+
+  constexpr auto lamb = [](size_t idx) constexpr -> uint32_t {
+      const size_t i = idx / width;
+      const size_t j = idx % width;
+
+      return ((j + i % 2) % 2) ? 0 : 2;
+  };
+
+  std::array<uint32_t, pixels> cross_data;
+
+  for(size_t idx = 0; idx < pixels; idx++){
+    cross_data[idx] = lamb(idx);
+  }
+
+  constexpr size_t pixel_size = pixels * sizeof(uint32_t);
+  constexpr size_t label_size = pixels * sizeof(uint32_t);
+
+
+  uint32_t* dev_image = nullptr;
+  uint32_t* dev_labels = nullptr;
+  cudaMalloc(&dev_image, pixel_size);
+  cudaMalloc(&dev_labels, label_size);
+  cudaMemcpy(dev_image, cross_data.data(), pixel_size, cudaMemcpyDefault);
+
+  dicomNodeError_t label_error = connectedComponentLabeling2D<uint32_t>(
+    dev_labels, dev_image, width, height
+  );
+
+  EXPECT_EQ(label_error, dicomNodeError_t::SUCCESS);
+
+  uint32_t* cross_out = new uint32_t[pixels];
+  cudaMemcpy(cross_out, dev_labels, label_size, cudaMemcpyDefault);
+
+  for(size_t i = 0; i < pixels; i++){
+    EXPECT_TRUE(!normal_xor(cross_out[i], cross_data[i]));
+  }
+
+  delete[] cross_out;
+  cudaFree(dev_image);
+  cudaFree(dev_labels);
+
+
 }
