@@ -34,7 +34,7 @@ class Mirror_X {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -61,7 +61,7 @@ class Mirror_Y {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -88,7 +88,7 @@ class Mirror_Z {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -116,7 +116,7 @@ class Mirror_XY {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -143,7 +143,7 @@ class Mirror_XZ {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -170,7 +170,7 @@ class Mirror_YZ {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -198,7 +198,7 @@ class Mirror_XYZ {
   public:
     static __host__ __device__ T mirrors(const T* data_in,
                                          const uint64_t flat_index,
-                                         const Domain<3> space
+                                         const Extent<3> space
                                         ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
@@ -222,8 +222,8 @@ class Mirror_XYZ {
 
 
 template<typename OP, typename T>
-  requires Mirrors<OP, T, Domain<3>>
-__host__ cudaError_t mirror(const T* data_in, T* data_out, const Domain<3> space){
+  requires Mirrors<OP, T, Extent<3>>
+__host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
   const size_t data_size = space.size();
@@ -243,7 +243,7 @@ __host__ cudaError_t mirror(const T* data_in, T* data_out, const Domain<3> space
     | [&](){ return cudaMalloc(&device_data_out, sizeof(T) * data_size); }
     | [&](){ return cudaMemcpy(device_data_in, data_in, sizeof(T) * data_size, cudaMemcpyDefault); }
     | [&](){
-      mirror_kernel<OP, T, Domain<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
+      mirror_kernel<OP, T, Extent<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
         device_data_in, device_data_out, space.size(), space
       );
       return cudaGetLastError(); }
@@ -257,8 +257,8 @@ __host__ cudaError_t mirror(const T* data_in, T* data_out, const Domain<3> space
 }
 
 template<typename OP, typename T>
-  requires Mirrors<OP, T, Domain<3>>
-__host__ cudaError_t mirror_in_place(T* data_in, const Domain<3> space){
+  requires Mirrors<OP, T, Extent<3>>
+__host__ cudaError_t mirror_in_place(T* data_in, const Extent<3> space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
   const size_t data_size = space.size();
@@ -278,7 +278,7 @@ __host__ cudaError_t mirror_in_place(T* data_in, const Domain<3> space){
     | [&](){ return cudaMalloc(&device_data_out, sizeof(T) * data_size); }
     | [&](){ return cudaMemcpy(device_data_in, data_in, sizeof(T) * data_size, cudaMemcpyDefault); }
     | [&](){
-      mirror_kernel<OP, T, Domain<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
+      mirror_kernel<OP, T, Extent<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
         device_data_in, device_data_out, space.size(), space
       );
       return cudaGetLastError(); }

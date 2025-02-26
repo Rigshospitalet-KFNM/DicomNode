@@ -16,11 +16,11 @@
 #include<cuda/std/optional>
 
 TEST(INDEXING, CREATION_TEST_MULTIPLE_ARGS){
-  const Domain<3> domain(3,4,5);
+  const Extent<3> extent(3,4,5);
 
-  EXPECT_EQ(domain.x(), 5);
-  EXPECT_EQ(domain.y(), 4);
-  EXPECT_EQ(domain.z(), 3);
+  EXPECT_EQ(extent.x(), 5);
+  EXPECT_EQ(extent.y(), 4);
+  EXPECT_EQ(extent.z(), 3);
 
   const Index<3> index(1,2,3);
 
@@ -30,11 +30,11 @@ TEST(INDEXING, CREATION_TEST_MULTIPLE_ARGS){
 }
 
 TEST(INDEXING, CREATION_TEST_LIST){
-  const Domain<3> domain({3,4,5});
+  const Extent<3> extent({3,4,5});
 
-  EXPECT_EQ(domain.x(), 5);
-  EXPECT_EQ(domain.y(), 4);
-  EXPECT_EQ(domain.z(), 3);
+  EXPECT_EQ(extent.x(), 5);
+  EXPECT_EQ(extent.y(), 4);
+  EXPECT_EQ(extent.z(), 3);
 
   const Index<3> index({1,2,3});
 
@@ -44,11 +44,11 @@ TEST(INDEXING, CREATION_TEST_LIST){
 }
 
 TEST(INDEXING, INDEXING_INTO_DATA_STRUCTURES){
-  const Domain<3> domain({3,4,5});
+  const Extent<3> extent({3,4,5});
 
-  EXPECT_EQ(domain.x(), domain[2]);
-  EXPECT_EQ(domain.y(), domain[1]);
-  EXPECT_EQ(domain.z(), domain[0]);
+  EXPECT_EQ(extent.x(), extent[2]);
+  EXPECT_EQ(extent.y(), extent[1]);
+  EXPECT_EQ(extent.z(), extent[0]);
 
   const Index<3> index({1,2,3});
 
@@ -58,19 +58,19 @@ TEST(INDEXING, INDEXING_INTO_DATA_STRUCTURES){
 }
 
 TEST(INDEXING, CONTAINS_TAKES_REVERSED_INDEXES_INTO_ACCOUNT){
-  const Domain<3> domain(3,4,5);
+  const Extent<3> extent(3,4,5);
 
   const Index<3> index_in(4,3,2);
   const Index<3> index_out(2,3,4);
 
-  EXPECT_TRUE(domain.contains(index_in));
-  EXPECT_FALSE(domain.contains(index_out));
+  EXPECT_TRUE(extent.contains(index_in));
+  EXPECT_FALSE(extent.contains(index_out));
 }
 
 TEST(INDEXING, TO_FLAT_INDEX){
-  const Domain<3> domain(3,4,5);
+  const Extent<3> extent(3,4,5);
 
-  cuda::std::optional<uint64_t> flat_index = domain.flat_index(1,1,2);
+  cuda::std::optional<uint64_t> flat_index = extent.flat_index(1,1,2);
 
   EXPECT_TRUE(flat_index.has_value());
   if(flat_index.has_value()){
@@ -80,9 +80,9 @@ TEST(INDEXING, TO_FLAT_INDEX){
 }
 
 TEST(INDEXING, FROM_FLAT_INDEX){
-  const Domain<3> domain(3,4,5);
+  const Extent<3> extent(3,4,5);
 
-  Index<3> index = domain.from_flat_index(1 + 2 * 5 + 2 * 4 * 5);
+  Index<3> index = extent.from_flat_index(1 + 2 * 5 + 2 * 4 * 5);
 
   EXPECT_EQ(index.x(), 1);
   EXPECT_EQ(index.y(), 2);

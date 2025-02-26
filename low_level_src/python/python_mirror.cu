@@ -12,7 +12,7 @@
 // C style array, I should consider overloading to F style as it's just indexing
 // And the depth is O(1)
 template<typename OP, typename T>
-  requires Mirrors<OP, T, Domain<3>>
+  requires Mirrors<OP, T, Extent<3>>
 int py_mirror(python_array<T> arr){
   const pybind11::buffer_info& arr_buffer = arr.request(true);
   if(arr_buffer.ndim != 3){
@@ -25,7 +25,7 @@ int py_mirror(python_array<T> arr){
     }
   }
 
-  const Domain<3> domain(
+  const Extent<3> domain(
     arr_buffer.shape[0],
     arr_buffer.shape[1],
     arr_buffer.shape[2]

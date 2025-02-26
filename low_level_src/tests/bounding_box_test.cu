@@ -21,7 +21,7 @@ TEST(BOUNDING_BOX, Box_25x25x25_with_10_11_12_20_19_18){
   host_data[idx(20,19,18)] = 1;
   BoundingBox_3D out;
 
-  status = reduce<1, BoundingBoxOP_3D<uint8_t>, uint8_t, BoundingBox_3D, Domain<3>>(
+  status = reduce<1, BoundingBoxOP_3D<uint8_t>, uint8_t, BoundingBox_3D, Extent<3>>(
     host_data, data_size, &out, {25,25,25}
   );
 

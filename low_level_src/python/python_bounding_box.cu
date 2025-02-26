@@ -18,11 +18,11 @@ std::tuple<cudaError_t, pybind11::list> bounding_box(python_array<T>& arr){
 
   const size_t buffer_size = items;
   BoundingBox_3D out;
-  Domain<3> space(
+  Extent<3> space(
     buffer.shape[2], buffer.shape[1], buffer.shape[0]
   );
 
-  cudaError_t error = reduce<1, BoundingBoxOP_3D<T>, T, BoundingBox_3D, Domain<3>>(
+  cudaError_t error = reduce<1, BoundingBoxOP_3D<T>, T, BoundingBox_3D, Extent<3>>(
     (T*)buffer.ptr,
     buffer_size,
     &out,

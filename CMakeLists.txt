@@ -26,12 +26,8 @@ function(add_py_object_library name source)
   add_library(${name} OBJECT ${source})
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
-  target_compile_options(${name} PRIVATE
-    -O3
-    -pg
-  )
+  target_compile_options(${name} PRIVATE -O3)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
-  set_property(TARGET ${name} PROPERTY CUDA_ARCHITECTURES native)
 endfunction()
 
 
@@ -44,21 +40,20 @@ if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
   set(CMAKE_CUDA_STANDARD 20)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-#
-  message(status ${PYTHON_INCLUDE_DIRS})
+  set(CMAKE_CUDA_ARCHITECTURES native)
 
   add_library(utilities OBJECT low_level_src/python/utilities.cu)
   target_link_libraries(utilities PRIVATE pybind11::module Python::Python)
   target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(utilities PRIVATE -O3)
   set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
-  set_property(TARGET utilities PROPERTY CUDA_ARCHITECTURES native)
 
   set(CUDA_LIBRARIES
     bounding_box low_level_src/python/python_bounding_box.cu
     cuda_management low_level_src/python/python_cuda_management.cu
     mirror low_level_src/python/python_mirror.cu
     interpolation low_level_src/python/python_interpolation.cu
+    labeling low_level_src/python/python_labeling.cu
   )
 
   set(OBJECT_TARGETS)

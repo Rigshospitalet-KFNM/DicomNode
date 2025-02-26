@@ -425,10 +425,10 @@ class Space {
     Point<DIMENSIONS> starting_point;
     SquareMatrix<DIMENSIONS> basis;
     SquareMatrix<DIMENSIONS> inverted_basis;
-    Domain<DIMENSIONS> domain;
+    Extent<DIMENSIONS> extent;
 
   __device__ __host__ Index<DIMENSIONS> index(const uint64_t& flat_index) const {
-    return domain.from_flat_index(flat_index);
+    return extent.from_flat_index(flat_index);
   }
 
   __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
@@ -447,4 +447,19 @@ class Image {
     Space<DIMENSIONS> space;
     T* data = nullptr;
     T defaultValue = 0;
+
+  constexpr const uint32_t& num_cols() const {
+    static_assert(0 < DIMENSIONS);
+    return space.extent.sizes[0];
+  }
+
+  constexpr const uint32_t& num_rows () const {
+    static_assert(1 < DIMENSIONS);
+    return space.extent.sizes[1];
+  }
+
+  constexpr const uint32_t& num_slices() const {
+    static_assert(1 < DIMENSIONS);
+    return space.extent.sizes[2];
+  }
 };

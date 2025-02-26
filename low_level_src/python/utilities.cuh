@@ -21,6 +21,8 @@ cudaError_t extract_cuda_error(dicomNodeError_t error);
 
 std::string get_byte_string (size_t bytes);
 
+// Header declaration
+
 dicomNodeError_t is_instance(
   const pybind11::object& python_object,
   const char* module_name,
@@ -56,7 +58,45 @@ dicomNodeError_t check_buffer_pointers(
   return ret;
 }
 
+bool is_host_pointer(const cudaPointerAttributes& attr);
+
+
+// Anon namespace for templates
 namespace {
+  template<typename T>
+  dicomNodeError_t free_device_image(Image<3, T>* dev_out_image){
+    T* data_pointer = nullptr;
+    DicomNodeRunner runner;
+
+    // Note that if this shit fucks up, we
+    runner
+      | [&](){
+        return cudaMemcpy(
+          &data_pointer,
+          &dev_out_image->data,
+          sizeof(T*),
+          cudaMemcpyDefault
+        );
+    } | [&](){
+        return cudaFree(data_pointer);
+    } | [&](){
+        return cudaFree(dev_out_image);
+    };
+    return runner.error();
+  }
+
+  template<typename T>
+  dicomNodeError_t free_host_image(Image<3, T>* host_out_image){
+    const dicomNodeError_t error = encode_cuda_error(
+      cudaFree(host_out_image->data)
+    );
+
+    host_out_image->data=nullptr;
+
+    return error;
+  }
+
+
   template<typename T>
   dicomNodeError_t _load_into_host_image(
     Image<3, T>* host_out_image,
@@ -81,8 +121,22 @@ namespace {
       i++;
     }
 
-    host_out_image->data = new T[image_buffer.size];
-    std::memcpy(host_out_image->data, image_buffer.ptr, sizeof(T) * image_buffer.size);
+    error = encode_cuda_error(
+      cudaMalloc(
+        &host_out_image->data,
+        sizeof(image_buffer.size * sizeof(T))
+      )
+    );
+    if(error){ return error; }
+
+    error = encode_cuda_error(
+      cudaMemcpy(
+        host_out_image->data,
+        image_buffer.ptr,
+        sizeof(T) * image_buffer.size,
+        cudaMemcpyDefault
+      )
+    );
 
     return error;
   }
@@ -130,7 +184,11 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
  * @return cudaError_t
  */
 template<typename T>
-dicomNodeError_t load_image(Image<3, T>* image, const pybind11::object& python_image){
+[[nodiscard("Forgot to check error value on image loading")]]
+dicomNodeError_t load_image(
+  Image<3, T>* image,
+  const pybind11::object& python_image
+){
   cudaPointerAttributes attr;
   DicomNodeRunner runner{
     [](const dicomNodeError_t& error){
@@ -144,7 +202,7 @@ dicomNodeError_t load_image(Image<3, T>* image, const pybind11::object& python_i
   } | [&](){
     return cudaPointerGetAttributes(&attr, image);
   } | [&](){
-    if(attr.type == cudaMemoryType::cudaMemoryTypeUnregistered || attr.type == cudaMemoryType::cudaMemoryTypeHost){
+    if(is_host_pointer(attr)){
       return _load_into_host_image(image, python_image);
     } else {
       return _load_into_dev_image(image, python_image);
@@ -168,7 +226,7 @@ size_t get_image_size(const pybind11::object& python_object){
   const pybind11::object& space_class = space_module.attr("Space");
 
   if(pybind11::isinstance(python_object, space_class)){
-    const python_array<int>& python_domain = python_object.attr("domain").cast<python_array<int>>();
+    const python_array<int>& python_domain = python_object.attr("extent").cast<python_array<int>>();
     const pybind11::buffer_info& python_domain_buffer = python_domain.request();
     if (python_domain_buffer.ptr == nullptr) {
       return 0;
@@ -253,12 +311,30 @@ dicomNodeError_t load_texture_from_python_image(
   return runner.error();
 }
 
+/**
+ * @brief Frees an image, not that this functions assumes that the gpu driver
+ * is working
+ *
+ * @tparam T - The type
+ * @param dev_out_image
+ */
 template<typename T>
-void free_image(Image<3, T>* dev_out_image){
-  T* data_pointer = nullptr;
-  // Note that if this shit fucks up, we
-  cudaMemcpy(&data_pointer, &dev_out_image->data, sizeof(T*), cudaMemcpyDefault);
+dicomNodeError_t free_image(Image<3, T>* out_image){
+  DicomNodeRunner runner;
+  cudaPointerAttributes out_image_attr;
 
-  cudaFree(data_pointer);
-  cudaFree(dev_out_image);
+  runner | [&](){
+    return cudaPointerGetAttributes(&out_image_attr, out_image);
+  } | [&](){
+    dicomNodeError_t error;
+
+    if(is_host_pointer(out_image_attr)){
+      error = free_device_image(out_image);
+    } else {
+      error = free_host_image(out_image);
+    }
+    return error;
+  };
+
+  return runner.error();
 }

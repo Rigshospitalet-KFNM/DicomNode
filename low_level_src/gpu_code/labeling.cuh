@@ -11,24 +11,32 @@
  * https://github.com/FolkeV/CUDA_CCL at commit @1e9ca96
  */
 #pragma once
+#include<stdint.h>
+
 #include"core/core.cuh"
 
 namespace {
   // "Stolen" function Start
   // ---------- Find the root of a chain ----------
-  __device__ uint32_t find_root(uint32_t* labels, uint32_t label) {
+	/**
+	 * @brief Finds the root for the label by search
+	 *
+	 * @param label_chain Memory location where each index is less than the
+	 * @param label
+	 * @return __device__ uint32_t
+	 */
+  __device__ uint32_t find_root(const uint32_t* label_chain, uint32_t label) {
 	  // Resolve Label
-	  uint32_t next = labels[label];
+	  uint32_t next = label_chain[label];
 
 	  // Follow chain
 	  while(label != next) {
 	  	// Move to next
 	  	label = next;
-	  	next = labels[label];
+	  	next = label_chain[label];
 	  }
 
-	  // Return label
-	  return(label);
+	  return label;
   }
 
   // ---------- Label Reduction ----------
@@ -60,51 +68,56 @@ namespace {
   	while(label1 != label2) {
   		// Label 2 should be smallest
   		if(label1 < label2) {
-  			// Swap Labels
-  			label1 = label1 ^ label2;
-  			label2 = label1 ^ label2;
-  			label1 = label1 ^ label2;
+				cuda::std::swap(label1, label2);
   		}
 
-  		// AtomicMin label1 to label2
   		label3 = atomicMin(&g_labels[label1], label2);
-  		label1 = (label1 == label3) ? label2 : label3;
+  		label1 = label1 == label3 ? label2 : label3;
   	}
 
-  	// Return label1
-  	return(label1);
+  	return label1 ;
   }
 
+  /**
+   * @brief Initializes the labels in g_labels
+   *
+   * @tparam T
+   * @param g_labels pointer to GPU memory holding the labels of size()
+   * @param g_image pointer to Image memory
+   * @param numCols
+   * @param numRows
+   * @return __global__
+   */
   template<typename T>
-  __global__ void init_labels(uint32_t* g_labels, const T* g_image, const size_t numCols, const size_t numRows) {
+  __global__ void init_labels(uint32_t* g_labels, const T* g_image, const size_t num_cols, const size_t num_rows) {
   	// Calculate index
-  	const uint32_t ix = (blockIdx.x * blockDim.x) + threadIdx.x;
-  	const uint32_t iy = (blockIdx.y * blockDim.y) + threadIdx.y;
+  	const uint32_t ix = blockIdx.x * blockDim.x + threadIdx.x;
+  	const uint32_t iy = blockIdx.y * blockDim.y + threadIdx.y;
 
   	// Check Thread Range
-  	if((ix < numCols) && (iy < numRows)) {
+  	if((ix < num_cols) && (iy < num_rows)) {
   		// Fetch five image values
-  		const unsigned char pyx = g_image[iy*numCols + ix];
+  		const T pyx = g_image[iy*num_cols + ix];
 
-  		// Neighbour Connections
-  		const bool nym1x   =  (iy > 0) 					  	 ? (pyx == g_image[(iy-1) * numCols + ix  ]) : false;
-  		const bool nyxm1   =  (ix > 0)  		  			 ? (pyx == g_image[(iy  ) * numCols + ix-1]) : false;
-  		const bool nym1xm1 = ((iy > 0) && (ix > 0)) 		 ? (pyx == g_image[(iy-1) * numCols + ix-1]) : false;
-  		const bool nym1xp1 = ((iy > 0) && (ix < numCols -1)) ? (pyx == g_image[(iy-1) * numCols + ix+1]) : false;
+  		// Neighbor Connections
+  		const bool nym1x   =  (iy > 0) 					  	 ? (pyx == g_image[(iy-1) * num_cols + ix  ]) : false;
+  		const bool nyxm1   =  (ix > 0)  		  			 ? (pyx == g_image[(iy  ) * num_cols + ix-1]) : false;
+  		const bool nym1xm1 = ((iy > 0) && (ix > 0)) 		 ? (pyx == g_image[(iy-1) * num_cols + ix-1]) : false;
+  		const bool nym1xp1 = ((iy > 0) && (ix < num_cols -1)) ? (pyx == g_image[(iy-1) * num_cols + ix+1]) : false;
 
   		// Label
   		uint32_t label;
 
-  		// Initialise Label
+  		// Initialize Label
   		// Label will be chosen in the following order:
   		// NW > N > NE > E > current position
-  		label = (nyxm1)   ?  iy   *numCols + ix-1 : iy*numCols + ix;
-  		label = (nym1xp1) ? (iy-1)*numCols + ix+1 : label;
-  		label = (nym1x)   ? (iy-1)*numCols + ix   : label;
-  		label = (nym1xm1) ? (iy-1)*numCols + ix-1 : label;
+  		label = (nyxm1)   ?  iy   *num_cols + ix-1 : iy*num_cols + ix;
+  		label = (nym1xp1) ? (iy-1)*num_cols + ix+1 : label;
+  		label = (nym1x)   ? (iy-1)*num_cols + ix   : label;
+  		label = (nym1xm1) ? (iy-1)*num_cols + ix-1 : label;
 
   		// Write to Global Memory
-  		g_labels[iy*numCols + ix] = label;
+  		g_labels[iy*num_cols + ix] = label;
   	}
   }
 
@@ -172,57 +185,98 @@ namespace {
   __global__ void resolve_background(uint32_t *g_labels, const T *g_image,
   		const size_t numCols, const size_t numRows){
   	// Calculate index
-  	const uint32_t id = ((blockIdx.y * blockDim.y) + threadIdx.y) * numCols +
-  							((blockIdx.x * blockDim.x) + threadIdx.x);
+  	const uint32_t id = (blockIdx.y * blockDim.y + threadIdx.y) * numCols +
+  											blockIdx.x * blockDim.x + threadIdx.x;
 
   	if(id < numRows*numCols){
-  		g_labels[id] = (g_image[id] > 0) ? g_labels[id]+1 : 0;
+  		g_labels[id] = g_image[id] > 0 ? g_labels[id]+1 : 0;
   	}
   }
 }
+// End of "Stolen" functions
 
+/**
+ * @brief Does a GPU connected component labeling on a 2D
+ *
+ * This functions doesn't do any memory allocations
+ *
+ * @tparam T - type of the Image
+ * @param device_output_labels - pointer to GPU Memory of size
+ * @param input_image -
+ * @param numCols
+ * @param numRows
+ * @return dicomNodeError_t
+ */
 template<typename T>
 dicomNodeError_t connectedComponentLabeling2D(
 	uint32_t* device_output_labels,
-	T* inputImg,
-	size_t numCols,
-	size_t numRows
+	const T* input_image,
+	const size_t num_cols,
+	const size_t num_rows
 ){
-	// I should do some testing with different sizes but ooh well
 	constexpr uint32_t BLOCK_SIZE_X = 32;
-	constexpr uint32_t BLOCK_SIZE_Y = 4;
+	constexpr uint32_t BLOCK_SIZE_Y = 32;
 
 	// Create Grid/Block
-	dim3 block (BLOCK_SIZE_X, BLOCK_SIZE_Y);
-	dim3 grid ((numCols+BLOCK_SIZE_X-1)/BLOCK_SIZE_X,
-			(numRows+BLOCK_SIZE_Y-1)/BLOCK_SIZE_Y);
+	dim3 block{BLOCK_SIZE_X, BLOCK_SIZE_Y, 1};
+
+	const uint32_t grid_x = num_cols % BLOCK_SIZE_X ?
+      num_cols / BLOCK_SIZE_X + 1
+    : num_cols / BLOCK_SIZE_X;
+
+  const uint32_t grid_y = num_rows % BLOCK_SIZE_Y ?
+      num_rows / BLOCK_SIZE_X + 1
+    : num_rows / BLOCK_SIZE_X;
+
+
+	dim3 grid {grid_x, grid_y, 1};
 
 	DicomNodeRunner runner;
 
 	runner
-		|   [&](){
-			// Initialise labels
-			init_labels<<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
+    |   [&](){
+			init_labels<T><<< grid, block >>>(device_output_labels, input_image, num_cols, num_rows);
 			return cudaGetLastError();
 		} | [&](){
-			// Analysis
-			resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
+			resolve_labels <<< grid, block >>>(device_output_labels, num_cols, num_rows);
 			return cudaGetLastError();
 		} | [&](){
-			// Label Reduction
-			label_reduction <<< grid, block >>>(device_output_labels, inputImg, numCols, numRows);
+			label_reduction<T><<< grid, block >>>(device_output_labels, input_image, num_cols, num_rows);
 			return cudaGetLastError();
 		} | [&](){
-			// Analysis
-			resolve_labels <<< grid, block >>>(device_output_labels, numCols, numRows);
+			resolve_labels <<< grid, block >>>(device_output_labels, num_cols, num_rows);
 			return cudaGetLastError();
 		} | [&](){
-			// Force background to have label zero;
-			resolve_background<<<grid, block>>>(device_output_labels, inputImg, numCols, numRows);
+			resolve_background<T><<<grid, block>>>(device_output_labels, input_image, num_cols, num_rows);
 			return cudaGetLastError();
 		};
 
 
 	return runner.error();
 }
-// End of "Stolen" functions
+
+template<typename T>
+dicomNodeError_t slicedConnectedComponentLabeling(
+  uint32_t* labels,
+  const Image<3, T>& input_volume
+){
+  DicomNodeRunner runner;
+  const size_t pixels_per_slice = input_volume.num_cols() * input_volume.num_rows();
+  size_t offset = 0;
+
+  // Yeah I could make a single kernel doing this.
+  for(uint32_t i = 0; i < input_volume.num_slices(); i++) {
+    runner | [&](){
+      return connectedComponentLabeling2D(
+        labels + offset,
+        input_volume.data + offset,
+        input_volume.num_cols(),
+        input_volume.num_rows()
+      );
+    };
+
+    offset += pixels_per_slice;
+  }
+
+  return runner.error();
+}

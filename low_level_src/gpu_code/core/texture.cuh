@@ -34,9 +34,9 @@ dicomNodeError_t load_texture(
   cudaTextureObject_t host_texture;
 
   const cudaExtent extent = make_cudaExtent(
-      space.domain[2],
-      space.domain[1],
-      space.domain[0]
+      space.extent[2],
+      space.extent[1],
+      space.extent[0]
   );
 
   DicomNodeRunner runner;
@@ -57,9 +57,9 @@ dicomNodeError_t load_texture(
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(
       (void*)data,
-      space.domain[2] * sizeof(T),
-      space.domain[2],
-      space.domain[1]
+      space.extent[2] * sizeof(T),
+      space.extent[2],
+      space.extent[1]
     );
     params.extent = extent;
     params.kind = cudaMemcpyDefault;

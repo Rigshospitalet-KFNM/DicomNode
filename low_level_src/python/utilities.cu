@@ -34,13 +34,13 @@ dicomNodeError_t _load_into_host_space(
     } | [&](){
 
       return check_buffer_pointers(
-        std::cref(domain_buffer), host_space->domain.elements()
+        std::cref(domain_buffer), host_space->extent.elements()
       );
     } | [&](){
       std::memcpy(host_space->basis.points, basis_buffer.ptr, host_space->basis.elements() * sizeof(float));
       std::memcpy(host_space->inverted_basis.points, inv_basis_buffer.ptr, host_space->inverted_basis.elements() * sizeof(float));
       std::memcpy(host_space->starting_point.points, starting_point_buffer.ptr, host_space->starting_point.elements() * sizeof(float));
-      std::memcpy(host_space->domain.sizes, domain_buffer.ptr, host_space->domain.elements() * sizeof(uint32_t));
+      std::memcpy(host_space->extent.sizes, domain_buffer.ptr, host_space->extent.elements() * sizeof(uint32_t));
 
       return dicomNodeError_t::SUCCESS;
     };
@@ -85,7 +85,7 @@ dicomNodeError_t _load_into_device_space(
     } | [&](){
 
       return check_buffer_pointers(
-        std::cref(domain_buffer), device_space->domain.elements()
+        std::cref(domain_buffer), device_space->extent.elements()
       );
     } | [&](){ return cudaMemcpy(
       device_space->basis.points,
@@ -106,9 +106,9 @@ dicomNodeError_t _load_into_device_space(
       cudaMemcpyDefault);
     }
     | [&](){ return cudaMemcpy(
-      device_space->domain.sizes,
+      device_space->extent.sizes,
       domain_buffer.ptr,
-      device_space->domain.elements() * sizeof(int),
+      device_space->extent.elements() * sizeof(int),
       cudaMemcpyDefault);};
 
   return runner.error();
@@ -186,4 +186,10 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
     };
 
   return runner.error();
+}
+
+bool is_host_pointer(const cudaPointerAttributes& attr){
+  return
+       attr.type == cudaMemoryType::cudaMemoryTypeUnregistered
+    || attr.type == cudaMemoryType::cudaMemoryTypeHost;
 }

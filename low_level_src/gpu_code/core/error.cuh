@@ -1,4 +1,6 @@
 #pragma once
+#include<stdint.h>
+
 
 constexpr uint32_t cudaErrorFlag = 0x80000000;
 
@@ -20,7 +22,8 @@ static inline cudaError_t extract_cuda_error(const dicomNodeError_t error){
 }
 
 static inline dicomNodeError_t encode_cuda_error(const cudaError_t error){
-  return (dicomNodeError_t)(error | cudaErrorFlag);
+  if (error) { return (dicomNodeError_t)(error | cudaErrorFlag); }
+  return SUCCESS;
 }
 
 static inline bool is_cuda_error(const dicomNodeError_t error){

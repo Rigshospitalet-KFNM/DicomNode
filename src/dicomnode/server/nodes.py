@@ -40,6 +40,7 @@ from pydicom import Dataset
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
+from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory
@@ -150,7 +151,7 @@ class AbstractPipeline():
   known_endpoints: Dict[str, Address] = {}
   "Address book indexed by AE titles."
 
-  _associations_responds_addresses: Dict[int, Address] = {}
+  _associations_responds_addresses: Dict[int, Address]
   "Internal variable containing a mapping of association to endpoint address"
 
   association_container_factory: Type[AssociationEventFactory] = AssociationEventFactory
@@ -166,7 +167,7 @@ class AbstractPipeline():
   number_of_backups: int = 8
   "Number of backups before the os starts deleting old logs"
 
-  log_date_format = "%Y/%m/%d %H:%M:%S"
+  log_date_format: str = "%Y/%m/%d %H:%M:%S"
   "String format for timestamps in logs."
 
   log_output: Optional[Union[TextIO, Path, str]] = stdout
@@ -176,7 +177,7 @@ class AbstractPipeline():
   * `Path | str` - creates a rotating log at the path
   """
 
-  log_when = "w0"
+  log_when: str = "w0"
   "At what points in time the log should roll over, defaults to monday midnight"
 
   log_level: int = logging.INFO
@@ -190,7 +191,6 @@ class AbstractPipeline():
   associations are logged to pynetdicom, which can be helpful for bugfixing"""
 
   # End of Attributes definitions.
-
   def _setup_logger(self):
     if isinstance(self.log_output, str):
       self.log_output = Path(self.log_output)
@@ -207,7 +207,7 @@ class AbstractPipeline():
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
 
 
-  def __init__(self) -> None:
+  def __init__(self, config=None) -> None:
     # This function starts and opens the server
     #
     # 1. Logging
@@ -264,6 +264,7 @@ class AbstractPipeline():
 
     # Handler setup
     # class needs to be instantiated before handlers can be defined
+    self._associations_responds_addresses = {}
     self._updated_patients: Dict[Optional[int], Set[str]] = {}
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()

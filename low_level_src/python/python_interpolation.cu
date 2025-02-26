@@ -30,13 +30,13 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   const size_t out_image_elements = out_image_size / sizeof(T);
 
   const size_t shape[3] = {
-    destination_space.domain[0],
-    destination_space.domain[1],
-    destination_space.domain[2]
+    destination_space.extent[0],
+    destination_space.extent[1],
+    destination_space.extent[2]
   };
   const size_t strides[3] = {
-    destination_space.domain[1] * destination_space.domain[2] * sizeof(T),
-    destination_space.domain[2] * sizeof(T),
+    destination_space.extent[1] * destination_space.extent[2] * sizeof(T),
+    destination_space.extent[2] * sizeof(T),
     sizeof(T)
   };
 

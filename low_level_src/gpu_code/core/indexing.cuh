@@ -5,7 +5,7 @@
 #include<cuda/std/optional>
 
 template<uint8_t>
-struct Domain;
+struct Extent;
 
 /**
  * @brief An index in X,Y,Z,... coordinates
@@ -34,7 +34,7 @@ struct Index {
     static_assert(sizeof...(args) == DIMENSIONS);
   };
 
-  __device__ __host__ Index(const uint64_t flat_index, const Domain<DIMENSIONS> space){
+  __device__ __host__ Index(const uint64_t flat_index, const Extent<DIMENSIONS> space){
     uint64_t dimension_temp = 1;
 
     #pragma unroll
@@ -74,18 +74,18 @@ struct Index {
  *  Data is stored in Z,Y,X
  */
 template<uint8_t DIMENSIONS>
-struct Domain {
+struct Extent {
   static_assert(DIMENSIONS > 0);
   uint32_t sizes[DIMENSIONS]{};
 
-  __device__ __host__ Domain(){
+  __device__ __host__ Extent(){
     for(uint8_t i = 0; i < DIMENSIONS; i++){
       sizes[i] = 0;
     }
   }
 
   template<typename... Args>
-  __device__ __host__ Domain(Args... args) noexcept : sizes{static_cast<uint32_t>(args)...}{
+  __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<uint32_t>(args)...}{
     static_assert(sizeof...(args) == DIMENSIONS);
   };
 

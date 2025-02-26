@@ -17,7 +17,7 @@ TEST(SPACE_INDEXING, REAL_LIFE_1){
       0.0f , 0.60606061f, 0.0f,
       0.0f , 0.0f, 0.60769215f
     },
-    .domain = {645,440,440}
+    .extent = {645,440,440}
   };
 
   const float host_basis_xy_length = 1.5234375f;
@@ -32,7 +32,7 @@ TEST(SPACE_INDEXING, REAL_LIFE_1){
       0.0f , 0.65641026f, 0.0f,
       0.0f , 0.0f, 0.33333333f
     },
-    .domain = {354,512,512}
+    .extent = {354,512,512}
   };
 
   const Index3 host_central_idx{256, 256, 177};

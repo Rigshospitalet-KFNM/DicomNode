@@ -23,9 +23,9 @@ void print_host_image(const pybind11::object& python_image){
     std::cout << "Starting Point: (" << host_image.space.starting_point[0] << ", "
                                      << host_image.space.starting_point[1] << ", "
                                      << host_image.space.starting_point[2] << ")\n";
-    std::cout << "Domain: (" << host_image.space.domain[0] << ", "
-                             << host_image.space.domain[1] << ", "
-                             << host_image.space.domain[2] << ")\n";
+    std::cout << "Extent: (" << host_image.space.extent[0] << ", "
+                             << host_image.space.extent[1] << ", "
+                             << host_image.space.extent[2] << ")\n";
   }
 
   delete[] host_image.data;
@@ -45,12 +45,12 @@ void print_device_image(const pybind11::object& python_image){
     std::cout << "Starting Point: (" << host_image.space.starting_point[0] << ", "
                                      << host_image.space.starting_point[1] << ", "
                                      << host_image.space.starting_point[2] << ")\n";
-    std::cout << "Domain: (" << host_image.space.domain[0] << ", "
-                             << host_image.space.domain[1] << ", "
-                             << host_image.space.domain[2] << ")\n";
+    std::cout << "Extent: (" << host_image.space.extent[0] << ", "
+                             << host_image.space.extent[1] << ", "
+                             << host_image.space.extent[2] << ")\n";
   }
 
-  free_image(dev_image);
+  free_device_image(dev_image);
 }
 
 void apply_cuda_management_module(pybind11::module& m){

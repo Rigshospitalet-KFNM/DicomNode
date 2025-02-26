@@ -1,8 +1,8 @@
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 from . import tests_validators
+from . import tests_config_parser
 from dicomnode import lib
-
 
 class libTestCase(DicomnodeTestCase):
   def test_sorted(self):

@@ -12,9 +12,9 @@ namespace {
     const Texture<T>& texture = *src_image;
     const Space<3>& destination_space = *dst_space;
 
-    size_t destination_elements = destination_space.domain[0] *
-                                  destination_space.domain[1] *
-                                  destination_space.domain[2];
+    size_t destination_elements = destination_space.extent[0] *
+                                  destination_space.extent[1] *
+                                  destination_space.extent[2];
 
     const uint64_t gid = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -50,9 +50,9 @@ dicomNodeError_t gpu_interpolation_linear(
     | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
     | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
     | [&](){
-      const size_t elements = host_destination_space.domain[0] *
-                              host_destination_space.domain[1] *
-                              host_destination_space.domain[2];
+      const size_t elements = host_destination_space.extent[0] *
+                              host_destination_space.extent[1] *
+                              host_destination_space.extent[2];
 
       //size_t max_threads = prop.multiProcessorCount
       //                   * prop.maxThreadsPerMultiProcessor;

@@ -9,8 +9,8 @@
 
 __global__ void interpolation_tests(const Texture<float>* texture, float* out, Space<3>* out_space, float3* coords){
   const Texture<float>& refTexture = *texture;
-  const uint32_t x = texture->space.domain[2];
-  const uint32_t y = texture->space.domain[1];
+  const uint32_t x = texture->space.extent[2];
+  const uint32_t y = texture->space.extent[1];
 
   const float lx = threadIdx.x % x;
   const float ly = (threadIdx.x / x) % y;
@@ -74,7 +74,7 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
     0.0f,0.0f,0.0f
   };
 
-  local_space.domain = Domain<3>{z,y,x};
+  local_space.extent = Extent<3>{z,y,x};
 
   float *out = nullptr;
   cudaError_t cuda_error = cudaMalloc(&out, threads * sizeof(float));
@@ -170,7 +170,7 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
     -389.23828125f, -573.23828125f, -1133.0f
   };
 
-  local_space.domain = Domain<3>{z,y,x};
+  local_space.extent = Extent<3>{z,y,x};
 
   float *out = nullptr;
   cudaError_t cuda_error = cudaMalloc(&out, data_size);
@@ -366,7 +366,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
         0.0f, 0.0f, 1.0f
       },
     },
-    .domain = Domain<3>{z,y,x}
+    .extent = Extent<3>{z,y,x}
   };
 
   const Space<3> target_space {
@@ -387,7 +387,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
         0.0f, 0.0f, 1.0f
       },
     },
-    .domain = Domain<3>{uz, uy, ux}
+    .extent = Extent<3>{uz, uy, ux}
   };
 
   constexpr size_t out_elements = uz * uy * ux;
