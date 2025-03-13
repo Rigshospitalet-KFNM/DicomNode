@@ -78,6 +78,9 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   required_values: Dict[Union[int,str], Any] = {}
   "A Mapping of tags and associated values, doesn't work for values in sequences"
 
+  enforce_single_series = False
+
+
   image_grinder: Grinder = IdentityGrinder()
   """Grinder for converting stored dicom images
   into a data usable by the processing function"""
@@ -101,6 +104,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     super().__init__()
     self.options = options
     "Options for this Abstract input"
+
+    self.single_series_uid: Optional[UID] = None
 
     self.path: Optional[Path] = options.data_directory
     if self.options.logger is not None:
@@ -233,6 +238,15 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     if not self.validate_image(dicom):
       raise InvalidDataset
 
+    if self.enforce_single_series:
+      if 0x0020_000E not in dicom: # 0x0020_000E = Series Instance UID
+        raise InvalidDataset
+      if self.single_series_uid is None:
+        self.single_series_uid = dicom[0x0020_000E].value
+      else:
+        if self.single_series_uid != dicom[0x0020_000E].value:
+          raise InvalidDataset
+
     # Save the dataset
     if self.options.lazy:
       if self.path is None:
@@ -362,8 +376,8 @@ class HistoricAbstractInput(AbstractInput):
       IncorrectlyConfigured: _description_
   """
 
-  address: Address = None
-  query_level: QueryLevels = None
+  address: Optional[Address] = None
+  query_level: Optional[QueryLevels] = None
 
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
@@ -381,7 +395,7 @@ class HistoricAbstractInput(AbstractInput):
     if not self.send_historic_message and 0 < images:
       self.send_historic_message = True
       message = self.get_message_dataset(dataset)
-      if self.options.ae_title is None:
+      if self.options.ae_title is None and self.address is None:
         raise IncorrectlyConfigured
 
       send_move_thread(
@@ -406,6 +420,10 @@ class AbstractInputProxy(AbstractInput):
   """
   type_options: List[Type[AbstractInput]]
 
+  @property
+  def images(self):
+    return 0
+
   def validate(self) -> bool:
       return False
 
@@ -419,8 +437,6 @@ class AbstractInputProxy(AbstractInput):
         type_option.__init__(self, options=self.input_options)
         return self.add_image(dicom)
     raise InvalidDataset
-
-
 
 __all__ = [
   'AbstractInput',

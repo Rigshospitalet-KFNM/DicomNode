@@ -47,7 +47,7 @@ class Cluster:
       self.__init_nodes(self.nodes)
     else:
       raise IncorrectlyConfigured
-    
-__all__ = (
-  Cluster
-)
+
+__all__ = [
+  'Cluster'
+]

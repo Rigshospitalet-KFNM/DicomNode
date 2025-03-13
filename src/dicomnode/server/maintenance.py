@@ -101,8 +101,6 @@ class MaintenanceThread(Thread):
       mem_info = process.memory_info()
       self.logger.info(f"Process is using {human_readable_byte_count(mem_info.rss)} Memory")
 
-
-
 __all__ = [
   'MaintenanceThread'
 ]

@@ -190,6 +190,11 @@ class AbstractPipeline():
   """Sets the level pynetdicom logger, note that traceback from
   associations are logged to pynetdicom, which can be helpful for bugfixing"""
 
+  error_on_rejected_dataset = True
+  """If true the server will send a error message code back to the server if no
+  dataset were accepted by the inputs, if false it will send an accepted image
+  """
+
   # End of Attributes definitions.
   def _setup_logger(self):
     if isinstance(self.log_output, str):
@@ -323,6 +328,9 @@ class AbstractPipeline():
       handler = self._acceptation_handlers.get(association_type)
       if handler is not None:
         handler(self, association_accept_container)
+      else: # pragma no cover
+        self.logger.error("No association requested handler for found for "
+                          f"{association_type}!")
 
 
   def _consume_association_accept_store_association(
@@ -375,7 +383,11 @@ class AbstractPipeline():
         # End of Critical Zone
       except InvalidDataset:
         self.logger.info("Node rejected dataset: Received dataset is not accepted by any inputs")
-        return 0xB006
+        if self.error_on_rejected_dataset:
+          return 0xB006
+        else:
+          return 0x0000
+
       except Exception as exception:
         log_traceback(self.logger, exception, "Adding Image to input produced an exception")
         return 0xA801
@@ -453,9 +465,10 @@ class AbstractPipeline():
         self.logger.critical(f"Missing Release Handler for {association_type}!") # pragma: no cover
 
   def _release_store_handler(self, released_event: ReleasedEvent):
-    input_containers: List[Tuple[str, InputContainer]] = self._extract_input_containers(released_event)
+    input_containers = self._extract_input_containers(released_event)
     if len(input_containers) == 0:
-      self.logger.info(f"Release Event did not return any input containers to be processed.")
+      self.logger.info(f"Release Event from {released_event.association_ae} did"
+                       " not return any input containers to be processed.")
       return
     process = multiprocessing.Process(target=self._process_entry_point,
                                       args=(released_event, input_containers))
@@ -491,7 +504,7 @@ class AbstractPipeline():
 
   def _pipeline_processing(self,
                            patient_id: str,
-                           released_container: ReleasedEvent,
+                           released_container: Optional[ReleasedEvent],
                            patient_input_container: InputContainer):
     """Processes a patient through the pipeline and starts exporting it
 
@@ -703,7 +716,7 @@ class AbstractPipeline():
 
   def exception_handler_respond_with_dataset(self,
                                              exception : Exception,
-                                             release_container: ReleasedEvent,
+                                             release_container: Optional[ReleasedEvent],
                                              input_container: InputContainer):
     """This function is the default exception handler for processing
 
@@ -719,7 +732,7 @@ class AbstractPipeline():
         input_container (InputContainer): The InputContainer that was used to
         call process that threw.
     """
-    if self.unhandled_error_blueprint is None:
+    if self.unhandled_error_blueprint is None or release_container is None:
       return
 
     if release_container.association_ip is None:
@@ -778,7 +791,7 @@ class AbstractPipeline():
     AssociationTypes.STORE_ASSOCIATION : _release_store_handler
   }
 
-  exception_handlers: Dict[Type[Exception], Callable[[Exception, ReleasedEvent, InputContainer], None]] = {
+  exception_handlers: Dict[Type[Exception], Callable[[Exception, Optional[ReleasedEvent], InputContainer], None]] = {
 
   }
 
@@ -796,6 +809,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
     while self.running:
       try:
         released_container = self.process_queue.get(timeout=self.queue_timeout)
+        self.logger.info(f"Process queue got item, approximate queue length: "
+                         f"{self.process_queue.qsize()}")
         try:
           for association_type in released_container.association_types:
             handler = self._release_handlers.get(association_type)
