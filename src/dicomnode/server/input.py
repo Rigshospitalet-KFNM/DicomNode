@@ -41,6 +41,8 @@ class AbstractInputMetaClass(ABCMeta):
     UserAbstractInput_1 or UserAbstractInput_2
   In their type declaration.
   """
+  type_options: List
+
   def __or__(self: Union[Type['AbstractInput'], Type['AbstractInputProxy']],
              value: Union[Type['AbstractInput'], Type['AbstractInputProxy']]
              ) -> Type['AbstractInputProxy']:
