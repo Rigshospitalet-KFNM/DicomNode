@@ -249,6 +249,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
         if self.single_series_uid != dicom[0x0020_000E].value:
           raise InvalidDataset
 
+    replaced = dicom.SOPInstanceUID.name in self
+
     # Save the dataset
     if self.options.lazy:
       if self.path is None:
@@ -263,7 +265,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
         dicom_path = self.get_path(dicom)
         if not dicom_path.exists():
           save_dicom(dicom_path, dicom)
-    self.images += 1
+    if not replaced:
+      self.images += 1
     return 1
 
   def __str__(self):
