@@ -143,7 +143,9 @@ class PatientNode(ImageTreeInterface):
     valid = True
     for dicomnode_input in self.data.values():
       if isinstance(dicomnode_input, AbstractInput):
-        valid &= dicomnode_input.validate()
+        input_container_valid = dicomnode_input.validate()
+        self.logger.debug(f"Input {dicomnode_input.__class__.__name__} with Images {dicomnode_input.images} validates to: {input_container_valid}")
+        valid &= input_container_valid
       else:
         raise InvalidTreeNode # pragma: no cover
     return valid

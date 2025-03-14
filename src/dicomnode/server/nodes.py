@@ -270,7 +270,7 @@ class AbstractPipeline():
     # Handler setup
     # class needs to be instantiated before handlers can be defined
     self._associations_responds_addresses = {}
-    self._updated_patients: Dict[Optional[int], Set[str]] = {}
+    self._updated_patients: Dict[Optional[int], Dict[str, int]] = {}
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
 
@@ -344,7 +344,7 @@ class AbstractPipeline():
         accepted_container.association_ae
       )
 
-    self._updated_patients[accepted_container.association_id] = set()
+    self._updated_patients[accepted_container.association_id] = {}
 
 
   def _handle_c_store(self, event: evt.Event) -> int:
@@ -373,13 +373,14 @@ class AbstractPipeline():
           self._patient_locks[patient_id] = (threads, patient_lock)
 
         if patient_id not in self._updated_patients[thread_id]:
-          self._updated_patients[thread_id].add(patient_id)
+          self._updated_patients[thread_id][patient_id] = 0
           threads.add(thread_id)
       # End of Critical zone
       try:
         # Critical Patient zone
         with patient_lock:
-          self.data_state.add_image(c_store_container.dataset)
+          stored = self.data_state.add_image(c_store_container.dataset)
+          self._updated_patients[thread_id][patient_id] += stored
         # End of Critical Zone
       except InvalidDataset:
         self.logger.info("Node rejected dataset: Received dataset is not accepted by any inputs")
@@ -424,6 +425,7 @@ class AbstractPipeline():
           self.logger.critical(f"patient_locks: {self._patient_locks} patient id: {patient_id}") #pragma: no cover
           self.logger.critical("Another thread deleted thread-set and Patient log") #pragma: no cover
           continue # pragma: no cover
+        self.logger.info(f"Thread {release_event.association_id} added: {self._updated_patients[release_event.association_id][patient_id]} images")
         with patient_lock:
           if len(threads) == 1:
             if self.data_state.validate_patient_id(patient_id):
@@ -440,6 +442,7 @@ class AbstractPipeline():
           else:
             thread_id = release_event.association_id
             threads.remove(thread_id)
+            self.logger.debug(f"One of the Threads: {threads} will handle {patient_id}")
             continue
     del self._updated_patients[release_event.association_id] # Removing updated Patients
     return input_containers
