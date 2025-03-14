@@ -20,8 +20,6 @@ from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompil
 
 from . import base_classes
 
-
-
 def add_line(container: _Container, *args):
   for arg in args:
     container.append(arg)

@@ -6,7 +6,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from contextlib import contextmanager
 
 # Third Party Packages
-from pylatex import Package, NoEscape
+from pylatex import Package, NoEscape, escape_latex
 from pylatex.base_classes import Environment
 
 # Dicomnode packages
