@@ -313,9 +313,7 @@ class PatientNodeTestCase(TestCase):
     input_container = patient_node.extract_input_container()
 
   def test_header_creation_with_pivot_input(self):
-    options = PatientNode.Options(
-      parent_input="arg_1"
-    )
+    options = PatientNode.Options()
 
     patient_node = PatientNode({
       'arg_1' : TestInput1
@@ -335,9 +333,7 @@ class PatientNodeTestCase(TestCase):
     input_container = patient_node.extract_input_container()
 
   def test_header_creation_with_dynamic_input(self):
-    options = PatientNode.Options(
-      parent_input="arg_1"
-    )
+    options = PatientNode.Options()
 
     patient_dynamic_node = PatientNode({
       'arg_1' : TestDynamicInput

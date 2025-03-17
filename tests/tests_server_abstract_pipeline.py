@@ -142,7 +142,7 @@ class PipeLineTestCase(DicomnodeTestCase):
 
   def test_consume_c_store_missing_Patient_ID(self):
     # Setup
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
 
     container = CStoreEvent(
@@ -158,7 +158,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertEqual(cm.output[0], "INFO:dicomnode:Node rejected dataset: Received dataset doesn't have patient Identifier tag: 0x100020")
 
   def test_consume_c_store_missing_required_tag(self):
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
 
@@ -175,7 +175,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertIn("INFO:dicomnode:Node rejected dataset: Received dataset is not accepted by any inputs", cm.output)
 
   def test_consume_c_store_fails_filter(self):
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110101,'LO', 'ret_false')
@@ -193,7 +193,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertIn("INFO:dicomnode:Node rejected dataset: Received Dataset did not pass filter", cm.output)
 
   def test_consume_c_store_exception_filter(self):
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110101,'LO', 'ret_raise')
@@ -211,7 +211,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertIn("CRITICAL:dicomnode:User defined function filter produced an exception", cm.output)
 
   def test_consume_c_store_add_image_raises(self):
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
     input_dataset.add_new(0x00110102,'LO', 'ret_raise')
@@ -229,7 +229,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertIn("CRITICAL:dicomnode:Adding Image to input produced an exception", cm.output)
 
   def test_consume_c_store_success(self):
-    self.node._updated_patients[self.thread_id] = set()
+    self.node._updated_patients[self.thread_id] = {}
     input_dataset = Dataset()
     input_dataset.PatientID = TEST_CPR
     input_dataset.SOPInstanceUID = gen_uid()
@@ -253,7 +253,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertEqual(self.node.data_state.images, 1)
 
   def test_consume_release_container(self):
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0 }
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
     self.node.data_state.add_images(DATASETS)
     container = ReleasedEvent(
@@ -277,7 +277,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertRegexIn(log_cleanup, log_lines)
 
   def test_pipeline_container(self):
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
     self.node.data_state.add_images(DATASETS)
     input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
@@ -298,7 +298,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.assertRegexIn(log_dispatch, cm.output)
 
   def test_consume_release_container_not_enough_data(self):
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
 
     container = ReleasedEvent(
@@ -316,7 +316,7 @@ class PipeLineTestCase(DicomnodeTestCase):
 
   def test_consume_release_container_another_thread_leaving(self):
     # Simulate there's another thread adding to TEST_CPR images
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id,
                                                self.thread_id + 1]),
                                           threading.Lock())
@@ -332,12 +332,12 @@ class PipeLineTestCase(DicomnodeTestCase):
     with self.assertLogs('dicomnode', logging.DEBUG) as cm:
       self.node._release_store_handler(container)
 
-    log = f"PatientID to be updated in: {{{self.thread_id}: {{'1502799995'}}}}"
+    log = f"PatientID to be updated in: {{{self.thread_id}: {{'1502799995': 0}}}}"
     self.assertRegexIn(log, cm.output)
 
   def test_consume_release_container_with_raised_error(self):
     # Simulate there's another thread adding to TEST_CPR images
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id,]),
                                           threading.Lock())
     self.node.data_state.add_images(DATASETS)
@@ -357,7 +357,7 @@ class PipeLineTestCase(DicomnodeTestCase):
 
   def test_failed_processing_exit_with_code_1(self):
     # Simulate there's another thread adding to TEST_CPR images
-    self.node._updated_patients[self.thread_id] = set([TEST_CPR])
+    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]),
                                           threading.Lock())
     self.node.data_state.add_images(DATASETS)

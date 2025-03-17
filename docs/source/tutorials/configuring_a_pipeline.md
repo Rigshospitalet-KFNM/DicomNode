@@ -1,38 +1,47 @@
 # Configuring the pipeline
 
-So far we have only scratched the surface of configuration. To get the full overview, I suggest reading the `nodes.py` file, but some common configuration can be found below:
+This document is an extension of the "Create a pipeline". It explains the many
+build in configurations that the library offers.
 
 ## Permanent file storage
 
-By default all the dataset is kept in memory. That means if the program is stopped, all data is lost.
+By default all the dataset is kept in memory. That means if the program is
+stopped, all data is lost.
 To make the pipeline save a copy to disk you need to overwrite an attribute:
 
 ```python
 class MyPipeline(AbstractPipeline):
   ...
-  root_data_directory: Union[str, Path] = Path('path/to/data/directory')
+  data_directory: Union[str, Path] = Path('path/to/data/directory')
   ...
 ```
 
-The pipeline will now save a copy of each dataset, and delete them when it's done with the dataset.
-The file structure produced looks like this:
+The pipeline will now save a copy of each dataset, and delete them when
+it's done with the dataset. The file structure produced looks like this:
 
 ```text
-  root_data_directory / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                                ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                   / {\$input_arg_name_2} / Image_{\$image.modality}_{\$instance_number}.dcm
-                                                                                ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                               ... / ...
-                      / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                                ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                   / {\$input_arg_name_2} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                                ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                               ... / ...
-                  ... / ...
+  data_directory / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                               / {\$input_arg_name_2} / Image_{\$image.modality}_{\$instance_number}.dcm
+                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                           ... / ...
+                 / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                               / {\$input_arg_name_2} / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                                           ... / ...
+             ... / ...
 ```
 
-The `patient_identifier_tag` is another pipeline attribute, which the pipeline uses to separate images belonging to differing batches.
-The tag defaults to the tag PatientID. The `input_arg_name` is a key in the input directory, the files are the images stored in the input instance.
+The `patient_identifier_tag` is another `AbstractPipeline` attribute, which the
+pipeline uses to separate images belonging to differing "batches".
+The tag prevents that, if you send a PET from a patient and a CT from another
+then both series are accepted, but processing doesn't start on these series.
+The value of this tag is shared(equal) among all images used to generate the
+`InputContainer` of the processing function.
+
+The tag defaults to the tag PatientID. The `input_arg_name` is a key in the
+`input` directory, and each file is an image stored in the input instance.
 
 ## Logging
 

@@ -1,27 +1,38 @@
 # Configuration Guide
 
-This Document provides an overview of the different attributes, method and properties, that you can overwrite.
-Function docstring can be found in the files or sphinx documentation.
+This Document provides an overview of the different attributes, method and
+properties, that you can overwrite. Function docstring can be found in the files
+or sphinx documentation.
 
 ## AbstractInput
 
 ### Attributes - Input
 
-* `required_tags: List[int]` - The list of tags that must be present in a dataset to be accepted into the input. Consider checking SOP_mapping.py for collections of Tags.
-* `required_values: Dict[int, Any]` - A Mapping of tags and associated values, doesn't work for values in sequences
-* `image_grinder: Grinder = identity_grinder` Function for initial preprocessing, often to transform to data format, better suited for image processing.
+* `required_tags: List[int | str]` - The list of tags that must be present in a
+dataset to be accepted into the input. Consider checking SOP_mapping.py for
+collections of Tags.
+* `required_values: Dict[int | str, Any]` - A Mapping of tags and associated
+values, doesn't work for values in sequences
+* `image_grinder: Grinder = identity_grinder` Function for initial
+preprocessing, often to transform to data format, better suited for image processing.
+* `enforce_single_series = False` If True, requires series instance UID tags and
+After the first dataset, the input will reject datasets from a different series
 
 ### Methods - Input
 
-* `validate (self) -> bool` - Method for checking that all data is available. Should return True when input is ready for processing, false otherwise.
+* `validate (self) -> bool` - Abstract Method for checking if all data needed
+for processing is stored in the input. Should return `True` when input is ready
+for processing, `False` otherwise.
 
 ## Abstract Pipeline
 
-This class is the server running the dicom node. It contains configuration for the many subclasses to instantiated.
+This class is the server running the dicom node. It contains configuration for
+the many subclasses to instantiated.
 
 ### Attributes - Pipeline
 
-* `processing_directory` - Base directory that the processing will take place in. The specific directory that will run is: `processing_directory/patient_ID`
+* `processing_directory` - Base directory that the processing will take place
+in. The specific directory that will run is: `processing_directory/patient_ID`
 
 #### Maintenance Configuration
 
@@ -30,24 +41,28 @@ This class is the server running the dicom node. It contains configuration for t
 
 #### Input configuration
 
-* `input: Dict[str, Type[AbstractInput]] = {}` - Defines the AbstractInput leafs for each Patient Node.
-* `input_config: Dict[str, Dict[str, Any]] = {}` - config parsed to input, outer dict should have same keys as `input`.
-* `patient_identifier_tag: int = 0x00100020 # Patient ID` - Dicom tag to separate each study
-* `data_directory: Optional[Path] = None` - Path to where the pipeline tree may store dicom objects "permanently"
-* `lazy_storage: bool = False` - Indicates if the abstract inputs should use Lazy datasets.
+* `input: Dict[str, Type[AbstractInput]] = {}` - Defines the structure of the
+`InputContainer` that is an as argument to the processing function. Each key
+is the output of the `image_grinder` after the input has returned `True` on it's
+validate function
+* `patient_identifier_tag: int = 0x00100020 # Patient ID` - Dicom tag to
+separate each study in the Pipeline.
+* `data_directory: Optional[Path] = None` - Path to directory where the pipeline
+tree stores dicom images, that have been accepted by an input the pipeline.
+After processing the images are deleted again. If None, then the datasets are
+not stored, and in process memory only! Note this have the advantage of less
+wear on the Hard drive.
+* `lazy_storage: bool = False` - Indicates if the abstract inputs should use
+Lazy datasets. This can be very useful if you have very large datasets and run
+out of RAM.
 * `pipeline_tree_type: Type[PipelineTree] = PipelineTree` - Class of PipelineTree that the node will create as main data storage
 * `patient_container_type: Type[PatientNode] = PatientNode` - Class of PatientNode that the the PipelineTree should create as nodes.
 * `input_container_type: Type[PatientContainer] = PatientContainer` - Class of PatientContainer that the PatientNode should create when processing a patient
 
-#### DicomGeneration
-
-* `factory: Optional[DicomFactory] = None` - Class for producing various Dicom objects and series
-* `header_blueprint: Optional[Blueprint] = None` - Blueprint for creating a series header
-* `c_move_blueprint: Optional[Blueprint] = None` - Blueprint for create a C Move object
 
 #### AE configuration tags
 
-* `ae_title: str = "Your_AE_TITLE"` - AE title of  the dicomnode
+* `ae_title: str = "Your_AE_TITLE"` - AE title of the dicomnode
 * `ip: str = 'localhost'` - IP of node, Either 0.0.0.0 or localhost
 * `port: int = 104` - Port of Node, int in range 1-65535 (Requires root access to open port <1024)
 * `supported_contexts: List[PresentationContext] = AllStoragePresentationContexts` - Presentation contexts accepted by the node

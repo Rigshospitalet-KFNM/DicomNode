@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Type, Iterable, Set
 from pydicom import Dataset
 
 # Dicomnode Library Packages
+from dicomnode.dicom.series import DicomSeries
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dimse import Address
 from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
@@ -79,12 +80,6 @@ class PatientNode(ImageTreeInterface):
     If None it will create a 'dicomnode' logger and log to it
     Injected Into AbstractInputs
     """
-
-    parent_input: Optional[str] = None
-    """The input that will be used as parent input in header creation,
-    if None an arbitrary input is used.
-    Injected Into AbstractInputs"""
-
 
     ae_title: Optional[str] = None
     container_path: Optional[Path] = None
@@ -252,9 +247,6 @@ class PipelineTree(ImageTreeInterface):
     input_container_type: Type[InputContainer] = InputContainer
     "type of input containers get_patient_input_container should return"
 
-    parent_input: Optional[str] = None
-    "Input, that should be used as parent"
-
     patient_container: Type[PatientNode] = PatientNode
     "Type of node that's under this tree."
 
@@ -326,6 +318,24 @@ class PipelineTree(ImageTreeInterface):
 
     raise InvalidTreeNode # pragma: no cover
 
+  def get_storage_directory(self, identifier: Any) -> Optional[Path]:
+    if self.options.data_directory is None:
+      return None
+
+    if isinstance(identifier, DicomSeries):
+      val = identifier[self.patient_identifier_tag]
+      if val is not None and not isinstance(val, List):
+        return self.options.data_directory / str(val.value)
+      else:
+        return None
+
+    if isinstance(identifier, Dataset):
+      return self.options.data_directory / str(identifier[self.patient_identifier_tag].value)
+
+    if isinstance(identifier, str):
+      return self.options.data_directory / identifier
+
+    raise TypeError("Unknown identifier type")
 
   def validate_patient_id(self, patient_id: str) -> bool:
     """Determines if a patient have all needed data and extract it if it does

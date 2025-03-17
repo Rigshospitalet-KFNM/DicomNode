@@ -425,7 +425,7 @@ class DicomFactory():
     if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
       stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
     elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
-      raise NotImplemented("Signed encoding is not supported yet")
+      raise NotImplementedError("Signed encoding is not supported yet")
       #stored_image_type = SIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
     if stored_image_type is None:
       raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")

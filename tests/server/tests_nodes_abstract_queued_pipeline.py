@@ -71,9 +71,9 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
     thread_id_2 = 392
     thread_id_3 = 395
 
-    self.node._updated_patients[thread_id_1] = set([PATIENT_ID_1])
-    self.node._updated_patients[thread_id_2] = set([PATIENT_ID_2])
-    self.node._updated_patients[thread_id_3] = set([PATIENT_ID_3])
+    self.node._updated_patients[thread_id_1] = { PATIENT_ID_1 : 0 }
+    self.node._updated_patients[thread_id_2] = { PATIENT_ID_2 : 0 }
+    self.node._updated_patients[thread_id_3] = { PATIENT_ID_3 : 0 }
     self.node._patient_locks[PATIENT_ID_1] = (set([thread_id_1]), threading.Lock())
     self.node._patient_locks[PATIENT_ID_2] = (set([thread_id_2]), threading.Lock())
     self.node._patient_locks[PATIENT_ID_3] = (set([thread_id_3]), threading.Lock())

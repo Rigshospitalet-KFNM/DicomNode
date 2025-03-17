@@ -41,7 +41,7 @@ Superclass it and open it with the following code:
 from dicomnode.server.node import AbstractPipeline
 
 class MyPipeline(AbstractPipeline):
-  pass
+  ...
 
 if __name__ == '__main__':
   pipeline = MyPipeline()
@@ -80,7 +80,10 @@ determine if an image is valid.
 * `requires_values` - Dict which is a mapping between tags and values. An image
 is only valid if it matches the given value.
 
-You must implement a method to check if the input have all the images it needs.
+You must implement a method called `validate` to check if the input have all the
+images it needs for processing.
+This is more tricky that you might think because there's not a universal tag,
+which
 
 And finally you must provide a method for transforming the dicom images into a
 format used by your processing step.
@@ -134,7 +137,7 @@ however as an example:
 ```python
 class MyInput(AbstractInput):
   def validate(self) -> bool:
-    max_instance_number = 0
+    max_instance_number = -1 # Use
     for dataset in self.data.values():
       max_instance_number = max(dataset.InstanceNumber, max_instance_number)
     return self.images == max_instanceNumber
@@ -276,7 +279,7 @@ class MyPipeline(AbstractPipeline):
 
   ...
 
-  return DicomOutput([Address(ip='', port=104, ae_title=""), datasets])
+  return DicomOutput([Address(ip='', port=104, ae_title=""), datasets], self.ae_title)
 ```
 
 If you have performed the steps above you now have a functional pipeline.

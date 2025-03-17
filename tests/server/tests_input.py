@@ -431,6 +431,9 @@ class InputTestCase(TestCase):
     self.assertEqual(added_images, 1)
     # HAHAHAHAHAHAHAHAHAHAHAHAHAHA
     self.assertIsInstance(test_instance, CTInput)
+    self.assertEqual(test_instance.images, 1)
+    self.assertEqual(test_instance.enforce_single_series, False)
+
 
     test_dataset_2 = Dataset()
     test_dataset_2.SOPInstanceUID = gen_uid()
@@ -505,7 +508,7 @@ class InputTestCase(TestCase):
 
     dataset_CT = Dataset()
     dataset_CT.SOPInstanceUID = gen_uid()
-    dataset_CT.Modality = 'PET'
+    dataset_CT.Modality = 'CT'
 
     HiHiHiHi = HeHeHeHe()
 
@@ -514,3 +517,81 @@ class InputTestCase(TestCase):
       HiHiHiHi.add_images,
       [dataset_PET, dataset_CT]
     )
+
+  def test_replacing_images_preserves_class_invariant(self):
+    class NeverValidating(AbstractInput):
+      def validate(self) -> bool:
+        return False
+
+    pipeline_input = NeverValidating()
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+
+    added_images_1 = pipeline_input.add_image(dataset)
+    self.assertEqual(added_images_1, 1)
+    self.assertEqual(pipeline_input.images, 1)
+    added_images_2 = pipeline_input.add_image(dataset)
+    self.assertEqual(added_images_2, 1)
+    self.assertEqual(pipeline_input.images, 1)
+
+  def test_enforcing_single_series(self):
+    class NormalBehavior(AbstractInput):
+      def validate(self) -> bool:
+        return False
+
+    class EnforcingBehavior(AbstractInput):
+      enforce_single_series = True
+
+      def validate(self) -> bool:
+        return False
+
+    dataset_missing_series = Dataset()
+    dataset_missing_series.SOPInstanceUID = gen_uid()
+
+    dataset_series_1 = Dataset()
+    dataset_series_1.SOPInstanceUID = gen_uid()
+    dataset_series_1.SeriesInstanceUID = gen_uid()
+
+    dataset_series_2 = Dataset()
+    dataset_series_2.SOPInstanceUID = gen_uid()
+    dataset_series_2.SeriesInstanceUID = gen_uid()
+
+    normal = NormalBehavior()
+
+    normal.add_image(dataset_missing_series)
+    normal.add_image(dataset_series_1)
+    normal.add_image(dataset_series_2)
+
+    enforcer = EnforcingBehavior()
+
+    self.assertRaises(InvalidDataset, enforcer.add_image, dataset_missing_series)
+    enforcer.add_image(dataset_series_1)
+    self.assertRaises(InvalidDataset, enforcer.add_image, dataset_series_2)
+
+  def test_validating_with_strings(self):
+    dataset = Dataset()
+
+    class StringTagsValidation(AbstractInput):
+      required_tags = ["not a tag"]
+
+    self.assertRaises(IncorrectlyConfigured, StringTagsValidation.validate_image, dataset)
+
+
+    class StringValuesValidation(AbstractInput):
+      required_values = {
+        "Not a tag" : 0
+      }
+
+    self.assertRaises(IncorrectlyConfigured, StringValuesValidation.validate_image, dataset)
+
+    dataset.Modality = "PT"
+    dataset.InstanceNumber = 1
+
+    class StringTagsValidationWorking(AbstractInput):
+      required_tags = ["Modality"]
+      required_values = {
+        "InstanceNumber" : 1
+      }
+
+    self.assertTrue(StringTagsValidationWorking.validate_image(dataset))

@@ -156,7 +156,10 @@ class IdentityMapping():
 class ImageTreeInterface(ABC):
   """Base class for a tree of Dicom Images.
 
+  The class is the common interface for tree nodes of Tree consisting of
+  datasets
   """
+
   @abstractmethod
   def add_image(self, _dicom : Dataset) -> int:
     """Abstract Method for adding datasets to the Tree"""
@@ -452,6 +455,8 @@ class PatientTree(ImageTreeInterface):
 
   def studies(self) -> Iterable[StudyTree]:
     for study in self.data.values():
+      if not isinstance(study, StudyTree):
+        raise InvalidTreeNode
       yield study
 
   def series(self) -> Iterable[SeriesTree]:

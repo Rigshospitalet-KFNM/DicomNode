@@ -89,8 +89,6 @@ class AbstractPipeline():
   input: Dict[str, Type[AbstractInput]] = {}
   "Defines the AbstractInput leafs for each Patient Node."
 
-  input_config: Dict[str, Dict[str, Any]] = {}
-
   patient_identifier_tag: int = 0x00100020 # Patient ID
   "Dicom tag to separate each study in the PipelineTree"
 
@@ -113,21 +111,6 @@ class AbstractPipeline():
 
   input_container_type: Type[InputContainer] = InputContainer
   "Class of PatientContainer that the PatientNode should create when processing a patient"
-
-  #DicomGeneration
-  dicom_factory: Optional[DicomFactory] = None
-  "Class for producing various Dicom objects and series"
-
-  header_blueprint: Optional[Blueprint] = None
-  "Blueprint for creating a series header"
-
-  c_move_blueprint: Optional[Blueprint] = None
-  "Blueprint for create a C Move object"
-
-  parent_input: Optional[str] = None
-  """Input to be used for SeriesHeader generation
-  Must be a key in the input attribute.
-  """
 
   # Dicom communication configuration tags
   ae_title: str = "Your_AE_TITLE"
@@ -243,7 +226,6 @@ class AbstractPipeline():
       lazy=self.lazy_storage,
       input_container_type=self.input_container_type,
       patient_container=self.patient_container_type,
-      parent_input=self.parent_input,
     )
 
     self.data_state: PipelineTree = self.pipeline_tree_type(
@@ -328,9 +310,9 @@ class AbstractPipeline():
       handler = self._acceptation_handlers.get(association_type)
       if handler is not None:
         handler(self, association_accept_container)
-      else: # pragma no cover
+      else:
         self.logger.error("No association requested handler for found for "
-                          f"{association_type}!")
+                          f"{association_type}!") # pragma no cover
 
 
   def _consume_association_accept_store_association(
@@ -509,12 +491,15 @@ class AbstractPipeline():
                            patient_id: str,
                            released_container: Optional[ReleasedEvent],
                            patient_input_container: InputContainer):
-    """Processes a patient through the pipeline and starts exporting it
+    """Processes a patient through the pipeline and exporting it
+
+    This function is not called directly, it's a target process is spawned,
+    when the data is spawned.
 
     Args:
-      patient_ID (str): Indentifier of the patient to be procesed
-      released_container: (ReleasedContainer): data proccessing starts
-        after an assocation is released. This is the data from the released
+      patient_ID (str): Identifier of the patient to be processed
+      released_container: (ReleasedContainer): data processing starts
+        after an association is released. This is the data from the released
         association.
     """
     self.logger.info(f"Processing {patient_id}")
@@ -532,7 +517,7 @@ class AbstractPipeline():
         type(exception), self.exception_handler_respond_with_dataset
       )
       exception_handler(exception, released_container, patient_input_container)
-      exit(1)
+      exit(1) # This is okay because this function is called from another process
     else:
       self.logger.debug(f"Process {patient_id} Successful, Dispatching output!")
       if self._dispatch(result):
@@ -659,6 +644,8 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.require_called_aet: {self.dicom_application_entry.require_called_aet}")
     self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
+
+    self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
     #self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
     # I don't know why the type checker is high.
     event_handlers: List[evt.EventHandlerType] = [ t for t in self._evt_handlers.items() ]
@@ -688,23 +675,7 @@ class AbstractPipeline():
     raise TypeError("Unknown identifier type")
 
   def get_storage_directory(self, identifier: Any) -> Optional[Path]:
-    if self.data_directory is None:
-      return None
-
-    if isinstance(identifier, DicomSeries):
-      val = identifier[self.patient_identifier_tag]
-      if val is not None and not isinstance(val, List):
-        return self.data_directory / str(val.value)
-      else:
-        return None
-
-    if isinstance(identifier, Dataset):
-      return self.data_directory / str(identifier[self.patient_identifier_tag].value)
-
-    if isinstance(identifier, str):
-      return self.data_directory / identifier
-
-    raise TypeError("Unknown identifier type")
+    return self.data_state.get_storage_directory(identifier)
 
   def _build_error_dataset(self, blueprint: Blueprint,
                                  pivot: Dataset,

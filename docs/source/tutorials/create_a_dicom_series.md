@@ -7,8 +7,9 @@ title: Create a dicom series
 
 ## Introduction
 
-Dicom node is a dicom in and dicom out, however in most pipeline you will
-transform the dicom input into some other data format, for processing.
+Dicom node is a dicom in and dicom out library, however in most pipeline you
+will need to transform the dicom input into some other data format for
+processing. Then to interact with a PACS system
 You will need to transform data back into dicom, which this tutorial is about.
 
 ## Building a series
@@ -34,11 +35,11 @@ At this point the blueprint is empty or the equivalent to a white paper house
 blueprint. We need to fill it with virtual elements which are equivalent to
 lines in a normal blueprint.
 
-A virtual element describes to construct a single tag in a dicom series. For
-instance, the series description should probably indicate that this image was
-produces by your pipeline and the tag should be set in all images of the dicom
-series. This is done with a `StaticElement`, because we know what should be in
-the tag before our pipeline is even running.
+A virtual element describes a method to construct a single tag in a dicom
+series. For instance, the series description should probably indicate that this
+image was produces by your pipeline and the tag should be equal in all images
+of the dicom series. This is done with a `StaticElement`, because we know what
+should be in the tag before our pipeline is even running.
 
 ```Python
 # Code continued from earlier example
@@ -192,11 +193,28 @@ You can parse user defined data in by the kwargs value when you build the series
 
 ### Factories & Default blueprints
 
-So a blueprint is just the idea of a series and you need something to produce
-the series whenever the pipeline is running, this is the purpose of a
-`DicomFactory`. This is a base class which should be specialized to the input
-data. So for instance the `NumpyFactory` is dicom factory witch creates dicom
-series from a numpy array.
+To convert a blueprint to a real series, you use a `DicomFactory` from the
+`dicomnode.dicom.dicom_factory` Module. It's a mostly stateless class with some
+methods of producing dicom series. Here the parent series is just the series
+that `CopyElement` will copy from.
+
+There's the following relevant methods:
+
+* `build_series` - This method builds a dicom series from a volume and a parent
+series. Note that there's a bunch of tags, which is derived from the input
+image, that this function automatically sets and overwrites any virtual tags in
+the blueprint.
+* `build_nifti_series` - This method builds from a series from a nifti image.
+The main difference is that there's no parent series, so if your blueprint
+contains a CopyElement you'll experience an Error
+* `build_series_without_image_encoding` - A method that does the same as
+`build series` except it doesn't do the image encoding, which means you have to
+do it
+* `build_instance` - This method produces a single dataset, the intent is to
+generate message datasets or error datasets.
+* `encore_pdf` - This embeds a pdf file into a dicom series, either as an
+embedded pdf or an image per page as a secondary capture.
+
 
 These Factories have a default blueprint, which you should be included your
 blueprint. Either by starting out from the blueprint or combining the
@@ -207,70 +225,12 @@ blueprints:
 # Note this code doesn't work because DicomFactory is an abstract class
 dicom_factory = DicomFactory()
 # Method 1
-blueprint_1 = dicom_factory.get_default_blueprint()
-... # fill with tags
-
-# Method 2
-blueprint_2 = Blueprint()
-... # fill with tags
-
-blueprint_2 += dicom_factory.get_default_blueprint()
-```
 
 ## Building a dicom series in a pipeline
 
-At run time you'll get an intermediate data structure called a `SeriesHeader`.
-Which contains all of the shared information of the input dicom series. This is
-what you'll use to construct the out dicom series.
 
-With the data flow seen can be seen below:
-
-![Image](./Images/blueprint.drawio.svg)
-
-To implement a dicom factory and blueprint in a pipeline you need to overwrite
-some tags in the `AbstractPipeline` similar to how is done in:
-[create a pipeline](./create_a_pipeline.md).
-
-
-You need to fill the attributes:
-
-* `dicom_factory: Optional[DicomFactory]` - This is the factory, that is used
-to create the series header. Note that this object is shared with all threads.
-* `header_blueprint: Optional[Blueprint]` - Blueprint to construct series
-header from.
-
-Futhermore there's two Optional Attributes.
-
-* `parent_input: Optional[Str]` - Specifies the input series to be used as
-parent, must equal a key in the `input` attribute. If unspecified a random
-input series is used.
-
-If you have filled these attributes in the node, then in the process function
-the `InputContainer` will have an `header` attribute with a `SeriesHeader` that
-you can pass to your `DicomFactory` along with image data to produce a new
-dicom series.
-
-## Example
-
-```python
-from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory, SeriesHeader ...
-from dicomnode.server.nodes import AbstractPipeline
-
-class MyFactory(DicomFactory):
-  def build_from_header(series_header: SeriesHeader, image: Any) -> List[Dataset]
-    ...
-
-  def get_default_blueprint(self):
-    return Blueprint([
-      ...
-    ])
-
-factory = MyFactory()
-
-blueprint = Blueprint([
-  ...
-]) + factory.get_default_blueprint()
-
+blueprint = Blueprint()
+...
 
 class MyPipeline(AbstractPipeline):
   ...
@@ -278,12 +238,13 @@ class MyPipeline(AbstractPipeline):
   header_blueprint = blueprint
 
   def process(self, input_container)
+    parent_series = input_container.datasets['parent']
+
+
     image = ...
 
-    datasets = self.dicom_factory.build_from_header(input_container.header, image)
+    datasets = self.dicom_factory.build_series(image, blueprint, parent)
+
+    # Do the outout
+
 ```
-
-Note that it's unlikely that you need to impliement your own DicomFactory, as there's a few build into the library:
-
-* NumpyFactory - numpy arrays
-* NiftiFactory - nifti images

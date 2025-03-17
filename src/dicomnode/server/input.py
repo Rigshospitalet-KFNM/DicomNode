@@ -43,7 +43,7 @@ class AbstractInputMetaClass(ABCMeta):
   """
   type_options: List
 
-  def __or__(self: Union[Type['AbstractInput'], Type['AbstractInputProxy']],
+  def __or__(self: Union[Type['AbstractInput'], Type['AbstractInputProxy']], # type: ignore
              value: Union[Type['AbstractInput'], Type['AbstractInputProxy']]
              ) -> Type['AbstractInputProxy']:
     if issubclass(self, AbstractInputProxy) and issubclass(value, AbstractInputProxy):
@@ -129,7 +129,9 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
   @abstractmethod
   def validate(self) -> bool:
-    """Checks if the input have sufficient data, to start processing
+    """Method for checking if all data needed for
+processing is stored in the input. Should return `True` when input is ready for
+processing, `False` otherwise.
 
     Returns:
         bool: If there's sufficient data to start processing
@@ -193,6 +195,9 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   def validate_image(cls, dicom: Dataset) -> bool:
     """Checks if an image belongs in the input
 
+    This needs to be a classmethod because the proxy needs to use this method
+    to determine if the proxy should instantiates this type
+
     Args:
         dicom (Dataset): Dataset in question
 
@@ -250,7 +255,6 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
           raise InvalidDataset
 
     replaced = dicom.SOPInstanceUID.name in self
-
     # Save the dataset
     if self.options.lazy:
       if self.path is None:
