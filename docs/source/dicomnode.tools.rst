@@ -12,6 +12,22 @@ dicomnode.tools.anonymize module
    :undoc-members:
    :show-inheritance:
 
+dicomnode.tools.compare module
+------------------------------
+
+.. automodule:: dicomnode.tools.compare
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+dicomnode.tools.gating module
+-----------------------------
+
+.. automodule:: dicomnode.tools.gating
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 dicomnode.tools.show module
 ---------------------------
 

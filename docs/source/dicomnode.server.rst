@@ -1,8 +1,24 @@
 dicomnode.server package
 ========================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   dicomnode.server.factories
+
 Submodules
 ----------
+
+dicomnode.server.cluster module
+-------------------------------
+
+.. automodule:: dicomnode.server.cluster
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 dicomnode.server.grinders module
 --------------------------------

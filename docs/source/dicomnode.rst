@@ -1,16 +1,20 @@
 dicomnode package
 =================
 
-Note that the root package uses lazy imports. This is mainly to shave off a
-second on initialization, as matplotlib is very heavy to load.
+Subpackages
+-----------
 
-Module contents
----------------
+.. toctree::
+   :maxdepth: 4
 
-.. automodule:: dicomnode
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   dicomnode.bin
+   dicomnode.data_structures
+   dicomnode.dicom
+   dicomnode.lib
+   dicomnode.math
+   dicomnode.report
+   dicomnode.server
+   dicomnode.tools
 
 Submodules
 ----------
@@ -23,19 +27,10 @@ dicomnode.constants module
    :undoc-members:
    :show-inheritance:
 
-Subpackages
------------
+Module contents
+---------------
 
-.. toctree::
-   :maxdepth: 2
-
-   dicomnode.bin
-   dicomnode.constants
-   dicomnode.dicom
-   dicomnode.datastructures
-   dicomnode.lib
-   dicomnode.report
-   dicomnode.server
-   dicomnode.tools
-
-
+.. automodule:: dicomnode
+   :members:
+   :undoc-members:
+   :show-inheritance:
