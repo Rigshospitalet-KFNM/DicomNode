@@ -366,6 +366,7 @@ class AbstractPipeline():
         # End of Critical Zone
       except InvalidDataset:
         self.logger.info("Node rejected dataset: Received dataset is not accepted by any inputs")
+        self.logger.info(f"SOP class: {c_store_container.dataset[0x0008_0016]}")
         if self.error_on_rejected_dataset:
           return 0xB006
         else:

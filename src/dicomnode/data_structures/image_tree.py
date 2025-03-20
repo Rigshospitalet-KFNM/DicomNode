@@ -509,3 +509,11 @@ class DicomTree(ImageTreeInterface):
         raise InvalidTreeNode()
       for series in study.series():
         yield series
+
+__all__ = [
+  'DicomTree',
+  'PatientTree',
+  'SeriesTree',
+  'ImageTreeInterface',
+  'IdentityMapping'
+]

@@ -71,6 +71,12 @@ class OptionsValidator(Validator):
         break
     return return_value
 
+class NegatedValidator(Validator):
+  def __init__(self, validator: Validator) -> None:
+    self.validator = validator
+
+  def __call__(self, target: Any) -> bool:
+    return not self.validator(target)
 
 def get_validator_for_value(value):
   if isinstance(value, Validator):
