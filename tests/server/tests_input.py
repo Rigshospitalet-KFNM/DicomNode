@@ -47,8 +47,8 @@ logger = logging.getLogger("test_server_input")
 SERIES_DESCRIPTION = "Fancy Series"
 
 class TestInput(AbstractInput):
-  required_tags: List[int] = []
-  required_values: Dict[int, Any] = {
+  required_tags: List[int|str] = []
+  required_values: Dict[int|str, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
 
@@ -73,8 +73,8 @@ class TestLazyDynamicMissingPathInput(DynamicInput):
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 
 class HistoricInput(HistoricAbstractInput):
-  required_tags: List[int] = []
-  required_values: Dict[int, Any] = {
+  required_tags: List[int|str] = []
+  required_values: Dict[int|str, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
 
@@ -571,6 +571,7 @@ class InputTestCase(TestCase):
 
   def test_validating_with_strings(self):
     dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid() # This is defaulted needed by all inputs
 
     class StringTagsValidation(AbstractInput):
       required_tags = ["not a tag"]

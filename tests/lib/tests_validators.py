@@ -6,7 +6,8 @@ from unittest import TestCase
 
 # Dicomnode modules
 from dicomnode.lib.validators import EqualityValidator, RegexValidator,\
-  OptionsValidator, get_validator_for_value
+  OptionsValidator, get_validator_for_value, NegatedValidator,\
+  CaselessRegexValidator
 
 class ValidatorsTestCases(TestCase):
   def test_validator(self):
@@ -54,3 +55,36 @@ class ValidatorsTestCases(TestCase):
     self.assertIs(get_validator_for_value(validator), validator)
 
     validator = get_validator_for_value(re.compile(r"\d+"))
+
+  def test_negated_validator(self):
+    validator = NegatedValidator(
+      RegexValidator(
+        "TEST"
+      )
+    )
+
+    self.assertFalse(validator("TEST"))
+    self.assertTrue(validator("test"))
+
+  def test_caseless_regex(self):
+    validator = CaselessRegexValidator("SpOnGeBoB")
+
+    self.assertTrue(validator("spongebob"))
+    self.assertTrue(validator("sPoNgEbOb"))
+    self.assertTrue(validator("SPONGEBOB"))
+    self.assertTrue(validator("SPONGEBOB is in here"))
+    self.assertTrue(validator("asdf SPONGEBOB is in here"))
+
+    self.assertFalse(validator("squidward"))
+    self.assertFalse(validator("SQUIDWARD"))
+
+  def test_caseless_regex_negated(self):
+    validator = NegatedValidator(CaselessRegexValidator("SpOnGeBoB"))
+
+    self.assertFalse(validator("spongebob"))
+    self.assertFalse(validator("sPoNgEbOb"))
+    self.assertFalse(validator("SPONGEBOB"))
+    self.assertFalse(validator("SPONGEBOB is in here"))
+    self.assertFalse(validator("asdf SPONGEBOB is in here"))
+    self.assertTrue(validator("squidward"))
+    self.assertTrue(validator("SQUIDWARD"))

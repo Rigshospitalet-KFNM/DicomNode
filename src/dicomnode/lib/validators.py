@@ -53,7 +53,16 @@ class RegexValidator(Validator):
       self.pattern = value
 
   def __call__(self, target: Any) -> bool:
-    return  self.pattern.search(target) is not None
+    return self.pattern.search(target) is not None
+
+class CaselessRegexValidator(RegexValidator):
+  def __init__(self, value: Union[str, Pattern]) -> None:
+    if isinstance(value, str):
+      value = value.lower()
+    super().__init__(value)
+
+  def __call__(self, target: str) -> bool:
+    return super().__call__(target.lower())
 
 
 class OptionsValidator(Validator):

@@ -211,6 +211,7 @@ processing, `False` otherwise.
         if required_tag is None:
           raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
 
+
       if required_tag not in dicom:
         #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
