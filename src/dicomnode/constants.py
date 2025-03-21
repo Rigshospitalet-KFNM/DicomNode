@@ -37,7 +37,7 @@ DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
 DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
 """Name of software, to be placed in Manufacturer Models name (0008,1090)"""
 
-DICOMNODE_VERSION = "0.0.13"
+DICOMNODE_VERSION = "0.0.14"
 """Version of the library"""
 
 

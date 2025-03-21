@@ -26,7 +26,7 @@ from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
-from dicomnode.lib.validators import get_validator_for_value
+from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.logging import get_logger
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
@@ -225,7 +225,8 @@ processing, `False` otherwise.
       if required_tag not in dicom:
         #self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
-      if not cls._validate_value(dicom[required_tag].value, required_value):
+      if not cls._validate_value(required_value,dicom[required_tag].value):
+        #print(f"value: {dicom[required_tag].value}, required value: {required_value}")
         #self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
         return False
 

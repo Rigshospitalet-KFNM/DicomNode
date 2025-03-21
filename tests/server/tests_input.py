@@ -21,7 +21,7 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 
 # Dicomnode packages
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
-
+from dicomnode.lib.validators import RegexValidator, CaselessRegexValidator, NegatedValidator
 from dicomnode.dicom.dimse import Address, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.series import DicomSeries
@@ -596,3 +596,20 @@ class InputTestCase(TestCase):
       }
 
     self.assertTrue(StringTagsValidationWorking.validate_image(dataset))
+
+  def test_validators(self):
+    topogram = Dataset()
+    topogram.SOPInstanceUID = gen_uid()
+    topogram.SeriesDescription = "TOPOGRAM 1 tm"
+
+    ct_image = Dataset()
+    ct_image.SOPInstanceUID = gen_uid()
+    ct_image.SeriesDescription = "AC_CT"
+
+    class ValidatorInput(AbstractInput):
+      required_values = {
+        0x0008_103E : NegatedValidator(CaselessRegexValidator("topogram"))
+      }
+
+    self.assertFalse(ValidatorInput.validate_image(topogram))
+    self.assertTrue(ValidatorInput.validate_image(ct_image))
