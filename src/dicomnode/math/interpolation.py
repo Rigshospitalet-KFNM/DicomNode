@@ -71,7 +71,7 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   Returns:
       _type_: _description_
   """
-  original_grid = [numpy.arange(s) for s in reversed(source.space.domain)]
+  original_grid = [numpy.arange(s) for s in reversed(source.space.extent)]
 
   # Create interpolator for original data
   interpolator = RegularGridInterpolator(
@@ -91,6 +91,6 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   orig_indices = (world_coords_new - source.space.starting_point) @ source.space.inverted_basis
 
   # Interpolate
-  interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.domain) # type: ignore
+  interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.extent) # type: ignore
 
   return Image(interpolated, target)

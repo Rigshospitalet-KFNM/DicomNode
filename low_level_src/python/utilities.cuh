@@ -226,15 +226,15 @@ size_t get_image_size(const pybind11::object& python_object){
   const pybind11::object& space_class = space_module.attr("Space");
 
   if(pybind11::isinstance(python_object, space_class)){
-    const python_array<int>& python_domain = python_object.attr("extent").cast<python_array<int>>();
-    const pybind11::buffer_info& python_domain_buffer = python_domain.request();
-    if (python_domain_buffer.ptr == nullptr) {
+    const python_array<int>& python_extent = python_object.attr("extent").cast<python_array<int>>();
+    const pybind11::buffer_info& python_extent_buffer = python_extent.request();
+    if (python_extent_buffer.ptr == nullptr) {
       return 0;
     }
-    int* data = (int*)python_domain_buffer.ptr;
+    int* data = (int*)python_extent_buffer.ptr;
 
     size_t size = sizeof(T);
-    for(int i = 0; i < python_domain_buffer.size; i++){
+    for(int i = 0; i < python_extent_buffer.size; i++){
       size *= data[i];
     }
 
@@ -285,7 +285,7 @@ dicomNodeError_t get_image_pointer(
 
 template<typename T>
 dicomNodeError_t load_texture_from_python_image(
-  Texture<T>* texture,
+  Texture<3, T>* texture,
   const pybind11::object& python_image
 ){
   DicomNodeRunner runner{

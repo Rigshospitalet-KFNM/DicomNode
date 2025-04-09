@@ -1,16 +1,19 @@
 #pragma once
 
-#include"lin_alg.cuh"
+#include"../declarations.cuh"
+#include"../concepts.cuh"
+#include"../cuda_management.cuh"
 
-
-template<typename T>
+template<uint8_t DIMENSION, typename T>
 class Texture {
+  static_assert(DIMENSION == 3, "Texture is only support for 3 dimensional volumes");
+
   public:
     cudaTextureObject_t texture;
-    Space<3> space;
+    Space<DIMENSION> space;
 
   __device__ T operator()(const Point<3>& point) const {
-    const Point<3> interpolated_coordinate = space.interpolate_point(point);
+    const Point<DIMENSION> interpolated_coordinate = space.interpolate_point(point);
 
     return tex3D<T>(texture,
       interpolated_coordinate[0] + 0.5f,
@@ -18,11 +21,21 @@ class Texture {
       interpolated_coordinate[2] + 0.5f
     );
   }
+
+  const Extent<DIMENSION>& extent() const {
+    return space.extent();
+  }
+
+  constexpr size_t elements() const {
+    return space.elements();
+  }
 };
+
+static_assert(CImage<Texture<3, float>, 3>, "Texture is not a volume?");
 
 template<typename T>
 dicomNodeError_t load_texture(
-  Texture<T>* texture,
+  Texture<3, T>* texture,
   const T* data,
   const Space<3>& space
 ){
@@ -95,13 +108,13 @@ dicomNodeError_t load_texture(
 }
 
 template<typename T>
-cudaError_t free_texture(Texture<T>** texture){
+cudaError_t free_texture(Texture<3, T>** texture){
   if(texture && !(*texture)){
     return cudaSuccess;
   }
 
   cudaPointerAttributes attr;
-  Texture<T>* ptr = *texture;
+  Texture<3, T>* ptr = *texture;
   cudaError_t error = cudaPointerGetAttributes(&attr, ptr);
 
   if(error){
@@ -111,8 +124,8 @@ cudaError_t free_texture(Texture<T>** texture){
   }
 
   if(attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged){
-    Texture<T> host_texture;
-    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture<T>), cudaMemcpyDefault);
+    Texture<3, T> host_texture;
+    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture<3, T>), cudaMemcpyDefault);
     if(error){
       const char* error_name = cudaGetErrorName(error);
       printf("ptr: %p\n", ptr);

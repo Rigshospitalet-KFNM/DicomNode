@@ -5,32 +5,39 @@
 #include"python_labeling.cuh"
 
 
-
-
 namespace {
   template<typename T>
-  std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_slice_based_ccl(
+  std::tuple<dicomNodeError_t, python_array<T>> templated_slice_based_ccl(
     pybind11::object& python_image
   ){
     //const python_array<T> raw_image = python_image.attr("raw");
     Image<3, T> image;
+    python_array<T> return_array = {};
 
-    DicomNodeRunner runner;
+    DicomNodeRunner runner{
+      [&](dicomNodeError_t error){ free_image(&image); }
+    };
     runner | [&](){
-      return SUCCESS;
-      //return load_image(&image, python_image);
+      return load_image(&image, python_image);
     } | [&](){
-      //return free_image(&image);
       return SUCCESS;
+    }
+    | [&](){
+      return free_image(&image);
     };
 
-    return {runner.error(), {}};
+    return {runner.error(), std::move(return_array)};
   }
 
 
   std::tuple<dicomNodeError_t, pybind11::array> slice_based_ccl(
     pybind11::object& image
   ){
+  if(!is_instance(image, "dicomnode.math.image", "Image")){
+    const std::string error_message("Error: Sliced Based component labeling takes a dicomnode.math.image.Image object as argument");
+    throw std::runtime_error(error_message);
+  }
+
   const pybind11::array& raw_image = image.attr("raw");
   const std::string dtype = pybind11::str(raw_image.attr("dtype"));
 
@@ -63,5 +70,14 @@ void apply_labeling_module(pybind11::module& m){
     "GPU module for performing connected component labeling"
   );
 
-  sub_module.def("slice_based", &slice_based_ccl);
+  sub_module.def(
+    "slice_based",
+    &slice_based_ccl,
+    "Performs Slice based Connected Component labeling on the GPU for each\
+ slice of the time\n\n\
+  Args:\n\
+      (dicomnode.math.image.Image) - An image with an underlying type of:\n\
+ * float\n * uint8_t\n * uint16_t\n * uint32_t\n, * int8_t\n * int16_t\n\
+ * int32_t\n"
+  );
 }

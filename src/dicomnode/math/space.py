@@ -47,8 +47,8 @@ class Space:
     return self._inverted_basis
 
   @property
-  def domain(self):
-    return self._domain
+  def extent(self):
+    return self._extent
 
   @property
   def starting_point(self):
@@ -58,16 +58,16 @@ class Space:
     self._basis = numpy.array(basis, dtype=float32)
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
     self._starting_point = numpy.array(start_points, dtype=float32)
-    self._domain = numpy.array(domain, dtype=uint32)
+    self._extent = numpy.array(domain, dtype=uint32)
 
   def coords(self):
     index = 0
-    points = numpy.prod(self.domain)
+    points = numpy.prod(self.extent)
 
     while index < points:
-      x = index % self.domain[2]
-      y = (index // self.domain[2]) % self.domain[1]
-      z = index // (self.domain[1] * self.domain[2])
+      x = index % self.extent[2]
+      y = (index // self.extent[2]) % self.extent[1]
+      z = index // (self.extent[1] * self.extent[2])
 
       yield numpy.array([x,y,z])
 
@@ -117,7 +117,7 @@ class Space:
     )
 
   def __str__(self):
-    return (f"Space over extend x: {self.domain[2]}, y: {self.domain[1]} z: {self.domain[0]}\n"
+    return (f"Space over extend x: {self.extent[2]}, y: {self.extent[1]} z: {self.extent[0]}\n"
             f"Starting point at ({self.starting_point[0]},{self.starting_point[1]}, {self.starting_point[2]})\n"
             f"Basis:\n"
             f"{self.basis[0,0]} {self.basis[0,1]} {self.basis[0,2]}\n"

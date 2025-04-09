@@ -9,7 +9,6 @@
 #include"utilities.cuh"
 
 using basis_t = pybind11::array_t<float>;
-using domain_array = pybind11::array_t<uint32_t>;
 
 template<typename T>
 std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
@@ -43,7 +42,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   pybind11::array_t<T> out_array(shape, strides);
   pybind11::buffer_info out_buffer = out_array.request(true);
 
-  Texture<T> *device_texture = nullptr;
+  Texture<3, T> *device_texture = nullptr;
   T* device_out_image = nullptr;
 
   auto error_function = [&](dicomNodeError_t _){
@@ -55,7 +54,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   DicomNodeRunner runner{error_function};
   runner
     | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
-    | [&](){ return cudaMalloc(&device_texture, sizeof(Texture<T>)); }
+    | [&](){ return cudaMalloc(&device_texture, sizeof(Texture<3, T>)); }
     | [&](){
       return load_texture_from_python_image<T>(
         device_texture,

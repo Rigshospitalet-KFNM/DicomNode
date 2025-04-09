@@ -7,8 +7,8 @@
 
 #include"../gpu_code/dicom_node_gpu.cuh"
 
-__global__ void interpolation_tests(const Texture<float>* texture, float* out, Space<3>* out_space, float3* coords){
-  const Texture<float>& refTexture = *texture;
+__global__ void interpolation_tests(const Texture<3, float>* texture, float* out, Space<3>* out_space, float3* coords){
+  const Texture<3, float>& refTexture = *texture;
   const uint32_t x = texture->space.extent[2];
   const uint32_t y = texture->space.extent[1];
 
@@ -80,11 +80,11 @@ TEST(INTERPOLATION, INTERPOLATE_AT_POINT){
   cudaError_t cuda_error = cudaMalloc(&out, threads * sizeof(float));
   EXPECT_EQ(cuda_error, cudaSuccess);
 
-  Texture<float>* texture=nullptr;
+  Texture<3, float>* texture=nullptr;
   Space<3>* out_space = nullptr;
   float3* coords = nullptr;
 
-  cuda_error = cudaMalloc(&texture, sizeof(Texture<float>));
+  cuda_error = cudaMalloc(&texture, sizeof(Texture<3, float>));
   EXPECT_EQ(cuda_error, cudaSuccess);
 
   cuda_error = cudaMalloc(&out_space, sizeof(Space<3>));
@@ -395,8 +395,8 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
 
   cudaError_t error;
 
-  Texture<uint8_t>* texture = nullptr;
-  error = cudaMalloc(&texture, sizeof(Texture<uint8_t>));
+  Texture<3, uint8_t>* texture = nullptr;
+  error = cudaMalloc(&texture, sizeof(Texture<3, uint8_t>));
 
   ASSERT_EQ(error, cudaSuccess);
   uint8_t* device_interpolated_image = nullptr;

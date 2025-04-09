@@ -5,11 +5,11 @@
 namespace {
   template<typename T>
   __global__ void kernel_interpolation_linear(
-    const Texture<T>* src_image,
+    const Texture<3, T>* src_image,
     const Space<3>* dst_space,
     T* destination_data
   ){
-    const Texture<T>& texture = *src_image;
+    const Texture<3, T>& texture = *src_image;
     const Space<3>& destination_space = *dst_space;
 
     size_t destination_elements = destination_space.extent[0] *
@@ -28,7 +28,7 @@ namespace {
 
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear(
-  const Texture<T>* device_texture,
+  const Texture<3, T>* device_texture,
   const Space<3>& host_destination_space,
   T* device_out_data
 ){

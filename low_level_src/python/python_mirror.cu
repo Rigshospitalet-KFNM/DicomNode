@@ -25,13 +25,13 @@ int py_mirror(python_array<T> arr){
     }
   }
 
-  const Extent<3> domain(
+  const Extent<3> extent(
     arr_buffer.shape[0],
     arr_buffer.shape[1],
     arr_buffer.shape[2]
   );
 
-  cudaError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, domain);
+  cudaError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, extent);
 
   return (int)error;
 }

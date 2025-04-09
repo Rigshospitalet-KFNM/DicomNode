@@ -53,7 +53,7 @@ class SpaceTestCases(DicomnodeTestCase):
     space = Space.from_nifti(image)
 
     # To do asserts
-    self.assertTrue((space.domain == numpy.array([s for s in reversed(shape)])).all())
+    self.assertTrue((space.extent == numpy.array([s for s in reversed(shape)])).all())
 
   def test_coordinates(self):
     shape = (2,3,4)
