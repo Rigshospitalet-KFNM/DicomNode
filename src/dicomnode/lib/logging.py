@@ -4,10 +4,12 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard library
 from logging import Logger, basicConfig, StreamHandler, getLogger, Formatter,\
-  DEBUG, INFO, CRITICAL
+  DEBUG, INFO, CRITICAL, LogRecord
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from threading import get_native_id
+from multiprocessing import Process
+from multiprocessing.queues import Queue
 from io import TextIOWrapper
 from sys import stdout
 from typing import Optional, Union, TextIO
@@ -36,6 +38,7 @@ basicConfig(
   datefmt=__date_format,
   handlers=[StreamHandler(stdout)]
 )
+
 
 
 def get_logger() -> Logger:
@@ -141,3 +144,24 @@ def log_traceback(logger: Logger, exception: Exception, header_message: Optional
   logger.critical(exception_name_message)
   traceback_message = format_exc()
   logger.critical(traceback_message)
+
+def listener_configuration():
+  return __setup_logger()
+
+def listener_logger(queue: Queue[LogRecord]):
+  while True:
+    try:
+      record = queue.get()
+      if record is None:
+        break
+      logger = getLogger(record.name)
+      logger.handle(record)
+
+    except Exception:
+      import sys, traceback
+      print("Wopsy", file=sys.stderr)
+      traceback.print_exc(file=sys.stderr)
+
+def _setup_logger2(queue: Queue[LogRecord]):
+  listener_process = Process(target=listener_logger, args=(queue,), daemon=True)
+  listener_process.start()

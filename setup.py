@@ -157,7 +157,7 @@ setup(name='dicomnode',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
       "nibabel>=5.1.0,<6.0.0",
-      "dicom2nifti>=2.4.8,<3.0.0",
+      "dicom2nifti>=2.4.8,<2.6.0", # They upgraded to pydicom 3
       "rt_utils>=1.2.7,<2.0.0",
       "scipy<2.0.0"
     ],

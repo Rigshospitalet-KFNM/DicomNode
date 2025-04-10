@@ -15,8 +15,9 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Standard lib
 from enum import Enum
 import logging
-from logging import getLogger
+from logging import getLogger, LogRecord
 import multiprocessing
+from multiprocessing.queues import Queue
 from os import chdir, getcwd, kill
 from pathlib import Path
 from queue import Queue, Empty
@@ -183,6 +184,7 @@ class AbstractPipeline():
     if isinstance(self.log_output, str):
       self.log_output = Path(self.log_output)
 
+
     self.logger = set_logger(
       log_output=self.log_output,
       log_level=self.log_level,
@@ -203,6 +205,7 @@ class AbstractPipeline():
     # 3. Create Server
 
     # logging
+    self._log_queue: Queue[LogRecord] = Queue[LogRecord]()
     self._setup_logger()
 
     self.__cwd = getcwd()
