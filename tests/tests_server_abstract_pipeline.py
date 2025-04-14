@@ -27,6 +27,7 @@ from pydicom import Dataset, DataElement
 from pydicom.uid import RawDataStorage, SecondaryCaptureImageStorage
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dicom_factory import DicomFactory
 from dicomnode.dicom.series import DicomSeries
@@ -118,7 +119,7 @@ class TestPipeLine(AbstractPipeline):
         raise Exception
     return True
 
-  def process(self, input_container: InputContainer):
+  def process(self, input_data: InputContainer):
     if(self.raise_error):
       raise Exception
 
@@ -263,18 +264,15 @@ class PipeLineTestCase(DicomnodeTestCase):
       association_types=set([AssociationTypes.STORE_ASSOCIATION])
     )
 
-    #with self.assertLogs('dicomnode', logging.DEBUG):
-    self.node._release_store_handler(container)
-
-    with open(f"{self._testMethodName}.log", 'r') as log_file:
-      log_lines = [line.strip() for line in log_file.readlines()]
+    with self.assertLogs(self.node.logger, logging.DEBUG) as output:
+        self.node._release_store_handler(container)
 
     log_process = f"Processing {TEST_CPR}"
     log_dispatch = f"Dispatched {TEST_CPR} Successful"
     log_cleanup = f"Removing ['{ TEST_CPR}']'s images"
-    self.assertRegexIn(log_process, log_lines)
-    self.assertRegexIn(log_dispatch, log_lines)
-    self.assertRegexIn(log_cleanup, log_lines)
+    self.assertRegexIn(log_process, output.output)
+    self.assertRegexIn(log_dispatch, output.output)
+    self.assertRegexIn(log_cleanup, output.ouput)
 
   def test_pipeline_container(self):
     self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
@@ -288,7 +286,7 @@ class PipeLineTestCase(DicomnodeTestCase):
       association_types=set([AssociationTypes.STORE_ASSOCIATION])
     )
 
-    with self.assertLogs('dicomnode', logging.DEBUG) as cm:
+    with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
       self.node._process_entry_point(container, [(TEST_CPR, input_container)])
 
     log_process = f"Processing {TEST_CPR}"
@@ -411,7 +409,7 @@ class PipeLineTestCase(DicomnodeTestCase):
 
   def test_missing_output_from_process(self):
     class DumbPipeline(AbstractPipeline):
-      def process(self, *args):
+      def process(self, *args): # type: ignore
         return None
     node = DumbPipeline()
     with self.assertLogs(node.logger, DEBUG) as recorded_logs:
@@ -433,7 +431,7 @@ class PipeLineTestCase(DicomnodeTestCase):
         return False
 
     class DumbPipeline(AbstractPipeline):
-      def process(self, *args):
+      def process(self, *args): # type: ignore
         return FalseOutput()
 
     node = DumbPipeline()

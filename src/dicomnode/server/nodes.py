@@ -17,7 +17,7 @@ from enum import Enum
 import logging
 from logging import getLogger, LogRecord
 import multiprocessing
-from multiprocessing.queues import Queue
+from multiprocessing import Queue as MPQueue
 from os import chdir, getcwd, kill
 from pathlib import Path
 from queue import Queue, Empty
@@ -38,6 +38,7 @@ from pynetdicom.presentation import AllStoragePresentationContexts, Presentation
 from pydicom import Dataset
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
@@ -45,7 +46,8 @@ from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory
-from dicomnode.lib.logging import log_traceback, set_logger, get_logger
+from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
+  listener_logger, set_queue_handler, set_writer_handler
 from dicomnode.server.factories.association_events import AcceptedEvent, \
   AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
 from dicomnode.server.input import AbstractInput
@@ -191,11 +193,13 @@ class AbstractPipeline():
       format=self.log_format,
       date_format=self.log_date_format,
       backupCount=self.number_of_backups,
-      when=self.log_when
+      when=self.log_when,
+      queue=self._log_queue,
     )
+    set_writer_handler(self.logger)
+
     # Set pynetdicom logger
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
-
 
   def __init__(self, config=None) -> None:
     # This function starts and opens the server
@@ -205,7 +209,7 @@ class AbstractPipeline():
     # 3. Create Server
 
     # logging
-    self._log_queue: Queue[LogRecord] = Queue[LogRecord]()
+    self._log_queue: MPQueue[Optional[LogRecord]] = MPQueue()
     self._setup_logger()
 
     self.__cwd = getcwd()
@@ -237,8 +241,9 @@ class AbstractPipeline():
       pipeline_tree_options
     )
 
-    self._maintenance_thread = self.maintenance_thread(
-      self.data_state, self.study_expiration_days, daemon=True)
+    self.is_open = False
+
+
 
     self._association_event_factory = self.association_container_factory()
 
@@ -470,24 +475,29 @@ class AbstractPipeline():
       self.data_state.clean_up_patients(patients_to_clean_up)
 
   def _process_entry_point(
-      self, released_container, input_containers: List[Tuple[str, InputContainer]] ) -> None:
+      self, released_event: ReleasedEvent, input_containers: List[Tuple[str, InputContainer]] ) -> None:
     """This function is called when an association, which stored
     some datasets is released.
 
     Args:
-      released_container (ReleasedContainer): Dataclass containing information
+      released_event (ReleasedEvent): Dataclass containing information
         about the released association
+      input_containers (List[Tuple[str, InputContainer]]) - A list of
 
     """
-    self.logger = getLogger("dicomnode") # Reset loggers as
+    self.logger = get_logger() # Reset loggers as
+    if len(input_containers) == 0:
+      self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
+      return
+
     for patient_id, input_container in input_containers:
       self.logger.debug(f"Started to process {patient_id}")
       processing_directory = self.get_processing_directory(patient_id)
       if processing_directory is not None:
         with TemporaryWorkingDirectory(processing_directory):
-          self._pipeline_processing(patient_id, released_container, input_container)
+          self._pipeline_processing(patient_id, released_event, input_container)
       else:
-        self._pipeline_processing(patient_id, released_container, input_container)
+        self._pipeline_processing(patient_id, released_event, input_container)
 
 
   def _pipeline_processing(self,
@@ -615,8 +625,15 @@ class AbstractPipeline():
       If your application includes additional connections, you should overwrite this method,
       And close any connections and call the super function.
     """
+    if not self.is_open:
+      self.logger.error("Attempted to close an closed node")
+      return
+
     while self.dicom_application_entry.active_associations != []: #pragma: no cover
       sleep(0.005)
+
+    self.dicom_application_entry.shutdown()
+    self.wait_for_processing() # Waiting for
 
     self.logger.info("Closing Server!")
     if self.processing_directory is not None:
@@ -624,8 +641,10 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self._maintenance_thread.stop()
+    self._log_queue.put_nowait(None)
+    self._logger_thread.join()
 
-    self.dicom_application_entry.shutdown()
+    set_writer_handler(self.logger)
 
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -636,27 +655,45 @@ class AbstractPipeline():
       Keyword Args:
         blocking (bool) : if true, this functions doesn't return.
     """
+    if self.is_open:
+      self.logger.error("Attempted to open a node, that was already open")
+      return
+
+    self.logger.info(f"Starting Server at address: {self.ip}:{self.port} and AE: {self.ae_title}")
+    self.logger.debug(f"self.dicom_application_entry.require_called_aet: {self.dicom_application_entry.require_called_aet}")
+    self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
+    self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
+    self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
+
+    set_queue_handler(self.logger)
+    self._logger_thread = Thread(
+      target=listener_logger,
+      args=(self._log_queue,),
+      daemon=True
+    )
+    self._logger_thread.start()
+
     if self.processing_directory is not None:
       if not self.processing_directory.exists():
         # Multiple Threads might attempt to create the directory at the same time
         self.processing_directory.mkdir(exist_ok=True)
       chdir(self.processing_directory)
 
+    self._maintenance_thread = self.maintenance_thread(
+      self.data_state, self.study_expiration_days, daemon=True
+    )
     self._maintenance_thread.start()
-    self.logger.info(f"Starting Server at address: {self.ip}:{self.port} and AE: {self.ae_title}")
-    self.logger.debug(f"self.dicom_application_entry.require_called_aet: {self.dicom_application_entry.require_called_aet}")
-    self.logger.debug(f"self.dicom_application_entry.require_calling_aet: {self.dicom_application_entry.require_calling_aet}")
-    self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
 
-    self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
     #self.logger.debug(f"self.dicom_application_entry.supported_contexts: {self.dicom_application_entry.supported_contexts}")
     # I don't know why the type checker is high.
     event_handlers: List[evt.EventHandlerType] = [ t for t in self._evt_handlers.items() ]
 
+    self.is_open = True
     self.dicom_application_entry.start_server(
       (self.ip,self.port),
       block=blocking,
-      evt_handlers=event_handlers)
+      evt_handlers=event_handlers
+    )
 
   def get_processing_directory(self, identifier) -> Optional[Path]:
     if self.processing_directory is None:
@@ -754,6 +791,15 @@ class AbstractPipeline():
     except CouldNotCompleteDIMSEMessage:
       self.logger.error("Unable to send error message to the client at "
                         f"{response_address}")
+
+  def wait_for_processing(self):
+    """This function blocks until there's no 'processing' subprocesses running
+    """
+    this_process = PS_UTIL_Process(multiprocessing.current_process().pid)
+
+    children = [c for c in this_process.children(False)]
+    for c in children:
+      c.wait()
 
   ##### Handler Directories #####
   # Handlers are an extendable way of

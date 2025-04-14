@@ -15,3 +15,4 @@ lcov.info
 cspell.json
 tests_report_pe2i_report.py
 .dicom_node.code-workspace
+.cache/

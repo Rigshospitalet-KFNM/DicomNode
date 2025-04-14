@@ -6,6 +6,7 @@ from numpy import uint8, uint16, uint32, uint64, int8, int16, int32, int64
 from pydicom.uid import UID
 
 DICOMNODE_LOGGER_NAME = 'dicomnode'
+DICOMNODE_PROCESS_LOGGER = "process_dicomnode"
 
 # Default paths
 DEFAULT_PROCESSING_DIRECTORY = "/tmp/dicomnode"

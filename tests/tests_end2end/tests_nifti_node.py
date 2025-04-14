@@ -17,7 +17,9 @@ from pydicom import Dataset
 from pydicom.uid import CTImageStorage
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patient
+from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
@@ -28,6 +30,8 @@ from dicomnode.server.pipeline_tree import InputContainer
 # Testing packages
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
 
+
+blueprint = Blueprint([])
 
 ##### Constants #####
 TEST_AE_TITLE = "NIFTYAE"
@@ -70,17 +74,17 @@ class NiftiNode(AbstractPipeline):
     INPUT_KW : NiftiInput
   }
 
-  def process(self, input_container: InputContainer):
-    nifti_object: Nifti1Image = input_container[INPUT_KW]
+  def process(self, input_data: InputContainer):
+    nifti_object: Nifti1Image = input_data[INPUT_KW]
     data_array = nifti_object.get_fdata()
     data_array += 1
 
-    if input_container.header is None or self.dicom_factory is None:
-      raise Exception
+    dicom_factory = DicomFactory()
 
-    series = self.dicom_factory.build_series(
-      input_container.datasets,
-      nifti_object
+    series = dicom_factory.build_series(
+      data_array,
+      blueprint,
+      input_data.datasets[INPUT_KW],
     )
 
     return FileOutput(
@@ -158,7 +162,8 @@ class End2EndNiftiTestCase(TestCase):
       dataset.SOPClassUID = CTImageStorage
       make_meta(dataset)
 
-    send_images(TEST_AE_TITLE, address, datasets)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      send_images(TEST_AE_TITLE, address, datasets)
+      node.close()
 
-    sleep(0.25)
-    node.close()
+    print(captured_logs)

@@ -3,52 +3,113 @@ import logging
 from logging.handlers import QueueHandler
 import multiprocessing
 from multiprocessing import Process
-from random import random
+from random import random, randint
 import time
 from multiprocessing import Queue
+from threading import Thread
 from typing import List
 
-# Dicomnode test
+# Third party modules
+from pydicom import Dataset
+from pydicom.uid import SecondaryCaptureImageStorage
+
+# Dicomnode Modules
+from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.dicom.dimse import send_images, Address
 from dicomnode.lib import logging as dnl
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.server.nodes import AbstractPipeline
+from dicomnode.server.input import AbstractInput
+from dicomnode.server.output import NoOutput
 
 # Test helpers
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 def worker(queue: Queue):
-  handler = QueueHandler(queue)
   root = logging.getLogger()
-  root.addHandler(handler)
-  name = multiprocessing.current_process().name
+  root.handlers.clear()
+  root.addHandler(QueueHandler(queue))
+  root.setLevel(logging.DEBUG)
 
-  for i in range(10):
+  name = multiprocessing.current_process().name
+  pid = multiprocessing.current_process().pid
+
+  for i in range(3):
     time.sleep(random() / 1000)
     logger = logging.getLogger()
-    message = f"Logger {name}: message {i}"
-    #print(message)
+    message = f"Logger {name} - {pid}: message {i}"
     logger.info(message)
-
 
 class LoggingTestcase(DicomnodeTestCase):
   def test_logging(self):
     queue = Queue()
-
-    listener = Process(
+    listener = Thread(
       target=dnl.listener_logger,
       args=(queue,)
     )
     listener.start()
+    logger = logging.getLogger(DICOMNODE_PROCESS_LOGGER)
 
-    workers: List[Process] = []
-    for i in range(10):
-      worker_process = Process(
-        target=worker(queue),
-        name=f"Process {i + 1}"
-      )
-      worker_process.start()
+    with self.assertLogs(logger) as ctx:
+      workers: List[Process] = []
+      for i in range(3):
+        worker_process = Process(
+          target=worker,
+          args=(queue,)
+        )
+        workers.append(worker_process)
 
-      workers.append(worker_process)
+      for w in workers:
+        w.start()
 
-    for w in workers:
-      w.join()
+      for w in workers:
+        w.join()
 
-    queue.put_nowait(None)
+      queue.put_nowait(None)
+      listener.join()
+
+  def test_logging_end2end(self):
+    test_port = randint(10250, 30000)
+
+    class TestInput(AbstractInput):
+      def validate(self) -> bool:
+        return True
+
+    class TestPipeline(AbstractPipeline):
+      ae_title = "TEST"
+      port = test_port
+
+      input = {
+        'TEST' : TestInput
+      }
+
+      def process(self, input_data):
+        self.logger.critical("Hello from Test")
+        self.logger.critical(self.logger.handlers)
+        return NoOutput()
+
+    instance = TestPipeline()
+    instance.open(blocking=False)
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    dataset.PatientID = "Patient^ID"
+    dataset.InstanceNumber = 1
+    make_meta(dataset)
+
+    # So this test is fucking stupid. Well problem is we wanna test that the
+    # process logger gets the messages, but because they are chained together
+    # We get emission from both, however if you capture both logs, then
+    # the way the assertLogsContextManager works is by replacing the handlers
+    # Which means the process logger doesn't get the message, so if you test
+    # the thing you wanna test, you get nosy output, otherwise the you can't
+    # test it. The solution is to write a none capturing LogContextManager
+    # TODO: TODO: TODO:
+
+    logger = logging.getLogger(DICOMNODE_PROCESS_LOGGER)
+
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
+
+      instance.close()
