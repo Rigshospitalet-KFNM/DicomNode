@@ -272,7 +272,7 @@ class PipeLineTestCase(DicomnodeTestCase):
     log_cleanup = f"Removing ['{ TEST_CPR}']'s images"
     self.assertRegexIn(log_process, output.output)
     self.assertRegexIn(log_dispatch, output.output)
-    self.assertRegexIn(log_cleanup, output.ouput)
+    self.assertRegexIn(log_cleanup, output.output)
 
   def test_pipeline_container(self):
     self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}

@@ -18,7 +18,7 @@ import logging
 from logging import getLogger, LogRecord
 import multiprocessing
 from multiprocessing import Queue as MPQueue
-from os import chdir, getcwd, kill
+from os import chdir, getcwd, getpid
 from pathlib import Path
 from queue import Queue, Empty
 import shutil
@@ -665,6 +665,8 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
     self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
 
+    signal.signal(signal.SIGINT, self.signal_handler_SIGINT)
+
     set_queue_handler(self.logger)
     self._logger_thread = Thread(
       target=listener_logger,
@@ -726,6 +728,25 @@ class AbstractPipeline():
         'exception' : exception
       }
     )
+
+  def signal_handler_SIGINT(self, signal_, frame):
+    pid = getpid()
+
+    self.logger.critical(f"Process {pid} Received Signal {signal_}")
+
+    current_process = PS_UTIL_Process()
+    for child in current_process.children(recursive=False):
+      child.send_signal(signal_)
+
+    print(signal_ == signal.SIGINT)
+
+    if signal_ in [signal.SIGTERM, signal.SIGINT]:
+      self._log_queue.put_nowait(None)
+      self._logger_thread.join()
+      exit(1)
+
+    if signal_ in [ signal.SIGKILL]:
+      exit(1)
 
 
   def exception_handler_respond_with_dataset(self,
@@ -850,11 +871,11 @@ class AbstractQueuedPipeline(AbstractPipeline):
     released_container = self._association_event_factory.build_association_released(event)
     self.process_queue.put(released_container)
 
-  def signal_handler_SIGINT(self, signal, frame):
+  def signal_handler_SIGINT(self, signal_, frame):
     self.running = False
     current_process = PS_UTIL_Process()
     for child in current_process.children(recursive=False):
-      child.send_signal(signal)
+      child.send_signal(signal_)
 
   def __init__(self, master_queue: Optional[Queue[ReleasedEvent]]=None) -> None:
     self.running = True

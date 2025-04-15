@@ -53,6 +53,9 @@ def get_response_logger() -> Logger:
 def set_queue_handler(logger: Logger):
   #print(f"Setting Logger {logger.name} to be writing to queue")
   logger.handlers.clear()
+  global __log_level
+  logger.setLevel(__log_level)
+
   if __queue is not None:
     logger.addHandler(QueueHandler(__queue))
 
@@ -75,7 +78,10 @@ def set_writer_handler(logger: Logger):
     handler = StreamHandler(stdout)
 
   handler.setFormatter(log_formatter)
+  global __log_level
   logger.addHandler(handler)
+  logger.setLevel(__log_level)
+
 
 def __setup_logger() -> Logger:
   global __log_level
@@ -168,7 +174,6 @@ def listener_logger(queue: Queue[Optional[LogRecord]]):
     try:
       record = queue.get()
       if record is None:
-        #print("Record was none!")
         break
       record.name = logger.name
       logger.handle(record)
