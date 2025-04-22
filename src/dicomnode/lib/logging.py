@@ -51,7 +51,6 @@ def get_response_logger() -> Logger:
   return getLogger(DICOMNODE_PROCESS_LOGGER)
 
 def set_queue_handler(logger: Logger):
-  #print(f"Setting Logger {logger.name} to be writing to queue")
   logger.handlers.clear()
   global __log_level
   logger.setLevel(__log_level)
@@ -60,7 +59,6 @@ def set_queue_handler(logger: Logger):
     logger.addHandler(QueueHandler(__queue))
 
 def set_writer_handler(logger: Logger):
-  #print(f"Setting Logger {logger.name} to be writing to file")
   logger.handlers.clear()
   log_formatter = Formatter(fmt=__format, datefmt=__date_format)
 

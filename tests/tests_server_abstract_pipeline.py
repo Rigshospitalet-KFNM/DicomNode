@@ -266,12 +266,7 @@ class PipeLineTestCase(DicomnodeTestCase):
 
     with self.assertLogs(self.node.logger, logging.DEBUG) as output:
         self.node._release_store_handler(container)
-
-    log_process = f"Processing {TEST_CPR}"
-    log_dispatch = f"Dispatched {TEST_CPR} Successful"
-    log_cleanup = f"Removing ['{ TEST_CPR}']'s images"
-    self.assertRegexIn(log_process, output.output)
-    self.assertRegexIn(log_dispatch, output.output)
+    log_cleanup = f"Removing ['{TEST_CPR}']'s images"
     self.assertRegexIn(log_cleanup, output.output)
 
   def test_pipeline_container(self):

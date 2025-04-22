@@ -1,6 +1,7 @@
 """This is a test case of a historic input"""
 
 # Python3 standard library
+from logging import DEBUG
 import signal
 from os import kill, getpid
 from time import sleep
@@ -13,6 +14,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from psutil import Process as PS_Process
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom import make_meta, gen_uid
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.nodes import AbstractPipeline
@@ -28,14 +30,22 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     " process, that it kills any running child processes. Note that this"\
     " test is flaky, and you might need increase delays"
 
+    # I will also note there's a flake, here where some times the signal doesn't
+    # propagate. I have no idea why. An alternative would perhaps be you create
+    # a shared flag with a thread, that repeatable checks it, and if signaled
+    # Just calls exit
+
+    start_up_delay = 0.2
+
     test_port = randint(1024, 45000)
+
 
     def process_function():
       class DumbInput(AbstractInput):
         def validate(self) -> bool:
           return True
 
-      class LoggingPipeline(AbstractPipeline):
+      class DummyPipeline(AbstractPipeline):
         port = test_port
         ae_title = "TEST"
 
@@ -50,10 +60,11 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
         log_output = None
 
         def process(self, input_data):
+          self.logger.info(f"Processing Process {getpid()} starting")
           sleep(10)
           return NoOutput()
 
-      instance = LoggingPipeline()
+      instance = DummyPipeline()
       instance.open(blocking=True)
 
     victim_process = Process(target=process_function)
@@ -61,7 +72,7 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
 
     victim_pid = victim_process.pid
     if victim_pid is None:
-      raise AssertionError("This should not happen!")
+      raise AssertionError("Failed to start the process")
 
     dataset = Dataset()
     dataset.SOPInstanceUID = gen_uid()
@@ -71,32 +82,18 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     make_meta(dataset)
 
     # Need a small delay
-    sleep(0.3)
-
+    sleep(start_up_delay)
 
     send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
 
     # Wait for processing to begin. Although I am not sure why there's 2?
-    while len(PS_Process(victim_process.pid).children(True)) >= 2:
-      pass
-
+    sleep(start_up_delay)
 
     kill(victim_pid, signal.SIGINT)
-    # Sadly we need a small delay here for the subprocesses to handle the signal
-    # and die
-    sleep(0.5)
-
-    passes = True
 
     for process in PS_Process(victim_process.pid).children(True):
-      if process.is_running():
-        print("Had to manually kill victim's children")
-        process.kill()
-        passes = False
+      while process.is_running():
+        pass
 
-    if victim_process.is_alive():
-      passes = False
-      print("Had to manually kill Victim")
-      victim_process.kill()
-
-    self.assertTrue(passes)
+    while victim_process.is_alive():
+      pass

@@ -25,7 +25,7 @@ import shutil
 import signal
 from sys import stdout
 from threading import Thread, Lock
-from time import sleep
+from time import sleep, time
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
 from psutil import Process as PS_UTIL_Process
@@ -485,6 +485,7 @@ class AbstractPipeline():
       input_containers (List[Tuple[str, InputContainer]]) - A list of
 
     """
+    signal.signal(signal.SIGINT, self.process_signal_handler_SIGINT)
     self.logger = get_logger() # Reset loggers as
     if len(input_containers) == 0:
       self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
@@ -665,7 +666,7 @@ class AbstractPipeline():
     self.logger.debug(f"self.dicom_application_entry.maximum_pdu_size: {self.dicom_application_entry.maximum_pdu_size}")
     self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
 
-    signal.signal(signal.SIGINT, self.signal_handler_SIGINT)
+    signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
 
     set_queue_handler(self.logger)
     self._logger_thread = Thread(
@@ -729,24 +730,37 @@ class AbstractPipeline():
       }
     )
 
-  def signal_handler_SIGINT(self, signal_, frame):
+  def node_signal_handler_SIGINT(self, signal_, frame):
     pid = getpid()
 
     self.logger.critical(f"Process {pid} Received Signal {signal_}")
+    attempts = 0
+    while children := PS_UTIL_Process().children(recursive=True):
+      if 5 < attempts:
+        break
+      for child in children:
+        self.logger.critical(f"Send signal {signal_} to {child.pid} - {child.status()}")
+        if child.is_running():
+          child.send_signal(signal_)
+      attempts += 1
+      sleep(0.015)
+    for child in PS_UTIL_Process().children(recursive=True):
+      # If sending signals doesn't work, NUKING TIME!
+      self.logger.critical(f"BRUTALLY KILLED {child.pid}")
+      child.kill()
 
-    current_process = PS_UTIL_Process()
-    for child in current_process.children(recursive=False):
-      child.send_signal(signal_)
+    self.logger.critical(f"Killed all subprocesses!")
 
-    print(signal_ == signal.SIGINT)
 
     if signal_ in [signal.SIGTERM, signal.SIGINT]:
       self._log_queue.put_nowait(None)
       self._logger_thread.join()
-      exit(1)
+    exit(1)
 
-    if signal_ in [ signal.SIGKILL]:
-      exit(1)
+
+  def process_signal_handler_SIGINT(self, signal_, frame):
+    self.logger.critical("Process killed by Parent")
+    exit(1)
 
 
   def exception_handler_respond_with_dataset(self,
@@ -871,11 +885,9 @@ class AbstractQueuedPipeline(AbstractPipeline):
     released_container = self._association_event_factory.build_association_released(event)
     self.process_queue.put(released_container)
 
-  def signal_handler_SIGINT(self, signal_, frame):
+  def node_signal_handler_SIGINT(self, signal_, frame):
     self.running = False
-    current_process = PS_UTIL_Process()
-    for child in current_process.children(recursive=False):
-      child.send_signal(signal_)
+    super().node_signal_handler_SIGINT(signal_, frame)
 
   def __init__(self, master_queue: Optional[Queue[ReleasedEvent]]=None) -> None:
     self.running = True
@@ -891,7 +903,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
     self._evt_handlers[evt.EVT_RELEASED] = self._handle_association_released
 
   def open(self, blocking=True):
-    signal.signal(signal.SIGINT, self.signal_handler_SIGINT)
+    signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
     super().open(blocking)
 
   def close(self) -> None:

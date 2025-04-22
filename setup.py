@@ -9,7 +9,6 @@ import shutil
 
 # Third party Tools
 from setuptools import setup, find_packages, Extension
-from setuptools._distutils.dist import Distribution
 from setuptools.command.build_ext import build_ext
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
