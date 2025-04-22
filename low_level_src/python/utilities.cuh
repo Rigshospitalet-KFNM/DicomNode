@@ -106,7 +106,6 @@ namespace {
     return error;
   }
 
-
   template<typename T>
   dicomNodeError_t _load_into_host_image(
     Image<3, T>* host_out_image,
@@ -142,7 +141,6 @@ namespace {
       }
 
       return dicomNodeError_t::SUCCESS;
-
     } | [&](){
       return _load_into_host_space(&host_out_image->space, space);
     }
@@ -270,7 +268,7 @@ size_t get_image_size(const pybind11::object& python_object){
 
   if(pybind11::isinstance(python_object, image_class)){
     const python_array<T>& raw_image = python_object.attr("raw").cast<python_array<T>>();
-    return raw_image.size() * sizeof(T);
+    return raw_image.elements() * sizeof(T);
   }
 
   return 0;

@@ -21,9 +21,11 @@ struct Volume {
   Extent<DIMENSIONS> m_extent;
   T default_value;
 
-  size_t elements() const { return m_extent.elements(); }
+  size_t elements() const {
+    return m_extent.elements();
+  }
 
-  bool is_allocated(){
+  bool is_allocated() const {
     return data == nullptr;
   }
 

@@ -44,4 +44,8 @@ class Space {
   __device__ __host__ Point<DIMENSIONS> interpolate_point(const Point<DIMENSIONS>& point) const {
     return (point - starting_point) * inverted_basis;
   }
+
+  __device__ __host__ size_t elements() const {
+    return extent.elements();
+  }
 };

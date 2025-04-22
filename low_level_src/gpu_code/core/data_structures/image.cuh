@@ -44,4 +44,8 @@ class Image {
     static_assert(1 < DIMENSIONS);
     return space.extent.sizes[2];
   }
+
+  size_t elements() const {
+    return volume.elements();
+  }
 };

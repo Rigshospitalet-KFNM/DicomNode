@@ -24,11 +24,28 @@ namespace {
     runner | [&](){
       return load_image(&image, python_image);
     } | [&](){
-      size_t label_size = 0;
+      const size_t label_size = sizeof(T) * image.elements();
 
       return cudaMalloc(&device_out_labels, label_size);
-    }
-    | [&](){
+    } | [&](){
+      return slicedConnectedComponentLabeling<T>(
+        device_out_labels, image
+      );
+    } | [&](){
+      const size_t label_size = sizeof(T) * image.elements();
+      T* data = new T[image.elements()];
+
+      return_array = python_array<T>(
+        {image.num_slices(), image.num_rows(), image.num_cols()},
+        {image.num_rows() * image.num_cols() * sizeof(T) ,image.num_cols() * sizeof(T), sizeof(T)},
+        data
+      );
+
+      return cudaMemcpy(data, device_out_labels, label_size, cudaMemcpyDeviceToHost);
+    } | [&](){
+      free_device_memory(&device_out_labels);
+      return dicomNodeError_t::SUCCESS;
+    } | [&](){
       return free_image(&image);
     };
 

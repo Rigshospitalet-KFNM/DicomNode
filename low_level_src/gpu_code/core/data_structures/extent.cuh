@@ -18,12 +18,6 @@ struct Extent {
   static_assert(DIMENSIONS > 0);
   uint32_t sizes[DIMENSIONS]{}; // this zero initializes the array
 
-  __device__ __host__ Extent(){
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
-      sizes[i] = 0;
-    }
-  }
-
   template<typename... Args>
   __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<uint32_t>(args)...}{
     static_assert(sizeof...(args) == DIMENSIONS);
@@ -37,6 +31,12 @@ struct Extent {
     return sizes[i];
   }
 
+  /**
+   * @brief Checks in the index inside of the extent
+   *
+   * @param index
+   * @return __device__
+   */
   __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const {
     bool in = true;
     #pragma unroll
@@ -123,7 +123,12 @@ struct Extent {
     return &sizes[DIMENSIONS - 1];
   }
 
-  __device__  __host__ size_t size() const noexcept {
+  /**
+   * @brief Returns the number of elements that is covered by this extent
+   *
+   * @return __device__ the number of elements
+   */
+  __device__  __host__ size_t elements() const noexcept {
     size_t size = 1;
 
     #pragma unroll
@@ -132,10 +137,6 @@ struct Extent {
     }
 
     return size;
-  }
-
-  static constexpr __host__ __device__ size_t elements() {
-    return DIMENSIONS;
   }
 };
 
