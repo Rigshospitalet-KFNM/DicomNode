@@ -2,6 +2,7 @@
 
 #include"../declarations.cuh"
 #include"../concepts.cuh"
+#include"space.cuh"
 #include"../cuda_management.cuh"
 
 template<uint8_t DIMENSION, typename T>

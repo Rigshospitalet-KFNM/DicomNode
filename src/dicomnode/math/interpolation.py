@@ -20,9 +20,6 @@ from dicomnode.math import CUDA, switch_ordering
 from dicomnode.math.space import Space
 from dicomnode.math.image import Image
 
-if CUDA:
-  from dicomnode.math import _cuda
-
 class RESAMPLE_METHODS(Enum):
   LINEAR = "linear"
 
@@ -48,11 +45,12 @@ def resample(source: ImageContainerType,
     target = extract_space(target)
 
   if CUDA:
+    from dicomnode.math import _cuda
     success, interpolated =  _cuda.interpolation.linear(source, target)
 
     return Image(interpolated, target)
   else:
-    return cpu_interpolate(source, target, method)
+    return cpu_interpolate(source, target, method) # pragma: no cover # I test on gpu devices
 
 
 def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):

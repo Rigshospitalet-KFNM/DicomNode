@@ -21,8 +21,16 @@ cudaError_t extract_cuda_error(dicomNodeError_t error);
 
 std::string get_byte_string (size_t bytes);
 
-// Header declaration
-
+// Header declaration, definitions in utilities.cu
+/**
+ * @brief Checks if a python object is of an expected type. As python is not
+ * staticly typed and you can't trust that users don't pass stupid shit.
+ *
+ * @param python_object
+ * @param module_name
+ * @param instance_type
+ * @return dicomNodeError_t
+ */
 dicomNodeError_t is_instance(
   const pybind11::object& python_object,
   const char* module_name,
@@ -60,6 +68,8 @@ dicomNodeError_t check_buffer_pointers(
 
 bool is_host_pointer(const cudaPointerAttributes& attr);
 
+dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_space);
+
 
 // Anon namespace for templates
 namespace {
@@ -73,7 +83,7 @@ namespace {
       | [&](){
         return cudaMemcpy(
           &data_pointer,
-          &dev_out_image->data,
+          &(dev_out_image->volume.data),
           sizeof(T*),
           cudaMemcpyDefault
         );
@@ -86,12 +96,12 @@ namespace {
   }
 
   template<typename T>
-  dicomNodeError_t free_host_image(Image<3, T>* host_out_image){
+  __host__ dicomNodeError_t free_host_image(Image<3, T>* host_out_image){
     const dicomNodeError_t error = encode_cuda_error(
-      cudaFree(host_out_image->data)
+      cudaFree(host_out_image->volume.data)
     );
 
-    host_out_image->data=nullptr;
+    host_out_image->volume.data=nullptr;
 
     return error;
   }
@@ -106,40 +116,53 @@ namespace {
     const pybind11::buffer_info& image_buffer = raw_image.request();
     const pybind11::object& space = python_image.attr("space");
 
-    dicomNodeError_t error = _load_into_host_space(&host_out_image->space, space);
-    if(error){
-      return error;
-    }
-
-    size_t image_size = sizeof(T);
-    for (int i = 0; const ssize_t dim : image_buffer.shape){
-      if(dim <= 0){
-        error = dicomNodeError_t::NON_POSITIVE_SHAPE;
-        return error;
+    DicomNodeRunner runner{
+      [&](dicomNodeError_t error){
+        free_device_memory(&(host_out_image->volume.data));
       }
-      image_size *= dim;
-      i++;
+    };
+
+    runner
+      | [&](){
+      // This function checks if the data is valid to copy
+      if(host_out_image->volume.data != nullptr){
+        return dicomNodeError_t::ALREADY_ALLOCATED_OBJECT;
+      }
+
+      size_t image_size = sizeof(T);
+      for (int i = 0; const ssize_t dim : image_buffer.shape){
+        if(dim <= 0){
+          return dicomNodeError_t::NON_POSITIVE_SHAPE;
+        }
+        image_size *= dim;
+        i++;
+      };
+      if(image_buffer.size == SSIZE_T_ERROR_VALUE){
+        return dicomNodeError_t::UNABLE_TO_ACQUIRE_BUFFER;
+      }
+
+      return dicomNodeError_t::SUCCESS;
+
+    } | [&](){
+      return _load_into_host_space(&host_out_image->space, space);
     }
-
-    error = encode_cuda_error(
-      cudaMalloc(
-        &host_out_image->data,
+    | [&](){
+      return cudaMalloc(
+        &host_out_image->volume.data,
         sizeof(image_buffer.size * sizeof(T))
-      )
-    );
-    if(error){ return error; }
-
-    error = encode_cuda_error(
-      cudaMemcpy(
-        host_out_image->data,
+      );
+    } | [&](){
+      return cudaMemcpy(
+        host_out_image->volume.data,
         image_buffer.ptr,
         sizeof(T) * image_buffer.size,
         cudaMemcpyDefault
-      )
-    );
+      );
+    };
 
-    return error;
+    return runner.error();
   }
+
 
   template<typename T>
   dicomNodeError_t _load_into_dev_image(
@@ -151,7 +174,10 @@ namespace {
     const pybind11::buffer_info& image_buffer = raw_image.request();
     const pybind11::object& space = python_image.attr("space");
 
-    DicomNodeRunner runner{[&](dicomNodeError_t error){free_device_memory(&dev_out_image->data);}};
+    DicomNodeRunner runner{[&](dicomNodeError_t error){
+      free_device_memory(&dev_out_image->volume.data);}
+    };
+
     runner
       | [&](){
         return _load_into_device_space(&(dev_out_image->space), space);
@@ -164,16 +190,14 @@ namespace {
         }
         return dicomNodeError_t::SUCCESS;
       } | [&](){
-       return cudaMalloc(&dev_out_image->data, image_size);
+       return cudaMalloc(&dev_out_image->volume.data, image_size);
       } | [&](){
-        return cudaMemcpy(dev_out_image->data, image_buffer.ptr, image_size, cudaMemcpyDefault);
+        return cudaMemcpy(dev_out_image->volume.data, image_buffer.ptr, image_size, cudaMemcpyDefault);
       };
 
     return runner.error();
   }
 }
-
-dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_space);
 
 /**
  * @brief This function extracts the underlying cudaError_t that was triggered.

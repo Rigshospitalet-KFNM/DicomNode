@@ -234,7 +234,7 @@ dicomNodeError_t connectedComponentLabeling2D(
 	DicomNodeRunner runner;
 
 	runner
-    |   [&](){
+      | [&](){
 			init_labels<T><<< grid, block >>>(device_output_labels, input_image, num_cols, num_rows);
 			return cudaGetLastError();
 		} | [&](){

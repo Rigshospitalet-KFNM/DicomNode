@@ -24,6 +24,10 @@ offload to C/C++ and if we do that, it's a hop skip and a long jump to CUDA.
 To put this into perspective, your can get some rather stupid speedups in the
 x300 ballpark with GPU programming.
 
+I'll also apologize for the general structure of the C++ part, as it's my first
+project and therefore contractually obligated to make some really fucking dumb
+decisions.
+
 Options
 *******
 
@@ -346,6 +350,43 @@ classification of the runner class. What matter is that this works, and it does.
 So Instead using the cudaError class I created my own error class, which is
 returned from all of dicomnode's C++ functions, that can fail. It also encodes
 all cudaError_t by flipping the 32'th bit.
+
+RAII and CUDA
+*************
+
+So one of the core concepts of CPP is RAII meaning: Resource acquisition is
+initialization. The point of this to automate resource acquisition and
+releasing. A consequence of this that you gain quite references in your code,
+because you want to avoid creating/copying/destroying resources. Because these
+can fail and are pain to deal with, and then you pass the owning object around
+instead.
+It's a really good idea, however the concept sorta breaks with CUDA because it
+introduces a separate memory space namely the device memory. You cannot pass by
+default a reference to a kernel, because that object live in the CPU's memory
+space and the gpu threads cannot access that space. Just like the CPU cannot
+access memory on the GPU.
+
+There's a `Medium article https://medium.com/@dmitrijtichonov/cuda-series-memory-and-allocation-fce29c965d37`
+which does a pretty good job of explaining the memory model that cuda uses.
+
+While there exists abstraction in the driver that enable the program to overcome
+these limitation, they come at the cost of performance. In the authors view
+this problem is not something that automation should do. It's the responsibility
+of the programer to understand where object exists in what stage of the
+execution. This is because the bandwidth between CPU and GPU should be
+bottleneck.
+
+If you take a look at the specs of the NVidia 5090 you cna see that it have a
+bandwidth of 1.79 TB/s, while it has 104.8 Tflops for 32bit floating point.
+Which means you can roughly do 104.8 / (1.79 / 4) ~ 230 floating point
+operations per float transferred. That means that if you do less than 230
+operation on each float, then your bottleneck will be transfer speed.
+
+Okay sidetrack over. So what do you do now that RAII is out the window.
+The plan is to create thin objects, that are copied on kernel invocation. The
+kernels have an argument size limit of 256 bytes, so thin object has be smaller
+that that.
+
 
 Conclusion
 **********

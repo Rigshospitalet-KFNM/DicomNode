@@ -12,15 +12,21 @@ namespace {
   ){
     //const python_array<T> raw_image = python_image.attr("raw");
     Image<3, T> image;
+    uint32_t* device_out_labels = nullptr;
     python_array<T> return_array = {};
 
     DicomNodeRunner runner{
-      [&](dicomNodeError_t error){ free_image(&image); }
+      [&](dicomNodeError_t error){
+        free_image(&image);
+        free_device_memory(&device_out_labels);
+      }
     };
     runner | [&](){
       return load_image(&image, python_image);
     } | [&](){
-      return SUCCESS;
+      size_t label_size = 0;
+
+      return cudaMalloc(&device_out_labels, label_size);
     }
     | [&](){
       return free_image(&image);

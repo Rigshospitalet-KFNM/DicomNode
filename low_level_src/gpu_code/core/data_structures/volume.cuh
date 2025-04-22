@@ -16,18 +16,16 @@
 #include"extent.cuh"
 
 template<uint8_t DIMENSIONS, typename T>
-class Volume {
+struct Volume {
   T* data = nullptr;
   Extent<DIMENSIONS> m_extent;
   T default_value;
 
-  public:
-    Volume(){
-
-    }
-
-
   size_t elements() const { return m_extent.elements(); }
+
+  bool is_allocated(){
+    return data == nullptr;
+  }
 
   const Extent<DIMENSIONS>& extent() const {
     return m_extent;

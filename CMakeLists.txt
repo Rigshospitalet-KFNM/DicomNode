@@ -27,6 +27,7 @@ function(add_py_object_library name source)
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(${name} PRIVATE -O3)
+  target_compile_options(${name} PRIVATE -Wno-deprecated-gpu-targets)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endfunction()
 
@@ -46,6 +47,7 @@ if(CMAKE_CUDA_COMPILER)
   target_link_libraries(utilities PRIVATE pybind11::module Python::Python)
   target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(utilities PRIVATE -O3)
+  target_compile_options(utilities PRIVATE -Wno-deprecated-gpu-targets)
   set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
 
   set(CUDA_LIBRARIES
@@ -67,7 +69,6 @@ if(CMAKE_CUDA_COMPILER)
     list(APPEND OBJECT_TARGETS $<TARGET_OBJECTS:${LIBRARY_NAME}>)
   endforeach()
 
-
   pybind11_add_module(_cuda SHARED
                       low_level_src/python_entry_point.cu
                       $<TARGET_OBJECTS:utilities>
@@ -76,7 +77,7 @@ if(CMAKE_CUDA_COMPILER)
 
   target_compile_options(_cuda PRIVATE -O3 -g)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
-
+  target_compile_options(_cuda PRIVATE -Wno-deprecated-gpu-targets)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)

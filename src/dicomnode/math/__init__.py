@@ -24,7 +24,6 @@ from . import types
 # Cuda code
 try:
   from dicomnode.math import _cuda
-
   cudaError, device_prop = _cuda.get_device_properties()
   if not cudaError:
     CUDA = True

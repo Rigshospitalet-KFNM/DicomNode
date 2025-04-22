@@ -1,5 +1,16 @@
-#include"../declarations.cuh"
+/**
+ * @file space.cuh
+ * @author your name (you@domain.com)
+ * @brief
+ * @version 0.1
+ * @date 2025-04-22
+ *
+ * @copyright Copyright (c) 2025
+ *
+ */
+#pragma once
 
+#include"../declarations.cuh"
 
 /**
  * @brief A space is description of a linear space of n Dimensions where the

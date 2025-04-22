@@ -1,9 +1,10 @@
 /**
  * @file image.cuh
  * @author Demiguard
- * @brief Defines the
+ * @brief Defines the Image class which represent a linear space with associated
+ * data.
  * @version 0.1
- * @date 2025-02-27
+ * @date 2025-04-22
  *
  * @copyright Copyright (c) 2025
  *
@@ -13,7 +14,8 @@
 #include<stdint.h>
 
 #include"../concepts.cuh"
-
+#include"space.cuh"
+#include"volume.cuh"
 
 
 //template<template<uint8_t DIMENSIONS, typename T> typename VOLUME, uint8_t DIMENSIONS, typename T>
@@ -22,10 +24,7 @@ template<uint8_t DIMENSIONS,typename T>
 class Image {
   public:
     Space<DIMENSIONS> space;
-    //VOLUME<DIMENSIONS, T> volume;
-
-    T* data = nullptr;
-    T defaultValue = 0;
+    Volume<DIMENSIONS, T> volume;
 
   T operator()(Point<DIMENSIONS> point){
 

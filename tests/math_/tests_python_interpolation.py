@@ -5,7 +5,7 @@ import numpy
 from dicomnode.math import CUDA
 from dicomnode.math.image import Image
 from dicomnode.math.space import Space
-from dicomnode.math.interpolation import cpu_interpolate
+from dicomnode.math.interpolation import cpu_interpolate, resample
 
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -59,7 +59,6 @@ class CPUInterpolationTests(DicomnodeTestCase):
     shape = (4,4,4)
     data = (2 * numpy.arange(numpy.prod(shape)) + 1).reshape(shape)
 
-    image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
 
     out_shape = (3,3,3)
     out_space = Space(numpy.eye(3, dtype=numpy.float32), (0.5,0,0), out_shape)
@@ -72,6 +71,23 @@ class CPUInterpolationTests(DicomnodeTestCase):
 
 
 class GPUInterpolationTest(DicomnodeTestCase):
+  @skipIf(not CUDA, "Need GPU for this test")
+  def test_that_gpu_method_works(self):
+    shape = (4,4,4)
+    data = (2 * numpy.arange(numpy.prod(shape)) + 1).reshape(shape)
+
+    image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
+
+    out_shape = (3,3,3)
+    out_space = Space(numpy.eye(3, dtype=numpy.float32), (0.5,0,0), out_shape)
+    dumb_image = Image(data, out_space)
+
+    image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
+    out = resample(image, dumb_image)
+
+    self.assertTrue((out.raw==(data[:3,:3,:3] + 1)).all())
+
+
   @skipIf(not CUDA, "Need GPU for gpu test")
   def test_interpolation_gpu(self):
     from dicomnode.math import _cuda
