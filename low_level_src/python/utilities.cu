@@ -14,7 +14,9 @@ dicomNodeError_t _load_into_host_space(
   const pybind11::buffer_info& inv_basis_buffer = inv_basis.request();
   const pybind11::buffer_info& extent_buffer = extent.request();
 
-  DicomNodeRunner runner;
+  DicomNodeRunner runner([](const dicomNodeError_t error){
+    std::cout << "Load in to host space encountered:" << error_to_human_readable(error);
+  });
 
   runner
     | [&](){
@@ -34,13 +36,13 @@ dicomNodeError_t _load_into_host_space(
     } | [&](){
 
       return check_buffer_pointers(
-        std::cref(extent_buffer), host_space->extent.elements()
+        std::cref(extent_buffer), host_space->extent.dimensionality()
       );
     } | [&](){
       std::memcpy(host_space->basis.points, basis_buffer.ptr, host_space->basis.elements() * sizeof(float));
       std::memcpy(host_space->inverted_basis.points, inv_basis_buffer.ptr, host_space->inverted_basis.elements() * sizeof(float));
       std::memcpy(host_space->starting_point.points, starting_point_buffer.ptr, host_space->starting_point.elements() * sizeof(float));
-      std::memcpy(host_space->extent.sizes, extent_buffer.ptr, host_space->extent.elements() * sizeof(uint32_t));
+      std::memcpy(host_space->extent.sizes, extent_buffer.ptr, host_space->extent.dimensionality() * sizeof(uint32_t));
 
       return dicomNodeError_t::SUCCESS;
     };
@@ -85,7 +87,7 @@ dicomNodeError_t _load_into_device_space(
     } | [&](){
 
       return check_buffer_pointers(
-        std::cref(extent_buffer), device_space->extent.elements()
+        std::cref(extent_buffer), device_space->extent.dimensionality()
       );
     } | [&](){ return cudaMemcpy(
       device_space->basis.points,
@@ -108,7 +110,7 @@ dicomNodeError_t _load_into_device_space(
     | [&](){ return cudaMemcpy(
       device_space->extent.sizes,
       extent_buffer.ptr,
-      device_space->extent.elements() * sizeof(int),
+      device_space->extent.dimensionality() * sizeof(uint32_t),
       cudaMemcpyDefault);};
 
   return runner.error();

@@ -13,6 +13,8 @@
 #pragma once
 #include<stdint.h>
 
+#include<iostream>
+
 #include"core/core.cuh"
 
 namespace {
@@ -260,9 +262,16 @@ dicomNodeError_t slicedConnectedComponentLabeling(
   uint32_t* labels,
   const Image<3, T>& input_volume
 ){
-  DicomNodeRunner runner;
-  const size_t pixels_per_slice = input_volume.num_cols() * input_volume.num_rows();
+	const size_t pixels_per_slice = input_volume.num_cols() * input_volume.num_rows();
   size_t offset = 0;
+  DicomNodeRunner runner(
+		[&](dicomNodeError_t error){
+      std::cout << "SlicedConnectedComponentLabeling encountered error: " << error_to_human_readable(error) << "\n"
+								<< "At offset: " << offset << "\n"
+								<< "At Labels: " << labels + offset << "\n"
+								<< "At input data" << input_volume.volume.data << "\n";
+		}
+	);
 
   // Yeah I could make a single kernel doing this.
   for(uint32_t i = 0; i < input_volume.num_slices(); i++) {

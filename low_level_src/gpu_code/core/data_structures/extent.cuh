@@ -1,7 +1,11 @@
 #pragma once
 
 #include<stdint.h>
+#include<vector>
+#include<array>
+
 #include<cuda/std/optional>
+
 #include"../declarations.cuh"
 #include"../concepts.cuh"
 
@@ -141,6 +145,26 @@ struct Extent {
     }
 
     return size;
+  }
+
+  constexpr uint8_t dimensionality() const {
+    return DIMENSIONS;
+  }
+
+  __host__ dicomNodeError_t set_dimensions(const std::vector<ssize_t>& dims){
+    if(dims.size() != DIMENSIONS){
+      return INPUT_SIZE_MISMATCH;
+    }
+
+    for(int i = 0; const ssize_t& dim : dims){
+      if(dim <= 0){
+        return dicomNodeError_t::NON_POSITIVE_SHAPE;
+      }
+      sizes[i] = dim;
+      i++;
+    }
+
+    return dicomNodeError_t::SUCCESS;
   }
 };
 

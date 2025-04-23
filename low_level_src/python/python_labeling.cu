@@ -17,6 +17,10 @@ namespace {
 
     DicomNodeRunner runner{
       [&](dicomNodeError_t error){
+        std::cout << "device_out_labels: " << device_out_labels << "\n";
+        std::cout << "Image volume Data: " << image.volume.data << "\n";
+        std::cout << "label size " << sizeof(T) * image.elements() << "\n";
+
         free_image(&image);
         free_device_memory(&device_out_labels);
       }
@@ -25,9 +29,12 @@ namespace {
       return load_image(&image, python_image);
     } | [&](){
       const size_t label_size = sizeof(T) * image.elements();
+      std::cout << "label Size: " << label_size << "\n";
+      std::cout << "Address: " << &device_out_labels << "\n";
 
       return cudaMalloc(&device_out_labels, label_size);
     } | [&](){
+      std::cout << "Hello world: " << device_out_labels << "\n";
       return slicedConnectedComponentLabeling<T>(
         device_out_labels, image
       );
@@ -41,11 +48,10 @@ namespace {
         data
       );
 
-      return cudaMemcpy(data, device_out_labels, label_size, cudaMemcpyDeviceToHost);
+      std::cout << "copying back\n";
+      return cudaMemcpy(data, device_out_labels, label_size, cudaMemcpyDefault);
     } | [&](){
       free_device_memory(&device_out_labels);
-      return dicomNodeError_t::SUCCESS;
-    } | [&](){
       return free_image(&image);
     };
 
@@ -56,32 +62,35 @@ namespace {
   std::tuple<dicomNodeError_t, pybind11::array> slice_based_ccl(
     pybind11::object& image
   ){
-  if(!is_instance(image, "dicomnode.math.image", "Image")){
-    const std::string error_message("Error: Sliced Based component labeling takes a dicomnode.math.image.Image object as argument");
+  if(is_instance(image, "dicomnode.math.image", "Image") != dicomNodeError_t::SUCCESS){
+    const std::string error_message("Error: Sliced Based component labeling tak"
+      "es a dicomnode.math.image.Image object as argument\n");
+
     throw std::runtime_error(error_message);
   }
 
   const pybind11::array& raw_image = image.attr("raw");
-  const std::string dtype = pybind11::str(raw_image.attr("dtype"));
+  const pybind11::dtype image_dtype = raw_image.dtype();
 
   //Switch statement doesn't work because I am comparing strings
-  if(dtype == "float32"){
+  if(image_dtype.equal(pybind11::dtype::of<float>())){
     return templated_slice_based_ccl<float>(image);
-  } else if (dtype == "uint8") {
+  } else if (image_dtype.equal(pybind11::dtype::of<uint8_t>())) {
     return templated_slice_based_ccl<uint8_t>(image);
-  } if (dtype == "uint16") {
+  } if (image_dtype.equal(pybind11::dtype::of<uint16_t>())) {
     return templated_slice_based_ccl<uint16_t>(image);
-  } if (dtype == "uint32") {
+  } if (image_dtype.equal(pybind11::dtype::of<uint32_t>())) {
     return templated_slice_based_ccl<uint32_t>(image);
-  } else if (dtype == "int8") {
+  } else if (image_dtype.equal(pybind11::dtype::of<int8_t>())) {
     return templated_slice_based_ccl<int8_t>(image);
-  } if (dtype == "int16") {
+  } if (image_dtype.equal(pybind11::dtype::of<int16_t>())) {
     return templated_slice_based_ccl<int16_t>(image);
-  } if (dtype == "int32") {
+  } if (image_dtype.equal(pybind11::dtype::of<int32_t>())) {
     return templated_slice_based_ccl<int32_t>(image);
   }
 
-  const std::string error_message = "Unsupported dtype:" + dtype;
+  const std::string data_type_name = pybind11::str(raw_image.attr("dtype"));
+  const std::string error_message = "Unsupported dtype:" + data_type_name;
   throw std::runtime_error(error_message);
 }
 }; // End of Anon namespace

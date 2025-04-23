@@ -1,0 +1,3 @@
+from dicomnode.math.image import Image
+
+def slice_based(image: Image): ...

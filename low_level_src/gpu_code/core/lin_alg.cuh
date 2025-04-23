@@ -82,7 +82,7 @@ __device__ dicomNodeError_t ForwardElimination(
       while(newPivotRow == 0.0f){
         j++;
         if(j == DIMENSION){
-          return dicomNodeError_t::NotLinearIndependent;
+          return dicomNodeError_t::NOT_LINEAR_INDEPENDENT;
         }
         newPivotRow = matrix->points[DIMENSION * j + i];
       }
@@ -186,7 +186,7 @@ __device__ dicomNodeError_t _invertMatrixForward(
       while(newPivotRow == 0.0f){
         j++;
         if(j == DIMENSION){
-          return dicomNodeError_t::NotLinearIndependent;
+          return dicomNodeError_t::NOT_LINEAR_INDEPENDENT;
         }
         newPivotRow = matrix[DIMENSION * j + i];
       }

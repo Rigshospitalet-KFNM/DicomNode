@@ -11,6 +11,7 @@
 #pragma once
 
 #include<stdint.h>
+#include<vector>
 
 #include"../concepts.cuh"
 #include"extent.cuh"
@@ -27,6 +28,10 @@ struct Volume {
 
   bool is_allocated() const {
     return data == nullptr;
+  }
+
+  dicomNodeError_t set_extent(const std::vector<ssize_t>& dims){
+    return m_extent.set_dimensions(dims);
   }
 
   const Extent<DIMENSIONS>& extent() const {

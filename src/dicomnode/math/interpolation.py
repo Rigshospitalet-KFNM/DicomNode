@@ -11,7 +11,6 @@ from typing import Union
 
 # Third party modules
 import numpy
-from scipy.interpolate import RegularGridInterpolator
 
 # Dicomnode modules
 from dicomnode.lib.logging import get_logger
@@ -69,6 +68,7 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   Returns:
       _type_: _description_
   """
+  from scipy.interpolate import RegularGridInterpolator
   original_grid = [numpy.arange(s) for s in reversed(source.space.extent)]
 
   # Create interpolator for original data

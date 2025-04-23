@@ -170,8 +170,12 @@ def bounding_box(array):
   else:
     return _bounding_box_cpu(array)
 
+
+from . import labeling
+
 def __all__():
   return [
+    labeling,
     space,
     CUDA,
     image,
