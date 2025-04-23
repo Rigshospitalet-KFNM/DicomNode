@@ -267,9 +267,9 @@ dicomNodeError_t slicedConnectedComponentLabeling(
   // Yeah I could make a single kernel doing this.
   for(uint32_t i = 0; i < input_volume.num_slices(); i++) {
     runner | [&](){
-      return connectedComponentLabeling2D(
+      return connectedComponentLabeling2D<T>(
         labels + offset,
-        input_volume.data + offset,
+        input_volume.volume.data + offset,
         input_volume.num_cols(),
         input_volume.num_rows()
       );

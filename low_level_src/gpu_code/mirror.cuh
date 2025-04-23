@@ -17,12 +17,12 @@ __host__ __device__ T invert_index(const T index, const T size){
 template<typename OP, typename T, typename... Args>
   requires Mirrors<OP, T, Args...>
 __global__ void mirror_kernel(
-    T* data_in, T* data_out, size_t data_size, Args... args
+    T* data_in, T* data_out, size_t num_elements, Args... args
   ){
 
   const uint64_t global_index = blockDim.x * blockIdx.x + threadIdx.x;
 
-  if(global_index < data_size){
+  if(global_index < num_elements){
     data_out[global_index] = OP::mirrors(data_in, global_index, args...);
   }
 
@@ -226,7 +226,7 @@ template<typename OP, typename T>
 __host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
-  const size_t data_size = space.size();
+  const size_t data_size = space.elements();
 
   auto error_function = [&](cudaError_t error){
     free_device_memory(&device_data_in, &device_data_out);
@@ -244,7 +244,7 @@ __host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space
     | [&](){ return cudaMemcpy(device_data_in, data_in, sizeof(T) * data_size, cudaMemcpyDefault); }
     | [&](){
       mirror_kernel<OP, T, Extent<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
-        device_data_in, device_data_out, space.size(), space
+        device_data_in, device_data_out, space.elements(), space
       );
       return cudaGetLastError(); }
     | [&](){ return cudaMemcpy(data_out, device_data_out, sizeof(T) * data_size, cudaMemcpyDefault);}
@@ -258,31 +258,31 @@ __host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space
 
 template<typename OP, typename T>
   requires Mirrors<OP, T, Extent<3>>
-__host__ cudaError_t mirror_in_place(T* data_in, const Extent<3> space){
+__host__ cudaError_t mirror_in_place(T* data_in, const Extent<3>& space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
-  const size_t data_size = space.size();
+  const size_t elements = space.elements();
 
   auto error_function = [&](cudaError_t error){
     free_device_memory(&device_data_in, &device_data_out);
   };
 
-  const dim3 grid = get_grid<1>(data_size, MAP_BLOCK_SIZE);
+  const dim3 grid = get_grid<1>(elements, MAP_BLOCK_SIZE);
 
   CudaRunner runner{error_function};
 
   // So here there's a mirco optimization of just allocating once and indexing
   // I should write some benchmarks to measure just how much it effects stuff
   runner
-    | [&](){ return cudaMalloc(&device_data_in, sizeof(T) * data_size); }
-    | [&](){ return cudaMalloc(&device_data_out, sizeof(T) * data_size); }
-    | [&](){ return cudaMemcpy(device_data_in, data_in, sizeof(T) * data_size, cudaMemcpyDefault); }
+    | [&](){ return cudaMalloc(&device_data_in, sizeof(T) * elements); }
+    | [&](){ return cudaMalloc(&device_data_out, sizeof(T) * elements); }
+    | [&](){ return cudaMemcpy(device_data_in, data_in, sizeof(T) * elements, cudaMemcpyDefault); }
     | [&](){
       mirror_kernel<OP, T, Extent<3>><<<grid, MIRROR_BLOCK_SIZE>>>(
-        device_data_in, device_data_out, space.size(), space
+        device_data_in, device_data_out, space.elements(), space
       );
       return cudaGetLastError(); }
-    | [&](){ return cudaMemcpy(data_in, device_data_out, sizeof(T) * data_size, cudaMemcpyDefault);}
+    | [&](){ return cudaMemcpy(data_in, device_data_out, sizeof(T) * elements, cudaMemcpyDefault);}
     | [&](){
       free_device_memory(&device_data_in, &device_data_out);
       return cudaSuccess;

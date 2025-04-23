@@ -18,6 +18,10 @@ struct Extent {
   static_assert(DIMENSIONS > 0);
   uint32_t sizes[DIMENSIONS]{}; // this zero initializes the array
 
+  // Default constructor is need because otherwise the next constructor is used
+  // which fails as no arguments fails static assert
+  Extent(){}
+
   template<typename... Args>
   __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<uint32_t>(args)...}{
     static_assert(sizeof...(args) == DIMENSIONS);

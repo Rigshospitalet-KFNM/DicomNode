@@ -268,7 +268,7 @@ size_t get_image_size(const pybind11::object& python_object){
 
   if(pybind11::isinstance(python_object, image_class)){
     const python_array<T>& raw_image = python_object.attr("raw").cast<python_array<T>>();
-    return raw_image.elements() * sizeof(T);
+    return raw_image.size() * sizeof(T);
   }
 
   return 0;
