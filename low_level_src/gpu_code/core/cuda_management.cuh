@@ -6,6 +6,12 @@
 #include<tuple>
 #include"error.cuh"
 
+static bool is_host_pointer(const cudaPointerAttributes& attr){
+  return
+       attr.type == cudaMemoryType::cudaMemoryTypeUnregistered
+    || attr.type == cudaMemoryType::cudaMemoryTypeHost;
+}
+
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
   ([&]{
@@ -19,7 +25,7 @@ void free_device_memory(Ts** && ... device_pointer){
       printf("Unable to get cudaPointerGetAttribute for pointer %p\n", *device_pointer);
       return;
     }
-    if(attr.type == cudaMemoryType::cudaMemoryTypeDevice || attr.type == cudaMemoryType::cudaMemoryTypeManaged){
+    if(!is_host_pointer(attr)){
       error = cudaFree(*device_pointer);
       if(error != cudaSuccess){
         const char* error_name = cudaGetErrorName(error);

@@ -189,9 +189,3 @@ dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_spac
 
   return runner.error();
 }
-
-bool is_host_pointer(const cudaPointerAttributes& attr){
-  return
-       attr.type == cudaMemoryType::cudaMemoryTypeUnregistered
-    || attr.type == cudaMemoryType::cudaMemoryTypeHost;
-}

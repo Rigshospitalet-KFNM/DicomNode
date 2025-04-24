@@ -360,9 +360,16 @@ releasing. A consequence of this that you gain quite references in your code,
 because you want to avoid creating/copying/destroying resources. Because these
 can fail and are pain to deal with, and then you pass the owning object around
 instead.
-It's a really good idea, however the concept sorta breaks with CUDA because it
-introduces a separate memory space namely the device memory. You cannot pass by
-default a reference to a kernel, because that object live in the CPU's memory
+RAII is a really good idea, however the concept sorta breaks with CUDA because:
+
+1. A CUDA program is really just a C/C++ program in disguise. It sets up the
+driver context and more important for this problem it does the tear down.
+However because there's no order of destruction you can end up needing the
+destroyed context to destroy an object. In general Kernel launches and copy
+constructors, constructors and destructors really doesn't play nice. There's a
+bit on in the `CUDA Standard https://docs.nvidia.com/cuda/cuda-c-programming-guide/#global-function-argument-processing`
+2. it introduces a separate memory space namely the device memory. You cannot pass
+by default a reference to a kernel, because that object live in the CPU's memory
 space and the gpu threads cannot access that space. Just like the CPU cannot
 access memory on the GPU.
 
@@ -385,7 +392,28 @@ operation on each float, then your bottleneck will be transfer speed.
 Okay sidetrack over. So what do you do now that RAII is out the window.
 The plan is to create thin objects, that are copied on kernel invocation. The
 kernels have an argument size limit of 256 bytes, so thin object has be smaller
-that that.
+that that. These objects are zero initialized in general.
+
+TESTING
+*******
+
+Now it's not really sufficient to have a single test suite in python, as any c++
+function really have three parts. An unwrapping of the python construct to c++
+readable data, some processing of said data and finally repacking the data for
+python. The unit in unit test would prefer it have the units be as small as
+possible, hence there's a c++ test suite, that tests just the processing part.
+
+This suite is only build if you build the library manually i.e not by pip.
+To build and run it:
+
+cd build
+make
+./cu_tests
+
+Additionally you should run the test with various tools to ensure there are no
+memory leaks
+compute-sanitizer --leak-check full --tool=memcheck ./cu_tests
+
 
 
 Conclusion

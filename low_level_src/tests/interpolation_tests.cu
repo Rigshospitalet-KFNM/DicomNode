@@ -403,7 +403,10 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
   error = cudaMalloc(&device_interpolated_image, out_size);
   ASSERT_EQ(error, cudaSuccess);
 
-  dicomNodeError_t dicomnode_error = load_texture<uint8_t>(texture, host_data, source_space);
+  dicomNodeError_t dicomnode_error = load_texture<uint8_t>(
+    texture,
+    host_data, source_space
+  );
   if(dicomnode_error){
     error = extract_cuda_error(dicomnode_error);
     const char* error_name = cudaGetErrorName(error);
@@ -436,7 +439,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
     );
   }
 
-  cudaFree(texture);
+  free_texture(&texture);
   cudaFree(device_interpolated_image);
 
   delete[] host_data;

@@ -109,69 +109,67 @@ dicomNodeError_t load_texture(
 }
 
 template<typename T>
-cudaError_t free_texture(Texture<3, T>** texture){
-  if(texture && !(*texture)){
-    return cudaSuccess;
+dicomNodeError_t free_host_texture(Texture<3, T>& texture){
+  cudaResourceDesc res;
+
+  DicomNodeRunner runner{[](dicomNodeError_t error){
+    std::cout << "free_host_texture encoutered an error:" << error_to_human_readable(error) << "\n";
+  }};
+
+  runner | [&](){
+    return cudaGetTextureObjectResourceDesc(&res, texture.texture);
+  } | [&](){
+    if(res.resType == cudaResourceTypeArray){
+      return cudaFreeArray(res.res.array.array);
+    } else {
+      printf("Texture was not allocated with array?\n");
+      return cudaError_t::cudaSuccess;
+    }
+  } | [&](){
+    return cudaDestroyTextureObject(texture.texture);
+  };
+
+  return runner.error();
+}
+
+template<typename T>
+dicomNodeError_t free_texture(Texture<3, T>** texture){
+  if(!texture) {
+    return dicomNodeError_t::SUCCESS;
+  }
+  if(!(*texture)){
+    return dicomNodeError_t::SUCCESS;
   }
 
   cudaPointerAttributes attr;
   Texture<3, T>* ptr = *texture;
-  cudaError_t error = cudaPointerGetAttributes(&attr, ptr);
 
-  if(error){
-    const char* error_name = cudaGetErrorName(error);
-    printf("Encountered %s not get pointer info of %p\n", error_name, ptr);
-    return error;
-  }
+  DicomNodeRunner runner([&](dicomNodeError_t error){
+    std::cout << "free_host_texture encoutered an error:" << error_to_human_readable(error) << "\n";
+  });
 
-  if(attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged){
-    Texture<3, T> host_texture;
-    error = cudaMemcpy(&host_texture, ptr, sizeof(Texture<3, T>), cudaMemcpyDefault);
-    if(error){
-      const char* error_name = cudaGetErrorName(error);
-      printf("ptr: %p\n", ptr);
-      printf("ptr->texture: %p\n", &(ptr->texture));
+  runner
+    | [&](){
+      return cudaPointerGetAttributes(&attr, ptr);
+    } | [&](){
+      if(is_host_pointer(attr)){
+        return free_host_texture(*ptr);
+      } else {
+        Texture<3, T> host_texture;
+        DicomNodeRunner subrunner;
+        subrunner | [&](){
+          return cudaMemcpy(&host_texture, ptr, sizeof(Texture<3, T>), cudaMemcpyDefault);
+        } | [&](){
+          return free_host_texture(host_texture);
+        } | [&](){
+          return cudaFree(ptr);
+        };
 
-      printf("Encountered %s while copying %p to %p\n", error_name, ptr, &host_texture);
-      return error;
-    }
+        return subrunner.error();
+      }
+    };
 
-    cudaResourceDesc res;
-    error = cudaGetTextureObjectResourceDesc(&res, host_texture.texture);
+  *texture = nullptr;
 
-    if(error){
-      const char* error_name = cudaGetErrorName(error);
-      printf("Encountered %s while destroying the texture object\n", error_name);
-      return error;
-    }
-
-    error = cudaDestroyTextureObject(host_texture.texture);
-    if(error){
-      const char* error_name = cudaGetErrorName(error);
-      printf("Encountered %s while destroying the texture object\n", error_name);
-      return error;
-    }
-
-    if(res.resType == cudaResourceTypeArray){
-      cudaFreeArray(res.res.array.array);
-    } else {
-      printf("To do\n");
-    }
-
-    error = cudaFree(ptr);
-    if(error){
-      const char* error_name = cudaGetErrorName(error);
-      printf("Encountered %s while freeing %p\n", error_name, ptr);
-      return error;
-    }
-    *texture = nullptr;
-  } else {
-    error = cudaDestroyTextureObject((*texture)->texture);
-    if(error){
-      const char* error_name = cudaGetErrorName(error);
-      printf("Encountered %s while destroying the texture object\n", error_name);
-    }
-  }
-
-  return error;
+  return runner.error();
 }
