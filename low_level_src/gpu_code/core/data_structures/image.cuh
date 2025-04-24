@@ -22,16 +22,21 @@
 //  requires CVolume<VOLUME, DIMENSIONS, T>
 template<uint8_t DIMENSIONS,typename T>
 class Image {
+  static_assert(0 < DIMENSIONS);
+
   public:
     Space<DIMENSIONS> space;
     Volume<DIMENSIONS, T> volume;
 
-  T operator()(Point<DIMENSIONS> point){
+  Image(){}
+  Image(Space<DIMENSIONS> a_space, Volume<DIMENSIONS, T> v_volume):
+    space(std::move(a_space)),
+    volume(std::move(v_volume))
+  {}
 
-  }
+  //T operator()(Point<DIMENSIONS> point){}
 
   constexpr const uint32_t& num_cols() const {
-    static_assert(0 < DIMENSIONS);
     return space.extent.sizes[0];
   }
 
@@ -41,7 +46,7 @@ class Image {
   }
 
   constexpr const uint32_t& num_slices() const {
-    static_assert(1 < DIMENSIONS);
+    static_assert(2 < DIMENSIONS);
     return space.extent.sizes[2];
   }
 

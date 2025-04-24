@@ -7,19 +7,20 @@
 
 namespace {
   template<typename T>
-  std::tuple<dicomNodeError_t, python_array<T>> templated_slice_based_ccl(
+  std::tuple<dicomNodeError_t, python_array<uint32_t>> templated_slice_based_ccl(
     pybind11::object& python_image
   ){
     //const python_array<T> raw_image = python_image.attr("raw");
     Image<3, T> image;
     uint32_t* device_out_labels = nullptr;
-    python_array<T> return_array = {};
+    python_array<uint32_t> return_array = {};
 
     DicomNodeRunner runner{
       [&](dicomNodeError_t error){
-        std::cout << "device_out_labels: " << device_out_labels << "\n";
-        std::cout << "Image volume Data: " << image.volume.data << "\n";
-        std::cout << "label size " << sizeof(T) * image.elements() << "\n";
+        std::cout << "Sliced based CCL encountered: " << error_to_human_readable(error) << "\n"
+                   << "device_out_labels: " << device_out_labels << "\n"
+                   << "Image volume Data: " << image.volume.data << "\n"
+                   << "label size " << sizeof(T) * image.elements() << "\n";
 
         free_image(&image);
         free_device_memory(&device_out_labels);
@@ -29,27 +30,20 @@ namespace {
       return load_image(&image, python_image);
     } | [&](){
       const size_t label_size = sizeof(T) * image.elements();
-      std::cout << "label Size: " << label_size << "\n";
-      std::cout << "Address: " << &device_out_labels << "\n";
-
       return cudaMalloc(&device_out_labels, label_size);
     } | [&](){
-      std::cout << "Hello world: " << device_out_labels << "\n";
       return slicedConnectedComponentLabeling<T>(
-        device_out_labels, image
+        device_out_labels, image.volume
       );
     } | [&](){
       const size_t label_size = sizeof(T) * image.elements();
-      T* data = new T[image.elements()];
-
-      return_array = python_array<T>(
+      return_array = python_array<uint32_t>(
         {image.num_slices(), image.num_rows(), image.num_cols()},
-        {image.num_rows() * image.num_cols() * sizeof(T) ,image.num_cols() * sizeof(T), sizeof(T)},
-        data
+        {image.num_rows() * image.num_cols() * sizeof(T) ,image.num_cols() * sizeof(T), sizeof(T)}
       );
 
-      std::cout << "copying back\n";
-      return cudaMemcpy(data, device_out_labels, label_size, cudaMemcpyDefault);
+      pybind11::buffer_info return_buffer = return_array.request(true);
+      return cudaMemcpy(return_buffer.ptr, device_out_labels, label_size, cudaMemcpyDefault);
     } | [&](){
       free_device_memory(&device_out_labels);
       return free_image(&image);

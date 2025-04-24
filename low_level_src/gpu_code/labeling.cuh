@@ -260,27 +260,27 @@ dicomNodeError_t connectedComponentLabeling2D(
 template<typename T>
 dicomNodeError_t slicedConnectedComponentLabeling(
   uint32_t* labels,
-  const Image<3, T>& input_volume
+  const Volume<3, T>& input_volume
 ){
-	const size_t pixels_per_slice = input_volume.num_cols() * input_volume.num_rows();
+	const size_t pixels_per_slice = input_volume.extent().x() * input_volume.extent().y();
   size_t offset = 0;
   DicomNodeRunner runner(
 		[&](dicomNodeError_t error){
       std::cout << "SlicedConnectedComponentLabeling encountered error: " << error_to_human_readable(error) << "\n"
 								<< "At offset: " << offset << "\n"
 								<< "At Labels: " << labels + offset << "\n"
-								<< "At input data" << input_volume.volume.data << "\n";
+								<< "At input data" << input_volume.data << "\n";
 		}
 	);
 
   // Yeah I could make a single kernel doing this.
-  for(uint32_t i = 0; i < input_volume.num_slices(); i++) {
+  for(uint32_t i = 0; i < input_volume.extent().z(); i++) {
     runner | [&](){
       return connectedComponentLabeling2D<T>(
         labels + offset,
-        input_volume.volume.data + offset,
-        input_volume.num_cols(),
-        input_volume.num_rows()
+        input_volume.data + offset,
+        input_volume.extent().y(),
+        input_volume.extent().x()
       );
     };
 

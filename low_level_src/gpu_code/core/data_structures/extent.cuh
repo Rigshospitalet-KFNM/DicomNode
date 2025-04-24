@@ -6,6 +6,7 @@
 
 #include<cuda/std/optional>
 
+
 #include"../declarations.cuh"
 #include"../concepts.cuh"
 
@@ -35,7 +36,7 @@ struct Extent {
     return sizes[i];
   }
 
-  __device__ __host__ const uint32_t& operator[](const uint8_t i) const {
+  __device__ __host__ constexpr const uint32_t& operator[](const uint8_t i) const {
     return sizes[i];
   }
 
@@ -102,17 +103,17 @@ struct Extent {
   }
 
   __device__ __host__ const uint32_t& x() const noexcept {
-    return sizes[2];
+    return sizes[DIMENSIONS - 1];
   }
 
   __device__ __host__ const uint32_t& y() const noexcept{
     static_assert(DIMENSIONS > 1);
-    return sizes[1];
+    return sizes[DIMENSIONS - 2];
   }
 
   __device__ __host__ const uint32_t& z() const noexcept {
     static_assert(DIMENSIONS > 2);
-    return sizes[0];
+    return sizes[DIMENSIONS - 3];
   }
 
   __device__ __host__ constexpr uint32_t* begin() noexcept{
@@ -165,6 +166,19 @@ struct Extent {
     }
 
     return dicomNodeError_t::SUCCESS;
+  }
+
+  template<uint8_t ARRAY_SIZE>
+  __host__ dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
+    static_assert(ARRAY_SIZE == DIMENSIONS);
+
+    for(int i = 0; const ssize_t& dim : dims){
+      if(dim <= 0){
+        return dicomNodeError_t::NON_POSITIVE_SHAPE;
+      }
+      sizes[i] = dim;
+      i++;
+    }
   }
 };
 
