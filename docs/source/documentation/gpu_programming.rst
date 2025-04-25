@@ -113,6 +113,9 @@ into and run CUDA code from there. There's a few libraries for this, however
 as I didn't really have a good look of the landscape I picked something that
 could get the job done and not the "best" choice.
 
+As a rule of thumb, it will be compiled with the latest version of CUDA/GCC/C++
+standard. However most of the base is C++20 and using CUDA 11.0 or later.
+
 I would have looked more into boost's python bindings, but it's whatever.
 
 This story starts in the *setup.py* where the script checks if the CUDA compiler
@@ -406,13 +409,18 @@ possible, hence there's a c++ test suite, that tests just the processing part.
 This suite is only build if you build the library manually i.e not by pip.
 To build and run it:
 
-cd build
-make
-./cu_tests
+.. code-block:: bash
+
+  cd build
+  make
+  ./cu_tests
 
 Additionally you should run the test with various tools to ensure there are no
-memory leaks
-compute-sanitizer --leak-check full --tool=memcheck ./cu_tests
+memory leaks:
+
+.. code-block::bash
+
+  compute-sanitizer --leak-check full --tool=memcheck ./cu_tests
 
 
 

@@ -12,6 +12,12 @@ static bool is_host_pointer(const cudaPointerAttributes& attr){
     || attr.type == cudaMemoryType::cudaMemoryTypeHost;
 }
 
+static bool is_host_pointer(const void* ptr){
+  cudaPointerAttributes attr;
+  cudaPointerGetAttributes(&attr, ptr); // Fucked if this fails
+  return is_host_pointer(attr);
+}
+
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
   ([&]{
@@ -19,14 +25,8 @@ void free_device_memory(Ts** && ... device_pointer){
       return;
     }
 
-    cudaPointerAttributes attr;
-    cudaError_t error = cudaPointerGetAttributes(&attr, *device_pointer);
-    if(error != cudaSuccess){
-      printf("Unable to get cudaPointerGetAttribute for pointer %p\n", *device_pointer);
-      return;
-    }
-    if(!is_host_pointer(attr)){
-      error = cudaFree(*device_pointer);
+    if(!is_host_pointer(device_pointer)){
+      cudaError_t error = cudaFree(*device_pointer);
       if(error != cudaSuccess){
         const char* error_name = cudaGetErrorName(error);
         const char* error_desc = cudaGetErrorString(error);
