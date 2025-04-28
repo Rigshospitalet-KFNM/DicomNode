@@ -69,6 +69,8 @@ class IndexTracker:
     self.X = X
     self._index = self.max_index // 2
     self.ax = ax
+    self.ax.set_xticks([],[])
+    self.ax.set_yticks([],[])
     self.im = ax.imshow(self.display_data, cmap='gray_r')
     self.update()
 

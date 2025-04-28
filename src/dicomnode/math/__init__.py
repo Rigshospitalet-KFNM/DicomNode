@@ -85,6 +85,11 @@ def mirror_inplace_gpu(arr: image.numpy_image, direction: MirrorDirection):
   Raises:
       CudaException: _description_
   """
+  if not CUDA:
+    raise Exception("You need GPU for this")
+
+  from dicomnode.math import _cuda
+
   # Cuda functions are inplace
   if direction == MirrorDirection.X:
     func = _cuda.mirror_x

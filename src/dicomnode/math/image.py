@@ -13,7 +13,9 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.math.space import Space
+from dicomnode import math
+from dicomnode.math.types import MirrorDirection
+from dicomnode.math.space import Space, ReferenceSpace
 
 numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
 raw_image_frames: TypeAlias = ndarray[Tuple[int,int,int,int], Any]
@@ -106,6 +108,44 @@ class Image:
 
   def transform_to_ras(self):
     """Changes the image such that it's in the ras reference space"""
+
+    # This function is done in a couple of steps:
+    # 1. First ensure that the image is in the correct rotation
+    # 2. Performs mirroring until we are in RAS space
+
+    if not self.space.is_correct_rotation:
+      pass
+
+    reference_space = ReferenceSpace.from_space(self.space)
+
+    match reference_space:
+      case ReferenceSpace.RAS:
+        pass # Yay
+      case ReferenceSpace.RAI:
+        self._raw = math.mirror(self.raw, MirrorDirection.Z)
+        self.space.mirror_perspective(MirrorDirection.Z)
+      case ReferenceSpace.RPS:
+        self._raw = math.mirror(self.raw, MirrorDirection.Y)
+        self.space.mirror_perspective(MirrorDirection.Y)
+      case ReferenceSpace.RPI:
+        self._raw = math.mirror(self.raw, MirrorDirection.YZ)
+        self.space.mirror_perspective(MirrorDirection.YZ)
+      case ReferenceSpace.LAS:
+        self._raw = math.mirror(self.raw, MirrorDirection.X)
+        self.space.mirror_perspective(MirrorDirection.X)
+      case ReferenceSpace.LAI:
+        self._raw = math.mirror(self.raw, MirrorDirection.XZ)
+        self.space.mirror_perspective(MirrorDirection.XZ)
+      case ReferenceSpace.LPS:
+        self._raw = math.mirror(self.raw, MirrorDirection.XY)
+        self.space.mirror_perspective(MirrorDirection.XY)
+      case ReferenceSpace.LPI:
+        self._raw = math.mirror(self.raw, MirrorDirection.XYZ)
+        self.space.mirror_perspective(MirrorDirection.XYZ)
+      case None:
+        raise Exception("")
+
+
 
 
   @classmethod

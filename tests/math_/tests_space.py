@@ -5,6 +5,7 @@ import numpy
 from nibabel.nifti1 import Nifti1Image, Nifti1Header
 
 # Dicomnode modules
+from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space
 
 # Testing helpers
@@ -86,3 +87,20 @@ class SpaceTestCases(DicomnodeTestCase):
     self.assertTrue((coords[21] == [1,2,1]).all())
     self.assertTrue((coords[22] == [2,2,1]).all())
     self.assertTrue((coords[23] == [3,2,1]).all())
+
+  def test_mirroring_of_space(self):
+    space = Space(numpy.array([ # type: ignore
+      [2,1,0],
+      [1,2,0],
+      [0,0,3]
+    ]), [10,20,30], [10,30,50])
+
+    space.mirror_perspective(MirrorDirection.X)
+
+    print(space.basis)
+    print(space.starting_point)
+
+    space.mirror_perspective(MirrorDirection.X)
+
+    print(space.basis)
+    print(space.starting_point)

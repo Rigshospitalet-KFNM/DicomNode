@@ -15,6 +15,7 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
+from dicomnode.math.types import MirrorDirection
 RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float32]]
 
 # Rotation matrix can be found here:
@@ -120,6 +121,69 @@ class Space:
       (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
     )
 
+  def _mirror_x_direction(self):
+    """THIS FUNCTION LEADS THE CLASS IN AN INVALID STATE, UNLESS YOU HAVE CALLED
+    self._inverted_basis = inv(self.basis)
+    """
+    self._starting_point = self.starting_point + self.basis[0,:] * self.extent[2]
+    self._basis[0,:] = -self.basis[0,:]
+
+  def _mirror_y_direction(self):
+    """THIS FUNCTION LEADS THE CLASS IN AN INVALID STATE, UNLESS YOU HAVE CALLED
+    self._inverted_basis = inv(self.basis)
+    """
+    self._starting_point = self.starting_point + self.basis[1,:] * self.extent[1]
+    self._basis[1,:] = -self.basis[1,:]
+
+  def _mirror_z_direction(self):
+    """THIS FUNCTION LEADS THE CLASS IN AN INVALID STATE, UNLESS YOU HAVE CALLED
+    self._inverted_basis = inv(self.basis)
+    """
+    self._starting_point = self.starting_point + self.basis[2,:] * self.extent[0]
+    self._basis[2,:] = -self.basis[2,:]
+
+
+  def mirror_perspective(self, direction: MirrorDirection):
+    """Changes the starting point and invert the basis vector matching the input
+    direction. If the function spans a space, this function does update that
+    space.
+
+
+    Visualizing an 1D example (Looks best in real docs):
+      |-------------------------------------|
+      ^                                     ^
+      startingPoint                         starting point + basis * self.extent
+
+    After mirroring:
+      |-------------------------------------|
+      ^                                     ^
+      startingPoint + basis * self.extent   starting point
+
+
+    """
+    match direction:
+      case MirrorDirection.X:
+        self._mirror_x_direction()
+      case MirrorDirection.XY:
+        self._mirror_x_direction()
+        self._mirror_y_direction()
+      case MirrorDirection.XZ:
+        self._mirror_x_direction()
+        self._mirror_z_direction()
+      case MirrorDirection.XYZ:
+        self._mirror_x_direction()
+        self._mirror_y_direction()
+        self._mirror_z_direction()
+      case MirrorDirection.Y:
+        self._mirror_y_direction()
+      case MirrorDirection.YZ:
+        self._mirror_y_direction()
+        self._mirror_z_direction()
+      case MirrorDirection.Z:
+        self._mirror_z_direction()
+
+    self._inverted_basis = inv(self.basis)
+
   def __str__(self):
     return (f"Space over extend x: {self.extent[2]}, y: {self.extent[1]} z: {self.extent[0]}\n"
             f"Starting point at ({self.starting_point[0]},{self.starting_point[1]}, {self.starting_point[2]})\n"
@@ -132,12 +196,11 @@ class Space:
     return str(self)
 
   @property
-  def correct_rotation(self) -> bool:
-    """Detect if the image is rotated such that the reference space makes sense
-
+  def is_correct_rotation(self) -> bool:
+    """Detect if the image is rotated such that the reference space is not None
 
     Returns:
-        bool: _description_
+        bool: return True if there's a reference space that matches
     """
 
     abs_affine = absolute(self.basis)
@@ -256,7 +319,7 @@ class ReferenceSpace(Enum):
 
   @classmethod
   def from_space(cls, affine: Space):
-    if not affine.correct_rotation:
+    if not affine.is_correct_rotation:
       return None
 
     def is_positive(num):
