@@ -4,8 +4,8 @@
 # Python Standard Library
 from functools import reduce
 from enum import Enum
-from typing import Any, List, Callable, Optional, Tuple, Union
-
+from types import EllipsisType
+from typing import Any,Callable, List, Literal, Iterable, Optional, Tuple, Union
 # Third Party Libraries
 import numpy
 from pydicom import DataElement
@@ -16,7 +16,7 @@ from pydicom.valuerep import PersonName
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.exceptions import InvalidDataset, MissingDatasets
 
 PRIVATIZATION_VERSION = 1
 
@@ -285,6 +285,91 @@ def sort_datasets(dataset: Dataset):
     return dataset.ImagePositionPatient[2]
 
   return dataset.InstanceNumber
+
+def assess_single_series(datasets: Iterable[Dataset]) -> Optional[UID]:
+  """Assess a collection of datasets to ensure, that they are of a single
+  series. Throws if multiple series are inside of the collection.
+
+  Args:
+    datasets: Iterable[Dataset] - The collection of datasets to
+
+  Returns:
+    UID: Optional[UID] - None if no instance UID series in datasets, otherwise
+                         The series uid of all the datasets
+
+  Raises:
+    InvalidDataset: If the collection contains multiple series.
+    MissingDatasets: if the collection is empty
+  """
+
+  sentinel: None | EllipsisType | UID = ...
+
+  for dataset in datasets:
+    if sentinel is ...:
+      sentinel = dataset.get('SeriesInstanceUID', None)
+    else:
+      if sentinel != dataset.get('SeriesInstanceUID', None):
+        raise InvalidDataset("Collection contains multiple Series")
+
+  if sentinel is ...:
+    raise MissingDatasets("Dataset Container is empty")
+
+  return sentinel
+
+
+class ComparingDatasets:
+  def __init__(self, dataset_1, dataset_2) -> None:
+    self.dataset_1 = iter(dataset_1)
+    self.dataset_2 = iter(dataset_2)
+
+    self._next_tag_1: Optional[DataElement] = None
+    self._next_tag_2: Optional[DataElement] = None
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    if self._next_tag_1 is None:
+      try:
+        self._next_tag_1 = next(self.dataset_1)
+      except StopIteration:
+        self._next_tag_1 = None
+
+    if self._next_tag_2 is None:
+      try:
+        self._next_tag_2 = next(self.dataset_2)
+      except StopIteration:
+        self._next_tag_2 = None
+
+    tag_1 = self._next_tag_1
+    tag_2 = self._next_tag_2
+
+    if(tag_1 is None and tag_2 is None):
+      raise StopIteration #
+    elif tag_1 is None:
+      self._next_tag_2 = None
+      return (None, tag_2)
+    elif tag_2 is None:
+      self._next_tag_1 = None
+      return (tag_1, None)
+    else:
+      if tag_1.tag == tag_2.tag:
+        self._next_tag_1 = None
+        self._next_tag_2 = None
+        return (tag_1, tag_2)
+      elif tag_1.tag < tag_2.tag:
+        self._next_tag_1 = None
+        return (tag_1, None)
+      else:
+        self._next_tag_2 = None
+        return (None, tag_2)
+
+def print_difference_between_datasets(dataset_1 : Dataset, dataset_2: Dataset):
+  for (tag_1, tag_2) in ComparingDatasets(dataset_1, dataset_2):
+    if tag_1 is None and tag_2 is not None:
+      print(f"Missing {tag_2.tag} from the first dataset")
+    elif tag_2 is None and tag_1 is not None:
+      print(f"Missing {tag_1.tag} from the second dataset")
 
 from . import anonymization
 from . import blueprints

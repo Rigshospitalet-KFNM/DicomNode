@@ -39,6 +39,10 @@ ROTATION_MATRIX_90_DEG_Z  = array([
 
 class Space:
   @property
+  def reference_space(self):
+    return ReferenceSpace.from_space(self)
+
+  @property
   def basis(self):
     return self._basis
 
@@ -127,7 +131,7 @@ class Space:
   def __repr__(self) -> str:
     return str(self)
 
-
+  @property
   def correct_rotation(self) -> bool:
     """Detect if the image is rotated such that the reference space makes sense
 
@@ -251,8 +255,8 @@ class ReferenceSpace(Enum):
   """
 
   @classmethod
-  def from_affine(cls, affine: Space):
-    if not affine.correct_rotation():
+  def from_space(cls, affine: Space):
+    if not affine.correct_rotation:
       return None
 
     def is_positive(num):

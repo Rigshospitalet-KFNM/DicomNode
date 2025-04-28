@@ -103,6 +103,11 @@ class Image:
   def __getitem__(self, idx):
     return self.raw[idx]
 
+
+  def transform_to_ras(self):
+    """Changes the image such that it's in the ras reference space"""
+
+
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     image_data = build_image_from_datasets(datasets)
@@ -112,6 +117,9 @@ class Image:
 
   def __str__(self) -> str:
     return f"An Image over the space:\n{self.space}"
+
+  def __repr__(self) -> str:
+    return str(self)
 
 
 class FramedImage():

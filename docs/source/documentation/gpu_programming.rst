@@ -422,8 +422,6 @@ memory leaks:
 
   compute-sanitizer --leak-check full --tool=memcheck ./cu_tests
 
-
-
 Conclusion
 **********
 

@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
 import numpy
 from numpy import ndarray, float32
 from pydicom import Dataset, DataElement
+from pydicom.uid import UID
 from pydicom.tag import Tag
 from pydicom.datadict import dictionary_VR, keyword_dict
 from pydicom.tag import BaseTag
@@ -25,10 +26,11 @@ from rt_utils import RTStruct
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
-from dicomnode.dicom import has_tags, sort_datasets, gen_uid
+from dicomnode.dicom import has_tags, sort_datasets, gen_uid,\
+  assess_single_series
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import Image, FramedImage
-from dicomnode.lib.exceptions import InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
+from dicomnode.lib.exceptions import MissingDatasets, InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
 
 logger = getLogger(DICOMNODE_LOGGER_NAME)
 
@@ -108,16 +110,20 @@ class Series:
 
 
 class DicomSeries(Series):
-  """This represent a series of dicom, that contains an image.
+  """This represent a series of dicom datasets, that together contains an image.
 
-  Note that the image is constructed lazily, so that
+  Note: that the image is constructed lazily, so that
   """
   pivot: Dataset
   datasets: List[Dataset]
+  series_instance_UID: Optional[UID]
+
 
   def __init__(self, datasets: List[Dataset]) -> None:
     if len(datasets) == 0:
-      raise ValueError("Cannot construct a dicom series from an empty list")
+      raise MissingDatasets("Cannot construct a dicom series from an empty list")
+
+    self.series_instance_UID = assess_single_series(datasets)
 
     self.datasets = datasets
     self.pivot = self.datasets[0]

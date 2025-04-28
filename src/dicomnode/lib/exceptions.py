@@ -50,3 +50,7 @@ class MissingNiftiImage(Exception):
 
 class MissingOptionalDependency(ImportError):
   """Raised when trying to import an optional dependency, that's missing"""
+
+class MissingDatasets(ValueError):
+  """Raised when the function assumes there to be datasets in a container but
+  there isn't any datasets in the container"""
