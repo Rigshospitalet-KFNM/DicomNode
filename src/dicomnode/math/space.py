@@ -15,28 +15,13 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.math.types import MirrorDirection
-RawBasisMatrix: TypeAlias = ndarray[Tuple[Literal[3], Literal[3]], dtype[float32]]
+from dicomnode.lib.exceptions import NonReducedBasis
+from dicomnode.math.types import MirrorDirection, ROTATION_MATRIX_90_DEG_X,\
+  ROTATION_MATRIX_90_DEG_Y, ROTATION_MATRIX_90_DEG_Z
 
-# Rotation matrix can be found here:
-# https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
-ROTATION_MATRIX_90_DEG_X  = array([
-  [1, 0,  0],
-  [0, 0, -1],
-  [0, 1,  0],
-])
+RawBasisMatrix: TypeAlias = ndarray[Tuple[int, ...], dtype[float32]]
 
-ROTATION_MATRIX_90_DEG_Y  = array([
-  [ 0, 0, 1],
-  [ 0, 1, 0],
-  [-1, 0, 0],
-])
 
-ROTATION_MATRIX_90_DEG_Z  = array([
-  [0, -1, 0],
-  [1,  0, 0],
-  [0,  0, 1],
-])
 
 class Space:
   @property
@@ -46,6 +31,11 @@ class Space:
   @property
   def basis(self):
     return self._basis
+
+  @basis.setter
+  def basis(self, basis):
+    self._basis = basis
+    self._inverted_basis = inv(basis)
 
   @property
   def inverted_basis(self):
@@ -64,6 +54,16 @@ class Space:
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
     self._starting_point = numpy.array(start_points, dtype=float32)
     self._extent = numpy.array(domain, dtype=uint32)
+
+  def __eq__(self, other):
+
+    # This is mostly useful for testing
+    if not isinstance(other, Space):
+      raise TypeError(f"Compared {other.__class__.__name__} with a space")
+
+    return (self.basis == other.basis).all() and\
+           (self.starting_point == other.starting_point).all() and\
+           (self.extent == other.extent).all()
 
   def coords(self):
     index = 0
@@ -226,13 +226,13 @@ class Space:
       else:
         return 0
 
-  def rotation_to_standard_space(self) -> ndarray:
+  def get_rotation_matrix_to_standard_space(self) -> ndarray:
     axis_x_dom = self.__dominant_axis(self.basis[0])
     axis_y_dom = self.__dominant_axis(self.basis[1])
     axis_z_dom = self.__dominant_axis(self.basis[2])
 
     if axis_x_dom == axis_y_dom or axis_x_dom == axis_z_dom or axis_y_dom == axis_z_dom:
-      raise Exception
+      raise NonReducedBasis("The Basis is invalid")
 
     if axis_x_dom == 0:
       if axis_y_dom == 1:
@@ -250,15 +250,43 @@ class Space:
       else:
         return ROTATION_MATRIX_90_DEG_Y
 
+  def _rotate_extent(self, rotation_matrix):
+    new_extent = numpy.empty((3,), dtype=uint32)
+
+    new_extent[0] = self.extent[self.__dominant_axis(rotation_matrix[0])]
+    new_extent[1] = self.extent[self.__dominant_axis(rotation_matrix[1])]
+    new_extent[2] = self.extent[self.__dominant_axis(rotation_matrix[2])]
+
+    return new_extent
+
+  def _rotate_starting_point(self, rotation_matrix):
+    new_starting_point = numpy.copy(self.starting_point)
+
+    for i in range(3):
+      index = self.__dominant_axis(rotation_matrix[i])
+      rotation_direction = rotation_matrix[i][index]
+
+      if rotation_direction == 1:
+        pass
+      elif rotation_direction == -1:
+        new_starting_point += (self.extent[i] * self.basis[:,i])
+
+      else:
+        raise Exception("")
+
+
+    return new_starting_point
+
   def rotate(self, rotation_matrix):
-    pass
+    new_basis = self.basis @ rotation_matrix
+    new_starting_point = self._rotate_starting_point(rotation_matrix)
+    new_extent = self._rotate_extent(rotation_matrix)
 
-
-  def __matmul__(self, other):
-    return self.basis @ other
-
-  def __rmatmul__(self, other):
-    return other @ self.basis
+    return Space(
+      new_basis,
+      new_starting_point,
+      new_extent
+    )
 
 class ReferenceSpace(Enum):
   """These are the possible reference spaces a study can be in.

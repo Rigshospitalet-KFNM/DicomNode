@@ -8,6 +8,7 @@ import time
 from multiprocessing import Queue
 from threading import Thread
 from typing import List
+from unittest import skip
 
 # Third party modules
 from pydicom import Dataset

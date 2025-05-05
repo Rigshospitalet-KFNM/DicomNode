@@ -45,7 +45,7 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
-from dicomnode.lib.io import TemporaryWorkingDirectory
+from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile
 from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
   listener_logger, set_queue_handler, set_writer_handler
 from dicomnode.server.factories.association_events import AcceptedEvent, \
@@ -127,6 +127,8 @@ class AbstractPipeline():
 
   supported_contexts: List[PresentationContext] = AllStoragePresentationContexts
   "Presentation contexts accepted by the node"
+
+  run_file: Optional[Union[str, Path]] = None
 
   require_called_aet: bool = True
   "Require caller to specify AE title of node"
@@ -518,7 +520,11 @@ class AbstractPipeline():
     """
     self.logger.info(f"Processing {patient_id}")
     try:
-      result = self.process(patient_input_container)
+      if self.run_file is not None:
+        with ResourceFile(self.logger, self.run_file) as run_file:
+          result = self.process(patient_input_container)
+      else:
+          result = self.process(patient_input_container)
       if result is None:
         error_message = "You forgot to return a PipelineOutput object in the "\
                         "process function. If output is handled by process, "\

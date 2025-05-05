@@ -54,3 +54,12 @@ class MissingOptionalDependency(ImportError):
 class MissingDatasets(ValueError):
   """Raised when the function assumes there to be datasets in a container but
   there isn't any datasets in the container"""
+
+class NonReducedBasis(Exception):
+  """Basis are required to have a dominent vector for example:
+  [1,1,0]
+  [0,1,0]
+  [0,0,1]
+
+  is Invalid because the second axis is equal in 1 and 2 row.
+  """

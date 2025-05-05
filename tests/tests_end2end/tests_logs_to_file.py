@@ -3,6 +3,7 @@
 # Python3 standard library
 from pathlib import Path
 from random import randint
+from unittest import skip
 
 # Third party Packages
 from pydicom import Dataset
@@ -19,6 +20,7 @@ from dicomnode.server.output import NoOutput
 from helpers.dicomnode_test_case import DicomnodeTestCase
 
 class LogFileIsWritten(DicomnodeTestCase):
+  #@skip("Something doesn't work here")
   def test_end2end_log_file_written(self):
 
     test_port = randint(1024, 45000)

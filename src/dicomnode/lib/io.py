@@ -3,10 +3,15 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
+from datetime import datetime, timedelta
 from warnings import warn
 from argparse import Namespace
+import fcntl
+import time
+from logging import Logger
 from pathlib import Path
 import os
+import random
 from typing import Dict, List, Optional, Tuple, Type, Union
 import shutil
 
@@ -216,3 +221,45 @@ class DicomLazyIterator:
   def __iter__(self):
     for sub_path in self._path.glob(f'**/*.{self._dicom_fileheader}'):
       yield load_dicom(sub_path)
+
+class ResourceFile:
+  """A Resource file is a queue of processes each waiting to gain access to a
+  resource. The absence of this file indicate that the resource is available.
+
+  This file doesn't handle any acquisition or release of the resource
+  """
+
+  def __init__(self,
+               logger : Logger,
+               file_path: str | Path,
+               ):
+    self.resource = file_path
+    self.pid = os.getpid()
+    self.logger = logger
+    self.locked = False
+
+
+  def __enter__(self):
+    while True:
+      retries = 0
+      try:
+        self.resource_file = open(self.resource, 'r')
+        fcntl.flock(self.resource_file, fcntl.LOCK_EX)
+        self.logger.info(f"Process: {self.pid} acquired resource: {self.resource}")
+        self.locked = True
+        return self.resource_file
+
+      except IOError as io_error:
+        if io_error.errno == 11:
+          self.logger.info(f"Process: {self.pid} attempted and failed to acquire resource: {self.resource}")
+          sleep_time = 120 + retries * 60 + random.uniform(0, 60)
+          time.sleep(sleep_time)
+          retries += 1
+        else:
+          raise
+
+  def __exit__(self, exc_type, exc_value, exc_traceback):
+    if self.resource_file and self.locked:
+      fcntl.flock(self.resource_file, fcntl.LOCK_UN)
+      self.resource_file.close()
+      self.locked = False

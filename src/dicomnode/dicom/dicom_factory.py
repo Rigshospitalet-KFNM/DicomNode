@@ -135,7 +135,7 @@ class DiscardElement(VirtualElement):
   def __init__(self, tag) -> None:
     self.tag = tag
 
-  def corporealialize(self, _datasets: Iterable[Dataset]) -> None:
+  def corporealialize(self, datasets: Iterable[Dataset]) -> None:
     return None
 
 
@@ -147,7 +147,7 @@ class StaticElement(VirtualElement, Generic[T]):
     super().__init__(tag, VR, name=name)
     self.value: T = value
 
-  def corporealialize(self, _datasets: Iterable[Dataset]) -> DataElement:
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement:
     return DataElement(self.tag, self.VR, self.value)
 
   def __str__(self):
@@ -205,12 +205,12 @@ class SequenceElement(InstanceVirtualElement):
       Union['InstanceVirtualElement', DataElement]]]] = None
 
   def corporealialize(self,
-                      parent_datasets: Iterable[Dataset]) -> 'SequenceElement':
+                      datasets: Iterable[Dataset]) -> 'SequenceElement':
     self._partial_initialized_sequences = []
     for blueprint in self._blueprints:
       partial_initialized_sequence = []
       for virtual_element in blueprint:
-        corporealialize_value = virtual_element.corporealialize(parent_datasets)
+        corporealialize_value = virtual_element.corporealialize(datasets)
         if corporealialize_value is not None:
           partial_initialized_sequence.append(corporealialize_value)
       self._partial_initialized_sequences.append(partial_initialized_sequence)
@@ -422,13 +422,15 @@ class DicomFactory():
     if len(image.shape) != 2:
       raise ValueError("You can only store an 2D image using this function")
 
-    if self.default_pixel_representation == self.PixelRepresentation.UNSIGNED:
-      stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
-    elif self.default_pixel_representation == self.PixelRepresentation.TWOS_COMPLIMENT:
-      raise NotImplementedError("Signed encoding is not supported yet")
-      #stored_image_type = SIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
-    if stored_image_type is None:
-      raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
+    match self.default_pixel_representation:
+      case self.PixelRepresentation.UNSIGNED:
+        stored_image_type = UNSIGNED_ARRAY_ENCODING.get(self.default_bits_allocated, None)
+        if stored_image_type is None:
+          raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
+      case self.PixelRepresentation.TWOS_COMPLIMENT:
+        raise NotImplementedError("Signed encoding is not supported yet")
+      case _:
+        raise IncorrectlyConfigured("default bits allocated must be 8,16,32,64")
 
     if stored_image_type != image.dtype:
       encoded_image, slope, intercept = fit_image_into_unsigned_bit_range(image,

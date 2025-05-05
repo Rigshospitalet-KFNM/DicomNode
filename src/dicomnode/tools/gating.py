@@ -183,7 +183,6 @@ BASE_BLUEPRINT = Blueprint([
   StaticElement(0x0008_0005, 'CS', 'ISO_IR 100'),
   StaticElement(0x0008_0005, 'CS', ['ORIGINAL', 'PRIMARY']),
   StaticElement(0x0008_0016, 'UI', PositronEmissionTomographyImageStorage),
-
 ])
 
 

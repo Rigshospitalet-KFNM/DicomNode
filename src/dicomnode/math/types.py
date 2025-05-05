@@ -4,10 +4,31 @@ from enum import Enum
 from typing import List, Tuple, Union
 
 # Third party package
-
+from numpy import array
 # Dicomnode packages
 # As this is a types module, then do not import other modules, as this module
 # is assumed to be able to imported without dependencies.
+
+# Rotation matrix can be found here:
+# https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
+ROTATION_MATRIX_90_DEG_X  = array([
+  [1, 0,  0],
+  [0, 0, -1],
+  [0, 1,  0],
+])
+"""Apply this matrix """
+
+ROTATION_MATRIX_90_DEG_Y  = array([
+  [ 0, 0, 1],
+  [ 0, 1, 0],
+  [-1, 0, 0],
+])
+
+ROTATION_MATRIX_90_DEG_Z  = array([
+  [0, -1, 0],
+  [1,  0, 0],
+  [0,  0, 1],
+])
 
 class MirrorDirection(Enum):
   X = 0

@@ -17,8 +17,8 @@ from dicomnode import math
 from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space, ReferenceSpace
 
-numpy_image: TypeAlias = ndarray[Tuple[int,int,int], Any]
-raw_image_frames: TypeAlias = ndarray[Tuple[int,int,int,int], Any]
+numpy_image: TypeAlias = ndarray[Tuple[int,...], Any]
+raw_image_frames: TypeAlias = ndarray[Tuple[int,...], Any]
 
 def fit_image_into_unsigned_bit_range(image: ndarray,
                                       bits_stored = 16,
@@ -105,6 +105,9 @@ class Image:
   def __getitem__(self, idx):
     return self.raw[idx]
 
+  def mirror_perspective(self, mirror_direction: MirrorDirection):
+    self._raw = math.mirror(self.raw, mirror_direction) # type: ignore
+    self.space.mirror_perspective(mirror_direction)
 
   def transform_to_ras(self):
     """Changes the image such that it's in the ras reference space"""
@@ -122,26 +125,19 @@ class Image:
       case ReferenceSpace.RAS:
         pass # Yay
       case ReferenceSpace.RAI:
-        self._raw = math.mirror(self.raw, MirrorDirection.Z)
-        self.space.mirror_perspective(MirrorDirection.Z)
+        self.mirror_perspective(MirrorDirection.Z)
       case ReferenceSpace.RPS:
-        self._raw = math.mirror(self.raw, MirrorDirection.Y)
-        self.space.mirror_perspective(MirrorDirection.Y)
+        self.mirror_perspective(MirrorDirection.Y)
       case ReferenceSpace.RPI:
-        self._raw = math.mirror(self.raw, MirrorDirection.YZ)
-        self.space.mirror_perspective(MirrorDirection.YZ)
+        self.mirror_perspective(MirrorDirection.YZ)
       case ReferenceSpace.LAS:
-        self._raw = math.mirror(self.raw, MirrorDirection.X)
-        self.space.mirror_perspective(MirrorDirection.X)
+        self.mirror_perspective(MirrorDirection.X)
       case ReferenceSpace.LAI:
-        self._raw = math.mirror(self.raw, MirrorDirection.XZ)
-        self.space.mirror_perspective(MirrorDirection.XZ)
+        self.mirror_perspective(MirrorDirection.XZ)
       case ReferenceSpace.LPS:
-        self._raw = math.mirror(self.raw, MirrorDirection.XY)
-        self.space.mirror_perspective(MirrorDirection.XY)
+        self.mirror_perspective(MirrorDirection.XY)
       case ReferenceSpace.LPI:
-        self._raw = math.mirror(self.raw, MirrorDirection.XYZ)
-        self.space.mirror_perspective(MirrorDirection.XYZ)
+        self.mirror_perspective(MirrorDirection.XYZ)
       case None:
         raise Exception("")
 

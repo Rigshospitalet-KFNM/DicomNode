@@ -43,6 +43,29 @@ class LabelingTestCase(DicomnodeTestCase):
       ]
     ]), space)
 
+    cuda_success, res = labeling._gpu_labeling(image)
 
-    res = labeling._gpu_labeling(image)
-    print(res)
+    from dicomnode.math import _cuda
+
+    self.assertIsInstance(cuda_success, _cuda.DicomnodeError)
+    self.assertIsInstance(res, numpy.ndarray)
+
+    expected_res = numpy.array([
+      [
+        [1,1,1],
+        [1,0,1],
+        [1,1,1]
+      ],
+      [
+        [1,1,1],
+        [0,0,0],
+        [7,7,7]
+      ],
+      [
+        [1,0,1],
+        [0,1,0],
+        [1,0,1]
+      ]
+    ])
+
+    self.assertTrue((res == expected_res).all())
