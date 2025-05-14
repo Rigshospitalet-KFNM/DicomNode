@@ -10,7 +10,7 @@ from typing import List
 # Third party packages
 import numpy
 from pydicom import Dataset, Sequence
-from rt_utils import RTStruct
+from rt_utils import RTStruct as _RTStruct
 from rt_utils.image_helper import create_empty_series_mask,\
   get_patient_to_pixel_transformation_matrix,\
   get_slice_contour_data, get_slice_mask_from_slice_contour_data
@@ -56,5 +56,5 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
 
   return Image(mask, space)
 
-def get_mask(rt_struct: RTStruct, name: str) -> Image:
+def get_mask(rt_struct: _RTStruct, name: str) -> Image:
   return get_mask_ds(rt_struct.series_data, rt_struct.ds, name)

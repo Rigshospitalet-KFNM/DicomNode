@@ -99,12 +99,15 @@ class IndexTracker:
 def track_image_to_axes(
   figure: Figure,
   axes: Axes,
-  image: Image | FramedImage,
+  image: Image | FramedImage | numpy.ndarray,
   orientation = Orientation.Z) -> IndexTracker:
+
+  if isinstance(image, Image) or isinstance(image, FramedImage):
+    image = image.raw
 
   tracker = IndexTracker(
     axes,
-    image.raw,
+    image,
     orientation=orientation
   )
 

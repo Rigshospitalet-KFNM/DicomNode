@@ -85,28 +85,26 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11:
                                    const pybind11::object& new_space
   ){
   const pybind11::array& raw_image = image.attr("raw");
-  const std::string dtype = pybind11::str(raw_image.attr("dtype"));
+  const pybind11::dtype& image_dtype = raw_image.dtype();
 
   //Switch statement doesn't work because I am comparing strings
-  if(dtype == "float32"){
+  if(image_dtype.equal(pybind11::dtype::of<float>())){
     return interpolate_linear_templated<float>(image, new_space);
-  } else if (dtype == "uint8") {
+  } else if (image_dtype.equal(pybind11::dtype::of<uint8_t>()) ) {
     return interpolate_linear_templated<uint8_t>(image, new_space);
-  } if (dtype == "uint16") {
+  } if (image_dtype.equal(pybind11::dtype::of<uint16_t>())) {
     return interpolate_linear_templated<uint16_t>(image, new_space);
-  } if (dtype == "uint32") {
+  } if (image_dtype.equal(pybind11::dtype::of<uint32_t>())) {
     return interpolate_linear_templated<uint32_t>(image, new_space);
-  } else if (dtype == "int8") {
+  } else if (image_dtype.equal(pybind11::dtype::of<int8_t>())) {
     return interpolate_linear_templated<int8_t>(image, new_space);
-  } if (dtype == "int16") {
+  } if (image_dtype.equal(pybind11::dtype::of<int16_t>())) {
     return interpolate_linear_templated<int16_t>(image, new_space);
-  } if (dtype == "int32") {
+  } if (image_dtype.equal(pybind11::dtype::of<int32_t>())) {
     return interpolate_linear_templated<int32_t>(image, new_space);
   }
 
-  // The other types are not supported by the hardware :(
-  // Well int32 are
-
+  const std::string dtype = pybind11::str(raw_image.attr("dtype"));
   const std::string error_message = "Unsupported dtype:" + dtype;
   throw std::runtime_error(error_message);
 }

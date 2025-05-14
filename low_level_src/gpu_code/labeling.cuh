@@ -102,9 +102,9 @@ namespace {
   		const T pyx = g_image[iy*num_cols + ix];
 
   		// Neighbor Connections
-  		const bool nym1x   =  (iy > 0) 					  	 ? (pyx == g_image[(iy-1) * num_cols + ix  ]) : false;
-  		const bool nyxm1   =  (ix > 0)  		  			 ? (pyx == g_image[(iy  ) * num_cols + ix-1]) : false;
-  		const bool nym1xm1 = ((iy > 0) && (ix > 0)) 		 ? (pyx == g_image[(iy-1) * num_cols + ix-1]) : false;
+  		const bool nym1x   =  (iy > 0) 					  	          ? (pyx == g_image[(iy-1) * num_cols + ix  ]) : false;
+  		const bool nyxm1   =  (ix > 0)  		  			          ? (pyx == g_image[(iy  ) * num_cols + ix-1]) : false;
+  		const bool nym1xm1 = ((iy > 0) && (ix > 0)) 		      ? (pyx == g_image[(iy-1) * num_cols + ix-1]) : false;
   		const bool nym1xp1 = ((iy > 0) && (ix < num_cols -1)) ? (pyx == g_image[(iy-1) * num_cols + ix+1]) : false;
 
   		// Label
@@ -113,10 +113,10 @@ namespace {
   		// Initialize Label
   		// Label will be chosen in the following order:
   		// NW > N > NE > E > current position
-  		label = (nyxm1)   ?  iy   *num_cols + ix-1 : iy*num_cols + ix;
-  		label = (nym1xp1) ? (iy-1)*num_cols + ix+1 : label;
-  		label = (nym1x)   ? (iy-1)*num_cols + ix   : label;
-  		label = (nym1xm1) ? (iy-1)*num_cols + ix-1 : label;
+  		label = (nyxm1)   ?  iy    * num_cols + ix-1 : iy*num_cols + ix;
+  		label = (nym1xp1) ? (iy-1) * num_cols + ix+1 : label;
+  		label = (nym1x)   ? (iy-1) * num_cols + ix   : label;
+  		label = (nym1xm1) ? (iy-1) * num_cols + ix-1 : label;
 
   		// Write to Global Memory
   		g_labels[iy*num_cols + ix] = label;

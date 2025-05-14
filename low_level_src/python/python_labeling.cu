@@ -39,7 +39,7 @@ namespace {
       const size_t label_size = sizeof(T) * image.elements();
       return_array = python_array<uint32_t>(
         {image.num_slices(), image.num_rows(), image.num_cols()},
-        {image.num_rows() * image.num_cols() * sizeof(T) ,image.num_cols() * sizeof(T), sizeof(T)}
+        {image.num_rows() * image.num_cols() * sizeof(uint32_t) ,image.num_cols() * sizeof(uint32_t), sizeof(uint32_t)}
       );
 
       pybind11::buffer_info return_buffer = return_array.request(true);

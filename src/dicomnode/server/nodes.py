@@ -251,6 +251,7 @@ class AbstractPipeline():
 
     # Server validations and creation.
     self.dicom_application_entry = ApplicationEntity(ae_title = self.ae_title)
+    self.server_thread = None
     # You need VerificationPresentationContexts for ECHOSCU
     # and you want ECHO-SCU
     contexts = VerificationPresentationContexts + self.supported_contexts
@@ -640,7 +641,8 @@ class AbstractPipeline():
       sleep(0.005)
 
     self.dicom_application_entry.shutdown()
-    self.wait_for_processing() # Waiting for
+    if self.server_thread is not None:
+      self.server_thread.server_close()
 
     self.logger.info("Closing Server!")
     if self.processing_directory is not None:
@@ -698,7 +700,7 @@ class AbstractPipeline():
     event_handlers: List[evt.EventHandlerType] = [ t for t in self._evt_handlers.items() ]
 
     self.is_open = True
-    self.dicom_application_entry.start_server(
+    self.server_thread = self.dicom_application_entry.start_server(
       (self.ip,self.port),
       block=blocking,
       evt_handlers=event_handlers
@@ -832,15 +834,6 @@ class AbstractPipeline():
     except CouldNotCompleteDIMSEMessage:
       self.logger.error("Unable to send error message to the client at "
                         f"{response_address}")
-
-  def wait_for_processing(self):
-    """This function blocks until there's no 'processing' subprocesses running
-    """
-    this_process = PS_UTIL_Process(multiprocessing.current_process().pid)
-
-    children = [c for c in this_process.children(False)]
-    for c in children:
-      c.wait()
 
   ##### Handler Directories #####
   # Handlers are an extendable way of

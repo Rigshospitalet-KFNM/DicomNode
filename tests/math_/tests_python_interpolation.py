@@ -57,7 +57,7 @@ class CPUInterpolationTests(DicomnodeTestCase):
 
   def test_incrementByInterpolation(self):
     shape = (4,4,4)
-    data = (2 * numpy.arange(numpy.prod(shape)) + 1).reshape(shape)
+    data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
 
 
     out_shape = (3,3,3)
@@ -74,7 +74,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
   @skipIf(not CUDA, "Need GPU for this test")
   def test_that_gpu_method_works(self):
     shape = (4,4,4)
-    data = (2 * numpy.arange(numpy.prod(shape)) + 1).reshape(shape)
+    data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
 
     image = Image(data, Space(numpy.eye(3, dtype=numpy.float32), (0,0,0), shape))
 
@@ -242,5 +242,4 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
-
     self.assertTrue((arr==cpu_version.raw).all())

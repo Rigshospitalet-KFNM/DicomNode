@@ -31,3 +31,6 @@ class MathTestCases(DicomnodeTestCase):
        [ 5.0, 11.0, 17.0, 23.0],
       ]
     ])
+
+  def test_switch_ordering_is_it(self):
+    pass

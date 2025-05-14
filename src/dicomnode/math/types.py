@@ -1,13 +1,16 @@
 # Python Standard library
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Tuple, Union
+from typing import Any,List, Tuple, TypeAlias, Union
 
 # Third party package
-from numpy import array
+from numpy import array, ndarray
 # Dicomnode packages
 # As this is a types module, then do not import other modules, as this module
 # is assumed to be able to imported without dependencies.
+
+numpy_image: TypeAlias = ndarray[Tuple[int,...], Any]
+raw_image_frames: TypeAlias = ndarray[Tuple[int,...], Any]
 
 # Rotation matrix can be found here:
 # https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions

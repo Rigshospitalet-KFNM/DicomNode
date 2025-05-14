@@ -129,7 +129,6 @@ dicomNodeError_t is_instance(
   return dicomNodeError_t::SUCCESS;
 }
 
-
 dicomNodeError_t check_buffer_pointers(
   const pybind11::buffer_info& buffer, const size_t elements
 ){

@@ -11,14 +11,15 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
+from dicomnode import dicom
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode import math
+from dicomnode.math.types import numpy_image, raw_image_frames
 from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space, ReferenceSpace
 
-numpy_image: TypeAlias = ndarray[Tuple[int,...], Any]
-raw_image_frames: TypeAlias = ndarray[Tuple[int,...], Any]
+
 
 def fit_image_into_unsigned_bit_range(image: ndarray,
                                       bits_stored = 16,
@@ -41,6 +42,8 @@ def fit_image_into_unsigned_bit_range(image: ndarray,
     return new_image, slope, intercept
 
 def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
+    datasets.sort(key=dicom.sort_datasets)
+
     pivot = datasets[0]
     x_dim = pivot.Columns
     y_dim = pivot.Rows
@@ -48,28 +51,15 @@ def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
     # tags are RescaleIntercept, RescaleSlope
     rescale = (0x00281052 in pivot and 0x00281053 in pivot)
 
-    if 0x7FE00008 in pivot:
-      dataType = float32
-    elif 0x7FE00009 in pivot:
-      dataType = float64
-    elif rescale:
-      dataType = float64
-    elif pivot.PixelRepresentation == 0:
-      dataType = UNSIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
-    else:
-      dataType = SIGNED_ARRAY_ENCODING.get(pivot.BitsAllocated, None)
-
-    if dataType is None:
-      raise InvalidDataset
-
-    image_array: numpy_image = empty((z_dim, y_dim, x_dim), dtype=dataType)
+    image_array: numpy_image = empty((z_dim, y_dim, x_dim), dtype=float32)
 
     for i, dataset in enumerate(datasets):
       image = dataset.pixel_array
       if rescale:
-        image = image.astype(dataType) * dataset.RescaleSlope\
+        image_array[i,:,:] = image.astype(float32) * dataset.RescaleSlope\
               + dataset.RescaleIntercept
-      image_array[i,:,:] = image
+      else:
+        image_array[i,:,:] = image.astype(float32)
 
     return image_array
 
@@ -78,7 +68,7 @@ class Image:
                image_data: numpy_image,
                space: Space,
                minimum_value=0) -> None:
-    self._raw = numpy.array(image_data, dtype=float32)
+    self._raw = numpy.array(image_data)
     self._space = space
     self._minimum_value = minimum_value
 
@@ -110,7 +100,20 @@ class Image:
     self.space.mirror_perspective(mirror_direction)
 
   def transform_to_ras(self):
-    """Changes the image such that it's in the ras reference space"""
+    """Changes the image such that it's in the RAS reference space
+    """
+
+    # This space means that the patient lies like this:
+
+    # Y -------> X
+    # |   \  /
+    # |    \/
+    # |    |
+    # |    |
+    # |  ------
+    # |    o
+    # v
+    # Z
 
     # This function is done in a couple of steps:
     # 1. First ensure that the image is in the correct rotation

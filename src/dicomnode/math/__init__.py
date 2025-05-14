@@ -10,13 +10,13 @@ that for you.
   """
 
 # Python standard library
-from typing import List, Tuple
+from typing import List, Literal, Tuple
 
 # Third party packages
 import numpy
 
 # Imports
-from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException
+from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException, numpy_image
 
 # Module Imports
 from . import types
@@ -32,9 +32,6 @@ try:
 
 except ImportError:
   CUDA = False
-
-from . import space
-from . import image
 
 def sum_1_to_n(n: int) -> int:
   return n * (n + 1) // 2
@@ -56,22 +53,34 @@ def switch_ordering(input_data: numpy.ndarray) -> numpy.ndarray:
     (numpy.ndarray): A view of the data
   """
 
-  return input_data.transpose(tuple(reversed(range(0, input_data.ndim))))
+  return input_data.transpose(tuple(reversed(range(0, input_data.ndim)))
+  )
+
+def transpose_nifti_coords(input_data: numpy.ndarray):
+  """Converts swaps an image from
+
+  Args:
+      input_data (_type_): _description_
+
+  Returns:
+      _type_: _description_
+  """
+
+
+  return numpy.fliplr(switch_ordering(input_data))
 
 def center_of_gravity(data: numpy.ndarray):
     ndims = data.ndim
     imadim = data.shape
-    cog = numpy.zeros((ndims,), dtype=int)
+    center_of_gravity = numpy.zeros((ndims,), dtype=int)
 
     # loop over each dimension to find center
     for dim in range(0,ndims):
-        cog[dim] = numpy.sum(range(0,imadim[dim])*numpy.sum(data, axis=dim))//numpy.sum(numpy.sum(data, axis=dim))
+        center_of_gravity[dim] = numpy.sum(range(0,imadim[dim])*numpy.sum(data, axis=dim))//numpy.sum(numpy.sum(data, axis=dim))
 
-    return cog
+    return center_of_gravity
 
-
-
-def mirror_inplace_gpu(arr: image.numpy_image, direction: MirrorDirection):
+def mirror_inplace_gpu(arr: numpy_image, direction: MirrorDirection):
   """This mirrors the data inplace with a direction.
 
   Note that this is slower than mirror because it just provides a view of the
@@ -112,7 +121,7 @@ def mirror_inplace_gpu(arr: image.numpy_image, direction: MirrorDirection):
     raise CudaException(error)
 
 
-def mirror(arr: image.numpy_image, direction: MirrorDirection) -> image.numpy_image:
+def mirror(arr: numpy_image, direction: MirrorDirection) -> numpy_image:
   """Provides a view of the data mirrored with respect to the input
 
   Args:
@@ -163,6 +172,8 @@ def _bounding_box_gpu(array):
   if not CUDA:
     raise Exception("GPU code call without working GPU driver")
 
+  from dicomnode.math import _cuda
+
   error, (x_min, x_max, y_min, y_max, z_min, z_max) = _cuda.bounding_box(array)
   if error:
     raise CudaException(CudaErrorEnum(int(error)))
@@ -175,8 +186,9 @@ def bounding_box(array):
   else:
     return _bounding_box_cpu(array)
 
-
 from . import labeling
+from . import space
+from . import image
 
 def __all__():
   return [

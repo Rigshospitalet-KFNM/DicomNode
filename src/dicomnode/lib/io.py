@@ -6,6 +6,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from datetime import datetime, timedelta
 from warnings import warn
 from argparse import Namespace
+import errno
 import fcntl
 import time
 from logging import Logger
@@ -250,7 +251,7 @@ class ResourceFile:
         return self.resource_file
 
       except IOError as io_error:
-        if io_error.errno == 11:
+        if io_error.errno == errno.EAGAIN:
           self.logger.info(f"Process: {self.pid} attempted and failed to acquire resource: {self.resource}")
           sleep_time = 120 + retries * 60 + random.uniform(0, 60)
           time.sleep(sleep_time)
