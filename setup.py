@@ -129,11 +129,12 @@ class CMakeBuild(build_ext):
       print(f"failed to copy! {E}")
 
 
-extensions = []
+extensions = [
+  CMakeExtension("dicomnode.math._cpp", sourcedir="cpp_src")
+]
 
 if shutil.which("nvcc"):
-  p = Path(".")
-  extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir=str(p.absolute())))
+  extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
 
 setup(name='dicomnode',

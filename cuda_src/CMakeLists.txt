@@ -22,7 +22,7 @@ find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 
 # Create object libraries for each source file
-function(add_py_object_library name source)
+function(add_cuda_library name source)
   add_library(${name} OBJECT ${source})
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
@@ -30,7 +30,6 @@ function(add_py_object_library name source)
   target_compile_options(${name} PRIVATE -Wno-deprecated-gpu-targets)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endfunction()
-
 
 # -----------------------------------------------------------------------
 # Checking for CUDA
@@ -43,7 +42,7 @@ if(CMAKE_CUDA_COMPILER)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
   set(CMAKE_CUDA_ARCHITECTURES native)
 
-  add_library(utilities OBJECT low_level_src/python/utilities.cu)
+  add_library(utilities OBJECT python/utilities.cu)
   target_link_libraries(utilities PRIVATE pybind11::module Python::Python)
   target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(utilities PRIVATE -O3)
@@ -51,28 +50,28 @@ if(CMAKE_CUDA_COMPILER)
   set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
 
   set(CUDA_LIBRARIES
-    bounding_box low_level_src/python/python_bounding_box.cu
-    cuda_management low_level_src/python/python_cuda_management.cu
-    mirror low_level_src/python/python_mirror.cu
-    interpolation low_level_src/python/python_interpolation.cu
-    labeling low_level_src/python/python_labeling.cu
+    bounding_box python/python_bounding_box.cu
+    cuda_management python/python_cuda_management.cu
+    mirror python/python_mirror.cu
+    interpolation python/python_interpolation.cu
+    labeling python/python_labeling.cu
   )
 
-  set(OBJECT_TARGETS)
+  set(CUDA_OBJECT_TARGETS)
   list(LENGTH CUDA_LIBRARIES LIBRARY_COUNT)
   math(EXPR LIBRARY_COUNT "${LIBRARY_COUNT} - 1")
   foreach(INDEX RANGE 0 ${LIBRARY_COUNT} 2)
     math(EXPR SOURCE_INDEX "${INDEX} + 1")
     list(GET CUDA_LIBRARIES ${INDEX} LIBRARY_NAME)
     list(GET CUDA_LIBRARIES ${SOURCE_INDEX} SOURCE_FILE)
-    add_py_object_library(${LIBRARY_NAME} ${SOURCE_FILE})
-    list(APPEND OBJECT_TARGETS $<TARGET_OBJECTS:${LIBRARY_NAME}>)
+    add_cuda_library(${LIBRARY_NAME} ${SOURCE_FILE})
+    list(APPEND CUDA_OBJECT_TARGETS $<TARGET_OBJECTS:${LIBRARY_NAME}>)
   endforeach()
 
   pybind11_add_module(_cuda SHARED
-                      low_level_src/python_entry_point.cu
+                      python_entry_point.cu
                       $<TARGET_OBJECTS:utilities>
-                      ${OBJECT_TARGETS}
+                      ${CUDA_OBJECT_TARGETS}
   )
 
   target_compile_options(_cuda PRIVATE -O3 -g)
@@ -92,7 +91,7 @@ if(CMAKE_CUDA_COMPILER)
       FetchContent_MakeAvailable(googletest)
       enable_testing()
 
-      add_executable(cu_tests low_level_src/test_initiator.cu)
+      add_executable(cu_tests test_initiator.cu)
       target_link_libraries(
         cu_tests
         GTest::gtest_main
