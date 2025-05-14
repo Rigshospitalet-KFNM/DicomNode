@@ -11,7 +11,6 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode import dicom
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode import math
@@ -42,7 +41,9 @@ def fit_image_into_unsigned_bit_range(image: ndarray,
     return new_image, slope, intercept
 
 def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
-    datasets.sort(key=dicom.sort_datasets)
+    # This import is here to prevent circular imports
+    from dicomnode.dicom import sort_datasets
+    datasets.sort(key=sort_datasets)
 
     pivot = datasets[0]
     x_dim = pivot.Columns

@@ -245,8 +245,6 @@ class AbstractPipeline():
 
     self.is_open = False
 
-
-
     self._association_event_factory = self.association_container_factory()
 
     # Server validations and creation.

@@ -257,3 +257,6 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 def testing_logs():
   """Set or reset logs up for testing"""
   set_logger(None)
+
+
+from . import dicomnode_test_case
