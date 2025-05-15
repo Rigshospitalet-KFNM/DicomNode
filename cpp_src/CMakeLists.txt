@@ -20,20 +20,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 
-
 function(add_cpp_library name source)
   add_library(${name} OBJECT ${source})
   target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
+  target_precompile_headers(
+    ${name}
+    PRIVATE
+    <pybind11/pybind11.h>
+    <pybind11/numpy.h>
+  )
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(${name} PRIVATE -O3)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endfunction()
 
-
-# The CPP aka non-gpu
 set(CPP_LIBRARIES
   cpp_interpolation python_interpolation.cpp
 )
+
 set(CPP_OBJECT_TARGETS)
 list(LENGTH CPP_LIBRARIES CPP_LIBRARY_COUNT)
 math(EXPR CPP_LIBRARY_COUNT "${CPP_LIBRARY_COUNT} - 1")
@@ -51,3 +55,10 @@ pybind11_add_module(
   python_entry_point.cpp
   ${CPP_OBJECT_TARGETS}
 )
+
+target_precompile_headers(
+    _cpp
+    PRIVATE
+    <pybind11/pybind11.h>
+    <pybind11/numpy.h>
+  )

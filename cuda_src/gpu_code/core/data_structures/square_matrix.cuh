@@ -36,10 +36,13 @@ struct SquareMatrix {
   }
 
   __host__ __device__ const Point<DIMENSIONS> operator*(
-    const Point<DIMENSIONS>& other) const {
+    const Point<DIMENSIONS>& other
+  ) const {
       // It's zero initialized!
       Point<DIMENSIONS> point;
+      #pragma unroll
       for(uint8_t j = 0; j < DIMENSIONS; j++){
+        #pragma unroll
         for(uint8_t i = 0; i < DIMENSIONS; i++){
           point[j] += other[i] * points[idx(i,j)];
         }

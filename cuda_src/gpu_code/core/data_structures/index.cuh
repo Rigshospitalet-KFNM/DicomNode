@@ -1,5 +1,6 @@
-#include"../declarations.cuh"
+#pragma once
 
+#include"../declarations.cuh"
 
 /**
  * @brief An index in X,Y,Z,... coordinates

@@ -84,7 +84,7 @@ if(CMAKE_CUDA_COMPILER)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG e397860
+      GIT_TAG 52eb810
       )
       # For Windows: Prevent overriding the parent project's compiler/linker settings
       #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

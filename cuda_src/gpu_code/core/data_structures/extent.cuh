@@ -6,7 +6,6 @@
 
 #include<cuda/std/optional>
 
-
 #include"../declarations.cuh"
 #include"../concepts.cuh"
 

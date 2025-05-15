@@ -124,9 +124,10 @@ class CMakeBuild(build_ext):
   def copy_extensions_to_source(self) -> None:
     try:
       return super().copy_extensions_to_source()
-    except Exception as E:
+    except Exception as exception:
+      print(f"failed to copy! {exception}")
+      raise exception
 
-      print(f"failed to copy! {E}")
 
 
 extensions = [

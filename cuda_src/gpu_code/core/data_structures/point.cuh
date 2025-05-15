@@ -1,5 +1,7 @@
 #include"../declarations.cuh"
 
+#include<cuda/std/utility>
+
 /**
  * @brief A point in a N-dimensional Space
  *

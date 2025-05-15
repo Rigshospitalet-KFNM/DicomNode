@@ -249,12 +249,13 @@ size_t get_image_size(const pybind11::object& python_object){
   const pybind11::object& space_class = space_module.attr("Space");
 
   if(pybind11::isinstance(python_object, space_class)){
-    const python_array<int>& python_extent = python_object.attr("extent").cast<python_array<int>>();
+    using EXTENT_DATA_TYPE = uint32_t;
+    const python_array<EXTENT_DATA_TYPE>& python_extent = python_object.attr("extent").cast<python_array<int>>();
     const pybind11::buffer_info& python_extent_buffer = python_extent.request();
     if (python_extent_buffer.ptr == nullptr) {
       return 0;
     }
-    int* data = (int*)python_extent_buffer.ptr;
+    EXTENT_DATA_TYPE* data = (EXTENT_DATA_TYPE*)python_extent_buffer.ptr;
 
     size_t size = sizeof(T);
     for(int i = 0; i < python_extent_buffer.size; i++){

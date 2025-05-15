@@ -2,6 +2,8 @@ venv/
 dist/
 *.egg-info/
 build/
+cpp_build/
+cuda_build/
 .coverage
 coverage/
 __pycache__/
