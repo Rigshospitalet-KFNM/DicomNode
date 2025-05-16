@@ -2,11 +2,13 @@
 
 #include<stdint.h>
 
+#include<array>
+
 #include"../declarations.hpp"
 
-template<uint8_t DIMENSIONS>
+template<u8 DIMENSIONS>
 struct SquareMatrix {
-  f32 points[DIMENSIONS * DIMENSIONS]{};
+  std::array<f32, DIMENSIONS * DIMENSIONS> points;
 
   static constexpr u32 idx(const i32 row, const i32 col){
     return row * DIMENSIONS + col;

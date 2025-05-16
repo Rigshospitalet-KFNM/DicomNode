@@ -158,7 +158,7 @@ struct Extent {
     return dicomNodeError_t::SUCCESS;
   }
 
-  template<uint8_t ARRAY_SIZE>
+  template<u8 ARRAY_SIZE>
   dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
     static_assert(ARRAY_SIZE == DIMENSIONS);
 
@@ -169,5 +169,15 @@ struct Extent {
       sizes[i] = dim;
       i++;
     }
+  }
+
+  std::array<u64, DIMENSIONS> python_strides(size_t pixel_size) const{
+    std::array<u64, DIMENSIONS> out;
+
+    for(u64& stride : out){
+
+    }
+
+    return out;
   }
 };

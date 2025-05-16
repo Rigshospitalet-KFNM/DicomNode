@@ -34,7 +34,7 @@ struct Index {
   };
 
   Index(const u64 flat_index, const Extent<DIMENSIONS> space){
-    uint64_t dimension_temp = 1;
+    u64 dimension_temp = 1;
 
     for(u8 dim = 0; dim < DIMENSIONS; dim++){
       coordinates[dim] = (flat_index % (dimension_temp * space[dim]))

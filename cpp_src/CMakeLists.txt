@@ -10,7 +10,7 @@ if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
   set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
   set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=${NUMBER_OF_PROCESSORS})
   set(CMAKE_JOB_POOL_COMPILE compile_pool)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto -flto-jobs=${NUMBER_OF_PROCESSORS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 endif()
 
 set(VERSION_INFO 0.0.1)
@@ -62,3 +62,5 @@ target_precompile_headers(
     <pybind11/pybind11.h>
     <pybind11/numpy.h>
   )
+
+add_subdirectory(tests)

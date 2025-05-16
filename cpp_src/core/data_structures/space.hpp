@@ -6,7 +6,7 @@
 
 #include"../declarations.hpp"
 
-template<uint8_t DIMENSIONS>
+template<u8 DIMENSIONS>
 struct Space {
   Point<DIMENSIONS> starting_point;
   SquareMatrix<DIMENSIONS> basis;
@@ -27,7 +27,9 @@ struct Space {
     return (point - starting_point) * inverted_basis;
   }
 
-  size_t elements() const {
+  constexpr size_t elements() const {
     return extent.elements();
   }
+
+
 };

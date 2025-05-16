@@ -74,6 +74,30 @@ inline size_t get_image_size(const pybind11::object& python_object){
   return 0;
 }
 
+template<typename T>
+dicomNodeError_t get_python_buffer_pointer(
+  const pybind11::object& obj,
+  const char* attr,
+  const size_t expected_size,
+  T** out,
+  bool writable=false
+){
+  const pybind11::array_t<T>& python_array = obj.attr(attr).cast<const pybind11::array_t<T>&>();
+
+  const pybind11::buffer_info buffer = python_array.request(writable);
+  if (buffer.ptr == NULL){
+    return UNABLE_TO_ACQUIRE_BUFFER;
+  }
+
+  if (buffer.size != expected_size){
+    return INPUT_SIZE_MISMATCH;
+  }
+
+  *out = static_cast<T*>(buffer.ptr);
+
+  return SUCCESS;
+}
+
 template<u8 DIM>
 dicomNodeError_t load_space(
   const pybind11::object& python_space,
@@ -82,15 +106,66 @@ dicomNodeError_t load_space(
 
   DicomNodeRunner runner;
 
+  f32* start_point_ptr = NULL;
+  f32* basis_ptr = NULL;
+  f32* inverted_basis_ptr = NULL;
+  u32* extent_ptr = NULL;
+
   runner
     | [&](){
       return is_instance(python_space, "dicomnode.math.space", "Space");
   } | [&](){
-    const pybind11::array_t<f32>& starting_point = python_space.attr("starting_point").cast<const pybind11::array_t<f32>&>();
-    const pybind11::buffer_info starting_point_buffer = starting_point.request(false);
-    if (starting_point_buffer.ptr == NULL){
-      return UNABLE_TO_ACQUIRE_BUFFER;
-    }
+    return get_python_buffer_pointer(
+      python_space,
+      space.starting_point_attr_name,
+      DIM,
+      &start_point_ptr
+    );
+  } | [&](){
+    return get_python_buffer_pointer(
+      python_space,
+      space.basis_attr_name,
+      DIM * DIM,
+      &basis_ptr
+    );
+  } | [&](){
+    return get_python_buffer_pointer(
+      python_space,
+      space.inverted_basis_attr_name,
+      DIM * DIM,
+      &inverted_basis_ptr
+    );
+  } | [&](){
+    return get_python_buffer_pointer(
+      python_space,
+      space.extent_attr_name,
+      DIM,
+      &extent_ptr
+    );
+  } | [&](){
+    std::memcpy(
+      space.starting_point.points.begin(),
+      start_point_ptr,
+      sizeof(f32) * DIM
+    );
+
+    std::memcpy(
+      space.basis.points.begin(),
+      basis_ptr,
+      sizeof(f32) * DIM * DIM
+    );
+
+    std::memcpy(
+      space.inverted_basis.points.begin(),
+      start_point_ptr,
+      sizeof(f32) * DIM * DIM
+    );
+
+    std::memcpy(
+      space.extent.begin(),
+      extent_ptr,
+      sizeof(u32) * DIM
+    );
 
     return SUCCESS;
   };

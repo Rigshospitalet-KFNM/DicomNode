@@ -3,6 +3,7 @@
 #include<tuple>
 #include<execution>
 #include<algorithm>
+#include<utility>
 
 #include<pybind11/numpy.h>
 
@@ -10,13 +11,89 @@
 #include"utils.hpp"
 #include"python_interpolation.hpp"
 
+template<typename T, u8 DIM>
+dicomNodeError_t interpolation(
+  const T* in_image,
+  T* out_image,
+  const Space<DIM>& source_space,
+  const Space<DIM>& destination_space
+) {
+
+  if(in_image == nullptr){
+    return INPUT_TYPE_ERROR;
+  }
+  if(out_image == nullptr){
+    return INPUT_TYPE_ERROR;
+  }
+
+  const size_t elements = destination_space.elements();
+  T* out_image_end = out_image + elements;
+
+  // So just for future performance geeks. The reason why I don't reuse the
+  // memory from out, is that it may not be sufficient to hold all the indexs
+  // Say you have a u8 image. Then the maximum index is 255, which isn't a lot
+  // for a volume. So I make a vector of Indexes
+  std::vector<u64> indexes(elements);
+  std::iota(indexes.begin(), indexes.end(), static_cast<u64>(0));
+
+  std::transform(
+    std::execution::par,
+    indexes.begin(),
+    indexes.end(),
+    out_image,
+    [&](const u64& flat_index){
+      const Index<DIM> index = destination_space.extent.from_flat_index(
+        flat_index
+      );
+
+      const Point<DIM> destination_point = destination_space.at_index(index);
+      const Point<DIM> source_indexes = source_space.interpolate_point(destination_point);
+
+      Point<3> bb_lower_corner;
+      for(u8 i = 0; const f32& sidx : source_indexes){
+        bb_lower_corner[i] = std::floor(sidx);
+        i++;
+      }
+
+      Point<3> diff = source_indexes - bb_lower_corner;
+
+      f64 out = 0;
+
+      constexpr size_t bounding_points = std::pow(2, DIM);
+      for(u64 bit_mask = 0; bit_mask < bounding_points; bit_mask++){
+        Index<3> image_index;
+        f64 multiplier = 1;
+
+        for(u8 dim = 0; dim < DIM; dim++){
+          if((bit_mask >> dim) & 1) {
+            multiplier *= diff[dim];
+            image_index[dim] = static_cast<i32>(std::ceil(source_indexes[dim]));
+          } else {
+            multiplier *= (1 - diff[dim]);
+            image_index[dim] = static_cast<i32>(bb_lower_corner[dim]);
+          }
+        }
+        auto opt_source_flat_index = source_space.extent.flat_index(image_index);
+        if(opt_source_flat_index.has_value()){
+          const u64& source_flat_index = *opt_source_flat_index;
+          out += multiplier * static_cast<f64>(in_image[source_flat_index]);
+        }
+      }
+
+      return static_cast<T>(out);
+    }
+  );
+
+  return SUCCESS;
+}
+
+
 template<typename T>
 std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
   const pybind11::object& image,
   const pybind11::object& new_space
 ) {
   constexpr u8 DIM = 3;
-
 
   pybind11::array_t<T> out_array;
 
@@ -39,13 +116,8 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
     if (source_ptr == NULL){
       return dicomNodeError_t::UNABLE_TO_ACQUIRE_BUFFER;
     }
-    const size_t shape[DIM] = {
-      0,0,0
-    };
-
-    const size_t strides[DIM] = {
-      0,0,0
-    };
+    const std::array<u32, DIM> shape = destination_space.extent.sizes;
+    const std::array<size_t, DIM> strides = destination_space.extent.python_strides(sizeof(T));
 
     out_array = pybind11::array_t<T>(shape, strides);
     pybind11::buffer_info out_buffer = out_array.request(true);
@@ -59,66 +131,13 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
     }
 
     T* output_buffer_pointer = static_cast<T*>(out_buffer.ptr);
-    T* output_buffer_end = output_buffer_pointer + out_buffer.size;
 
-
-    std::iota(output_buffer_pointer, output_buffer_end, static_cast<T>(0));
-
-    std::transform(
-      std::execution::par,
+    return interpolation(
+      source_ptr,
       output_buffer_pointer,
-      output_buffer_end,
-      output_buffer_pointer,
-      [&](const T& flat_index){
-        const Space<DIM>& thread_source_space = source_space;
-        const Space<DIM>& thread_destination_space = destination_space;
-
-        // Ok because of this was initialized with iota
-        const uint64_t destination_image_index = static_cast<uint64_t>(flat_index);
-
-        const Index<DIM> index = thread_destination_space.extent.from_flat_index(
-          destination_image_index
-        );
-
-        const Point<DIM> destination_point = thread_destination_space.at_index(index);
-        const Point<DIM> source_indexes = thread_source_space.interpolate_point(destination_point);
-
-        Point<3> bb_lower_corner;
-        for(u8 i = 0; const f32& sidx : source_indexes){
-          bb_lower_corner[i] = std::floor(sidx);
-          i++;
-        }
-
-        Point<3> diff = source_indexes - bb_lower_corner;
-
-        T out = 0;
-
-        constexpr size_t bounding_points = std::pow(2, DIM);
-        for(u64 bit_mask = 0; bit_mask < bounding_points; bit_mask++){
-          Index<3> image_index;
-          f64 multiplier = 1;
-
-          for(u8 dim = 0; dim < DIM; dim++){
-            if((bit_mask >> dim) & 1) {
-              multiplier *= diff[dim];
-              image_index[dim] = static_cast<i32>(std::ceil(source_indexes[dim]));
-            } else {
-              multiplier *= (1 - diff[dim]);
-              image_index[dim] = static_cast<i32>(bb_lower_corner[i]);
-            }
-          }
-          auto opt_source_flat_index = thread_source_space.extent.flat_index(image_index);
-          if(opt_source_flat_index.has_value()){
-            const u64& source_flat_index = *opt_source_flat_index;
-            out += multiplier * source_ptr[source_flat_index];
-          }
-        }
-
-        return out;
-      }
+      source_space,
+      destination_space
     );
-
-   return SUCCESS;
   };
 
   return {runner.error(), out_array};

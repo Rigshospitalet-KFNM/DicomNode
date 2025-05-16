@@ -29,6 +29,12 @@ function(add_cuda_library name source)
   target_compile_options(${name} PRIVATE -O3)
   target_compile_options(${name} PRIVATE -Wno-deprecated-gpu-targets)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_precompile_headers(
+    ${name}
+    PRIVATE
+    <pybind11/pybind11.h>
+    <pybind11/numpy.h>
+  )
 endfunction()
 
 # -----------------------------------------------------------------------
@@ -77,6 +83,12 @@ if(CMAKE_CUDA_COMPILER)
   target_compile_options(_cuda PRIVATE -O3 -g)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
   target_compile_options(_cuda PRIVATE -Wno-deprecated-gpu-targets)
+  target_precompile_headers(
+    _cuda
+    PRIVATE
+    <pybind11/pybind11.h>
+    <pybind11/numpy.h>
+  )
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
