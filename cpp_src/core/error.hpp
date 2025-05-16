@@ -18,7 +18,9 @@ enum dicomNodeError_t: u32 {
 
 class DicomNodeRunner {
   public:
-    DicomNodeRunner() : m_error_function([](dicomNodeError_t _){}){}
+    DicomNodeRunner() : m_error_function([](dicomNodeError_t _){
+    (void) _;
+    }){}
 
     DicomNodeRunner(std::function<void(dicomNodeError_t)> error_funciton)
     : m_error_function(error_funciton) {}

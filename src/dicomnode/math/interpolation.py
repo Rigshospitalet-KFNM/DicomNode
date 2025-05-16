@@ -15,7 +15,7 @@ import numpy
 # Dicomnode modules
 from dicomnode.lib.logging import get_logger
 from dicomnode.dicom.series import extract_image, ImageContainerType, extract_space
-from dicomnode.math import CUDA, switch_ordering
+from dicomnode.math import CUDA, switch_ordering, _cpp
 from dicomnode.math.space import Space
 from dicomnode.math.image import Image
 
@@ -47,12 +47,15 @@ def resample(source: ImageContainerType,
     from dicomnode.math import _cuda
     success, interpolated =  _cuda.interpolation.linear(source, target)
 
+    if str(success) != "Success":
+      raise Exception(f"Cpp code encountered a lower level exception: {success}")
+
     return Image(interpolated, target)
   else:
-    return cpu_interpolate(source, target, method) # pragma: no cover # I test on gpu devices
+    return cpu_interpolate(source, target)
 
 
-def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):
+def cpu_interpolate(source: Image, target: Space):
   """Creates an image with the target space, where the data is interpolated /
   resamples from the source.
 
@@ -68,27 +71,10 @@ def cpu_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR
   Returns:
       _type_: _description_
   """
-  from scipy.interpolate import RegularGridInterpolator
-  original_grid = [numpy.arange(s) for s in reversed(source.space.extent)]
 
-  # Create interpolator for original data
-  interpolator = RegularGridInterpolator(
-      tuple(original_grid),
-      switch_ordering(source.raw),
-      method=method.value,
-      bounds_error=False,
-      fill_value=source.minimum_value
-  )
+  success, interpolated = _cpp.interpolation.linear(source, target)
 
-  # Create new grid coordinates
-  new_coords = numpy.array([i for i in target.coords()])
-
-  world_coords_new = target.starting_point + new_coords @ target.basis
-
-  # Transform world coordinates back to original basis indices for interpolation
-  orig_indices = (world_coords_new - source.space.starting_point) @ source.space.inverted_basis
-
-  # Interpolate
-  interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.extent) # type: ignore
+  if str(success) != "Success":
+    raise Exception(f"Cpp code encountered a lower level exception: {success}")
 
   return Image(interpolated, target)

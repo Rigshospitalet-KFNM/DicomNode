@@ -12,6 +12,10 @@
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
+#include"python_interpolation.hpp"
+
 PYBIND11_MODULE(_cpp, m){
   m.doc() = "Low level module with CPU code";
+
+  apply_interpolation_module(m);
 }

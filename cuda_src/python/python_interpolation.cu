@@ -81,8 +81,9 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   return {runner.error(), out_array};
 }
 
-std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(const pybind11::object& image,
-                                   const pybind11::object& new_space
+std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
+    const pybind11::object& image,
+    const pybind11::object& new_space
   ){
   const pybind11::array& raw_image = image.attr("raw");
   const pybind11::dtype& image_dtype = raw_image.dtype();

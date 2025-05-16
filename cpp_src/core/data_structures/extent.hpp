@@ -38,9 +38,9 @@ struct Extent {
    */
   inline bool contains(const Index<DIMENSIONS> index) const {
     bool in = true;
-    #pragma unroll
+
     for(u8 i = 0; i < DIMENSIONS; i++){
-      in &= 0 <= index[i] && index[i] < sizes[DIMENSIONS - (i + 1)];
+      in &= 0 <= index[i] && std::cmp_less_equal(index[i],sizes[DIMENSIONS - (i + 1)]);
     }
 
     return in;
@@ -60,7 +60,6 @@ struct Extent {
     u64 return_val = 0;
     u64 dimension_temp = 1;
 
-    #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
       return_val += index[i] * dimension_temp;
       dimension_temp *= sizes[DIMENSIONS - (i + 1)];
@@ -81,7 +80,6 @@ struct Extent {
     i32 coordinates[DIMENSIONS];
     u64 dimension_temp = 1;
 
-    #pragma unroll
     for(u8 dim = 0; dim < DIMENSIONS; dim++){
       const u32& extent = sizes[DIMENSIONS - (dim + 1)];
       coordinates[dim] = (flat_index % (dimension_temp * extent))
@@ -130,7 +128,6 @@ struct Extent {
   size_t elements() const noexcept {
     size_t size = 1;
 
-    #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
       size *= sizes[i];
     }
@@ -171,11 +168,13 @@ struct Extent {
     }
   }
 
-  std::array<u64, DIMENSIONS> python_strides(size_t pixel_size) const{
-    std::array<u64, DIMENSIONS> out;
+  std::array<size_t, DIMENSIONS> python_strides(size_t pixel_size) const{
+    std::array<size_t, DIMENSIONS> out;
 
-    for(u64& stride : out){
-
+    for(u32 i = 1; i <= DIMENSIONS; i++){
+      u32 inverted_index = DIMENSIONS - i;
+      out[inverted_index] = pixel_size;
+      pixel_size *= sizes[inverted_index];
     }
 
     return out;

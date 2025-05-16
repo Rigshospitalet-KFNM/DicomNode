@@ -3,6 +3,10 @@ project(dicomnode_c LANGUAGES CXX)
 
 include(ProcessorCount)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_BUILD_TYPE DEBUG)
+set(CMAKE_INSTALL_DO_STRIP FALSE)
+
 ProcessorCount(NUMBER_OF_PROCESSORS)
 
 if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
@@ -17,6 +21,7 @@ set(VERSION_INFO 0.0.1)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
 
@@ -30,7 +35,7 @@ function(add_cpp_library name source)
     <pybind11/numpy.h>
   )
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
-  target_compile_options(${name} PRIVATE -O3)
+  target_compile_options(${name} PRIVATE -g -Wall -Wextra)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endfunction()
 
@@ -55,6 +60,8 @@ pybind11_add_module(
   python_entry_point.cpp
   ${CPP_OBJECT_TARGETS}
 )
+
+target_compile_options(_cpp PRIVATE -g -Wall -Wextra)
 
 target_precompile_headers(
     _cpp

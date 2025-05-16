@@ -29,9 +29,10 @@ try:
     CUDA = True
   else:
     CUDA = False
-
 except ImportError:
   CUDA = False
+
+from . import _cpp
 
 def sum_1_to_n(n: int) -> int:
   return n * (n + 1) // 2

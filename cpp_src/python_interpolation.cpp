@@ -27,7 +27,7 @@ dicomNodeError_t interpolation(
   }
 
   const size_t elements = destination_space.elements();
-  T* out_image_end = out_image + elements;
+  //T* out_image_end = out_image + elements;
 
   // So just for future performance geeks. The reason why I don't reuse the
   // memory from out, is that it may not be sufficient to hold all the indexs
@@ -102,7 +102,7 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
   Space<DIM> source_space;
   Space<DIM> destination_space;
 
-  const pybind11::array_t<T>& image_array = image.attr("raw").cast<const pybind11::array_t<T>&>();
+  const pybind11::array_t<T>& image_array = image.attr("raw").cast<const pybind11::array_t<T>>();
   const pybind11::buffer_info& source_buffer = image_array.request(false);
 
   DicomNodeRunner runner;
@@ -111,6 +111,7 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
       return dicomnode::load_space<3>(image_space, source_space);
   } | [&](){
       return dicomnode::load_space<3>(new_space, destination_space);
+
   } | [&](){
     const T* source_ptr = (T*) source_buffer.ptr;
     if (source_ptr == NULL){
@@ -168,20 +169,26 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
   const pybind11::array& image_data = image.attr("raw");
   const pybind11::dtype& image_dtype = image_data.dtype();
 
-  if(image_dtype.equal(pybind11::dtype::of<float>())){
-    return templated_interpolate_linear<float>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<uint8_t>())){
-    return templated_interpolate_linear<uint8_t>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<uint16_t>())){
-    return templated_interpolate_linear<uint16_t>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<uint32_t>())){
-    return templated_interpolate_linear<uint32_t>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<int8_t>())){
-    return templated_interpolate_linear<int8_t>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<int16_t>())){
-    return templated_interpolate_linear<int16_t>(image, new_space);
-  } else if(image_dtype.equal(pybind11::dtype::of<int32_t>())){
-    return templated_interpolate_linear<int32_t>(image, new_space);
+  if(image_dtype.equal(pybind11::dtype::of<f32>())){
+    return templated_interpolate_linear<f32>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<f64>())){
+    return templated_interpolate_linear<f64>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<u8>())){
+    return templated_interpolate_linear<u8>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<u16>())){
+    return templated_interpolate_linear<u16>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<u32>())){
+    return templated_interpolate_linear<u32>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<u64>())){
+    return templated_interpolate_linear<u64>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<i8>())){
+    return templated_interpolate_linear<i8>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<i16>())){
+    return templated_interpolate_linear<i16>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<i32>())){
+    return templated_interpolate_linear<i32>(image, new_space);
+  } else if(image_dtype.equal(pybind11::dtype::of<i64>())){
+    return templated_interpolate_linear<i64>(image, new_space);
   }
 
   const std::string dtype = pybind11::str(image_data.dtype());

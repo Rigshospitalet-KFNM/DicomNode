@@ -24,7 +24,7 @@ inline dicomNodeError_t check_buffer_pointers(
     return UNABLE_TO_ACQUIRE_BUFFER;
   }
 
-  if (buffer.size != elements){
+  if (std::cmp_not_equal(buffer.size, elements)){
     std::cerr << "Input Size miss match buffer: " << buffer.size << " Elements:" << elements << "\n";
     return INPUT_SIZE_MISMATCH;
   }
@@ -82,14 +82,14 @@ dicomNodeError_t get_python_buffer_pointer(
   T** out,
   bool writable=false
 ){
-  const pybind11::array_t<T>& python_array = obj.attr(attr).cast<const pybind11::array_t<T>&>();
+  const pybind11::array_t<T>& python_array = obj.attr(attr).cast<const pybind11::array_t<T>>();
 
   const pybind11::buffer_info buffer = python_array.request(writable);
   if (buffer.ptr == NULL){
     return UNABLE_TO_ACQUIRE_BUFFER;
   }
 
-  if (buffer.size != expected_size){
+  if (buffer.size == SSIZE_ERROR || static_cast<u64>(buffer.size) != expected_size){
     return INPUT_SIZE_MISMATCH;
   }
 
@@ -143,6 +143,19 @@ dicomNodeError_t load_space(
       &extent_ptr
     );
   } | [&](){
+    if(  start_point_ptr == NULL
+      || basis_ptr == NULL
+      || inverted_basis_ptr == NULL
+      || extent_ptr == NULL
+    ) {
+      std::cout << "start_point_ptr:" << start_point_ptr << "\n"
+                << "basis_ptr:" << basis_ptr << "\n"
+                << "inverted_basis_ptr:" << inverted_basis_ptr << "\n"
+                << "extent_ptr:" << extent_ptr << "\n";
+
+      return INPUT_TYPE_ERROR;
+    }
+
     std::memcpy(
       space.starting_point.points.begin(),
       start_point_ptr,
@@ -157,7 +170,7 @@ dicomNodeError_t load_space(
 
     std::memcpy(
       space.inverted_basis.points.begin(),
-      start_point_ptr,
+      inverted_basis_ptr,
       sizeof(f32) * DIM * DIM
     );
 
