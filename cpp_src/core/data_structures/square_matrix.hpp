@@ -8,6 +8,8 @@
 
 template<u8 DIMENSIONS>
 struct SquareMatrix {
+  using SQUARE_MATRIX_TYPE = f32;
+
   std::array<f32, DIMENSIONS * DIMENSIONS> points;
 
   static constexpr u32 idx(const i32 row, const i32 col){
@@ -28,6 +30,14 @@ struct SquareMatrix {
 
   const f32& operator[](const u32 i) const {
     return points[i];
+  }
+
+  f32* begin(){
+    return points.begin();
+  }
+
+  f32* end(){
+    return points.end();
   }
 
   const Point<DIMENSIONS> operator*(

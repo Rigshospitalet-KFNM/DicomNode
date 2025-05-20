@@ -1,6 +1,9 @@
 #pragma once
+
 #include<iostream>
+
 #include<pybind11/pybind11.h>
+
 #include"core/core.hpp"
 
 namespace dicomnode {
@@ -8,10 +11,10 @@ inline dicomNodeError_t is_instance(
   const pybind11::object& python_object,
   const char* module_name,
   const char* instance_type){
-  const pybind11::module_& space_module = pybind11::module_::import(module_name);
-  const pybind11::object& space_class = space_module.attr(instance_type);
+  const pybind11::module_& module_ = pybind11::module_::import(module_name);
+  const pybind11::object& class_ = module_.attr(instance_type);
 
-  if(!pybind11::isinstance(python_object, space_class)) {
+  if(!pybind11::isinstance(python_object, class_)) {
     return dicomNodeError_t::INPUT_TYPE_ERROR;
   }
   return dicomNodeError_t::SUCCESS;
@@ -32,47 +35,6 @@ inline dicomNodeError_t check_buffer_pointers(
   return dicomNodeError_t::SUCCESS;
 }
 
-  /**
- * @brief Returns the amount of bytes spaned by an image object or a space for
- * an image object
- *
- * @tparam T
- * @param python_object
- * @return size_t
- */
-template<typename T>
-inline size_t get_image_size(const pybind11::object& python_object){
-  const pybind11::module_& space_module = pybind11::module_::import("dicomnode.math.space");
-  const pybind11::object& space_class = space_module.attr("Space");
-
-  if(pybind11::isinstance(python_object, space_class)){
-    using EXTENT_DATA_TYPE = uint32_t;
-    const pybind11::array_t<EXTENT_DATA_TYPE>& python_extent = python_object.attr("extent");
-    const pybind11::buffer_info& python_extent_buffer = python_extent.request();
-    if (python_extent_buffer.ptr == nullptr) {
-      return 0;
-    }
-
-    EXTENT_DATA_TYPE* data = (EXTENT_DATA_TYPE*)python_extent_buffer.ptr;
-
-    size_t size = sizeof(T);
-    for(int i = 0; i < python_extent_buffer.size; i++){
-      size *= data[i];
-    }
-
-    return size;
-  }
-
-  const pybind11::module_& image_module = pybind11::module_::import("dicomnode.math.image");
-  const pybind11::object& image_class = image_module.attr("Image");
-
-  if(pybind11::isinstance(python_object, image_class)){
-    const pybind11::array_t<T>& raw_image = python_object.attr("raw");
-    return raw_image.size() * sizeof(T);
-  }
-
-  return 0;
-}
 
 template<typename T>
 dicomNodeError_t get_python_buffer_pointer(
@@ -157,19 +119,19 @@ dicomNodeError_t load_space(
     }
 
     std::memcpy(
-      space.starting_point.points.begin(),
+      space.starting_point.begin(),
       start_point_ptr,
       sizeof(f32) * DIM
     );
 
     std::memcpy(
-      space.basis.points.begin(),
+      space.basis.begin(),
       basis_ptr,
       sizeof(f32) * DIM * DIM
     );
 
     std::memcpy(
-      space.inverted_basis.points.begin(),
+      space.inverted_basis.begin(),
       inverted_basis_ptr,
       sizeof(f32) * DIM * DIM
     );

@@ -181,7 +181,16 @@ def _bounding_box_gpu(array):
 
   return (x_min, x_max), (y_min, y_max), (z_min, z_max)
 
+from . import image
+
 def bounding_box(array):
+  from dicomnode.dicom.series import Series
+  if isinstance(array, Series):
+    array = array.image.raw
+
+  if isinstance(array, image.Image):
+    array = array.raw
+
   if CUDA:
     return _bounding_box_gpu(array)
   else:
@@ -189,7 +198,6 @@ def bounding_box(array):
 
 from . import labeling
 from . import space
-from . import image
 
 def __all__():
   return [

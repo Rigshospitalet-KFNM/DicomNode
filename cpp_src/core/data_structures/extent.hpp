@@ -9,9 +9,11 @@
 
 template<u8 DIMENSIONS>
 struct Extent {
+  using EXTENT_DATA_TYPE = u32;
+
   static_assert(DIMENSIONS > 0);
 
-  std::array<u32, DIMENSIONS> sizes{};
+  std::array<EXTENT_DATA_TYPE, DIMENSIONS> sizes{};
 
   // Default constructor is need because otherwise the next constructor is used
   // which fails as no arguments fails static assert

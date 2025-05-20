@@ -10,13 +10,13 @@ from enum import Enum
 from inspect import getfullargspec
 from pathlib import Path
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
-    Optional,Sequence as TypingSequence, Tuple, TypeVar, Union
+    Optional,Sequence as TypingSequence, Tuple, TypeVar, Union, TypeAlias
 
 # Third Party Library
 from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
 from numpy import ndarray, zeros_like
-from pydicom import DataElement, Dataset, Sequence
+from pydicom import DataElement, Dataset, Sequence, datadict
 from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
@@ -33,6 +33,8 @@ from dicomnode.lib.exceptions import MissingPivotDataset, ConstructionFailure
 logger = get_logger()
 
 T = TypeVar('T')
+
+TagType: TypeAlias = Union[BaseTag, str, int, Tuple[int,int]]
 
 PRIVATIZATION_VERSION = 1
 
@@ -63,7 +65,7 @@ class VirtualElement(ABC):
     return self.__tag
 
   @tag.setter
-  def tag(self, tag: Union[BaseTag, str, int, Tuple[int,int]]):
+  def tag(self, tag: TagType):
     self.__tag = Tag(tag)
 
   @property
@@ -79,7 +81,7 @@ class VirtualElement(ABC):
     self.__VR = val
 
   def __init__(self,
-               tag: Union[BaseTag, str, int, Tuple[int,int]],
+               tag: TagType,
                VR: str,
                name: Optional[str]=None) -> None:
     self.tag = tag
@@ -112,7 +114,7 @@ class CopyElement(VirtualElement):
   """Virtual Data Element, indicating that the value will be copied from an
   original dataset, Throws an error is element is missing"""
 
-  def __init__(self, tag: Union[BaseTag, str, int, Tuple[int,int]], Optional: bool = False, name: Optional[str] = None) -> None:
+  def __init__(self, tag: TagType, Optional: bool = False, name: Optional[str] = None) -> None:
     super().__init__(tag, '', name)
     self.Optional = Optional
 
@@ -129,7 +131,6 @@ class CopyElement(VirtualElement):
         return None
       else:
         raise KeyError(f"{self.tag} - {self.name}: not found in Header Parent Dataset")
-
 
 class DiscardElement(VirtualElement):
   def __init__(self, tag) -> None:
@@ -234,6 +235,28 @@ class SequenceElement(InstanceVirtualElement):
 
     return DataElement(self.tag, 'SQ', Sequence(sequence_datasets))
 
+class IndexElement(InstanceVirtualElement):
+  def __init__(self, tag: TagType, VR: str, indexable: TypingSequence[DataElement], name: str | None = None) -> None:
+    super().__init__(tag, VR, name)
+    self.indexable = indexable
+
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement | InstanceVirtualElement | None:
+    return self
+
+  def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
+    return self.indexable[instance_environment.instance_number]
+
+class KeyedIndexElement(InstanceVirtualElement):
+  def __init__(self, tag: TagType, VR: str, key: Any, name: str | None = None) -> None:
+    super().__init__(tag, VR, name)
+    self.key = key
+
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement | InstanceVirtualElement | None:
+    return self
+
+  def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
+    return instance_environment.kwargs[self.key][instance_environment.instance_number]
+
 
 class FunctionalElement(InstanceVirtualElement):
   """Abstract tag. This class represents a tag, that will be
@@ -250,8 +273,8 @@ class FunctionalElement(InstanceVirtualElement):
   def corporealialize(self, datasets: Iterable[Dataset]) -> 'FunctionalElement':
     return self
 
-  def produce(self, caller_args: InstanceEnvironment) -> Optional[DataElement]:
-    return DataElement(self.tag, self.VR, self.func(caller_args))
+  def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
+    return DataElement(self.tag, self.VR, self.func(instance_environment))
 
 
 class InstanceCopyElement(InstanceVirtualElement):
@@ -273,6 +296,27 @@ class InstanceCopyElement(InstanceVirtualElement):
 
     return instance_environment.instance_dataset.get(self.tag,
                                                      DataElement(self.tag, self.VR, None))
+
+class CopyOrElseElement(InstanceVirtualElement):
+  """Like the Copy Element, but adds the functionality to place a
+  missing value instead of just nothing"""
+  def __init__(self, tag: TagType, VR: str, orElse: Any, name=None):
+    super().__init__(tag, VR, name)
+    self._orElse = orElse
+
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement | InstanceVirtualElement | None:
+    dataset = get_pivot(datasets)
+
+    if dataset is not None:
+      if self.tag in dataset:
+        return dataset[self.tag]
+
+    if isinstance(self._orElse, DataElement):
+      return self._orElse
+    elif isinstance(self._orElse, VirtualElement):
+      return self._orElse.corporealialize(datasets)
+    else:
+      return DataElement(self.tag, self.VR, self._orElse)
 
 class Blueprint():
   """Blueprint for a dicom series. A blueprint contains no information on a specific series.
@@ -513,7 +557,11 @@ class DicomFactory():
     series = DicomSeries([Dataset() for _ in image])
 
     for virtual_tag in blueprint:
-      result = virtual_tag.corporealialize(parent_datasets)
+      try:
+        result = virtual_tag.corporealialize(parent_datasets)
+      except Exception as exception:
+        logger.error(f"Encountered an error in corporalizing Tag:{virtual_tag.tag} - {datadict.keyword_for_tag(virtual_tag.tag)}!")
+        raise exception
       if isinstance(result, DataElement):
         series.set_shared_tag(virtual_tag.tag, result)
       elif isinstance(result, InstanceVirtualElement):

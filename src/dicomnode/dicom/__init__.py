@@ -8,6 +8,7 @@ from types import EllipsisType
 from typing import Any,Callable, List, Literal, Iterable, Optional, Tuple, Union
 # Third Party Libraries
 import numpy
+import nibabel
 from pydicom import DataElement
 from pydicom.dataset import Dataset, validate_file_meta
 from pydicom.tag import BaseTag
@@ -152,7 +153,7 @@ def extrapolate_image_position_patient(
     image_orientation[0] * image_orientation[4] - image_orientation[1] * image_orientation[3],
   ])
 
-  position = [numpy.array(initial_position) + (slice_num - image_number) * cross_vector for slice_num in numpy.arange(1,slices + 1, 1, dtype=numpy.float64)]
+  position = [numpy.array(initial_position) + (slice_num - image_number) * cross_vector for slice_num in numpy.arange(0, slices, 1, dtype=numpy.float64)]
 
   return [[float(val) for val in pos] for pos in position]
 
@@ -212,6 +213,105 @@ def extrapolate_image_position_patient_dataset(dataset: Dataset, slices: int) ->
     dataset.InstanceNumber,
     slices
   )
+
+def create_dicom_coordinate_system(spacial_reference, rm_shape=None, cm_shape=None):
+  """Creates the values describing the spacial_reference's coordinate system for
+  a dicom series
+
+  Args:
+      spacial_reference: This the object that contains the coordinate system,
+        such as an affine matrix, a nifti object, an dicomnode image or a dicomnode space
+      rm_shape (Tuple[int,int,int], optional): Row major shape container (Default for this
+        library) Shape container with the format (Z,Y,X). Required if the
+        spacial_reference is an affine and cm_shape is None. Defaults to None.
+      cm_shape (Tuple[int,int,int], optional): Column major shape container (Default for Nifti)
+        Shape container with the format (X,Y,Z). Required if the
+        spacial_reference is an affine and rm_shape is None. Defaults to None.
+
+  Raises:
+      TypeError: If you do something boneheaded. Read the error and fix it...
+
+  Returns:
+      Tuple: [List[List[float]], tuple[floating[Any], floating[Any], floating[Any]], tuple[Any, ...], Tuple[float,float, float] -
+        This tuple contains:
+          * Points - This is a list of points where each member should be placed in 0x0020_0032
+          * Voxel_dim - This is a tuple with the size of a pixel in (X,Y,Z) sizes
+          * Orientation - The x and y vector that should be placed in x0020_0037
+          * Starting point - The starting point of the coordinate system.
+  """
+  # These imports are just to prevent Circular imports
+  from dicomnode.math.image import Image
+  from dicomnode.math.space import Space
+
+  if isinstance(spacial_reference, Space):
+    if rm_shape is not None or cm_shape is not None:
+      raise TypeError("When passing a space, you shouldn't pass a shape to the function")
+    starting_point = spacial_reference.starting_point
+    vec_x = spacial_reference.basis[0]
+    vec_y = spacial_reference.basis[1]
+    vec_z = spacial_reference.basis[2]
+    extent = spacial_reference.extent
+
+  elif isinstance(spacial_reference, Image):
+    if rm_shape is not None or cm_shape is not None:
+      raise TypeError("When passing an image, you shouldn't pass a shape to the function")
+
+    starting_point = spacial_reference.space.starting_point
+    vec_x = spacial_reference.space.basis[0]
+    vec_y = spacial_reference.space.basis[1]
+    vec_z = spacial_reference.space.basis[2]
+    extent = spacial_reference.space.extent
+  elif isinstance(spacial_reference, nibabel.nifti1.Nifti1Image) or isinstance(spacial_reference, nibabel.nifti2.Nifti2Image):
+    if rm_shape is not None or cm_shape is not None:
+      raise TypeError("When passing an Nifti object, you shouldn't pass a shape to the function")
+    if spacial_reference.affine is None:
+      raise TypeError("Unable to create coordinate system as input nifti doesn't contain any Affine")
+
+    vec_x = spacial_reference.affine[0,:3]
+    vec_y = spacial_reference.affine[1,:3]
+    vec_z = spacial_reference.affine[2,:3]
+    starting_point = spacial_reference.affine[:3, 3]
+    extent = tuple(reversed(spacial_reference.shape))
+
+  elif isinstance(spacial_reference, numpy.ndarray) and (rm_shape is not None and cm_shape is not None):
+    if rm_shape is not None and cm_shape is not None:
+      raise TypeError("You shouldn't pass both a shape and ww_shape")
+
+    if spacial_reference.shape != (4,4):
+      raise TypeError("The spacial reference is not an affine matrix")
+
+    vec_x = spacial_reference[0,:3]
+    vec_y = spacial_reference[1,:3]
+    vec_z = spacial_reference[2,:3]
+    starting_point = spacial_reference[:3, 3]
+    if cm_shape is None:
+      extent = tuple(reversed(spacial_reference.shape))
+    else:
+      extent = rm_shape
+  else:
+    raise TypeError(f"Unable able create dicom positions from {spacial_reference} of type: {type(spacial_reference)}")
+
+  # Input parsing done and starting_point, vec_x, vec_y, vec_z and extent is defied
+
+  pixel_size_x = numpy.linalg.norm(vec_x)
+  pixel_size_y = numpy.linalg.norm(vec_y)
+  pixel_size_z = numpy.linalg.norm(vec_z)
+
+  orientation = numpy.concat((
+    vec_x / pixel_size_x,
+    vec_y / pixel_size_y
+  ))
+
+  starting_point = starting_point
+
+  points = extrapolate_image_position_patient(
+    float(pixel_size_z), numpy.sign(vec_z[2]),
+        starting_point,
+        orientation, 1, extent[2]
+    )
+
+  return points, (pixel_size_x, pixel_size_y, pixel_size_z), list(orientation), starting_point
+
 
 def format_from_patient_name_str(patient_name: str) -> str:
   """Formats the dicom encoded patient name into a human displayable name

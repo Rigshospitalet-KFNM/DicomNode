@@ -21,6 +21,18 @@ from dicomnode.math.types import MirrorDirection, ROTATION_MATRIX_90_DEG_X,\
 
 RawBasisMatrix: TypeAlias = ndarray[Tuple[int, ...], dtype[float32]]
 
+def is_affine_in_correct_rotation(affine):
+  abs_affine = absolute(affine)
+
+  return abs_affine[0,1] < abs_affine[0,0] and \
+         abs_affine[0,2] < abs_affine[0,0] and \
+         abs_affine[1,0] < abs_affine[1,1] and \
+         abs_affine[1,2] < abs_affine[1,1] and \
+         abs_affine[2,0] < abs_affine[2,2] and \
+         abs_affine[2,1] < abs_affine[2,2]
+
+def is_positive(num):
+  return 0 < num
 
 
 class Space:
@@ -202,15 +214,7 @@ class Space:
     Returns:
         bool: return True if there's a reference space that matches
     """
-
-    abs_affine = absolute(self.basis)
-
-    return abs_affine[0,1] < abs_affine[0,0] and \
-           abs_affine[0,2] < abs_affine[0,0] and \
-           abs_affine[1,0] < abs_affine[1,1] and \
-           abs_affine[1,2] < abs_affine[1,1] and \
-           abs_affine[2,0] < abs_affine[2,2] and \
-           abs_affine[2,1] < abs_affine[2,2]
+    return is_affine_in_correct_rotation(self.basis)
 
 
   def __dominant_axis(self, vector):
@@ -346,16 +350,18 @@ class ReferenceSpace(Enum):
   """
 
   @classmethod
-  def from_space(cls, affine: Space):
-    if not affine.is_correct_rotation:
+  def from_space(cls, space: Space):
+    if not space.is_correct_rotation:
       return None
 
-    def is_positive(num):
-      return 0 < num
+    return cls.from_affine(space.basis)
 
-    x_coord = affine.basis[0,0]
-    y_coord = affine.basis[1,1]
-    z_coord = affine.basis[2,2]
+  @classmethod
+  def from_affine(cls, affine: ndarray):
+    x_coord = affine[0,0]
+    y_coord = affine[1,1]
+    z_coord = affine[2,2]
+
 
     if is_positive(x_coord) and is_positive(y_coord) and is_positive(z_coord):
       return cls.RAS

@@ -58,3 +58,25 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
 
 def get_mask(rt_struct: _RTStruct, name: str) -> Image:
   return get_mask_ds(rt_struct.series_data, rt_struct.ds, name)
+
+def get_mask_wrong_way(series: List[Dataset], RT_dataset: Dataset, name: str):
+  contour_sequence = get_contour_sequence_by_name(RT_dataset, name)
+  first_ds = series[0]
+
+  mask = numpy.empty(
+    (first_ds.Rows, first_ds.Columns, len(series)), dtype=numpy.bool_
+  )
+  transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
+
+  for i, series_slice in enumerate(series):
+    contour_slices = [
+      slice_contour_data
+        for slice_contour_data in get_slice_contour_data(series_slice, contour_sequence)
+          if len(slice_contour_data) > 3 # This is the line that prevent the error from happening
+    ]
+    if len(contour_slices):
+      mask[:,:,i] = get_slice_mask_from_slice_contour_data(
+        series_slice, contour_slices, transformation_matrix
+      )
+
+  return mask

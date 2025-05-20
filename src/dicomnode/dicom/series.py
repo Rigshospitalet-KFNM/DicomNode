@@ -28,6 +28,7 @@ from rt_utils import RTStruct
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import has_tags, sort_datasets, gen_uid,\
   assess_single_series
+from dicomnode.math import transpose_nifti_coords
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import Image, FramedImage
 from dicomnode.lib.exceptions import MissingDatasets, InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
@@ -204,7 +205,8 @@ class NiftiSeries(Series):
     self.nifti = nifti
     image_data = self.nifti.get_fdata()
     if image_data.flags.f_contiguous:
-      image_data = numpy.transpose(image_data, [i for i in range(image_data.ndim)].reverse())
+      #image_data = numpy.transpose(image_data, [i for i in range(image_data.ndim)].reverse())
+      image_data = transpose_nifti_coords(image_data)
     affine = Space.from_nifti(self.nifti)
 
     super().__init__(Image(image_data, affine))
