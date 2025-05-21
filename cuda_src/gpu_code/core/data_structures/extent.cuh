@@ -17,17 +17,17 @@
  * texture.
  *  Data is stored in Z,Y,X
  */
-template<uint8_t DIMENSIONS>
+template<u8 DIMENSIONS>
 struct Extent {
   static_assert(DIMENSIONS > 0);
-  uint32_t sizes[DIMENSIONS]{}; // this zero initializes the array
+  u32 sizes[DIMENSIONS]{}; // this zero initializes the array
 
   // Default constructor is need because otherwise the next constructor is used
   // which fails as no arguments fails static assert
   Extent(){}
 
   template<typename... Args>
-  __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<uint32_t>(args)...}{
+  __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
     static_assert(sizeof...(args) == DIMENSIONS);
   };
 
@@ -48,7 +48,7 @@ struct Extent {
   __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const {
     bool in = true;
     #pragma unroll
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
+    for(u8 i = 0; i < DIMENSIONS; i++){
       in &= 0 <= index[i] && index[i] < sizes[DIMENSIONS - (i + 1)];
     }
 
@@ -61,16 +61,16 @@ struct Extent {
     return contains(Index({static_cast<int32_t>(args)...}));
   }
 
-  __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Index<DIMENSIONS> index) const {
+  __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS> index) const {
     if(!contains(index)){
       return {};
     }
 
-    uint64_t return_val = 0;
-    uint64_t dimension_temp = 1;
+    u64 return_val = 0;
+    u64 dimension_temp = 1;
 
     #pragma unroll
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
+    for(u8 i = 0; i < DIMENSIONS; i++){
       return_val += index[i] * dimension_temp;
       dimension_temp *= sizes[DIMENSIONS - (i + 1)];
     }
@@ -86,13 +86,13 @@ struct Extent {
     return flat_index(index);
   }
 
-  __device__ __host__ Index<DIMENSIONS> from_flat_index(uint64_t flat_index) const {
+  __device__ __host__ Index<DIMENSIONS> from_flat_index(u64 flat_index) const {
     int32_t coordinates[DIMENSIONS];
     uint64_t dimension_temp = 1;
 
     #pragma unroll
-    for(uint8_t dim = 0; dim < DIMENSIONS; dim++){
-      const uint32_t& extent = sizes[DIMENSIONS - (dim + 1)];
+    for(u8 dim = 0; dim < DIMENSIONS; dim++){
+      const u32& extent = sizes[DIMENSIONS - (dim + 1)];
       coordinates[dim] = (flat_index % (dimension_temp * extent))
         / dimension_temp;
       dimension_temp *= extent;
@@ -101,33 +101,33 @@ struct Extent {
     return Index<DIMENSIONS>(coordinates);
   }
 
-  __device__ __host__ const uint32_t& x() const noexcept {
+  __device__ __host__ const u32& x() const noexcept {
     return sizes[DIMENSIONS - 1];
   }
 
-  __device__ __host__ const uint32_t& y() const noexcept{
+  __device__ __host__ const u32& y() const noexcept{
     static_assert(DIMENSIONS > 1);
     return sizes[DIMENSIONS - 2];
   }
 
-  __device__ __host__ const uint32_t& z() const noexcept {
+  __device__ __host__ const u32& z() const noexcept {
     static_assert(DIMENSIONS > 2);
     return sizes[DIMENSIONS - 3];
   }
 
-  __device__ __host__ constexpr uint32_t* begin() noexcept{
+  __device__ __host__ constexpr u32* begin() noexcept{
     return &sizes[0];
   }
 
-  __device__ __host__ constexpr uint32_t* end() noexcept{
+  __device__ __host__ constexpr u32* end() noexcept{
     return &sizes[DIMENSIONS - 1];
   }
 
-  __device__ __host__ constexpr const uint32_t* begin() const noexcept{
+  __device__ __host__ constexpr const u32* begin() const noexcept{
     return &sizes[0];
   }
 
-  __device__ __host__ constexpr const uint32_t* end() const noexcept{
+  __device__ __host__ constexpr const u32* end() const noexcept{
     return &sizes[DIMENSIONS - 1];
   }
 
@@ -140,14 +140,14 @@ struct Extent {
     size_t size = 1;
 
     #pragma unroll
-    for(uint8_t i = 0; i < DIMENSIONS; i++){
+    for(u8 i = 0; i < DIMENSIONS; i++){
       size *= sizes[i];
     }
 
     return size;
   }
 
-  constexpr uint8_t dimensionality() const {
+  constexpr u8 dimensionality() const {
     return DIMENSIONS;
   }
 
@@ -167,11 +167,11 @@ struct Extent {
     return dicomNodeError_t::SUCCESS;
   }
 
-  template<uint8_t ARRAY_SIZE>
+  template<u8 ARRAY_SIZE>
   __host__ dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
     static_assert(ARRAY_SIZE == DIMENSIONS);
 
-    for(int i = 0; const ssize_t& dim : dims){
+    for(u8 i = 0; const ssize_t& dim : dims){
       if(dim <= 0){
         return dicomNodeError_t::NON_POSITIVE_SHAPE;
       }

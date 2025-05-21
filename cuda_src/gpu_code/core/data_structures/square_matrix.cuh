@@ -3,35 +3,35 @@
 #include"../declarations.cuh"
 
 
-template<uint8_t DIMENSIONS>
+template<u8 DIMENSIONS>
 struct SquareMatrix {
   float points[DIMENSIONS * DIMENSIONS]{};
 
-  static constexpr __device__ __host__ uint32_t idx(const int32_t row, const int32_t col){
+  static constexpr __device__ __host__ uint32_t idx(const i32 row, const i32 col){
     return row * DIMENSIONS + col;
   }
 
-  __host__ __device__ float& operator[](const int32_t i){
+  __host__ __device__ f32& operator[](const i32 i){
     return points[i];
   }
 
-  __host__ __device__ float& operator[](const uint32_t i){
+  __host__ __device__ f32& operator[](const u32 i){
     return points[i];
   }
 
-  __device__ volatile float& operator[](const int32_t i) volatile {
+  __device__ volatile f32& operator[](const i32 i) volatile {
     return points[i];
   }
 
-  __device__ volatile float& operator[](const uint32_t i) volatile {
+  __device__ volatile f32& operator[](const u32 i) volatile {
     return points[i];
   }
 
-  __host__ __device__ const float& operator[](const int32_t i) const {
+  __host__ __device__ const f32& operator[](const i32 i) const {
     return points[i];
   }
 
-  __host__ __device__ const float& operator[](const uint32_t i) const {
+  __host__ __device__ const f32& operator[](const u32 i) const {
     return points[i];
   }
 
@@ -41,9 +41,9 @@ struct SquareMatrix {
       // It's zero initialized!
       Point<DIMENSIONS> point;
       #pragma unroll
-      for(uint8_t j = 0; j < DIMENSIONS; j++){
+      for(u8 j = 0; j < DIMENSIONS; j++){
         #pragma unroll
-        for(uint8_t i = 0; i < DIMENSIONS; i++){
+        for(u8 i = 0; i < DIMENSIONS; i++){
           point[j] += other[i] * points[idx(i,j)];
         }
       }

@@ -4,19 +4,33 @@ project(dicomnode_c LANGUAGES CXX)
 include(ProcessorCount)
 
 ProcessorCount(NUMBER_OF_PROCESSORS)
-
 if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
   message(STATUS "Processors ${NUMBER_OF_PROCESSORS}")
   set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
   set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=${NUMBER_OF_PROCESSORS})
   set(CMAKE_JOB_POOL_COMPILE compile_pool)
-
 endif()
 
 
 set(VERSION_INFO 0.0.1)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(FetchContent)
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
+  message(STATUS "Downloading CPM.cmake")
+  file(DOWNLOAD
+    https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.0/CPM.cmake
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake"
+  )
+endif()
+include("${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
+
+CPMAddPackage(
+  NAME pybind11
+  GITHUB_REPOSITORY pybind/pybind11
+  GIT_TAG v2.13.6
+)
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
@@ -92,7 +106,6 @@ if(CMAKE_CUDA_COMPILER)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
-    include(FetchContent)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git

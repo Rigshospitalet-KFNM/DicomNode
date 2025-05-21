@@ -13,6 +13,7 @@
 
 #include<stdint.h>
 
+#include"../declarations.cuh"
 #include"../concepts.cuh"
 #include"space.cuh"
 #include"volume.cuh"
@@ -20,7 +21,7 @@
 
 //template<template<uint8_t DIMENSIONS, typename T> typename VOLUME, uint8_t DIMENSIONS, typename T>
 //  requires CVolume<VOLUME, DIMENSIONS, T>
-template<uint8_t DIMENSIONS,typename T>
+template<u8 DIMENSIONS,typename T>
 class Image {
   static_assert(0 < DIMENSIONS);
 
@@ -36,16 +37,16 @@ class Image {
 
   //T operator()(Point<DIMENSIONS> point){}
 
-  constexpr const uint32_t& num_cols() const {
+  constexpr const u32& num_cols() const {
     return space.extent.sizes[0];
   }
 
-  constexpr const uint32_t& num_rows () const {
+  constexpr const u32& num_rows () const {
     static_assert(1 < DIMENSIONS);
     return space.extent.sizes[1];
   }
 
-  constexpr const uint32_t& num_slices() const {
+  constexpr const u32& num_slices() const {
     static_assert(2 < DIMENSIONS);
     return space.extent.sizes[2];
   }

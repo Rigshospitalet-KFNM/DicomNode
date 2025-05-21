@@ -5,7 +5,7 @@
 #include"space.cuh"
 #include"../cuda_management.cuh"
 
-template<uint8_t DIMENSION, typename T>
+template<u8 DIMENSION, typename T>
 class Texture {
   static_assert(DIMENSION == 3, "Texture is only support for 3 dimensional volumes");
 

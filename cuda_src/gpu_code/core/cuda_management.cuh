@@ -50,9 +50,9 @@ class CudaRunner{
     }
 
     CudaRunner& operator|(std::function<cudaError_t()> func) {
-      if(m_error == cudaSuccess){
+      if(m_error == cudaSuccess) [[likely]] {
         m_error = func();
-        if (m_error != cudaSuccess){
+        if (m_error != cudaSuccess) [[unlikely]] {
           m_error_function(m_error);
         }
       }
@@ -63,9 +63,9 @@ class CudaRunner{
       requires std::invocable<F> &&
                std::same_as<std::invoke_result_t<F>, cudaError_t>
     CudaRunner& operator|(F&& func) {
-      if(m_error == cudaSuccess){
+      if(m_error == cudaSuccess) [[likely]]{
         m_error = func();
-        if (m_error != cudaSuccess){
+        if (m_error != cudaSuccess)[[unlikely]]{
           m_error_function(m_error);
         }
       }
@@ -85,9 +85,9 @@ class DicomNodeRunner{
     : m_error_function(error_funciton) {}
 
   DicomNodeRunner& operator|(std::function<cudaError_t()> func){
-    if(m_error == dicomNodeError_t::SUCCESS){
+    if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
       cudaError_t ret = func();
-      if(ret != cudaSuccess){
+      if(ret != cudaSuccess) [[unlikely]] {
         m_error = encode_cuda_error(ret);
         m_error_function(m_error);
       }
@@ -96,9 +96,9 @@ class DicomNodeRunner{
   }
 
   DicomNodeRunner& operator|(std::function<dicomNodeError_t()> func){
-    if(m_error == dicomNodeError_t::SUCCESS){
+    if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
       m_error = func();
-      if(m_error != dicomNodeError_t::SUCCESS){
+      if(m_error != dicomNodeError_t::SUCCESS) [[unlikely]]{
         m_error_function(m_error);
       }
     }
@@ -109,9 +109,9 @@ class DicomNodeRunner{
     requires std::invocable<F> &&
              std::same_as<std::invoke_result_t<F>, dicomNodeError_t>
   DicomNodeRunner& operator|(F&& func){
-    if(m_error == dicomNodeError_t::SUCCESS){
+    if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
       m_error = func();
-      if(m_error != dicomNodeError_t::SUCCESS){
+      if(m_error != dicomNodeError_t::SUCCESS)[[unlikely]]{
         m_error_function(m_error);
       }
     }
