@@ -127,11 +127,12 @@ class DicomSeries(Series):
     self.series_instance_UID = assess_single_series(datasets)
 
     self.datasets = datasets
+    self.pivot = self.datasets[0]
     if 'InstanceNumber' in self.pivot:
       self.datasets.sort(key=sort_datasets)
+      self.pivot = self.datasets[0]
     else:
       self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
-    self.pivot = self.datasets[0]
 
     def image_constructor():
       return Image.from_datasets(self.datasets)
