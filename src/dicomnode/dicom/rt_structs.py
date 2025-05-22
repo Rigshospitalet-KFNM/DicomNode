@@ -36,7 +36,7 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
 
   first_ds = series[0]
 
-  mask = numpy.empty(
+  mask = numpy.zeros(
     (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.bool_
   )
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
@@ -63,7 +63,7 @@ def get_mask_wrong_way(series: List[Dataset], RT_dataset: Dataset, name: str):
   contour_sequence = get_contour_sequence_by_name(RT_dataset, name)
   first_ds = series[0]
 
-  mask = numpy.empty(
+  mask = numpy.zeros(
     (first_ds.Rows, first_ds.Columns, len(series)), dtype=numpy.bool_
   )
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)

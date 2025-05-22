@@ -127,11 +127,11 @@ class DicomSeries(Series):
     self.series_instance_UID = assess_single_series(datasets)
 
     self.datasets = datasets
-    self.pivot = self.datasets[0]
     if 'InstanceNumber' in self.pivot:
       self.datasets.sort(key=sort_datasets)
     else:
       self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
+    self.pivot = self.datasets[0]
 
     def image_constructor():
       return Image.from_datasets(self.datasets)
@@ -332,6 +332,7 @@ class FramedDicomSeries(Series):
         frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
       else:
         frame_acquisition_time[frameIndex] = datetime.combine(dataset.AcquisitionDate, dataset.AcquisitionTime)
+    # Done inserting datasets
 
     if first_dataset is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets")
@@ -342,10 +343,14 @@ class FramedDicomSeries(Series):
     if frame_acquisition_time is None:
       raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
 
+    # Sort datasets
+    for datasets in datasets_dict.values():
+      datasets.sort(key=sort_datasets)
+
     space = Space.from_datasets(datasets_dict[0])
 
     def construct_frame(raw:ndarray[Tuple[int,int,int,int], Any], frame: int):
-      frame_datasets = sorted(datasets_dict[frame], key=sort_datasets)
+      frame_datasets = datasets_dict[frame]
 
       for slice_number_in_series, dataset in enumerate(frame_datasets):
         raw[frame, slice_number_in_series, :, :] = \
