@@ -113,7 +113,7 @@ class Space:
   def from_datasets(cls, datasets: List[Dataset]):
     first_dataset = datasets[0]
     number_of_datasets = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
-    start_coordinates = first_dataset.ImagePositionPatient
+    slice_coordinates = numpy.array(first_dataset.ImagePositionPatient, dtype=float32)
     image_orientation = first_dataset.ImageOrientationPatient
 
     thickness_x = first_dataset.PixelSpacing[0]
@@ -126,10 +126,11 @@ class Space:
       [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z],
     ], dtype=float32)
 
+    starting_coordinates = (first_dataset.InstanceNumber * numpy.array([0,0,-1])) @ affine_raw + slice_coordinates
 
     return cls(
       affine_raw,
-      start_coordinates,
+      starting_coordinates ,
       (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
     )
 

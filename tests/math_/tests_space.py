@@ -1,4 +1,6 @@
 # Python standard library
+from random import shuffle
+
 
 # Third party modules
 import numpy
@@ -12,6 +14,7 @@ from dicomnode.math.types import ROTATION_MATRIX_90_DEG_X,\
   ROTATION_MATRIX_90_DEG_Y,ROTATION_MATRIX_90_DEG_Z
 
 # Testing helpers
+from tests.helpers import generate_numpy_datasets
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class SpaceTestCases(DicomnodeTestCase):
@@ -301,7 +304,6 @@ class SpaceTestCases(DicomnodeTestCase):
 
 
   def test_starting_point_z_axis(self):
-
     space = Space(numpy.array([ # type: ignore
       [1,0,0],
       [0,2,0],
@@ -328,3 +330,21 @@ class SpaceTestCases(DicomnodeTestCase):
     self.assertEqual(inv_z_space, space_zzz)
     self.assertEqual(inv_zz_space, space_zz)
     self.assertEqual(inv_zzz_space, space_z)
+
+  def test_construction_is_invariant_to_ordering(self):
+    datasets = [ds for ds in generate_numpy_datasets(
+      10, Cols=10, Rows=10,
+      starting_image_position=[0,0,0],
+      image_orientation=[1,0,0,0,1,0],
+      pixel_spacing=[3,3]
+    )]
+
+    space_from_ordered = Space.from_datasets(datasets)
+
+    # Do 10 times ensure non flaky behavior of the test
+    for _ in range(10):
+      shuffle(datasets)
+
+      space_from_shuffle = Space.from_datasets(datasets)
+
+      self.assertEqual(space_from_ordered, space_from_shuffle)
