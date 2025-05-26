@@ -102,6 +102,7 @@ class Space:
       affine = identity(3, dtype=float32)
       start_point = [0,0,0]
 
+    # Yeah this sucks, but most likely the data is already available
     if data.flags.f_contiguous:
       shape = numpy.array([s for s in reversed(data.shape)])[:3]
     else:
@@ -109,10 +110,18 @@ class Space:
 
     return cls(affine, start_point, shape)
 
+  def to_affine(self):
+    affine = numpy.eye(4)
+
+    affine[:3,:3] = self.basis
+    affine[3, :3] = self.starting_point
+
+    return affine
+
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):
     first_dataset = datasets[0]
-    number_of_datasets = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
+    slices_per_image = first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else len(datasets)
     slice_coordinates = numpy.array(first_dataset.ImagePositionPatient, dtype=float32)
     image_orientation = first_dataset.ImageOrientationPatient
 
@@ -126,12 +135,14 @@ class Space:
       [thickness_x * image_orientation[2], thickness_y * image_orientation[5], thickness_z],
     ], dtype=float32)
 
-    starting_coordinates = (first_dataset.InstanceNumber * numpy.array([0,0,-1])) @ affine_raw + slice_coordinates
+    slice_number = (first_dataset.InstanceNumber - 1) % first_dataset.NumberOfSlices if 'NumberOfSlices' in first_dataset else first_dataset.InstanceNumber - 1
+
+    starting_coordinates = (slice_number * numpy.array([0,0,-1])) @ affine_raw + slice_coordinates
 
     return cls(
       affine_raw,
       starting_coordinates ,
-      (number_of_datasets, first_dataset.Columns, first_dataset.Rows)
+      (slices_per_image, first_dataset.Columns, first_dataset.Rows)
     )
 
   def _mirror_x_direction(self):

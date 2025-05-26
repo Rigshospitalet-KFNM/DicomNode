@@ -58,7 +58,8 @@ def switch_ordering(input_data: numpy.ndarray) -> numpy.ndarray:
   )
 
 def transpose_nifti_coords(input_data: numpy.ndarray):
-  """Converts swaps an image from
+  """Converts swaps an image from viewable as nifti dataset to a dicomnode
+  native data.
 
   Args:
       input_data (_type_): _description_
@@ -66,8 +67,6 @@ def transpose_nifti_coords(input_data: numpy.ndarray):
   Returns:
       _type_: _description_
   """
-
-
   return numpy.fliplr(switch_ordering(input_data))
 
 def center_of_gravity(data: numpy.ndarray):

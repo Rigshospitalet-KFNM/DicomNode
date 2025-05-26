@@ -109,6 +109,12 @@ class Series:
       self._image = None
       self._image_constructor = image
 
+  def to_nifti(self):
+    return Nifti1Image(
+      transpose_nifti_coords(self.image.raw),
+      self.image.space.to_affine()
+    )
+
 
 class DicomSeries(Series):
   """This represent a series of dicom datasets, that together contains an image.

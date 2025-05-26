@@ -37,7 +37,7 @@ def get_mask_ds(series: List[Dataset], RT_dataset: Dataset, name: str) -> Image:
   first_ds = series[0]
 
   mask = numpy.zeros(
-    (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.bool_
+    (len(series), first_ds.Columns, first_ds.Rows), dtype=numpy.uint8
   )
   transformation_matrix = get_patient_to_pixel_transformation_matrix(series)
 
