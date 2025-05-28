@@ -12,7 +12,7 @@
 #include"python_interpolation.hpp"
 
 template<typename T, u8 DIM>
-dicomNodeError_t interpolation(
+CppError_t interpolation(
   const T* in_image,
   T* out_image,
   const Space<DIM>& source_space,
@@ -89,7 +89,7 @@ dicomNodeError_t interpolation(
 
 
 template<typename T>
-std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
+std::tuple<CppError_t, pybind11::array_t<T>> templated_interpolate_linear(
   const pybind11::object& image,
   const pybind11::object& new_space
 ) {
@@ -115,7 +115,7 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
   } | [&](){
     const T* source_ptr = (T*) source_buffer.ptr;
     if (source_ptr == NULL){
-      return dicomNodeError_t::UNABLE_TO_ACQUIRE_BUFFER;
+      return CppError_t::UNABLE_TO_ACQUIRE_BUFFER;
     }
     const std::array<u32, DIM> shape = destination_space.extent.sizes;
     const std::array<size_t, DIM> strides = destination_space.extent.python_strides(sizeof(T));
@@ -124,11 +124,11 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
     pybind11::buffer_info out_buffer = out_array.request(true);
 
     if(out_buffer.ptr == NULL){
-      return dicomNodeError_t::UNABLE_TO_ACQUIRE_BUFFER;
+      return CppError_t::UNABLE_TO_ACQUIRE_BUFFER;
     }
 
     if(out_buffer.size == SSIZE_ERROR){
-      return dicomNodeError_t::NON_POSITIVE_SHAPE;
+      return CppError_t::NON_POSITIVE_SHAPE;
     }
 
     T* output_buffer_pointer = static_cast<T*>(out_buffer.ptr);
@@ -147,7 +147,7 @@ std::tuple<dicomNodeError_t, pybind11::array_t<T>> templated_interpolate_linear(
 
 
 
-std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
+std::tuple<CppError_t, pybind11::array> interpolate_linear(
     const pybind11::object& image,
     const pybind11::object& new_space
 ) {
@@ -197,7 +197,7 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
 }
 
 
-void apply_interpolation_module(pybind11::module m){
+void apply_interpolation_module(pybind11::module& m){
   pybind11::module sub_module = m.def_submodule(
     "interpolation",
     "This module contains functions for resampling and interpolation.\n"
