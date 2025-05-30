@@ -141,29 +141,29 @@ struct Extent {
     return DIMENSIONS;
   }
 
-  dicomNodeError_t set_dimensions(const std::vector<ssize_t>& dims){
+  CppError_t set_dimensions(const std::vector<ssize_t>& dims){
     if(dims.size() != DIMENSIONS){
       return INPUT_SIZE_MISMATCH;
     }
 
     for(u8 i = 0; const ssize_t& dim : dims){
       if(dim <= 0){
-        return dicomNodeError_t::NON_POSITIVE_SHAPE;
+        return CppError_t::NON_POSITIVE_SHAPE;
       }
       sizes[i] = dim;
       i++;
     }
 
-    return dicomNodeError_t::SUCCESS;
+    return CppError_t::SUCCESS;
   }
 
   template<u8 ARRAY_SIZE>
-  dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
+  CppError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
     static_assert(ARRAY_SIZE == DIMENSIONS);
 
     for(u8 i = 0; const ssize_t& dim : dims){
       if(dim <= 0){
-        return dicomNodeError_t::NON_POSITIVE_SHAPE;
+        return CppError_t::NON_POSITIVE_SHAPE;
       }
       sizes[i] = dim;
       i++;

@@ -5,7 +5,7 @@
 
 #include"declarations.hpp"
 
-enum dicomNodeError_t: u32 {
+enum CppError_t: u32 {
   SUCCESS = 0,
   NOT_LINEAR_INDEPENDENT = 1,
   INPUT_TYPE_ERROR = 2,
@@ -18,17 +18,17 @@ enum dicomNodeError_t: u32 {
 
 class DicomNodeRunner {
   public:
-    DicomNodeRunner() : m_error_function([](dicomNodeError_t _){
+    DicomNodeRunner() : m_error_function([](CppError_t _){
     (void) _;
     }){}
 
-    DicomNodeRunner(std::function<void(dicomNodeError_t)> error_funciton)
+    DicomNodeRunner(std::function<void(CppError_t)> error_funciton)
     : m_error_function(error_funciton) {}
 
-  DicomNodeRunner& operator|(std::function<dicomNodeError_t()> func){
-    if(m_error == dicomNodeError_t::SUCCESS){
+  DicomNodeRunner& operator|(std::function<CppError_t()> func){
+    if(m_error == CppError_t::SUCCESS){
       m_error = func();
-      if(m_error != dicomNodeError_t::SUCCESS){
+      if(m_error != CppError_t::SUCCESS){
         m_error_function(m_error);
       }
     }
@@ -37,22 +37,22 @@ class DicomNodeRunner {
 
   template<typename F>
     requires std::invocable<F> &&
-             std::same_as<std::invoke_result_t<F>, dicomNodeError_t>
+             std::same_as<std::invoke_result_t<F>, CppError_t>
   DicomNodeRunner& operator|(F&& func){
-    if(m_error == dicomNodeError_t::SUCCESS){
+    if(m_error == CppError_t::SUCCESS){
       m_error = func();
-      if(m_error != dicomNodeError_t::SUCCESS){
+      if(m_error != CppError_t::SUCCESS){
         m_error_function(m_error);
       }
     }
     return *this;
   }
 
-  dicomNodeError_t error() const {
+  CppError_t error() const {
     return m_error;
   }
 
   private:
-    std::function<void(dicomNodeError_t)> m_error_function;
-    dicomNodeError_t m_error = dicomNodeError_t::SUCCESS;
+    std::function<void(CppError_t)> m_error_function;
+    CppError_t m_error = CppError_t::SUCCESS;
 };

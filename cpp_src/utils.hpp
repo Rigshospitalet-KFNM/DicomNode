@@ -7,7 +7,7 @@
 #include"core/core.hpp"
 
 namespace dicomnode {
-inline dicomNodeError_t is_instance(
+inline CppError_t is_instance(
   const pybind11::object& python_object,
   const char* module_name,
   const char* instance_type){
@@ -15,12 +15,12 @@ inline dicomNodeError_t is_instance(
   const pybind11::object& class_ = module_.attr(instance_type);
 
   if(!pybind11::isinstance(python_object, class_)) {
-    return dicomNodeError_t::INPUT_TYPE_ERROR;
+    return CppError_t::INPUT_TYPE_ERROR;
   }
-  return dicomNodeError_t::SUCCESS;
+  return CppError_t::SUCCESS;
 }
 
-inline dicomNodeError_t check_buffer_pointers(
+inline CppError_t check_buffer_pointers(
   const pybind11::buffer_info& buffer, const size_t elements
 ){
   if (buffer.ptr == nullptr) {
@@ -32,12 +32,12 @@ inline dicomNodeError_t check_buffer_pointers(
     return INPUT_SIZE_MISMATCH;
   }
 
-  return dicomNodeError_t::SUCCESS;
+  return CppError_t::SUCCESS;
 }
 
 
 template<typename T>
-dicomNodeError_t get_python_buffer_pointer(
+CppError_t get_python_buffer_pointer(
   const pybind11::object& obj,
   const char* attr,
   const size_t expected_size,
@@ -61,7 +61,7 @@ dicomNodeError_t get_python_buffer_pointer(
 }
 
 template<u8 DIM>
-dicomNodeError_t load_space(
+CppError_t load_space(
   const pybind11::object& python_space,
   Space<DIM>& space
 ){

@@ -45,10 +45,10 @@ def resample(source: ImageContainerType,
 
   if CUDA:
     from dicomnode.math import _cuda
-    success, interpolated =  _cuda.interpolation.linear(source, target)
+    error, interpolated =  _cuda.interpolation.linear(source, target)
 
-    if str(success) != "Success":
-      raise Exception(f"Cpp code encountered a lower level exception: {success}")
+    if error:
+      raise Exception(f"Cpp code encountered a lower level exception: {error}")
 
     return Image(interpolated, target)
   else:
@@ -72,9 +72,9 @@ def cpu_interpolate(source: Image, target: Space):
       _type_: _description_
   """
 
-  success, interpolated = _cpp.interpolation.linear(source, target)
+  error, interpolated = _cpp.interpolation.linear(source, target)
 
-  if str(success) != "Success":
-    raise Exception(f"Cpp code encountered a lower level exception: {success}")
+  if error:
+    raise Exception(f"Cpp code encountered a lower level exception: {error}")
 
   return Image(interpolated, target)
