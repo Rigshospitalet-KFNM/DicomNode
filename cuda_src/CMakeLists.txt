@@ -48,6 +48,7 @@ function(add_cuda_library name source)
     PRIVATE
     <pybind11/pybind11.h>
     <pybind11/numpy.h>
+    "gpu_code/core/core.cuh"
   )
 endfunction()
 
@@ -68,6 +69,13 @@ if(CMAKE_CUDA_COMPILER)
   target_compile_options(utilities PRIVATE -O3)
   target_compile_options(utilities PRIVATE -Wno-deprecated-gpu-targets)
   set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_precompile_headers(
+    utilities
+    PRIVATE
+    <pybind11/pybind11.h>
+    <pybind11/numpy.h>
+    "gpu_code/core/core.cuh"
+  )
 
   set(CUDA_LIBRARIES
     bounding_box python/python_bounding_box.cu
@@ -102,6 +110,7 @@ if(CMAKE_CUDA_COMPILER)
     PRIVATE
     <pybind11/pybind11.h>
     <pybind11/numpy.h>
+    "gpu_code/core/core.cuh"
   )
 
   # In debug create tests:
