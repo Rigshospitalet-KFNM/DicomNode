@@ -7,6 +7,7 @@
 #include"core/core.hpp"
 
 namespace dicomnode {
+
 inline CppError_t is_instance(
   const pybind11::object& python_object,
   const char* module_name,

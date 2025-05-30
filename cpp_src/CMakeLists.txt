@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 project(dicomnode_c LANGUAGES CXX)
 
+
+message("Building with ${CMAKE_VERSION}")
+
+if(CMAKE_VERSION GREATER_EQUAL "3.28")
+  SET(CMAKE_CXX_SCAN_FOR_MODULES FALSE)
+endif()
+
 include(ProcessorCount)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -20,6 +27,7 @@ endif()
 set(VERSION_INFO 0.0.1)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 include(FetchContent)
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
@@ -42,7 +50,7 @@ find_package(pybind11 REQUIRED)
 
 function(add_cpp_library name source)
   add_library(${name} OBJECT ${source})
-  target_link_libraries(${name} PRIVATE pybind11::module Python::Python utilities)
+  target_link_libraries(${name} PRIVATE pybind11::module Python::Python)
   target_precompile_headers(
     ${name}
     PRIVATE
@@ -50,7 +58,7 @@ function(add_cpp_library name source)
     <pybind11/numpy.h>
   )
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
-  target_compile_options(${name} PRIVATE -g -Wall -Wextra)
+  target_compile_options(${name} PRIVATE -O3 -Wall -Wextra)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endfunction()
 
@@ -75,6 +83,8 @@ pybind11_add_module(
   python_entry_point.cpp
   ${CPP_OBJECT_TARGETS}
 )
+
+message(${CPP_OBJECT_TARGETS})
 
 target_compile_options(_cpp PRIVATE -g -Wall -Wextra)
 

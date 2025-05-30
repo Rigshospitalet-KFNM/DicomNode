@@ -11,7 +11,6 @@
 
 #include<string>
 
-
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 
@@ -23,7 +22,7 @@ PYBIND11_MODULE(_cpp, m){
   m.doc() = "Low level module with CPU code";
 
   pybind11::class_<CppError_t>(m, "CppError")
-    .def("__bool__",[](const CppError_t& error){
+    .def("__bool__", [](const CppError_t& error){
       return error != SUCCESS;
     })
     .def("__str__", [](const CppError_t& error){
