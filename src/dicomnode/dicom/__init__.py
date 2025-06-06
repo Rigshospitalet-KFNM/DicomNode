@@ -16,7 +16,7 @@ from pydicom.uid import UID, generate_uid, ImplicitVRLittleEndian, ExplicitVRBig
 from pydicom.valuerep import PersonName
 
 # Dicomnode packages
-from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION
+from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION, DICOMNODE_PRIVATE_TAG_HEADER
 from dicomnode.lib.exceptions import InvalidDataset, MissingDatasets
 
 PRIVATIZATION_VERSION = 1
@@ -26,10 +26,8 @@ PRIVATIZATION_VERSION = 1
 
 
 class Reserved_Tags(Enum):
-  PRIVATE_TAG_NAMES = 0xFD
-  PRIVATE_TAG_VRS = 0xFE
-  PRIVATE_TAG_VM = 0xFF
-
+  PRIVATE_TAG_NAMES = 0xFE
+  PRIVATE_TAG_VRS = 0xFF
 
 def gen_uid() -> UID:
   """Generates a Unique identifier with Dicomnode's UID prefix
@@ -38,6 +36,16 @@ def gen_uid() -> UID:
       UID: A Unique identifier with Dicomnode's prefix.
   """
   return generate_uid(prefix=DICOMNODE_IMPLEMENTATION_UID + '.')
+
+def get_private_group_id(tag: BaseTag | int):
+  return (tag & 0xFFFF0000) + ((tag >> 8) & 0xFF)
+
+def get_private_group_tag(tag: BaseTag | int):
+  return tag & 0xFFFFFF00
+
+def is_private_group_tag(tag: BaseTag | int):
+  return 0x0001_0000 & tag and not tag & 0xFF00
+
 
 def make_meta(dicom: Dataset) -> None:
   """Similar to fix_meta_info method, however UID are generated with dicomnodes prefix instead
@@ -153,7 +161,7 @@ def extrapolate_image_position_patient(
     image_orientation[0] * image_orientation[4] - image_orientation[1] * image_orientation[3],
   ])
 
-  position = [numpy.array(initial_position) + (slice_num - image_number) * cross_vector for slice_num in numpy.arange(0, slices, 1, dtype=numpy.float64)]
+  position = [numpy.array(initial_position) + (slice_num - (image_number - 1)) * cross_vector for slice_num in numpy.arange(0, slices, 1, dtype=numpy.float64)]
 
   return [[float(val) for val in pos] for pos in position]
 
@@ -463,6 +471,77 @@ class ComparingDatasets:
       else:
         self._next_tag_2 = None
         return (None, tag_2)
+
+def add_private_tag(dataset: Dataset, data_element: DataElement):
+  if not data_element.is_private:
+    raise ValueError("The data_element is not private tag")
+
+  if is_private_group_tag(data_element.tag):
+    raise ValueError("Group Private tags are automatically, you don't have to add them")
+
+  group_tag = get_private_group_tag(data_element.tag)
+  group_tag_name = group_tag + Reserved_Tags.PRIVATE_TAG_NAMES.value
+  group_tag_VR = group_tag + Reserved_Tags.PRIVATE_TAG_VRS.value
+
+  if data_element.tag == group_tag_name:
+    raise ValueError("Reserved tag collision, This tag is reserved for Private tag names by dicomnode")
+
+  if data_element.tag == group_tag_VR:
+    raise ValueError("Reserved tag collision, This tag is reserved for Private tag VR by dicomnode")
+
+  if group_tag in dataset:
+    group_owner: str = dataset[group_tag].value
+    if not group_owner.startswith("Dicomnode"):
+      raise ValueError("You're trying to add a private to a group that Dicomnode cannot claim ownership over.")
+    if group_owner != DICOMNODE_PRIVATE_TAG_HEADER:
+      raise ValueError("The tag group is owned by a different private tag version than the current one installed in the library")
+  else:
+    dataset.add_new(group_tag, 'LO', DICOMNODE_PRIVATE_TAG_HEADER)
+
+  if group_tag_name in dataset:
+    if dataset[group_tag_name].VM == 1:
+      dataset[group_tag_name].value = [dataset[group_tag_name].value, data_element.name]
+    else:
+      dataset[group_tag_name].value.append(data_element.name)
+  else:
+    dataset.add_new(group_tag_name, 'LO', data_element.name)
+
+  if group_tag_VR in dataset:
+    if dataset[group_tag_VR].VM == 1:
+      dataset[group_tag_VR].value = [dataset[group_tag_VR].value, data_element.VR]
+    else:
+      dataset[group_tag_VR].value.append(data_element.VR)
+  else:
+    dataset.add_new(group_tag_VR, 'LO', data_element.VR)
+
+  dataset.add(data_element)
+
+
+def sanity_check_dataset(dataset: Dataset) -> bool:
+  """_summary_
+
+  Args:
+      dataset (Dataset): _description_
+
+  Returns:
+      bool: _description_
+  """
+  required_tags = [
+    0x0008_0016,
+    0x0008_0018,
+    0x0020_000D,
+    0x0020_000E
+  ]
+
+  def tag_in_dataset(tag):
+    return tag in dataset
+
+  tags_in_dataset = map(tag_in_dataset, required_tags)
+
+  def and_(a, b):
+    return a and b
+
+  return reduce(and_, tags_in_dataset, True)
 
 def print_difference_between_datasets(dataset_1 : Dataset, dataset_2: Dataset):
   for (tag_1, tag_2) in ComparingDatasets(dataset_1, dataset_2):

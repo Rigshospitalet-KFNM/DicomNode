@@ -72,7 +72,7 @@ SERIES_VARYING_TAGS = set([
   0x0020_0032, # ImagePositionPatient
   0x0020_1041, # SliceLocation
   0x0028_0106, # SmallestImagePixelValue
-  0x0028_0106, # LargestImagePixelValue
+  0x0028_0107, # LargestImagePixelValue
   0x0028_1052, # RescaleIntercept
   0x0028_1053, # RescaleSlope
   0x0054_1330, # ImageIndex

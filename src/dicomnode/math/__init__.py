@@ -29,7 +29,7 @@ try:
     CUDA = True
   else:
     CUDA = False
-except ImportError:
+except Exception:
   CUDA = False
 
 from . import _cpp

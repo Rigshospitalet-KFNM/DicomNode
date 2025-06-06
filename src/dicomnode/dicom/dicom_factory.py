@@ -22,8 +22,8 @@ from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
-from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-from dicomnode.dicom import make_meta
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING, DICOMNODE_PRIVATE_TAG_VERSION, DICOMNODE_PRIVATE_TAG_HEADER
+from dicomnode.dicom import make_meta, Reserved_Tags
 from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
@@ -36,8 +36,6 @@ T = TypeVar('T')
 
 TagType: TypeAlias = Union[BaseTag, str, int, Tuple[int,int]]
 
-PRIVATIZATION_VERSION = 1
-
 def get_pivot(datasets: Union[Dataset,Iterable[Dataset]]) -> Optional[Dataset]:
   if isinstance(datasets, Dataset):
     return datasets
@@ -47,9 +45,6 @@ def get_pivot(datasets: Union[Dataset,Iterable[Dataset]]) -> Optional[Dataset]:
     break
   return dataset
 
-class Reserved_Tags(Enum):
-  PRIVATE_TAG_NAMES = 0xFE
-  PRIVATE_TAG_VRS = 0xFF
 
 class VirtualElement(ABC):
   """Represents an element in a blueprint.
@@ -391,7 +386,7 @@ class Blueprint():
       # Check if the Group is allocated
 
       if not group_id in self:
-        self._dict[group_id] = StaticElement[str](group_id, "LO", f"Dicomnode - Private tags version: {PRIVATIZATION_VERSION}")
+        self._dict[group_id] = StaticElement[str](group_id, "LO", DICOMNODE_PRIVATE_TAG_HEADER)
         self._dict[tag_name] = StaticElement[List[str]](tag_name, "LO", [])
         self._dict[tag_VR] = StaticElement[List[str]](tag_VR, "LO", [])
 

@@ -635,8 +635,9 @@ class AbstractPipeline():
       self.logger.error("Attempted to close an closed node")
       return
 
-    while self.dicom_application_entry.active_associations != []: #pragma: no cover
-      sleep(0.005)
+    # Gracefully shutdown is fucking hard...
+    #while self.dicom_application_entry.active_associations != []: #pragma: no cover
+    #  sleep(0.005)
 
     self.dicom_application_entry.shutdown()
     if self.server_thread is not None:
