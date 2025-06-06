@@ -18,12 +18,14 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dimse import send_images, Address
 from dicomnode.lib import logging as dnl
+from dicomnode.lib.utils import spawn_process, spawn_thread
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import NoOutput
 
 # Test helpers
+from tests.helpers import process_thread_check_leak
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 def worker(queue: Queue):
@@ -42,21 +44,20 @@ def worker(queue: Queue):
     logger.info(message)
 
 class LoggingTestcase(DicomnodeTestCase):
-  def test_logging(self):
+  @process_thread_check_leak
+  def test_sample_queue_logging(self):
     queue = Queue()
-    listener = Thread(
-      target=dnl.listener_logger,
-      args=(queue,)
+    listener = spawn_thread(
+      dnl.listener_logger,
+      queue
     )
-    listener.start()
     logger = logging.getLogger(DICOMNODE_PROCESS_LOGGER)
 
     with self.assertLogs(logger) as ctx:
       workers: List[Process] = []
       for i in range(3):
-        worker_process = Process(
-          target=worker,
-          args=(queue,)
+        worker_process = spawn_process(
+          worker, queue, logger=logger, start=False
         )
         workers.append(worker_process)
 
@@ -69,7 +70,8 @@ class LoggingTestcase(DicomnodeTestCase):
       queue.put_nowait(None)
       listener.join()
 
-  def test_logging_end2end(self):
+  @process_thread_check_leak
+  def test_queue_logging_end2end(self):
     test_port = randint(10250, 30000)
 
     class TestInput(AbstractInput):

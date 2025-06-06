@@ -183,6 +183,7 @@ def listener_logger(queue: Queue[Optional[LogRecord]]):
       print(E)
       traceback.print_exc()
       break
+  queue.close()
 
 def close_thread_logger():
   if __queue is not None:

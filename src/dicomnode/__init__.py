@@ -63,15 +63,18 @@ class _LibraryPaths:
     self.set_directory_path('_figure_directory', constants.DICOMNODE_ENV_FIGURE_PATH, constants.DEFAULT_FIGURE_DIRECTORY)
 
   def set_directory_path(self, key: str, environment_key, default):
-    if environment_key in environ:
-      path = Path(environ[environment_key])
-      setattr(self, key, path)
-    else:
-      path = Path(default)
-      setattr(self, key, path)
+    try:
+      if environment_key in environ:
+        path = Path(environ[environment_key])
+        setattr(self, key, path)
+      else:
+        path = Path(default)
+        setattr(self, key, path)
 
-    if not path.exists(): # pragma: no cover
-      path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
+      if not path.exists(): # pragma: no cover
+        path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
+    except PermissionError:
+      setattr(self, key, None)
 
 library_paths = _LibraryPaths()
 """Data class holding various paths used by the library

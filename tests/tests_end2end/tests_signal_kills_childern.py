@@ -17,6 +17,7 @@ from psutil import Process as PS_Process
 from dicomnode.constants import DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom import make_meta, gen_uid
 from dicomnode.dicom.dimse import Address, send_images
+from dicomnode.lib.utils import spawn_process
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import PipelineOutput, NoOutput
@@ -67,8 +68,7 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
       instance = DummyPipeline()
       instance.open(blocking=True)
 
-    victim_process = Process(target=process_function)
-    victim_process.start()
+    victim_process = spawn_process(process_function)
 
     victim_pid = victim_process.pid
     if victim_pid is None:

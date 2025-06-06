@@ -19,19 +19,25 @@ from pydicom.uid import CTImageStorage
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patient
-from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
+from dicomnode.dicom.blueprints import add_UID_tag
+from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint, FunctionalElement, StaticElement, SeriesElement
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.output import FileOutput
+from dicomnode.server.output import FileOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
 
 # Testing packages
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
 
+blueprint = Blueprint([
+  FunctionalElement(0x0008_0016,'UI', add_UID_tag),
+  StaticElement(0x0008_0018, 'UI', CTImageStorage),
+  SeriesElement(0x0020_000D,'UI', add_UID_tag),
+  SeriesElement(0x0020_000E,'UI', add_UID_tag),
 
-blueprint = Blueprint([])
+])
 
 ##### Constants #####
 TEST_AE_TITLE = "NIFTYAE"
@@ -87,9 +93,7 @@ class NiftiNode(AbstractPipeline):
       input_data.datasets[INPUT_KW],
     )
 
-    return FileOutput(
-      [(self.output_dir, series)]
-    )
+    return NoOutput()
 
   def open(self, blocking=True) -> Optional[NoReturn]:
     if not self.output_dir.exists():
@@ -166,4 +170,4 @@ class End2EndNiftiTestCase(TestCase):
       send_images(TEST_AE_TITLE, address, datasets)
       node.close()
 
-    print(captured_logs)
+    #print(captured_logs)

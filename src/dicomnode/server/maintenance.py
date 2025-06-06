@@ -30,7 +30,7 @@ class MaintenanceThread(Thread):
                pipeline_tree: PipelineTree,
                study_expiration_days: int,
                group: None = None,
-               name: Optional[str] = None,
+               name: Optional[str] = "Maintenance",
                args: Iterable[Any] = [],
                kwargs: Optional[Mapping[str, Any]] = None,
                *,

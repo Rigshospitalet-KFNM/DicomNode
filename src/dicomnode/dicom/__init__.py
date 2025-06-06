@@ -479,6 +479,7 @@ def add_private_tag(dataset: Dataset, data_element: DataElement):
   if is_private_group_tag(data_element.tag):
     raise ValueError("Group Private tags are automatically, you don't have to add them")
 
+  tag_group_id = get_private_group_id(data_element.tag)
   group_tag = get_private_group_tag(data_element.tag)
   group_tag_name = group_tag + Reserved_Tags.PRIVATE_TAG_NAMES.value
   group_tag_VR = group_tag + Reserved_Tags.PRIVATE_TAG_VRS.value
@@ -489,14 +490,14 @@ def add_private_tag(dataset: Dataset, data_element: DataElement):
   if data_element.tag == group_tag_VR:
     raise ValueError("Reserved tag collision, This tag is reserved for Private tag VR by dicomnode")
 
-  if group_tag in dataset:
-    group_owner: str = dataset[group_tag].value
+  if tag_group_id in dataset:
+    group_owner: str = dataset[tag_group_id].value
     if not group_owner.startswith("Dicomnode"):
       raise ValueError("You're trying to add a private to a group that Dicomnode cannot claim ownership over.")
     if group_owner != DICOMNODE_PRIVATE_TAG_HEADER:
       raise ValueError("The tag group is owned by a different private tag version than the current one installed in the library")
   else:
-    dataset.add_new(group_tag, 'LO', DICOMNODE_PRIVATE_TAG_HEADER)
+    dataset.add_new(tag_group_id, 'LO', DICOMNODE_PRIVATE_TAG_HEADER)
 
   if group_tag_name in dataset:
     if dataset[group_tag_name].VM == 1:

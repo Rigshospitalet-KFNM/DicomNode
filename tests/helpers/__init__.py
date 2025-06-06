@@ -1,19 +1,16 @@
 # Python standard library
-
-# Third party Packages
-
-# Dicomnode Packages
-
-# Test helpers
-
 import cProfile
-import pstats
+from functools import wraps
+import os
 from logging import Logger
 from pathlib import Path
-from time import perf_counter
+import pstats
+import threading
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional,\
                     Tuple, Type, Union
-import os
+from unittest import TestCase
+
+# Third party Packages
 import numpy
 from pydicom import Dataset
 from pydicom.uid import UID, SecondaryCaptureImageStorage
@@ -21,7 +18,10 @@ from pynetdicom import events
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts, build_context
 from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, StudyRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind, PatientRootQueryRetrieveInformationModelMove  #type: ignore
+from psutil import Process
 
+# Dicomnode Packages
+# Test helpers
 try:
   TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
 except KeyError:
@@ -257,6 +257,28 @@ def get_test_ae(port: int, destination_port:int, logger: Logger, dataset: Option
 def testing_logs():
   """Set or reset logs up for testing"""
   set_logger(None)
+
+def process_thread_check_leak(func):
+  @wraps(func)
+  def wrapper(*args, **kwargs):
+    testcase = args[0]
+
+    if not isinstance(testcase, TestCase):
+      raise TypeError(f"Invalid usage of process_thread_check_leak decorator on {func.__name__}")
+
+    start_threads = threading.enumerate()
+
+    return_value = func(*args, **kwargs)
+
+    end_threads = threading.enumerate()
+
+    for thread in end_threads:
+      if thread not in start_threads:
+        testcase.fail(f"Leaked a thread {thread.name} from {testcase._testMethodName}")
+
+    return return_value
+
+  return wrapper
 
 
 from . import dicomnode_test_case

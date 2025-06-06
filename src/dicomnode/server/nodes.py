@@ -42,6 +42,7 @@ from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
+from dicomnode.lib.utils import spawn_process, spawn_thread
 from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
@@ -464,9 +465,11 @@ class AbstractPipeline():
       self.logger.info(f"Release Event from {released_event.association_ae} did"
                        " not return any input containers to be processed.")
       return
-    process = multiprocessing.Process(target=self._process_entry_point,
-                                      args=(released_event, input_containers))
-    process.start()
+
+    process = spawn_process(
+      self._process_entry_point, released_event, input_containers
+    )
+
     process.join()
     if process.exitcode:
       self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
@@ -651,6 +654,7 @@ class AbstractPipeline():
     self._maintenance_thread.stop()
     self._log_queue.put_nowait(None)
     self._logger_thread.join()
+    self._log_queue.join_thread()
 
     set_writer_handler(self.logger)
 

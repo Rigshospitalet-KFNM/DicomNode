@@ -1,13 +1,13 @@
-"""Functions that doesn't have any strong home place
-
-"""
+"""Functions that doesn't have any strong home place and no dependencies"""
 
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
 from argparse import ArgumentTypeError
+import multiprocessing
+from logging import Logger, getLogger
+import inspect
 from threading import Thread
-from logging import Logger
 from typing import Any, Optional, Type, Union
 
 try:
@@ -139,3 +139,35 @@ def human_readable_byte_count(number_of_bytes: int):
 
   # If less than 1 KB
   return f"{number_of_bytes} bytes"
+
+def spawn_thread(thread_function, *args, name=None, **kwargs):
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger()
+
+  thread = Thread(
+    target=thread_function, args=args, name=name
+  )
+
+  thread.start()
+
+  log_message = f"Spawned Thread {thread.native_id} with {thread_function.__name__} - {name}"
+
+  logger.debug(log_message)
+
+  return thread
+
+def spawn_process(process_function, *args, start=True,name=None, **kwargs):
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger()
+
+  process = multiprocessing.Process(
+    target=process_function, args=args, name=name
+  )
+
+  if start:
+    process.start()
+
+  log_message = f"Spawned Process {process.pid} with {process_function.__name__}"
+  print("")
+
+  logger.debug(log_message)
+
+  return process

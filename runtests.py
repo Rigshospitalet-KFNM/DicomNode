@@ -4,6 +4,8 @@ import argparse
 import os
 import shutil
 import re
+import psutil
+import threading
 from pathlib import Path
 from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
 from typing import  Set,  Union
@@ -77,6 +79,19 @@ if __name__ == "__main__":
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
   result = runner.run(running_suite)
   os.chdir(cwd)
+
+  this_process = psutil.Process()
+
+  print(f"This process has id: {this_process.pid}")
+
+  for process in this_process.children(True):
+    print(f"DEADLOCKED PROCESS! : {process}")
+    # CLICK CLICK MOTHERFUCKER
+    process.terminate()
+
+  for thread in threading.enumerate():
+    if thread.name != "MainThread":
+      print(f"Thread: {thread.name} should have been killed?")
 
   if not args.no_clean_up:
     if tmpDirPath.exists():

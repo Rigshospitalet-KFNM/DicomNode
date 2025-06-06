@@ -22,7 +22,7 @@ class LabelingTestCase(DicomnodeTestCase):
          [0.0,0.0,1.0],
         ]
     ),
-      start_points=numpy.array([1,1,1]),
+      starting_point=numpy.array([1,1,1]),
       domain=numpy.array([3,3,3]))
 
     image = Image(numpy.array([
@@ -80,7 +80,7 @@ class LabelingTestCase(DicomnodeTestCase):
          [0.0,0.0,1.0],
         ]
     ),
-      start_points=numpy.array([1,1,1]),
+      starting_point=numpy.array([1,1,1]),
       domain=numpy.array([3,3,3]))
 
     image = Image(numpy.array([

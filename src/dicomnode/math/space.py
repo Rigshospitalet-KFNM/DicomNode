@@ -36,6 +36,19 @@ def is_positive(num):
 
 
 class Space:
+  """A Space is a 3 dimensional linear space with a starting point and a domain,
+  which represent the coordinate system used describes an image.
+
+  It contains relevant information:
+  * basis - 3x3 basis, note that the vector are not unit vectors
+  * starting_point - The point in space for index (0,0,0)
+  * extent - The values z,y,x such that all indexes (k,j,i) satisfying:
+    0 < i < x, 0 < j < y, 0 < k < z
+    has a image value and all indexes not satisfying this condition do not.
+
+  This class doesn't cover images, with overlapping slices or non uniform slice
+  thickness, which you might encounter.
+  """
   @property
   def reference_space(self):
     return ReferenceSpace.from_space(self)
@@ -61,14 +74,31 @@ class Space:
   def starting_point(self):
     return self._starting_point
 
-  def __init__(self, basis: RawBasisMatrix, start_points, domain):
+  def __init__(self, basis, starting_point, domain):
+    """A Space is a 3 dimensional linear space with a starting point and a domain,
+  which represent the coordinate system used describes an image.
+
+  It contains relevant information:
+  * basis - 3x3 basis, note that the vector are not unit vectors
+  * starting_point - The point in space for index (0,0,0)
+  * extent - The values z,y,x such that all indexes (k,j,i) satisfying:
+    0 < i < x, 0 < j < y, 0 < k < z
+    has a image value and all indexes not satisfying this condition do not.
+
+  This class doesn't cover images, with overlapping slices or non uniform slice
+  thickness, which you might encounter.
+
+    Args:
+      basis : The basis of the space A object convertible to a 3 x 3 numpy matrix.
+      starting_point. : The starting point of the space - An object convertible to a numpy array of shape(3,)
+      extent : z,y,x of the space
+  """
     self._basis = numpy.array(basis, dtype=float32)
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
-    self._starting_point = numpy.array(start_points, dtype=float32)
+    self._starting_point = numpy.array(starting_point, dtype=float32)
     self._extent = numpy.array(domain, dtype=uint32)
 
   def __eq__(self, other):
-
     # This is mostly useful for testing
     if not isinstance(other, Space):
       raise TypeError(f"Compared {other.__class__.__name__} with a space")
