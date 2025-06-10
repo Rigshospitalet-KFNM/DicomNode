@@ -549,6 +549,9 @@ class DicomFactory():
 
     can_copy_instances = len(parent_datasets) == len(image)
 
+    if not can_copy_instances:
+      logger.info(f"Constructing a series of length {len(image)}, but there's only supplied {len(parent_datasets)} datasets!")
+
     series = DicomSeries([Dataset() for _ in image])
 
     for virtual_tag in blueprint:
