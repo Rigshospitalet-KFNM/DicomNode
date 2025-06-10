@@ -216,7 +216,7 @@ class SequenceElement(InstanceVirtualElement):
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     if self._partial_initialized_sequences is None:
       logger.error("You are attempting to produce from an uninitialized sequence element")
-      raise ConstructionFailure
+      raise ConstructionFailure(f"You are attempting to produce from an uninitialized sequence element at tag {self.tag}")
 
     sequence_datasets = []
     for partial_initialized_sequence in self._partial_initialized_sequences:
@@ -287,7 +287,7 @@ class InstanceCopyElement(InstanceVirtualElement):
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
     if instance_environment.instance_dataset is None:
-      raise ConstructionFailure
+      raise ConstructionFailure(f"Unable to construct {self.tag} because there was no reference dataset")
 
     return instance_environment.instance_dataset.get(self.tag,
                                                      DataElement(self.tag, self.VR, None))
