@@ -20,6 +20,10 @@ from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompil
 
 from . import base_classes
 
+def validate_compiler_installed(compiler: base_classes.LaTeXCompilers) -> bool:
+  return _which(compiler.value) is None # pragma: no cover
+
+
 def add_line(container: _Container, *args):
   for arg in args:
     container.append(arg)
@@ -46,11 +50,11 @@ class Report(_Document):
     compiler: base_classes.LaTeXCompilers = base_classes.LaTeXCompilers.DEFAULT
     font: _Optional[str] = None
 
-  def append(self, other):
-    if isinstance(other, base_classes.LaTeXComponent):
-      other.append_to(self)
+  def append(self, item) -> None:
+    if isinstance(item, base_classes.LaTeXComponent):
+      item.append_to(self)
     else:
-      super().append(other)
+      super().append(item)
 
   def __init__(
       self,
@@ -72,7 +76,6 @@ class Report(_Document):
     self.file_name = file_name
     self.__options = options
     if options.compiler == base_classes.LaTeXCompilers.DEFAULT:
-
       # These covers are environment dependant and does therefore not suit well to test coverage :(
       if _DICOMNODE_ENV_FONT in _environ: # pragma: no cover
         # load_font sets self.compiler
@@ -84,7 +87,7 @@ class Report(_Document):
     else:
       self.__compiler = self.__options.compiler # pragma: no cover
 
-    if _which(self.__compiler.value) is None: # pragma: no cover
+    if validate_compiler_installed(self.__compiler): # pragma: no cover
       logger.error(f"{self.__compiler} is not found in PATH, Either install it or update your PATH environment variable")
       if _platform.system() == 'Linux':
         logger.error("Dependant on your Linux distribution you can install the needed compiler with:")
