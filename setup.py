@@ -139,7 +139,7 @@ if shutil.which("nvcc"):
 
 
 setup(name='dicomnode',
-    version='0.0.17',
+    version='0.0.18',
     description='Test',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
