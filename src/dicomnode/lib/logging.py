@@ -169,22 +169,14 @@ def listener_logger(queue: Queue[Optional[LogRecord]]):
   set_writer_handler(logger)
 
   while True:
-    try:
-      record = queue.get()
-      if record is None:
-        break
-      record.name = logger.name
-      logger.handle(record)
-    except IOError:
-      print("Huston we got a IO problem?")
+    record = queue.get()
+    if record is None:
       break
-    except Exception as E:
-      import sys, traceback
-      print(E)
-      traceback.print_exc()
-      break
+    record.name = logger.name
+    logger.handle(record)
   queue.close()
 
 def close_thread_logger():
   if __queue is not None:
     __queue.put_nowait(None)
+    __queue.join_thread()

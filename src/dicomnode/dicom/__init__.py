@@ -490,6 +490,9 @@ def add_private_tag(dataset: Dataset, data_element: DataElement):
   if data_element.tag == group_tag_VR:
     raise ValueError("Reserved tag collision, This tag is reserved for Private tag VR by dicomnode")
 
+  if data_element.tag in dataset:
+    raise ValueError("This tag has already been places inside")
+
   if tag_group_id in dataset:
     group_owner: str = dataset[tag_group_id].value
     if not group_owner.startswith("Dicomnode"):

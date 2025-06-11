@@ -12,6 +12,28 @@ from dicomnode import dicom
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class DicomTests(DicomnodeTestCase):
+  def test_add_private_tag_errors_on_public_tags(self):
+    test_dataset = Dataset()
+    private_de = DataElement(0x0010_0010, 'PN', "HELLO WOLRD")
+    self.assertRaises(ValueError, dicom.add_private_tag, test_dataset, private_de)
+
+    self.assertEqual(len(test_dataset), 0)
+
+  def test_add_private_tag_errors_on_private_group_allocation(self):
+    test_dataset = Dataset()
+    private_de = DataElement(0x1337_0001, 'LO', "DICOMNODE")
+    self.assertRaises(ValueError, dicom.add_private_tag, test_dataset, private_de)
+    self.assertEqual(len(test_dataset), 0)
+
+  def test_add_private_tag_errors_on_reserved_tags(self):
+    test_dataset = Dataset()
+    private_de = DataElement(0x1337_01FE, 'LO', "DICOMNODE")
+    self.assertRaises(ValueError, dicom.add_private_tag, test_dataset, private_de)
+    self.assertEqual(len(test_dataset), 0)
+    private_de = DataElement(0x1337_01FF, 'LO', "DICOMNODE")
+    self.assertRaises(ValueError, dicom.add_private_tag, test_dataset, private_de)
+    self.assertEqual(len(test_dataset), 0)
+
   def test_add_private_tags_to_empty_dataset(self):
     test_dataset = Dataset()
 
@@ -25,15 +47,22 @@ class DicomTests(DicomnodeTestCase):
     self.assertIn(0x1337_01FE, test_dataset)
     self.assertIn(0x1337_01FF, test_dataset)
 
-
-  def test_add_private_tags_group_allocation_fails(self):
+  def test_add_private_tags_adding_multiple_things(self):
     test_dataset = Dataset()
 
-    private_de = DataElement(0x1337_0001, 'LO', "1512")
+    private_de = DataElement(0x1337_0101, 'IS', 1512)
+    private_de = DataElement(0x1337_0102, 'IS', 1512)
+    private_de = DataElement(0x1337_0103, 'IS', 1512)
 
-    self.assertRaises(ValueError, dicom.add_private_tag, test_dataset, private_de)
+    dicom.add_private_tag(test_dataset, private_de)
 
-    self.assertNotIn(private_de.tag, test_dataset)
+    self.assertIn(private_de.tag, test_dataset)
+
+    self.assertIn(0x1337_0001, test_dataset)
+    self.assertIn(0x1337_01FE, test_dataset)
+    self.assertIn(0x1337_01FF, test_dataset)
+
+
 
   def test_is_private_group_tag(self):
     self.assertTrue(dicom.is_private_group_tag(0x1337_0001))

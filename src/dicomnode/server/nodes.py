@@ -639,8 +639,8 @@ class AbstractPipeline():
       return
 
     # Gracefully shutdown is fucking hard...
-    #while self.dicom_application_entry.active_associations != []: #pragma: no cover
-    #  sleep(0.005)
+    while self.dicom_application_entry.active_associations != []: #pragma: no cover
+      sleep(0.005)
 
     self.dicom_application_entry.shutdown()
     if self.server_thread is not None:
