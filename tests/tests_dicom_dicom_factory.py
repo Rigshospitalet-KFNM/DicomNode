@@ -5,13 +5,18 @@ from datetime import datetime, date, time
 from logging import ERROR
 from typing import Any, List, Tuple
 from random import randint
-from unittest import TestCase
+from unittest import TestCase, skipIf
 
 # Third Party Modules
 import numpy
 from pydicom import DataElement, Dataset, Sequence
 from pydicom.tag import Tag
 from pydicom.uid import SecondaryCaptureImageStorage, CTImageStorage
+try:
+  import pdf2image
+  PDF2IMAGE_INSTALLED = True
+except ImportError:
+  PDF2IMAGE_INSTALLED = False
 
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
@@ -467,6 +472,7 @@ class DicomFactoryTestCase(TestCase):
     self.assertRaises(ConstructionFailure, sequence_element.produce,
                       InstanceEnvironment(1, DicomFactory()))
 
+  @skipIf(not PDF2IMAGE_INSTALLED, "Optional dependency required")
   def test_encoding_with_no_dataset_fails(self):
     factory = DicomFactory()
 

@@ -7,35 +7,45 @@ Test results can be found in /tmp/dicomnode
 # Python3 Standard Library imports
 from datetime import datetime as DateTime
 from pathlib import Path
+from typing import Optional
 from unittest import TestCase, skipIf
 
 # Third party imports
 import nibabel
 from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
-from pylatex import NewPage, Section
+from pylatex import NewPage, Section, base_classes
 
 # Dicomnode Imports
 from dicomnode import library_paths
 from dicomnode.lib.io import save_dicom
+from dicomnode.lib.exceptions import InvalidLatexCompiler
 from dicomnode.dicom import generate_uid, make_meta
 from dicomnode.dicom.blueprints import default_report_blueprint
 from dicomnode.dicom.blueprints.secondary_image_report_blueprint import SECONDARY_IMAGE_REPORT_BLUEPRINT
 from dicomnode.dicom.dicom_factory import DicomFactory
-from dicomnode.report import Report
+
+from dicomnode.report import Report, validate_compiler_installed
+from dicomnode.report.base_classes import LaTeXCompilers
 from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 from dicomnode.report.plot.triple_plot import TriplePlot
+
+if validate_compiler_installed(LaTeXCompilers.DEFAULT):
+  SKIP_REPORT_TESTS = True
+else:
+  SKIP_REPORT_TESTS = False
 
 nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz')
 figure_image_path = Path(f"{library_paths.report_data_directory}/report_image.png")
 
 if nifti_path.exists():
-  nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
+  nifti_image: Optional[nibabel.nifti1.Nifti1Image] = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
 else:
   nifti_image = None
 
 class GeneratorTestCase(TestCase):
+  @skipIf(SKIP_REPORT_TESTS, "You do not have a valid Latex compiler")
   def test_empty_report(self):
     test_file = f"{library_paths.report_directory}/test_empty_file"
     report = Report(test_file)
@@ -46,7 +56,7 @@ class GeneratorTestCase(TestCase):
 
     # Assert once there's a stable interface
 
-  @skipIf(not nifti_path.exists() or not figure_image_path.exists(), "Needs an image to plot")
+  @skipIf(SKIP_REPORT_TESTS or not nifti_path.exists() or not figure_image_path.exists(), "Needs an image to plot")
   def test_report(self):
     dataset = Dataset()
 
@@ -111,6 +121,7 @@ class GeneratorTestCase(TestCase):
 
     save_dicom(library_paths.report_directory/'test_report.dcm', encoded_report[0])
 
+  @skipIf(SKIP_REPORT_TESTS, "You do not have a valid Latex compiler")
   def test_encode_report_to_secondary_image_capture(self):
     datasets = [Dataset()]
 

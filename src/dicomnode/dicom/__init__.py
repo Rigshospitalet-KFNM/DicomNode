@@ -305,7 +305,7 @@ def create_dicom_coordinate_system(spacial_reference, rm_shape=None, cm_shape=No
   pixel_size_y = numpy.linalg.norm(vec_y)
   pixel_size_z = numpy.linalg.norm(vec_z)
 
-  orientation = numpy.concat((
+  orientation = numpy.concatenate((
     vec_x / pixel_size_x,
     vec_y / pixel_size_y
   ))
