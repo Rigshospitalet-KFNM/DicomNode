@@ -10,6 +10,7 @@ import shutil
 from typing import Iterable, NoReturn, Optional
 from time import sleep
 from unittest import TestCase
+from sys import stdout
 
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
@@ -17,7 +18,7 @@ from pydicom import Dataset
 from pydicom.uid import CTImageStorage
 
 # Dicomnode packages
-from dicomnode.constants import DICOMNODE_LOGGER_NAME
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patient
 from dicomnode.dicom.blueprints import add_UID_tag
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint, FunctionalElement, StaticElement, SeriesElement
@@ -29,7 +30,9 @@ from dicomnode.server.output import FileOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
 
 # Testing packages
-from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
+from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets,\
+  process_thread_check_leak
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 blueprint = Blueprint([
   FunctionalElement(0x0008_0016,'UI', add_UID_tag),
@@ -72,7 +75,7 @@ class NiftiNode(AbstractPipeline):
 
   # Logging
   log_level = logging.DEBUG
-  log_output = None
+  log_output = 'nifti_end2end'
   log_format = "%(asctime)s %(name)s %(funcName)s %(lineno)s %(levelname)s %(message)s"
 
   ae_title = TEST_AE_TITLE
@@ -93,6 +96,8 @@ class NiftiNode(AbstractPipeline):
       input_data.datasets[INPUT_KW],
     )
 
+    self.logger.debug("Build the thing")
+
     return NoOutput()
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -108,66 +113,67 @@ class NiftiNode(AbstractPipeline):
     return super().close()
 
 
-class End2EndNiftiTestCase(TestCase):
+class End2EndNiftiTestCase(DicomnodeTestCase):
   #@skip("This caused a cascade of bugs")
-  def test_end_to_end_plus(self):
+  @process_thread_check_leak
+  def test_end2end_nifti_plus(self):
     node = NiftiNode()
     port = randint(1025, 65535)
     node.port = port
-    node.open(blocking=False)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, 10):
+      with node.open_cm():
+        with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER, 10):
 
-    address = Address('localhost', port, TEST_AE_TITLE)
-    slices = 50
+          address = Address('localhost', port, TEST_AE_TITLE)
+          slices = 50
+          image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
 
-    image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+          slice_x = 2.0
+          slice_y = 2.0
+          slice_z = 2.0
 
-    slice_x = 2.0
-    slice_y = 2.0
-    slice_z = 2.0
+          rows = 300
+          cols = 400
 
-    rows = 300
-    cols = 400
+          PatientID = "FooBar"
+          datasets = [ ds for ds in generate_numpy_datasets(
+            slices,
+            Rows=rows,
+            Cols=cols,
+            PatientID=PatientID
+          )]
 
-    PatientID = "FooBar"
-    datasets = [ ds for ds in generate_numpy_datasets(slices,
-                                                      Rows=rows,
-                                                      Cols=cols,
-                                                      PatientID=PatientID
-                                                      )]
-    positions = extrapolate_image_position_patient(
-      slice_thickness=slice_z,
-      orientation=1,
-      initial_position=(0.0,0.0,0.0),
-      image_orientation=tuple(image_orientation),
-      image_number=1,
-      slices=slices
-    )
+          positions = extrapolate_image_position_patient(
+            slice_thickness=slice_z,
+            orientation=1,
+            initial_position=(0.0,0.0,0.0),
+            image_orientation=tuple(image_orientation),
+            image_number=1,
+            slices=slices
+          )
 
-    frame_of_reference_uid = gen_uid()
+          frame_of_reference_uid = gen_uid()
 
-    study_date = date(2012,8,3)
-    study_time = time(11,00,00)
+          study_date = date(2012,8,3)
+          study_time = time(11,00,00)
 
-    for i, (dataset, position) in enumerate(zip(datasets, positions)):
-      dataset.InstanceNumber = i + 1
-      dataset.PatientName = "Test^Person^1"
-      dataset.PatientSex = "M"
-      dataset.AccessionNumber = "AccessionNumber"
-      dataset.StudyDate = study_date
-      dataset.StudyTime = study_time
-      dataset.SliceThickness=slice_z
-      dataset.FrameOfReferenceUID = frame_of_reference_uid
-      dataset.PositionReferenceIndicator = None
-      dataset.ImagePositionPatient = position
-      dataset.ImageOrientationPatient = image_orientation
-      dataset.PatientPosition = "FFS"
-      dataset.Modality = "CT"
-      dataset.PixelSpacing = [slice_x,slice_y]
-      dataset.SOPClassUID = CTImageStorage
-      make_meta(dataset)
+          for i, (dataset, position) in enumerate(zip(datasets, positions)):
+            dataset.InstanceNumber = i + 1
+            dataset.PatientName = "Test^Person^1"
+            dataset.PatientSex = "M"
+            dataset.AccessionNumber = "AccessionNumber"
+            dataset.StudyDate = study_date
+            dataset.StudyTime = study_time
+            dataset.SliceThickness=slice_z
+            dataset.FrameOfReferenceUID = frame_of_reference_uid
+            dataset.PositionReferenceIndicator = None
+            dataset.ImagePositionPatient = position
+            dataset.ImageOrientationPatient = image_orientation
+            dataset.PatientPosition = "FFS"
+            dataset.Modality = "CT"
+            dataset.PixelSpacing = [slice_x,slice_y]
+            dataset.SOPClassUID = CTImageStorage
+            make_meta(dataset)
 
-    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
-      send_images(TEST_AE_TITLE, address, datasets)
-      node.close()
-
-    #print(captured_logs)
+          send_images(TEST_AE_TITLE, address, datasets)
+    self.assertEqual(node.data_state.images, 0)

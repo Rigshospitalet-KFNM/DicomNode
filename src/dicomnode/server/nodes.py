@@ -709,6 +709,19 @@ class AbstractPipeline():
       evt_handlers=event_handlers
     )
 
+  class ConnectionContextManager():
+    def __init__(self, node: 'AbstractPipeline'):
+      self.node = node
+
+    def __enter__(self):
+      self.node.open(blocking=False)
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+      self.node.close()
+
+  def open_cm(self):
+    return self.ConnectionContextManager(self)
+
   def get_processing_directory(self, identifier) -> Optional[Path]:
     if self.processing_directory is None:
       return None

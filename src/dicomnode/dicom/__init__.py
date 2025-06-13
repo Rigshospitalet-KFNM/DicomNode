@@ -93,41 +93,9 @@ def get_tag(Tag: int) -> Callable[[Dataset], Any]:
       return None
   return retFunc
 
-def __check_if_tag_is_creator(tag: BaseTag) -> bool:
-  return not(tag & 0xFF00)
-
-def reader_function_version_1(dataset: Dataset, data_element: DataElement):
-  # This is too ensure that the reserved tags remains the same.
-  class Reserved_Tags(Enum):
-    PRIVATE_TAG_NAMES = 0xFD
-    PRIVATE_TAG_VRS = 0xFE
-    PRIVATE_TAG_VM = 0xFF
-
-
-__reader_functions = {
-  1 : reader_function_version_1
-}
 
 def get_dicomnode_creator_header():
   return f"Dicomnode - Private tags version: {PRIVATIZATION_VERSION}"
-
-
-def __get_reader_function(data_element: DataElement) -> Optional[Callable[[Dataset, DataElement], None]]:
-  stringified_value = str(data_element.value)
-  if not stringified_value.startswith("Dicomnode - Private tags version: "):
-    return None
-
-  _, version_str = stringified_value.split("Dicomnode - Private tags version: ")
-
-  return __reader_functions.get(int(version_str), None)
-
-
-def refresh_dataset_dict(dataset: Dataset):
-  for data_element in dataset:
-    if data_element.is_private and __check_if_tag_is_creator(data_element.tag):
-      read_function  = __get_reader_function(data_element)
-      if read_function is not None:
-        read_function(dataset, data_element)
 
 
 def extrapolate_image_position_patient(
@@ -281,7 +249,7 @@ def create_dicom_coordinate_system(spacial_reference, rm_shape=None, cm_shape=No
     starting_point = spacial_reference.affine[:3, 3]
     extent = tuple(reversed(spacial_reference.shape))
 
-  elif isinstance(spacial_reference, numpy.ndarray) and (rm_shape is not None and cm_shape is not None):
+  elif isinstance(spacial_reference, numpy.ndarray) and (rm_shape is not None or cm_shape is not None):
     if rm_shape is not None and cm_shape is not None:
       raise TypeError("You shouldn't pass both a shape and ww_shape")
 
@@ -292,10 +260,11 @@ def create_dicom_coordinate_system(spacial_reference, rm_shape=None, cm_shape=No
     vec_y = spacial_reference[1,:3]
     vec_z = spacial_reference[2,:3]
     starting_point = spacial_reference[:3, 3]
-    if cm_shape is None:
-      extent = tuple(reversed(spacial_reference.shape))
+    if cm_shape is not None:
+      extent = tuple(reversed(cm_shape))
     else:
       extent = rm_shape
+
   else:
     raise TypeError(f"Unable able create dicom positions from {spacial_reference} of type: {type(spacial_reference)}")
 
@@ -497,7 +466,7 @@ def add_private_tag(dataset: Dataset, data_element: DataElement):
     group_owner: str = dataset[tag_group_id].value
     if not group_owner.startswith("Dicomnode"):
       raise ValueError("You're trying to add a private to a group that Dicomnode cannot claim ownership over.")
-    if group_owner != DICOMNODE_PRIVATE_TAG_HEADER:
+    if group_owner != get_dicomnode_creator_header():
       raise ValueError("The tag group is owned by a different private tag version than the current one installed in the library")
   else:
     dataset.add_new(tag_group_id, 'LO', DICOMNODE_PRIVATE_TAG_HEADER)
@@ -519,7 +488,6 @@ def add_private_tag(dataset: Dataset, data_element: DataElement):
     dataset.add_new(group_tag_VR, 'LO', data_element.VR)
 
   dataset.add(data_element)
-
 
 def sanity_check_dataset(dataset: Dataset) -> bool:
   """_summary_
@@ -547,12 +515,17 @@ def sanity_check_dataset(dataset: Dataset) -> bool:
 
   return reduce(and_, tags_in_dataset, True)
 
-def print_difference_between_datasets(dataset_1 : Dataset, dataset_2: Dataset):
+def print_difference_between_datasets(
+    dataset_1 : Dataset,
+    dataset_2: Dataset,
+    print_function=print
+  ):
+
   for (tag_1, tag_2) in ComparingDatasets(dataset_1, dataset_2):
     if tag_1 is None and tag_2 is not None:
-      print(f"Missing {tag_2.tag} from the first dataset")
+      print_function(f"Missing {tag_2.tag} from the first dataset")
     elif tag_2 is None and tag_1 is not None:
-      print(f"Missing {tag_1.tag} from the second dataset")
+      print_function(f"Missing {tag_1.tag} from the second dataset")
 
 from . import anonymization
 from . import blueprints
@@ -567,7 +540,6 @@ __all__ = [
   'make_meta',
   'get_tag',
   'get_dicomnode_creator_header',
-  'refresh_dataset_dict',
   'extrapolate_image_position_patient_dataset',
   'format_from_patient_name_str',
   'format_from_patient_name',
