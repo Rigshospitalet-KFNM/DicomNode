@@ -10,9 +10,6 @@ import shutil
 # is included from pyproject.toml
 import pybind11
 
-print(f"From setup - {pybind11.get_cmake_dir()}")
-
-
 # Third party Tools
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
@@ -114,9 +111,22 @@ class CMakeBuild(build_ext):
         # Set CMAKE_BUILD_PARALLEL_LEVEL to control the parallel build level
         # across all generators.
 
-    build_temp = Path(self.build_temp) / ext.name
+
+    build_temp = Path(self.build_temp) / f"{ext.name}_{Path(ext.sourcedir).name}"
+
+    print(f"\n\n\n\n\n{build_temp}\n\n\n\n\n")
     if not build_temp.exists():
       build_temp.mkdir(parents=True)
+
+    cache_file = build_temp / "CMakeCache.txt"
+    if cache_file.exists():
+      with open(cache_file) as f:
+        if str(ext.sourcedir) not in f.read():
+          print("Found cache dir")
+          shutil.rmtree(build_temp)
+          build_temp.mkdir(parents=True)
+
+
 
     try:
       subprocess.run(
@@ -161,7 +171,6 @@ setup(name='dicomnode',
       'pydicom<3.0.0',
       'pynetdicom<3.0.0',
       'psutil>=5.9.2',
-      #'pybind11[global]<4.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
       "nibabel>=5.1.0,<6.0.0",
