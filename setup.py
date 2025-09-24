@@ -7,6 +7,12 @@ import multiprocessing
 from pathlib import Path
 import shutil
 
+# is included from pyproject.toml
+import pybind11
+
+print(f"From setup - {pybind11.get_cmake_dir()}")
+
+
 # Third party Tools
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
@@ -45,6 +51,7 @@ class CMakeBuild(build_ext):
     # from Python.
     cmake_args = [
       f"-DNO_TESTING=True",
+      f"-DCMAKE_PREFIX_PATH={pybind11.get_cmake_dir()}",
       f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}{os.sep}",
       f"-DPYTHON_EXECUTABLE={sys.executable}",
       f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
@@ -154,7 +161,7 @@ setup(name='dicomnode',
       'pydicom<3.0.0',
       'pynetdicom<3.0.0',
       'psutil>=5.9.2',
-      'pybind11[global]>=2.11.1,<3.0.0',
+      #'pybind11[global]<4.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
       "nibabel>=5.1.0,<6.0.0",
