@@ -31,7 +31,7 @@ void print_image(const pybind11::object& python_image){
   free_image(&host_image);
 }
 void apply_cuda_management_module(pybind11::module& m){
-  pybind11::class_<cudaDeviceProp>(m, "DicomnodeDeviceProperties")
+  pybind11::class_<cudaDeviceProp>(m, "DicomnodeDeviceProperties", pybind11::module_local())
     .def_readonly("major", &cudaDeviceProp::major)
     .def_readonly("minor", &cudaDeviceProp::minor)
     .def_readonly("totalGlobalMem", &cudaDeviceProp::totalGlobalMem)
@@ -69,7 +69,7 @@ void apply_cuda_management_module(pybind11::module& m){
       return ss.str();
     });
 
-  pybind11::class_<cudaError_t>(m, "DicomnodeCudaError")
+  pybind11::class_<cudaError_t>(m, "DicomnodeCudaError", pybind11::module_local())
     .def("__int__", [](const cudaError_t& error){
       return static_cast<int>(error);
     })
