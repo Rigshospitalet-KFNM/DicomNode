@@ -18,6 +18,7 @@ import shutil
 
 # Thrid party Packages
 import pydicom
+from pydicom.filewriter import dcmwrite
 from pydicom import Dataset, Sequence
 from pydicom.errors import InvalidDicomError
 from pydicom.values import convert_SQ, convert_string
@@ -170,13 +171,24 @@ def load_dicoms(dicom_path: Path) -> List[Dataset]:
 
 def save_dicom(
     dicom_path: Path,
-    dicom: Dataset
+    dicom: Dataset,
+    overwrite = True
   ):
+  """A method similar to pydicom.dcmwrite, with sane defaults, and creates the
+  directory that the dicom is in, so you don't have to ensure a directory
+  structure is there.
+
+  Args:
+      dicom_path (Path): Path to where you wish to store the dataset
+      dicom (Dataset): The dataset to be saved
+      overwrite(boolean) : If false, then this function will error when
+                           overwritting a file
+  """
   dicom_path = dicom_path.absolute()
   if not dicom_path.parent.exists():
     dicom_path.parent.mkdir(parents=True)
 
-  dicom.save_as(dicom_path, write_like_original=False)
+  dicom.save_as(dicom_path, enforce_file_format=True, overwrite=overwrite)
 
 class TemporaryWorkingDirectory():
   """Creating a temporary directory for work to be done in

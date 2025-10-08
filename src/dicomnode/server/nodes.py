@@ -212,7 +212,11 @@ class AbstractPipeline():
     # 3. Create Server
 
     # logging
-    self._log_queue: MPQueue[Optional[LogRecord]] = MPQueue()
+    if not hasattr(self, '_log_queue'):
+      self._owning_queue = True
+      self._log_queue: MPQueue[Optional[LogRecord]] = MPQueue()
+    else:
+      self._owning_queue = False
     self._setup_logger()
 
     self.__cwd = getcwd()
@@ -652,9 +656,10 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self._maintenance_thread.stop()
-    self._log_queue.put_nowait(None)
-    self._logger_thread.join()
-    self._log_queue.join_thread()
+    if self._owning_queue:
+      self._log_queue.put_nowait(None)
+      self._logger_thread.join()
+      self._log_queue.join_thread()
 
     set_writer_handler(self.logger)
 
@@ -680,12 +685,13 @@ class AbstractPipeline():
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
 
     set_queue_handler(self.logger)
-    self._logger_thread = Thread(
-      target=listener_logger,
-      args=(self._log_queue,),
-      daemon=True
-    )
-    self._logger_thread.start()
+    if self._owning_queue:
+      self._logger_thread = Thread(
+        target=listener_logger,
+        args=(self._log_queue,),
+        daemon=True
+      )
+      self._logger_thread.start()
 
     if self.processing_directory is not None:
       if not self.processing_directory.exists():
@@ -776,7 +782,7 @@ class AbstractPipeline():
     self.logger.critical(f"Killed all subprocesses!")
 
 
-    if signal_ in [signal.SIGTERM, signal.SIGINT]:
+    if signal_ in [signal.SIGTERM, signal.SIGINT] and self._owning_queue:
       self._log_queue.put_nowait(None)
       self._logger_thread.join()
     exit(1)

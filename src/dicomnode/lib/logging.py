@@ -13,6 +13,7 @@ from multiprocessing import Process, current_process
 from multiprocessing.queues import Queue
 from io import TextIOWrapper
 from sys import stdout, stderr
+from os import getpid
 from typing import Optional, Union, TextIO
 from traceback import format_exc
 
@@ -163,17 +164,20 @@ def log_traceback(logger: Logger, exception: Exception, header_message: Optional
   logger.critical(traceback_message)
 
 
-def listener_logger(queue: Queue[Optional[LogRecord]]):
+def listener_logger(queue: Queue[Optional[LogRecord]], logger=None):
   # Do the setup!
-  logger = getLogger(DICOMNODE_PROCESS_LOGGER)
-  set_writer_handler(logger)
+  if logger is None:
+    logger = getLogger(DICOMNODE_PROCESS_LOGGER)
 
+  set_writer_handler(logger)
   while True:
     record = queue.get()
+
     if record is None:
       break
     record.name = logger.name
     logger.handle(record)
+
   queue.close()
 
 def close_thread_logger():

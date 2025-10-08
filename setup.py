@@ -154,10 +154,9 @@ extensions = [
 if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
-
 setup(name='dicomnode',
-    version='0.0.18',
-    description='Test',
+    version='0.0.19',
+    description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
     package_dir={"":"src"},
@@ -168,13 +167,13 @@ setup(name='dicomnode',
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
-      'pydicom<3.0.0',
-      'pynetdicom<3.0.0',
-      'psutil>=5.9.2',
+      'pydicom<4.0.0',
+      'pynetdicom',
+      'psutil',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
       "nibabel>=5.1.0,<6.0.0",
-      "dicom2nifti>=2.4.8,<2.6.0", # They upgraded to pydicom 3
+      "dicom2nifti<3.0.0",
       "rt_utils>=1.2.7,<2.0.0",
       "scipy<2.0.0"
     ],
@@ -183,9 +182,10 @@ setup(name='dicomnode',
      "docs" : ["myst_parser", "sphinx-rtd-theme"],
     },
 
-    python_requires='>=3.10.0',
+    python_requires='>=3.12.0',
     entry_points={
       'console_scripts': [
-      'omnitool=dicomnode.bin.omnitool:entry_func'
-    ]},
+        'omnitool=dicomnode.bin.omnitool:entry_func'
+      ]
+    },
 )

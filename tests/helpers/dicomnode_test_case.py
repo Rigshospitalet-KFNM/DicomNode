@@ -36,11 +36,11 @@ class _CapturingHandler(logging.Handler):
 
 
 class _AssertNonCapturingLogsContext(_BaseTestCaseContext):
-    """A context manager for assertLogs() and assertNoLogs() """
+    """A context manager for assertNonCapturingLogs() and assertNonCapturingNoLogs() """
 
-    LOGGING_FORMAT = "%(levelname)s:%(name)s:%(message)s"
+    LOGGING_FORMAT = "%(process)s - %(levelname)s:%(name)s:%(message)s"
 
-    def __init__(self, test_case, logger_name, level, no_logs):
+    def __init__(self, test_case, logger_name, level, no_logs, raise_error=True):
         _BaseTestCaseContext.__init__(self, test_case)
         self.logger_name = logger_name
         if level:
@@ -49,12 +49,13 @@ class _AssertNonCapturingLogsContext(_BaseTestCaseContext):
             self.level = logging.INFO
         self.msg = None
         self.no_logs = no_logs
+        self.raise_error = raise_error
 
     def __enter__(self):
         if isinstance(self.logger_name, logging.Logger):
-            logger = self.logger = self.logger_name
+          logger = self.logger = self.logger_name
         else:
-            logger = self.logger = logging.getLogger(self.logger_name)
+          logger = self.logger = logging.getLogger(self.logger_name)
         formatter = logging.Formatter(self.LOGGING_FORMAT)
         handler = _CapturingHandler()
         handler.setLevel(self.level)
@@ -81,7 +82,7 @@ class _AssertNonCapturingLogsContext(_BaseTestCaseContext):
 
         if self.no_logs:
             # assertNoLogs
-            if len(self.watcher.records) > 0:
+            if len(self.watcher.records) > 0 and self.raise_error:
                 self._raiseFailure(
                     "Unexpected logs found: {!r}".format(
                         self.watcher.output
@@ -90,7 +91,7 @@ class _AssertNonCapturingLogsContext(_BaseTestCaseContext):
 
         else:
             # assertLogs
-            if len(self.watcher.records) == 0:
+            if len(self.watcher.records) == 0 and self.raise_error:
                 self._raiseFailure(
                     "no logs of level {} or higher triggered on {}"
                     .format(logging.getLevelName(self.level), self.logger.name))
@@ -171,8 +172,8 @@ class DicomnodeTestCase(TestCase):
       msg = self._formatMessage(msg, f"Pattern {safe_repr(regex_1.pattern)} and {safe_repr(regex_2.pattern)} match to the same index")
       self.fail(msg)
 
-  def assertNonCapturingLogs(self, logger, level=logging.DEBUG):
-    return _AssertNonCapturingLogsContext(self, logger, level, no_logs=False)
+  def assertNonCapturingLogs(self, logger, level=logging.DEBUG, raise_error=True):
+    return _AssertNonCapturingLogsContext(self, logger, level, no_logs=False, raise_error=raise_error)
 
-  def assertNonCapturingNoLogs(self, logger, level=logging.DEBUG):
-    return _AssertNonCapturingLogsContext(self, logger, level, no_logs=True)
+  def assertNonCapturingNoLogs(self, logger, level=logging.DEBUG, raise_error=True):
+    return _AssertNonCapturingLogsContext(self, logger, level, no_logs=True, raise_error=raise_error)

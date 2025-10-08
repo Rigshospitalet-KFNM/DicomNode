@@ -90,7 +90,7 @@ if __name__ == "__main__":
     process.terminate()
 
   for thread in threading.enumerate():
-    if thread.name != "MainThread":
+    if thread.name != "MainThread" and thread.is_alive():
       print(f"Thread: {thread.name} should have been killed?")
 
   if not args.no_clean_up:

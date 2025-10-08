@@ -19,16 +19,16 @@ def anonymize_dataset(ds: Dataset, PatientName="Anon", PatientNumber="0000"):
 
   for dataElement in ds:
     vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
-    if type(dataElement.VR) == VR: # The VR might be very wierd
-      vr = str(vr)
-      _, vr = vr.split('.')
+    if not isinstance(vr, VR):
+      vr = VR(vr)
+      dataElement.VR = vr
     if dataElement.tag == BaseTag(0x00100010): # PatientName tag value
       dataElement.value  = f"{PatientName}_{PatientNumber}"
     if dataElement.tag == BaseTag(0x00100020): # PatientID tag value
       dataElement.value  = f"{PatientNumber}"
-    elif vr == "PN":
+    elif vr == VR.PN:
       dataElement.value = "Anon_" + dataElement.name
-    elif vr == "SQ":
+    elif vr == VR.SQ:
       for seq in dataElement:
         anonymize_dataset(seq)
 
@@ -48,30 +48,30 @@ def anonymize_dicom_tree(
   Returns:
       Callable[[Dataset], None]: _description_
   """
-  def retFunc(dataset) -> None:
+  def retFunc(dataset: Dataset) -> None:
     newPatientID = UIDMapping.PatientMapping[dataset.PatientID]
     dataset.PatientID = newPatientID
     PatientNumber = newPatientID[-UIDMapping.prefix_size:]
     if StudyID:
       dataset.StudyID = f"{StudyID}_{PatientNumber}"
 
-    def anon_ds(ds):
+    def anon_ds(ds: Dataset):
       if hasattr(ds, 'file_meta'):
         anon_ds(ds.file_meta)
 
       for dataElement in ds:
         vr = dataElement.VR # The VR of a data set is either a pydicom.valuerep.VR or str
-        if type(dataElement.VR) == VR: # The VR might be very wierd
-          vr = str(vr)
-          _, vr = vr.split('.')
+        if not isinstance(vr, VR): # The VR might be very wierd
+          vr = VR(vr)
+          dataElement.VR = vr
         if dataElement.tag == BaseTag(0x00100010): # PatientName tag value
           dataElement.value  = f"{PatientName}_{PatientNumber}"
-        elif vr == "PN":
+        elif vr == VR.PN:
           dataElement.value = "Anon_" + dataElement.name
-        elif vr == "SQ":
+        elif vr == VR.SQ:
           for seq in dataElement:
             anon_ds(seq)
-        elif vr == "UI":
+        elif vr == VR.UI:
           if newUID := UIDMapping.get_mapping(dataElement.value):
             dataElement.value = newUID
     anon_ds(dataset)

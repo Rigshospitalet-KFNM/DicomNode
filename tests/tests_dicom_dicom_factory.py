@@ -178,7 +178,7 @@ class BlueprintTestCase(TestCase):
 
   def test_static_element_string_conversion(self):
     self.assertEqual(str(StaticElement(0x0010_0010, 'PN',"TestName")),
-                     r"<StaticElement Patient's Name: (0010, 0010) PN TestName>")
+                     r"<StaticElement Patient's Name: (0010,0010) PN TestName>")
 
   def test_corporealialize_copy_from_nothing(self):
     copy = CopyElement(0x0010_0010)

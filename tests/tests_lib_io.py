@@ -6,7 +6,7 @@ from unittest import TestCase
 from pydicom import Dataset, DataElement, Sequence
 from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_sequence, write_data_element
-from pydicom.datadict import DicomDictionary, keyword_dict
+from pydicom.datadict import DicomDictionary, keyword_dict # type: ignore
 
 # Dicomnode packages
 from dicomnode.lib import io
@@ -55,18 +55,26 @@ class lib_io_test_case(TestCase):
     self.assertEqual(ds[self.test_tag_sq][0][self.test_tag], self.test_data_element)
 
   def test_apply_private_tags_unknown_sequence(self):
+    """Tests to that apply private tags updates tags inside of a sequence
+    """
+
+    # Assemble
     ds = Dataset()
     seq_ds = Dataset()
     seq_ds.add_new(self.test_tag, 'UN', self.test_string.encode())
     seq = DataElement(self.test_tag_sq, 'SQ', Sequence([seq_ds]))
     buffer = DicomBytesIO()
-    buffer._little_endian = True
-    buffer._implicit_VR = True
+    buffer.is_little_endian = True
+    buffer.is_implicit_VR = True
     write_sequence(buffer, seq, ["iso8859"])
     buffer.seek(0)
     seq_bytes = buffer.read()
     ds.add_new(self.test_tag_sq, 'UN', seq_bytes)
+
+    # Action
     io.apply_private_tags(ds, self.test_private_tag_dict)
+
+    # Assert
     self.assertEqual(ds[self.test_tag_sq][0][self.test_tag], self.test_data_element)
 
   def test_apply_private_tags_known_tags(self):

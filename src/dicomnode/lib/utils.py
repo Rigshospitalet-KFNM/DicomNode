@@ -7,6 +7,9 @@ from argparse import ArgumentTypeError
 import multiprocessing
 from logging import Logger, getLogger
 import inspect
+import sys
+import io
+from contextlib import contextmanager
 from threading import Thread
 from typing import Any, Optional, Type, Union
 
@@ -65,7 +68,7 @@ class ThreadWithReturnValue(Thread):
       self._return = self._target(*self._args, **self._kwargs) #type: ignore
 
 
-  def join(self, *args):
+  def join(self, *args): #type: ignore
     Thread.join(self, *args)
     return self._return
 
@@ -77,7 +80,8 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
 
   Args:
   """
-  if UNIX and getuid() == root_uid:
+  from os import getuid, setuid
+  if getuid() == root_uid:
     if logger is not None:
       logger.info("Dropping privileges to:")
     setuid(new_user_uid)

@@ -7,7 +7,7 @@ from logging import StreamHandler
 from pathlib import Path
 import shutil
 from sys import stdout
-from typing import List, Dict, Any, Iterator, Callable
+from typing import List, Dict, Any, Iterable, Callable
 from unittest import TestCase
 import datetime
 
@@ -17,6 +17,7 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
@@ -45,12 +46,12 @@ logging.basicConfig(
 logger = logging.getLogger("test_server_pipeline")
 
 class TestGrinder(Grinder):
-  def __call__(self, datasets: Iterator[Dataset]) -> str:
+  def __call__(self, datasets: Iterable[Dataset]) -> str:
     return "GrinderString"
 
 class TestInput1(AbstractInput):
-  required_tags: List[int] = []
-  required_values: Dict[int, Any] = {
+  required_tags = []
+  required_values = {
     0x0008103E : SERIES_DESCRIPTION
   }
 
@@ -58,8 +59,8 @@ class TestInput1(AbstractInput):
     return True
 
 class TestInput2(AbstractInput):
-  required_tags: List[int] = [0x0010_0010]
-  required_values: Dict[int, Any] = {
+  required_tags = [0x0010_0010]
+  required_values = {
     0x0008103E : SERIES_DESCRIPTION
   }
 
@@ -96,20 +97,31 @@ class PipelineTestCase(DicomnodeTestCase):
   def test_add_image(self):
     CPR = "1502799995"
     dataset = Dataset()
-    self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+    self.assertRegexIn("0x100020 not in dataset", captured_logs.output)
+
     dataset.PatientID = CPR
-    self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+    self.assertRegexIn("dataset was rejected from all inputs", captured_logs.output)
+
     dataset.SOPInstanceUID = gen_uid()
     dataset.SeriesDescription = SERIES_DESCRIPTION
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
-    self.pipeline_tree.add_image(dataset)
-    data = self.pipeline_tree.get_patient_input_container(CPR)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG) as captured_logs:
+      self.pipeline_tree.add_image(dataset)
+      data = self.pipeline_tree.get_patient_input_container(CPR)
+
     if data is not None:
       self.assertEqual(data['arg_1'].images, 1)
       self.assertEqual(data['arg_2'], 'GrinderString')
     else:
       raise AssertionError
+
+    self.assertRegexIn(f"Getting Patient node: {CPR}", captured_logs.output)
+
 
   def test_remove_expired_studies(self):
     CPR_1 = "1502799995"
@@ -167,15 +179,21 @@ class PipelineTestCase(DicomnodeTestCase):
     self.pipeline_tree.add_image(dataset_2)
 
     self.assertEqual(self.pipeline_tree.images, 2)
-    self.pipeline_tree.clean_up_patient(CPR_1)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG):
+      self.pipeline_tree.clean_up_patient(CPR_1)
+
+
     self.assertEqual(self.pipeline_tree.images, 1)
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertIn(CPR_2, self.pipeline_tree.data)
-    self.pipeline_tree.clean_up_patient(CPR_2)
+
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG):
+      self.pipeline_tree.clean_up_patient(CPR_2)
+
     self.assertEqual(self.pipeline_tree.images, 0)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)
 
-  def test_remove_patients(self):
+  def test_remove_patients_from_pipeline_tree(self):
     CPR_1 = "1502799995"
     dataset_1 = Dataset()
     dataset_1.PatientID = CPR_1
@@ -202,7 +220,10 @@ class PipelineTestCase(DicomnodeTestCase):
     self.pipeline_tree.add_image(dataset_2)
     self.pipeline_tree.add_image(dataset_3)
 
-    self.pipeline_tree.clean_up_patients([CPR_1, CPR_2])
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG) as logs:
+      self.pipeline_tree.clean_up_patients([CPR_1, CPR_2])
+
+    self.assertRegexIn("Removed 2 of 3 Patients", logs.output)
 
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)
@@ -237,7 +258,7 @@ class PipelineTestCase(DicomnodeTestCase):
 
     self.assertRegexIn("Pipeline Tree - 2 Patients - 40 images total", [str(tree)])
 
-class PatientNodeTestCase(TestCase):
+class PatientNodeTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
     self.options = PatientNode.Options(
@@ -251,21 +272,27 @@ class PatientNodeTestCase(TestCase):
   def tearDown(self) -> None:
     shutil.rmtree(self.path)
 
-  def test_add_image(self):
+  def test_add_image_to_patient_node(self):
     CPR = "1502799995"
     dataset = Dataset()
     # Test 1
-    self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
-    dataset.PatientID = CPR
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
+    self.assertRegexIn("dataset was rejected from all inputs", captured_logs.output)
     # Test 2
-    self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
+    dataset.PatientID = CPR
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      self.assertRaises(InvalidDataset, self.PatientNode.add_image, dataset)
+    self.assertRegexIn("dataset was rejected from all inputs", captured_logs.output)
     dataset.SOPInstanceUID = gen_uid()
     dataset.SeriesDescription = SERIES_DESCRIPTION
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
     # Test 3
-    self.PatientNode.add_image(dataset)
-    data = self.PatientNode.extract_input_container()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG) as captured_logs:
+      self.PatientNode.add_image(dataset)
+      data = self.PatientNode.extract_input_container()
+
     self.assertIsInstance(data, InputContainer)
     self.assertEqual(data['arg_1'].images, 1)
     self.assertEqual(data['arg_2'], 'GrinderString')
