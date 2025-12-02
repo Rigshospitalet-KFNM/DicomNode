@@ -1,4 +1,4 @@
-# Configuration Guide
+# Note Attribute Catalog
 
 This Document provides an overview of the different attributes, method and
 properties, that you can overwrite. Function docstring can be found in the files

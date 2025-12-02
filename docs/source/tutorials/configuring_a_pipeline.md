@@ -160,7 +160,7 @@ that generates a query Dataset and sends a C-FIND to the SCP. We get some
 answers and we pick the studies that we need, and send a C-MOVE for the studies
 we need. The connection closes and we set the Input as filled.
 
-### What went wrong
+### What is going to go wrong:
 
 In the bird eye view we assumed that nothing went wrong and we'll explore what
 can go wrong.
