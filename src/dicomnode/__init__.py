@@ -31,24 +31,35 @@ class _LibraryPaths:
 """
   # These are uninitialzed values
   _processing_directory = Path('.')
+  """"""
+
   _report_directory = Path('.')
+  """Directory that Compiled PDF files will be located at"""
   _report_data_directory = Path('.')
+  """Directory for static files to be used for report compilation"""
+
   _figure_directory = Path('.')
+  """Directory for render figures"""
 
   @property
   def processing_directory(self) -> Path:
+    """Directory for that the dicomnode should process files assume these files gets cleaned up after use"""
+
     return self._processing_directory
 
   @property
   def report_directory(self) -> Path:
+    """Directory that Compiled PDF files will be located at"""
     return self._report_directory
 
   @property
   def report_data_directory(self) -> Path:
+    """Directory for static files to be used for report compilation"""
     return self._report_data_directory
 
   @property
   def figure_directory(self):
+    """Directory for rendered figures to be placed"""
     return self._figure_directory
 
   def __init__(self) -> None:
@@ -75,6 +86,15 @@ class _LibraryPaths:
         path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
     except PermissionError:
       setattr(self, key, None)
+
+  def __str__(self):
+    return "\n".join([
+      str(self._processing_directory),
+      str(self._report_directory),
+      str(self._report_data_directory),
+      str(self._figure_directory),
+    ])
+
 
 library_paths = _LibraryPaths()
 """Data class holding various paths used by the library

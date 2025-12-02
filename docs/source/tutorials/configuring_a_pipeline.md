@@ -97,6 +97,10 @@ In this section I'll refer the **pivot** series to be the dicom series that the
 HistoricAbstractInput uses data from to generate and send it's C-FIND and C-MOVE
 DIMSE messages. The retrieved data will be referred to as **historic** series.
 
+In general it's assumed that the studies we retrieve will go into the historic
+input and not in the normal abstract inputs, while the historic input will only
+contain historic datasets
+
 ### Goal
 
 So inside of your pipeline you would create the following input:
@@ -118,6 +122,8 @@ from pydicom import Dataset
 
     # Where the date is the study date and the string is the series description.
 ```
+
+
 
 ### Assumptions and restrictions
 
@@ -198,3 +204,5 @@ be accepted unless a `enforce_single_study_date` is enabled.
 
 Likewise Historic Input rejects studies with the same study date, as the pivot
 study date.
+
+#### Really dumb series

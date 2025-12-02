@@ -73,7 +73,7 @@ class TestLazyDynamicMissingPathInput(DynamicInput):
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 
 class HistoricInput(HistoricAbstractInput):
-  required_tags: List[int|str] = []
+  required_tags: List[int|str] = ['SOPInstanceUID']
   required_values: Dict[int|str, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }

@@ -9,8 +9,11 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Python standard Library
 from abc import abstractmethod, ABC, ABCMeta
 from dataclasses import dataclass
+from datetime import date
+from enum import Enum
 from logging import Logger
 from pathlib import Path
+from threading import Thread
 from types import UnionType
 from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
 
@@ -81,7 +84,11 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   "A Mapping of tags and associated values, doesn't work for values in sequences"
 
   enforce_single_series = False
+  """Ensures that the input only contains a single series. The first accepted
+  series determines the SeriesUID"""
 
+  enforce_single_study_date = False
+  """Ensures that the input only contains """
 
   image_grinder: Grinder = IdentityGrinder()
   """Grinder for converting stored dicom images
@@ -98,13 +105,15 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     logger: Optional[Logger] = None
     data_directory: Optional[Path]  = None
     lazy: bool = False
-    "Indicate if the Abstract input should use "
+    "Indicate if the Abstract input should keep an ethereal handle to the dataset"
+
 
   def __init__(self,
       options: Options = Options(),
     ):
     super().__init__()
     self.options = options
+    self._study_date: Optional[date] = None # This gets updated by the PatientNode
     "Options for this Abstract input"
 
     self.single_series_uid: Optional[UID] = None
@@ -118,6 +127,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     # Tag for SOPInstance is (0x0008,0018)
     if 0x0008_0018 not in self.required_tags:
+      self.logger.info(f"You should add SOPInstanceUID to required tags for {self.__class__.__name__}")
       self.required_tags.append(0x0008_0018)
 
     if self.path is not None:
@@ -211,7 +221,6 @@ processing, `False` otherwise.
         if required_tag is None:
           raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
 
-
       if required_tag not in dicom:
         #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
@@ -232,6 +241,37 @@ processing, `False` otherwise.
 
     return True
 
+  def _enforce_single_series(self, dicom):
+    if self.enforce_single_series:
+      if 0x0020_000E not in dicom: # 0x0020_000E = Series Instance UID
+        return False
+      if self.single_series_uid is None:
+        self.single_series_uid = dicom[0x0020_000E].value
+      else:
+        if self.single_series_uid != dicom[0x0020_000E].value:
+          return False
+    return True
+
+  def _enforce_date_requirement(self, dicom):
+    if self.enforce_single_study_date:
+      if 0x0008_0020 not in dicom: # 0x0008_0020 = Study Date
+        return False
+      if self._study_date is not None:
+        if self._study_date != dicom.StudyDate:
+          return False
+    return True
+
+  def _state_based_validation(self, dicom: Dataset) -> bool:
+    """Check if a dicom can be accepted based on the state of this object
+
+    Args:
+        dicom (Dataset): Dataset to be checked
+
+    Returns:
+        bool: True if the dataset passes all checks, False if it fails one or more
+    """
+    return self._enforce_single_series(dicom) and self._enforce_date_requirement(dicom)
+
   def add_image(self, dicom: Dataset) -> int:
     """Attempts to add an image to the input.
 
@@ -247,14 +287,8 @@ processing, `False` otherwise.
     if not self.validate_image(dicom):
       raise InvalidDataset
 
-    if self.enforce_single_series:
-      if 0x0020_000E not in dicom: # 0x0020_000E = Series Instance UID
-        raise InvalidDataset
-      if self.single_series_uid is None:
-        self.single_series_uid = dicom[0x0020_000E].value
-      else:
-        if self.single_series_uid != dicom[0x0020_000E].value:
-          raise InvalidDataset
+    if not self._state_based_validation(dicom):
+      raise InvalidDataset
 
     replaced = dicom.SOPInstanceUID.name in self
     # Save the dataset
@@ -274,6 +308,17 @@ processing, `False` otherwise.
     if not replaced:
       self.images += 1
     return 1
+
+  # This is a property because we need to overload the setter in historic input
+
+  @property
+  def study_date(self):
+    return self._study_date
+
+
+  @study_date.setter
+  def study_date(self, value):
+    self._study_date = value
 
   def __str__(self):
     return f"{self.__class__.__name__} - {self.images} images - Valid: {self.validate()}"
@@ -382,11 +427,50 @@ class HistoricAbstractInput(AbstractInput):
   for proper configuration.
 
   """
+
+  class HistoricInputState(Enum):
+    EMPTY = 1
+    FETCHING = 2
+    FILLED = 3
+
   address: Optional[Address] = None
   query_level: Optional[QueryLevels] = None
 
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
+
+    if self.enforce_single_study_date:
+      self.logger.warning(f"In {self.__class__.__name__} enforce_single_study_date have been set, which is redundant for a historic input")
+
+    self.historic_dataset: Dict[date, Dict[str, List[Dataset]]] = {}
+    self.state = HistoricAbstractInput.HistoricInputState.EMPTY
+
+  def _enforce_date_requirement(self, dicom: Dataset):
+    if self._study_date is None: # If study date have not been set yet
+      return False
+
+    if 'StudyDate' not in dicom:
+      return False
+
+    if self._study_date < dicom.StudyDate:
+      return False
+
+    return True
+
+  def check_query_dataset(self, dicom) -> Optional[Dataset]:
+    return None
+
+  def thread_target(self, query_data):
+    self.state = HistoricAbstractInput.HistoricInputState.FILLED
+
+  def add_image(self, dicom: Dataset) -> int:
+    if self.state == HistoricAbstractInput.HistoricInputState.EMPTY:
+      if query_dataset := self.check_query_dataset(dicom):
+        self.state = HistoricAbstractInput.HistoricInputState.FETCHING
+        self.thread = Thread(group=None, target=self.thread_target, args=(self, query_dataset))
+
+      return 0
+    return 0
 
 
 

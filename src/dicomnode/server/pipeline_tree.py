@@ -8,7 +8,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
 from logging import Logger
 from pathlib import Path
 import shutil
@@ -97,6 +97,7 @@ class PatientNode(ImageTreeInterface):
     super().__init__()
     self.options = options
     self.creation_time = datetime.now()
+    self.study_date = None
 
     if self.options.container_path is not None:
       if self.options.container_path.is_file():
@@ -196,7 +197,9 @@ class PatientNode(ImageTreeInterface):
     if added == 0:
       self.logger.info("dataset was rejected from all inputs")
       raise InvalidDataset()
-    self.images += added
+    if self.study_date is not None and 'StudyDate' in dicom:
+      self._patch_study_date_for_inputs(dicom.StudyDate)
+    self.images += added # This is not true, because of replacement
     return added
 
   def _get_input_options(self, dicomnode_input: Type[AbstractInput], input_path: Optional[Path]):
@@ -206,6 +209,27 @@ class PatientNode(ImageTreeInterface):
         logger=self.options.logger,
         lazy=self.options.lazy
       )
+
+  def _patch_study_date_for_inputs(self, patch_date: date):
+    if self.study_date is not None:
+      return
+
+    self.study_date = patch_date
+
+    for dicomnode_input in self.data.values():
+      if isinstance(dicomnode_input, AbstractInput):
+        dicomnode_input._study_date = patch_date
+      else:
+        raise InvalidTreeNode()
+
+  @property
+  def stored_images(self) -> int:
+    images = 0
+    for dicomnode_input in self.data.values():
+      if isinstance(dicomnode_input, AbstractInput):
+        images += dicomnode_input.images
+
+    return images
 
   def __str__(self):
     sub_strings = [f"PatientNode created at {self.creation_time}"] + [f"  {input_}" for input_ in self.data.values()]

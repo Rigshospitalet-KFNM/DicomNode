@@ -31,7 +31,7 @@ from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 from dicomnode.report.plot.triple_plot import TriplePlot
 
-if validate_compiler_installed(LaTeXCompilers.DEFAULT):
+if validate_compiler_installed(LaTeXCompilers.XELATEX):
   SKIP_REPORT_TESTS = True
 else:
   SKIP_REPORT_TESTS = False
@@ -56,7 +56,7 @@ class GeneratorTestCase(TestCase):
 
     # Assert once there's a stable interface
 
-  @skipIf(SKIP_REPORT_TESTS or not nifti_path.exists() or not figure_image_path.exists(), "Needs an image to plot")
+  @skipIf(SKIP_REPORT_TESTS or not nifti_path.exists() or not figure_image_path.exists(), f"Needs an image to plot - Valid compiler: {SKIP_REPORT_TESTS} - {nifti_path} exists: { nifti_path.exists()} - {figure_image_path} exists: {figure_image_path.exists()}")
   def test_report(self):
     dataset = Dataset()
 

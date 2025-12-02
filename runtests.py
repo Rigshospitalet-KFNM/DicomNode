@@ -12,7 +12,8 @@ from typing import  Set,  Union
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
-# DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing
+os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = os.getcwd() + "/report_data"
+# DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing DICOMNODE
 
 from tests.helpers import testing_logs
 

@@ -11,9 +11,10 @@ from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.server.output import DicomOutput, FileOutput, MultiOutput,\
   NoOutput
 from tests.helpers import get_test_ae
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 
-class OutputTests(TestCase):
+class OutputTests(DicomnodeTestCase):
   def setUp(self) -> None:
     self.path = Path(self._testMethodName)
     self.path.mkdir()
@@ -57,10 +58,14 @@ class OutputTests(TestCase):
 
   def test_dicom_output_send_failure(self):
     address = Address('localhost', 150, "WrongAE")
-    with self.assertLogs("dicomnode", logging.DEBUG) as cm:
-      output = DicomOutput([(address, self.datasets)], "PIPELINE_AE")
-      self.assertFalse(output.send())
-    self.assertIn("ERROR:dicomnode:Could not send to images to WrongAE", cm.output)
+    with self.assertLogs("pynetdicom", logging.ERROR) as pynetdicom_logs:
+      with self.assertLogs("dicomnode", logging.DEBUG) as cm:
+        output = DicomOutput([(address, self.datasets)], "PIPELINE_AE")
+        self.assertFalse(output.send())
+      self.assertIn("ERROR:dicomnode:Could not send to images to WrongAE", cm.output)
+
+    self.assertRegexIn("Association request failed: unable to connect to remote", pynetdicom_logs.output)
+    self.assertRegexIn("TCP Initialisation Error: [Errno 111] Connection refused", pynetdicom_logs.output)
 
   def test_dicom_output_multi_output(self):
     output = MultiOutput([

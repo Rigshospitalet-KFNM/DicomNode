@@ -16,12 +16,12 @@ from typing import Any, List, Iterable, Tuple, Callable
 from pydicom import Dataset
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.logging import get_logger
 
-logger = get_logger()
 
 class PipelineOutput(ABC):
   """Base Class for pipeline outputs.
@@ -70,6 +70,8 @@ class DicomOutput(PipelineOutput):
 
   def send(self) -> bool:
     success = True
+    logger = get_logger()
+
     for address, datasets in self:
       datasets_list = [dataset for dataset in datasets]
       try:
