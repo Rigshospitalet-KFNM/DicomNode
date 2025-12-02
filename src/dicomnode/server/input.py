@@ -374,48 +374,24 @@ class DynamicInput(AbstractInput):
 
 
 class HistoricAbstractInput(AbstractInput):
-  """This input sends a DIMSE C-MOVE to location on creation
+  """This Input retrieves historic datasets based on the first dataset that this
+  input accepts.
 
-  An Example could be that your node receives a pet image, then this input can
-  fetch some CT stored at some database.
+  As there quite a few pitfalls with this Input, Please read:
+  https://dicomnode.readthedocs.io/en/latest/tutorials/configuring_a_pipeline.html#historic-inputs
+  for proper configuration.
 
-  Raises:
-      IncorrectlyConfigured: _description_
-      IncorrectlyConfigured: _description_
-      IncorrectlyConfigured: _description_
-      IncorrectlyConfigured: _description_
-      IncorrectlyConfigured: _description_
   """
-
   address: Optional[Address] = None
   query_level: Optional[QueryLevels] = None
 
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
-    self.send_historic_message = False # To do lock it
-    if self.address is None or self.query_level is None:
-      raise IncorrectlyConfigured("Historic datasets needs an Address and query level defined")
 
-  @abstractmethod
-  def get_message_dataset(self, added_dataset: Dataset) -> Dataset:
-    raise NotImplemented # pragma: type ignore
 
-  def add_image(self, dataset: Dataset) -> int:
-    images = super().add_image(dataset)
 
-    if not self.send_historic_message and 0 < images:
-      self.send_historic_message = True
-      message = self.get_message_dataset(dataset)
-      if self.options.ae_title is None and self.address is None:
-        raise IncorrectlyConfigured
 
-      send_move_thread(
-        SCU_AE=self.options.ae_title,
-        address=self.address,
-        dataset=message,
-      )
 
-    return 1
 
 
 class AbstractInputProxy(AbstractInput):

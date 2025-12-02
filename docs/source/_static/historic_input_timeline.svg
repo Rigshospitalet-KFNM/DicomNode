@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <rect width="30" height="30" stroke="black" fill="transparent" x="10" y="10"/>
+  <rect width="30" height="30" stroke="black" fill="transparent" x="10" y="75"/>
+  <rect width="30" height="30" stroke="black" fill="transparent" x="75" y="10"/>
+  <rect width="30" height="30" stroke="black" fill="transparent" x="75" y="75"/>
+
+<text x="16" y="26" font-size="3"> A) Source </text>
+<text x="79" y="26" font-size="3"> B) Dicomnode </text>
+<text x="19" y="91" font-size="3"> C) SCP </text>
+<text x="77" y="91" font-size="3"> D) Destination </text>
+
+<polygon points="72 12 74.5 15 72 18" fill="green" />
+<polygon points="25 75 25 71 29 75" fill="green" />
+<polygon points="82 40 78 41 82 44" fill="green" />
+<polygon points="100 74.5 97 72 103 72" fill="green" />
+
+<path d="m 40 15 l 32 0" stroke="green" />
+<path d="m 75 25 l -48 48" stroke="green" />
+<path d="m 40 83 l 41.5 -42.5" stroke="green" />
+<path d="m 100 40.5 l 0 32.5" stroke="green" />
+
+
+<text x="41" y="12" font-size="3"> 1. Initial transfer </text>
+<text x="6" y="56" font-size="3" > 2. C-FIND and C-MOVE  </text>
+<text x="55" y="73" font-size="3"> 3. C-STORE </text>
+<text x="77" y="59" font-size="3"> 4. Response </text>
+
+</svg>

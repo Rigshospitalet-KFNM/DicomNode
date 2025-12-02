@@ -114,7 +114,6 @@ class CMakeBuild(build_ext):
 
     build_temp = Path(self.build_temp) / f"{ext.name}_{Path(ext.sourcedir).name}"
 
-    print(f"\n\n\n\n\n{build_temp}\n\n\n\n\n")
     if not build_temp.exists():
       build_temp.mkdir(parents=True)
 
@@ -168,13 +167,13 @@ setup(name='dicomnode',
     install_requires=[
       'sortedcontainers>=2.4.0',
       'pydicom<4.0.0',
-      'pynetdicom',
-      'psutil',
+      'pynetdicom<4.0.0',
+      'psutil<8.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
       'pylatex[matrices, matplotlib]',
-      "nibabel>=5.1.0,<6.0.0",
-      "dicom2nifti<3.0.0",
-      "rt_utils>=1.2.7,<2.0.0",
+      "nibabel<6.0.0",
+      "dicom2nifti",
+      "rt_utils<2.0.0",
       "scipy<2.0.0"
     ],
     extras_require = {

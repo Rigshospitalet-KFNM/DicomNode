@@ -83,3 +83,118 @@ The logger is injected into most sub-libraries.
 ## Customizing outputs
 
 Sometimes you want to create a report supplementing an image series or you want to send data over some other form communication protocol. In that case you need to start customizing the output
+
+
+## Historic Inputs
+
+Sometimes you want historic images to compare against the current image.
+Dicomnode has a build-in for just that:
+`dicomnode.server.input.HistoricAbstractInput`. However sadly this is not plug
+and play solution as many things can go wrong. Hence this is why it has it own
+section. So please read this section carefully.
+
+In this section I'll refer the **pivot** series to be the dicom series that the
+HistoricAbstractInput uses data from to generate and send it's C-FIND and C-MOVE
+DIMSE messages. The retrieved data will be referred to as **historic** series.
+
+### Goal
+
+So inside of your pipeline you would create the following input:
+
+```python
+from datetime import date
+from typing import Dict
+from pydicom import Dataset
+
+  ... # Rest of the Dicomnode node configuration:
+  input = {
+    "SERIES_TYPE_1" : SERIES_1_INPUT, # Abstract Input Subtype
+    "SERIES_TYPE_2" : SERIES_2_INPUT # Abstract Input Subtype
+    "HISTORIC"      : HISTORIC_INPUT # Historic Abstract Input Sub type
+  }
+
+  def process(input_container):
+    historic: Dict[date, Dict[str, Dataset]] = input_container["HISTORIC"]
+
+    # Where the date is the study date and the string is the series description.
+```
+
+### Assumptions and restrictions
+
+This components requires a lot of moving parts to work together, which in turn
+impose restrictions:
+
+* All datasets have the 0x0008_0020 `StudyDate` Attribute and all historic
+  Series have the `SeriesDescription` Attribute
+* All non historic input datasets have the same `StudyDate`
+* Patients do not have two historic studies on the same day
+* You have configured another SCP to accept C-FIND, C-MOVE from the node. In
+  normal lingo: The Dicomnode you create must be able to retrieve dicom datasets
+* You can retrieve all the data you need over a single association, and a single
+  C-FIND, but multiple C-MOVE's
+* The Pipeline is configured such that the `PipelineTree` batch historic and
+  current studies. (You didn't change `patient_identifier_tag` node attribute
+  to StudyInstanceUID as example)
+
+If these Assumption or restrictions are backbreaking - Send patches with the
+wine.
+
+### A birds eye view of `HistoricAbstractInput`
+
+A historic input has three different states. Empty, Fetching, Filled
+
+* **Empty** - The Input is initialized, but doesn't know which patient to query
+  for.
+* **Fetching** - The Input have an active association with a SCP
+* **Filled** - The Input have closed it association with the SCP.
+
+Lets get an overview of the entire process with a historic Input:
+
+![Data transfer diagram](../_static/historic_input_timeline.svg)
+
+An external source sends data to our service, and a `PatientContainer` is
+created for our patient with an **Empty** `HistoricInput` and some other inputs
+
+The Historic gets a dataset and, sets it status to **Fetching** spawns a thread,
+that generates a query Dataset and sends a C-FIND to the SCP. We get some
+answers and we pick the studies that we need, and send a C-MOVE for the studies
+we need. The connection closes and we set the Input as filled.
+
+### What went wrong
+
+In the bird eye view we assumed that nothing went wrong and we'll explore what
+can go wrong.
+
+#### Historic data masquerading as current data
+
+If we get historic scans, they will pass the filters that is in place for the
+other inputs. So they'll be filled into our non historic inputs, which is
+problem because they'll overwrite / extend the inputs contents.
+
+To fix this problem you should add `enforce_single_study_date = True` like:
+
+```python
+
+class InputSeries1(AbstractInput)
+  ... # All normal stuff
+
+  enforce_single_study_date = True
+
+class InputSeries2(AbstractInput)
+  ... # All normal stuff
+
+  enforce_single_study_date = True
+
+class HistoricInput(HistoricAbstractInput)
+  ...
+
+```
+This will cause the inputs to reject Datasets with an older study date than the
+first accepted dataset. Note that it's the first globally accepted dataset, that
+determines the pivot study date.
+As a likely error is that creating association only supplies datasets for 1
+input, then the historic association gets datasets for both inputs, that would
+be accepted unless a `enforce_single_study_date` is enabled.
+
+Likewise Historic Input rejects studies with the same study date, as the pivot
+study date.
