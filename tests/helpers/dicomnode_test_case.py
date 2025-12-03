@@ -8,6 +8,8 @@ from unittest import TestCase
 from unittest.case import _BaseTestCaseContext
 from unittest.util import safe_repr
 
+# Dicomnode
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.lib.regex import escape_pattern
 
 RegexAble = Union[Pattern, str]
@@ -98,6 +100,19 @@ class _AssertNonCapturingLogsContext(_BaseTestCaseContext):
 
 
 class DicomnodeTestCase(TestCase):
+  def tearDown(self) -> None:
+    # Clear dicomnode logger:
+    dicomnode_logger = logging.getLogger(DICOMNODE_LOGGER_NAME)
+    for handler in dicomnode_logger.handlers:
+      print(f"test: {self.__class__.__name__}:{self._testMethodName} leaked a dicomnode handler")
+      dicomnode_logger.removeHandler(handler)
+
+    process_logger = logging.getLogger(DICOMNODE_PROCESS_LOGGER)
+    for handler in process_logger.handlers:
+      print(f"test: {self.__class__.__name__}:{self._testMethodName} leaked a process handler")
+      process_logger.removeHandler(handler)
+
+
   def assertRegexIn(self, regex: RegexAble, container: List[str], msg=None):
     if isinstance(regex, str):
       regex = escape_pattern(regex)

@@ -10,6 +10,7 @@ from typing import Iterable, Callable, Optional
 
 # Third party packages
 from pydicom import Dataset, DataElement
+from pydicom.datadict import tag_for_keyword, dictionary_VR
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove # type: ignore
@@ -176,6 +177,60 @@ def send_images(SCU_AE: str,
     raise CouldNotCompleteDIMSEMessage("Could not connect")
   return 0x0000
 
+def validate_query_dataset(dataset: Dataset):
+  if "QueryRetrieveLevel" not in dataset:
+    return False
+
+  if dataset.QueryRetrieveLevel == QueryLevels.PATIENT and 'PatientID' not in dataset:
+    logger.error("Attempted to send a move at Patient level without a PatientID tag")
+    return False
+
+  if dataset.QueryRetrieveLevel == QueryLevels.STUDY and 'StudyInstanceUID' not in dataset:
+    logger.error("Attempted to send a move at Study level without a StudyInstanceUID tag")
+    return False
+
+  if dataset.QueryRetrieveLevel == QueryLevels.SERIES and 'SeriesInstanceUID' not in dataset:
+    logger.error("Attempted to send a move at Series level without a SeriesInstanceUID tag")
+    return False
+
+  return True
+
+def create_query_dataset(query_level=QueryLevels.STUDY, **kwargs):
+  """Generates a dataset that can be send with a C-FIND or a C-MOVE
+
+  Args:
+      query_level (QueryLevels, optional): The query level for the query.
+        Defaults to QueryLevels.STUDY.
+
+  Raises:
+      ValueError: If a keyword doesn't match a Tag
+      InvalidQueryDataset: If the produced dataset isn't valid for a query
+
+  Returns:
+      Dataset: The dataset to be used for query:
+
+  Example:
+  >>> create_query_dataset(query_level="Patient", PatientID="patient_id")
+
+  """
+  dataset = Dataset()
+
+  dataset.QueryRetrieveLevel = query_level.value
+
+  for tag_name, value in kwargs.items():
+    tag = tag_for_keyword(tag_name)
+
+    if tag is None:
+      raise ValueError(f"Keyword: {tag_name} is not a ")
+
+    vr = dictionary_VR(tag)
+    dataset[tag] = DataElement(tag, vr, value)
+
+  if not validate_query_dataset(dataset):
+    raise InvalidQueryDataset
+
+  return dataset
+
 def send_images_thread(
     SCU_AE: str,
     address : Address,
@@ -208,20 +263,11 @@ def send_move(SCU_AE: str,
   Raises:
     InvalidQueryDataset:
   """
-  if "QueryRetrieveLevel" not in dataset:
-    dataset.QueryRetrieveLevel = query_level.value
+  if 'QueryRetrieveLevel' not in dataset:
+    dataset.QueryRetrieveLevel = query_level
 
-  if query_level == QueryLevels.PATIENT and 'PatientID' not in dataset:
-    logger.error("Attempted to send a move at Patient level without a PatientID tag")
-    raise InvalidQueryDataset
-
-  if query_level == QueryLevels.STUDY and 'StudyInstanceUID' not in dataset:
-    logger.error("Attempted to send a move at Study level without a StudyInstanceUID tag")
-    raise InvalidQueryDataset
-
-  if query_level == QueryLevels.SERIES and 'SeriesInstanceUID' not in dataset:
-    logger.error("Attempted to send a move at Series level without a SeriesInstanceUID tag")
-    raise InvalidQueryDataset
+  if not validate_query_dataset(dataset):
+    raise InvalidQueryDataset(f"Incoming Dataset is not valid")
 
   query_request_context = PatientRootQueryRetrieveInformationModelMove
   ae = ApplicationEntity(SCU_AE)

@@ -3,6 +3,7 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
+from datetime import date
 import logging
 from logging import StreamHandler
 import os
@@ -11,6 +12,7 @@ from typing import List, Dict, Any
 import shutil
 from sys import stdout
 from unittest import TestCase, mock
+from time import sleep
 
 #Third Party libs
 
@@ -21,8 +23,9 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 
 # Dicomnode packages
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from dicomnode.lib.validators import RegexValidator, CaselessRegexValidator, NegatedValidator
-from dicomnode.dicom.dimse import Address, QueryLevels
+from dicomnode.dicom.dimse import Address, create_query_dataset, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.grinders import NumpyGrinder
@@ -72,24 +75,7 @@ class TestLazyDynamicMissingPathInput(DynamicInput):
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 
-class HistoricInput(HistoricAbstractInput):
-  required_tags: List[int|str] = ['SOPInstanceUID']
-  required_values: Dict[int|str, Any] = {
-    0x0008103E : SERIES_DESCRIPTION
-  }
-
-  address = Address('localhost', 51211, "ENDPOINT")
-  query_level = QueryLevels.PATIENT
-
-  def get_message_dataset(self, added_dataset: Dataset) -> Dataset:
-    ds = Dataset()
-
-    return ds
-
-  def validate(self) -> bool:
-    return True
-
-class InputTestCase(TestCase):
+class InputTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     os.chdir(TESTING_TEMPORARY_DIRECTORY)
     self.path = Path(self._testMethodName)
@@ -613,3 +599,41 @@ class InputTestCase(TestCase):
 
     self.assertFalse(ValidatorInput.validate_image(topogram))
     self.assertTrue(ValidatorInput.validate_image(ct_image))
+
+
+class HistoricInput(HistoricAbstractInput):
+  required_tags: List[int|str] = ['SOPInstanceUID']
+  required_values: Dict[int|str, Any] = {
+    0x0008103E : SERIES_DESCRIPTION
+  }
+
+  def check_query_dataset(self, dicom: Dataset) -> Dataset | None:
+    if 'PatientID' not in dicom:
+      return None
+
+    return create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=dicom.PatientID)
+
+
+  address = Address('localhost', 51211, "ENDPOINT")
+
+study_date = date(2020, 1, 1)
+
+historic_input_dataset = Dataset()
+historic_input_dataset.SOPInstanceUID = gen_uid()
+historic_input_dataset.StudyDate = study_date
+historic_input_dataset.PatientID = "test id"
+
+
+class HistoricTestcases(DicomnodeTestCase):
+  def test_historic_input(self):
+    input_ = HistoricInput()
+
+    self.assertEqual(0, input_.add_image(historic_input_dataset))
+    input_.study_date = study_date
+    #
+    #self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FETCHING)
+    if input_.thread is None:
+      raise AssertionError("Thread should have been defined")
+
+    input_.thread.join()
+    self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FILLED)

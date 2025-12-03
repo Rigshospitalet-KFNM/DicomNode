@@ -22,5 +22,6 @@ def from_wildcard(string: str) -> Pattern:
   return compile(string.replace('*', '.*'))
 
 __all__ = [
-  'from_wildcard'
+  'from_wildcard',
+  'escape_pattern'
 ]

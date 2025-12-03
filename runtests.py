@@ -3,6 +3,7 @@ import sys
 import argparse
 import os
 import shutil
+import logging
 import re
 import psutil
 import threading
@@ -15,7 +16,32 @@ os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTOR
 os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = os.getcwd() + "/report_data"
 # DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing DICOMNODE
 
+
+
 from tests.helpers import testing_logs
+from tests.helpers.dicomnode_test_suite import BaseDicomnodeTestSuite
+
+class DicomnodeTestSuite(BaseDicomnodeTestSuite):
+  def pre_test(self, test):
+    #print(test._testMethodName)
+    #root_logger = logging.getLogger()
+    #print(f"root node handlers: {root_logger.handlers}")
+    #dicomnode_logger = logging.getLogger("dicomnode")
+    #print(f"Dicomnode node handlers: {dicomnode_logger.handlers}")
+    #process_logger = logging.getLogger("process_dicomnode")
+    #print(f"process logger handlers: {process_logger.handlers}")
+    pass
+
+
+  def post_test(self, test):
+    #root_logger = logging.getLogger()
+    #print(f"root node handlers: {root_logger.handlers}")
+    #dicomnode_logger = logging.getLogger("dicomnode")
+    #print(f"Dicomnode node handlers: {dicomnode_logger.handlers}")
+    #process_logger = logging.getLogger("process_dicomnode")
+    #print(f"process logger handlers: {process_logger.handlers}")
+    pass
+
 
 PYTHON_3_12_PLUS = 12 <= sys.version_info.minor
 
@@ -59,7 +85,7 @@ if __name__ == "__main__":
     runner = TextTestRunner(verbosity=args.verbose)
 
   loader = TestLoader()
-  running_suite = TestSuite()
+  running_suite = DicomnodeTestSuite()
 
   added_tests = set()
 
@@ -78,6 +104,8 @@ if __name__ == "__main__":
   tmpDirPath.mkdir(mode=0o777, exist_ok=True)
 
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
+
+
   result = runner.run(running_suite)
   os.chdir(cwd)
 

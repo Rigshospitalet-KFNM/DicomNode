@@ -434,16 +434,19 @@ class HistoricAbstractInput(AbstractInput):
     FILLED = 3
 
   address: Optional[Address] = None
-  query_level: Optional[QueryLevels] = None
 
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
+
+    if self.address is None or not isinstance(self.address, Address):
+      raise IncorrectlyConfigured("The historic Input needs an address to send images to!")
 
     if self.enforce_single_study_date:
       self.logger.warning(f"In {self.__class__.__name__} enforce_single_study_date have been set, which is redundant for a historic input")
 
     self.historic_dataset: Dict[date, Dict[str, List[Dataset]]] = {}
     self.state = HistoricAbstractInput.HistoricInputState.EMPTY
+    self.thread: Optional[Thread] = None
 
   def _enforce_date_requirement(self, dicom: Dataset):
     if self._study_date is None: # If study date have not been set yet
@@ -457,7 +460,7 @@ class HistoricAbstractInput(AbstractInput):
 
     return True
 
-  def check_query_dataset(self, dicom) -> Optional[Dataset]:
+  def check_query_dataset(self, dicom: Dataset) -> Optional[Dataset]:
     return None
 
   def thread_target(self, query_data):
@@ -467,16 +470,21 @@ class HistoricAbstractInput(AbstractInput):
     if self.state == HistoricAbstractInput.HistoricInputState.EMPTY:
       if query_dataset := self.check_query_dataset(dicom):
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
-        self.thread = Thread(group=None, target=self.thread_target, args=(self, query_dataset))
-
+        self.thread = Thread(group=None, name="Historic Input", target=self.thread_target, args=(query_dataset,))
+        self.thread.start()
       return 0
+
+
+    if not self.validate_image(dicom):
+      raise InvalidDataset
+
+    if not self._state_based_validation(dicom):
+      raise InvalidDataset
+
     return 0
 
-
-
-
-
-
+  def validate(self) -> bool:
+    return self.state == HistoricAbstractInput.HistoricInputState.FILLED
 
 class AbstractInputProxy(AbstractInput):
   """Internal library Class, that is constructed from an or operation between

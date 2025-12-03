@@ -54,9 +54,12 @@ class DIMSETestCases(TestCase):
 
     dataset = Dataset()
 
-    self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.PATIENT)
-    self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.STUDY)
-    self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.SERIES)
+    with self.assertLogs("dicomnode", logging.ERROR) as captured_logs:
+      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.PATIENT)
+      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.STUDY)
+      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.SERIES)
+
+    self.assertEqual(len(captured_logs.output), 3)
 
   def test_send_move_no_connection(self):
     address = Address('localhost', 4321, "PYNETDICOM") # Connection will fails as there's no end point

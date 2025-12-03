@@ -48,8 +48,6 @@ def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str
   keyword_dict.update(new_names_dict)
 
 
-
-
 def apply_private_tags(
     dataset: Dataset,
     private_tags: Dict[int, Tuple[str, str, str, str, str]] = {},

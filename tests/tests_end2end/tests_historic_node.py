@@ -7,6 +7,7 @@ from time import sleep
 from unittest import TestCase, skip
 
 # Third party Packages
+from pydicom import Dataset
 
 # Dicomnode Packages
 from dicomnode.dicom.dimse import Address, send_image
@@ -26,6 +27,8 @@ SENDER_AE_TITLE = "SENDER_AE"
 INPUT_KW = "input"
 HISTORIC_KW = "historic"
 
+DEFAULT_DATASET = Dataset()
+
 class HistoricPipeline(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {
@@ -38,7 +41,7 @@ class HistoricPipeline(AbstractPipeline):
   processing_directory = None
   log_output = None
 
-  def process(self, input_container: InputContainer) -> PipelineOutput:
+  def process(self, input_data: InputContainer) -> PipelineOutput:
     return NoOutput()
 
 class HistoricTestCase(TestCase):
@@ -51,7 +54,7 @@ class HistoricTestCase(TestCase):
   def tearDown(self) -> None:
     self.node.close()
 
-  @skip # Yes it's broken
+  @skip("Historic test case doesn't work yet") # Yes it's broken
   def test_create_and_send(self):
     address = Address("localhost", self.test_port, TEST_AE_TITLE)
     endpoint = get_test_ae(ENDPOINT_PORT, self.test_port, self.node.logger)

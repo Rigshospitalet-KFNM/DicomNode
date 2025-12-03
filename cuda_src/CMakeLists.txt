@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(dicomnode_c LANGUAGES CXX)
+project(dicomnode_c LANGUAGES CUDA)
 
 include(ProcessorCount)
 
@@ -11,16 +11,8 @@ if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
   set(CMAKE_JOB_POOL_COMPILE compile_pool)
 endif()
 
-
-set(VERSION_INFO 0.0.1)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 REQUIRED)
-
-message("pybind11 version: ${pybind11_VERSION}")
 
 # Create object libraries for each source file
 function(add_cuda_library name source)

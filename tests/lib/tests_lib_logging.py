@@ -17,6 +17,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 # Dicomnode Modules
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dimse import send_images, Address
+
 from dicomnode.lib import logging as dnl
 from dicomnode.lib.utils import spawn_process, spawn_thread
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
@@ -43,7 +44,6 @@ def worker(queue: Queue):
     message = f"Logger {name} - {pid}: message {i}"
     logger.info(message)
 
-class LoggingTestcase(DicomnodeTestCase):
   @process_thread_check_leak
   def test_sample_queue_logging(self):
     queue = Queue()

@@ -10,12 +10,8 @@ endif()
 
 include(ProcessorCount)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-set(CMAKE_BUILD_TYPE DEBUG)
-set(CMAKE_INSTALL_DO_STRIP FALSE)
 
 ProcessorCount(NUMBER_OF_PROCESSORS)
-
 if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
   message(STATUS "Processors ${NUMBER_OF_PROCESSORS}")
   set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
@@ -52,6 +48,7 @@ set(CPP_LIBRARIES
 set(CPP_OBJECT_TARGETS)
 list(LENGTH CPP_LIBRARIES CPP_LIBRARY_COUNT)
 math(EXPR CPP_LIBRARY_COUNT "${CPP_LIBRARY_COUNT} - 1")
+
 foreach(INDEX RANGE 0 ${CPP_LIBRARY_COUNT} 2)
   math(EXPR SOURCE_INDEX "${INDEX} + 1")
   list(GET CPP_LIBRARIES ${INDEX} LIBRARY_NAME)
@@ -67,9 +64,7 @@ pybind11_add_module(
   ${CPP_OBJECT_TARGETS}
 )
 
-message(${CPP_OBJECT_TARGETS})
-
-target_compile_options(_cpp PRIVATE -g -Wall -Wextra)
+target_compile_options(_cpp PRIVATE -O3 -g -Wall -Wextra)
 
 target_precompile_headers(
     _cpp
