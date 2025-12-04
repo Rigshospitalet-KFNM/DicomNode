@@ -70,6 +70,7 @@ class ConcurrencyTestCase(DicomnodeTestCase):
 
   def tearDown(self) -> None:
     self.node.close()
+    super().tearDown()
 
 
   def performance_spam_to_same_input(self):

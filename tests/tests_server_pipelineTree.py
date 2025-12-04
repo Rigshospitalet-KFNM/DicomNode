@@ -92,6 +92,7 @@ class PipelineTestCase(DicomnodeTestCase):
 
 
   def tearDown(self) -> None:
+    super().tearDown()
     shutil.rmtree(self.path)
 
   def test_add_image(self):
@@ -270,6 +271,7 @@ class PatientNodeTestCase(DicomnodeTestCase):
     }, self.options)
 
   def tearDown(self) -> None:
+    super().tearDown()
     shutil.rmtree(self.path)
 
   def test_add_image_to_patient_node(self):

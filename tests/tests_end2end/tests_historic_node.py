@@ -104,6 +104,7 @@ class HistoricTestCase(DicomnodeTestCase):
   def tearDown(self) -> None:
     self.node.close()
     self.endpoint.close()
+    super().tearDown()
 
 
   def test_end_2_end_historic_input(self):

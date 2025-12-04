@@ -70,11 +70,7 @@ class AssociationContextManager:
       return None
 
   def __exit__(self, exception_type, exception, traceback):
-    print(f"Leaving Association: {exception_type}, {exception}, {traceback}")
-    print(f"Assoc: {self.assoc is not None}")
     if self.assoc is not None and self.assoc.is_established:
-
-      print(f"Releasing Assoc: {self.assoc}")
       self.assoc.release()
 
 
@@ -198,15 +194,15 @@ def validate_query_dataset(dataset: Dataset):
   if "QueryRetrieveLevel" not in dataset:
     return False
 
-  if dataset.QueryRetrieveLevel == QueryLevels.PATIENT and 'PatientID' not in dataset:
+  if dataset.QueryRetrieveLevel == QueryLevels.PATIENT.value and 'PatientID' not in dataset:
     logger.error("Attempted to send a move at Patient level without a PatientID tag")
     return False
 
-  if dataset.QueryRetrieveLevel == QueryLevels.STUDY and 'StudyInstanceUID' not in dataset:
+  if dataset.QueryRetrieveLevel == QueryLevels.STUDY.value and 'StudyInstanceUID' not in dataset:
     logger.error("Attempted to send a move at Study level without a StudyInstanceUID tag")
     return False
 
-  if dataset.QueryRetrieveLevel == QueryLevels.SERIES and 'SeriesInstanceUID' not in dataset:
+  if dataset.QueryRetrieveLevel == QueryLevels.SERIES.value and 'SeriesInstanceUID' not in dataset:
     logger.error("Attempted to send a move at Series level without a SeriesInstanceUID tag")
     return False
 
@@ -299,7 +295,10 @@ def send_move(SCU_AE: str,
     dataset.QueryRetrieveLevel = query_level.value
 
   if not validate_query_dataset(dataset):
+
     raise InvalidQueryDataset(f"Incoming Dataset is not valid")
+
+
 
   query_request_context = PatientRootQueryRetrieveInformationModelMove
   ae = ApplicationEntity(SCU_AE)

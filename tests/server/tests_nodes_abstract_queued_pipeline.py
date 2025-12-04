@@ -60,6 +60,7 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
     self.node = TestPipeline()
 
   def tearDown(self) -> None:
+    super().tearDown()
     self.node.close()
 
   def test_real_dumb(self):

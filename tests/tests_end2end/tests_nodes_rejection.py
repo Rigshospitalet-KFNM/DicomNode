@@ -56,6 +56,7 @@ class RejectionTestCase(DicomnodeTestCase):
     while self.node.dicom_application_entry.active_associations != []:
       sleep(0.005) #pragma: no cover
     self.node.close()
+    super().tearDown()
 
   def test_rejection(self):
     with self.assertLogs(self.node.logger) as cm:

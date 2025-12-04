@@ -40,6 +40,7 @@ class OutputTests(DicomnodeTestCase):
     self.datasets = [self.dataset_1]
 
   def tearDown(self) -> None:
+    super().tearDown()
     self.endpoint.shutdown()
     shutil.rmtree(self.path)
 

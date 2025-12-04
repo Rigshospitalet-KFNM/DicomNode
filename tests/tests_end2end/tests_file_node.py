@@ -64,6 +64,7 @@ class StallingFileStorageTestCase(DicomnodeTestCase):
 
     #pprint([t for t in threading.enumerate()])
     self.node.close()
+    super().tearDown()
 
   @bench
   def performance_send_fs(self):

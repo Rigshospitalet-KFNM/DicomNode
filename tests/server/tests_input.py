@@ -86,6 +86,7 @@ class InputTestCase(DicomnodeTestCase):
     self.logger = logger
 
   def tearDown(self) -> None:
+    super().tearDown()
     shutil.rmtree(self.path)
 
   def test_SOPInstanceUID_is_required(self):
@@ -606,6 +607,11 @@ class HistoricInput(HistoricAbstractInput):
   required_values: Dict[int|str, Any] = {
     0x0008103E : SERIES_DESCRIPTION
   }
+  address = Address('localhost', 51211, "ENDPOINT")
+
+  def thread_target(self, query_data):
+    # SKIP ALL the quering, It's inside of e2e tests
+    self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def check_query_dataset(self, current_study: Dataset) -> Dataset | None:
     if 'PatientID' not in current_study:
@@ -617,7 +623,7 @@ class HistoricInput(HistoricAbstractInput):
     return super().handle_found_dataset(found_dataset)
 
 
-  address = Address('localhost', 51211, "ENDPOINT")
+
 
 study_date = date(2020, 1, 1)
 
@@ -629,7 +635,7 @@ historic_input_dataset.PatientID = "test id"
 
 class HistoricTestcases(DicomnodeTestCase):
   def test_historic_input(self):
-    input_ = HistoricInput()
+    input_ = HistoricInput(AbstractInput.Options(ae_title="BLAH BLAH"))
 
     self.assertEqual(0, input_.add_image(historic_input_dataset))
     input_.study_date = study_date

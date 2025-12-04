@@ -53,6 +53,7 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     self.logging_queue.put(None)
     self.listener_thread.join()
     sys.stdout = sys.__stdout__
+    super().tearDown()
 
 
   def test_signal_kills_children(self):

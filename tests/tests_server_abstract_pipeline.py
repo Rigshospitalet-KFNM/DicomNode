@@ -137,6 +137,8 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.thread_id = threading.get_native_id()
 
   def tearDown(self) -> None:
+    super().tearDown()
+
     storage = self.node.get_storage_directory(TEST_CPR)
     if storage is not None and storage.exists():
       rmtree(storage)

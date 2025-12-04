@@ -52,9 +52,6 @@ class BlueprintTestCase(DicomnodeTestCase):
       self.virtual_patient_sex,
     ])
 
-  def tearDown(self) -> None:
-    pass
-
   def test_iter(self):
     for i,virtual_element in enumerate(self.blueprint_1):
       if i == 0:
@@ -204,10 +201,6 @@ class DicomFactoryTestCase(DicomnodeTestCase):
       gen_dataset(i) for i in range(13)
     ])
 
-
-
-  def tearDown(self) -> None:
-    pass
 
   def test_CopyElementCorporealialize(self):
     copy_element = CopyElement(0x00100020)

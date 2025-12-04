@@ -23,6 +23,7 @@ class LazyDatasetTestCase(DicomnodeTestCase):
     self.path.mkdir()
 
   def tearDown(self) -> None:
+    super().tearDown()
     shutil.rmtree(self.path, ignore_errors=False)
 
   def test_Laziness(self):

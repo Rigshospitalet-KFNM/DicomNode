@@ -56,9 +56,9 @@ class DIMSETestCases(DicomnodeTestCase):
     dataset = Dataset()
 
     with self.assertLogs("dicomnode", logging.ERROR) as captured_logs:
-      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.PATIENT)
-      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.STUDY)
-      self.assertRaises(InvalidQueryDataset, send_move, address, "Dummy", dataset, QueryLevels.SERIES)
+      self.assertRaises(InvalidQueryDataset, send_move, "Dummy", address, dataset, QueryLevels.PATIENT)
+      self.assertRaises(InvalidQueryDataset, send_move, "Dummy", address, dataset, QueryLevels.STUDY)
+      self.assertRaises(InvalidQueryDataset, send_move, "Dummy", address, dataset, QueryLevels.SERIES)
 
     self.assertEqual(len(captured_logs.output), 3)
 
