@@ -11,7 +11,7 @@ from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, Stu
 from pynetdicom import events
 # Dicomnode packages
 
-
+MOVE_ENDPOINT = 10000
 ENDPOINT_PORT = 50000
 ENDPOINT_AE_TITLE = "ENDPOINT_AE"
 
@@ -25,7 +25,8 @@ class TestStorageEndpoint():
   def __init__(self,
                endpoint_port=ENDPOINT_PORT,
                endpoint_ae_title=ENDPOINT_AE_TITLE,
-               release_event: Optional[ThreadingEvent] = None
+               release_event: Optional[ThreadingEvent] = None,
+               move_endpoint = MOVE_ENDPOINT,
                ) -> None:
     self._storage = {}
     self.ae_title = endpoint_ae_title
@@ -39,13 +40,14 @@ class TestStorageEndpoint():
     self.ae.add_supported_context(PatientRootQueryRetrieveInformationModelMove)
     self.ae.add_supported_context(PatientRootQueryRetrieveInformationModelFind)
     self.release_event = release_event
+    self.move_target = ('127.0.0.1', move_endpoint)
 
 
   @property
   def storage(self) -> Dict[str, List[Dataset]]:
     return self._storage
 
-  def __handle_C_store(self, evt: events.Event):
+  def handle_C_store(self, evt: events.Event):
     dataset = evt.dataset
     dataset.file_meta = evt.file_meta
 
@@ -60,10 +62,20 @@ class TestStorageEndpoint():
 
     return 0x0000
 
-  def __accepted(self, evt: events.Event):
+  def handle_C_move(self, evt):
+    # Yield destination
+    yield self.move_target
+    # Yield Number of operations
+    yield 0
+    # Yield datasets, but there's none!
+
+  def handle_C_find(self, evt):
+    return
+
+  def _accepted(self, evt: events.Event):
     self.accepted_associations += 1
 
-  def __released(self, evt: events.Event):
+  def _released(self, evt: events.Event):
     if self.release_event is not None:
       self.release_event.set()
 
@@ -71,9 +83,11 @@ class TestStorageEndpoint():
     if not self.running:
       self.ae.start_server(("127.0.0.1", self.endpoint_port),
                            evt_handlers=[
-                             (events.EVT_RELEASED, self.__released),
-                             (events.EVT_ACCEPTED, self.__accepted),
-                             (events.EVT_C_STORE, self.__handle_C_store),
+                             (events.EVT_RELEASED, self._released),
+                             (events.EVT_ACCEPTED, self._accepted),
+                             (events.EVT_C_STORE, self.handle_C_store),
+                             (events.EVT_C_FIND, self.handle_C_find),
+                             (events.EVT_C_MOVE, self.handle_C_move),
                            ],
                            block=False,
                            ae_title=self.ae_title

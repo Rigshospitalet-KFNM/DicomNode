@@ -13,7 +13,7 @@ from pydicom import Dataset, DataElement
 from pydicom.datadict import tag_for_keyword, dictionary_VR
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
-from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, StudyRootQueryRetrieveInformationModelMove, SeriesRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind, StudyRootQueryRetrieveInformationModelFind, SeriesRootQueryRetrieveInformationModelFind # type: ignore
+from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind # type: ignore
 # Dicomnode packages
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.dicom import make_meta
@@ -29,13 +29,11 @@ class QueryLevels(Enum):
   SERIES="SERIES"
 
   def find_sop_class(self) -> UID:
-    mapping = {
-      QueryLevels.PATIENT : PatientRootQueryRetrieveInformationModelFind,
-      QueryLevels.STUDY : StudyRootQueryRetrieveInformationModelFind,
-      QueryLevels.SERIES : SeriesRootQueryRetrieveInformationModelMove
-    }
+    return PatientRootQueryRetrieveInformationModelFind
 
-    return mapping[self]
+  def move_sop_class(self) -> UID:
+    return PatientRootQueryRetrieveInformationModelMove
+
 
 class DIMSE_StatusCodes(Enum):
   SUCCESS = 0x0000
@@ -185,8 +183,11 @@ def send_images(SCU_AE: str,
     raise CouldNotCompleteDIMSEMessage("Could not connect")
   return 0x0000
 
-def create_query_ae(ae_title: str, query_level: QueryLevels) -> ApplicationEntity:
+def create_query_ae(ae_title: str) -> ApplicationEntity:
   ae = ApplicationEntity(ae_title)
+
+  ae.add_requested_context(PatientRootQueryRetrieveInformationModelFind)
+  ae.add_requested_context(PatientRootQueryRetrieveInformationModelMove)
 
   return ae
 

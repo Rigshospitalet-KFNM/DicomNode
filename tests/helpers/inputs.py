@@ -32,11 +32,6 @@ class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
   required_tags: List[int | str] = [0x00080018]
 
-  def validate(self) -> bool:
-    return True
-
-  def get_message_dataset(self, added_dataset: Dataset) -> Dataset:
-    return Dataset()
 
 
 class ListInput(AbstractInput):

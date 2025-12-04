@@ -467,9 +467,11 @@ class HistoricAbstractInput(AbstractInput):
 
     return True
 
+  @abstractmethod
   def check_query_dataset(self, current_study: Dataset) -> Optional[Dataset]:
     return None
 
+  @abstractmethod
   def handle_found_dataset(self, found_dataset: Dataset) -> Optional[Dataset]:
     return None
 
@@ -477,7 +479,7 @@ class HistoricAbstractInput(AbstractInput):
     query_level = QueryLevels(query_data.QueryRetrieveLevel)
 
     with AssociationContextManager(
-      create_query_ae(self.ae_title, query_level),
+      create_query_ae(self.ae_title),
       self._address.ip,
       self._address.port,
       ae_title=self._address.ae_title
@@ -504,7 +506,7 @@ class HistoricAbstractInput(AbstractInput):
       logger.info(f"{name(self)} found {len(studies_to_be_moved)}")
 
       for study in studies_to_be_moved:
-        move_responses = assoc.send_c_move(study, self.ae_title, query_level.find_sop_class())
+        move_responses = assoc.send_c_move(study, self.ae_title, query_level.move_sop_class())
         for status, move_response in move_responses:
           if status.Status not in [0xFF00, 0x0000]:
             logger.error(f"While C-Move'ing {name(self)} encountered a problem: {status}")
