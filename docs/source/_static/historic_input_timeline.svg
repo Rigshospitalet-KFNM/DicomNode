@@ -23,6 +23,7 @@
 <text x="41" y="12" font-size="3"> 1. Initial transfer </text>
 <text x="6" y="56" font-size="3" > 2. C-FIND and C-MOVE  </text>
 <text x="55" y="73" font-size="3"> 3. C-STORE </text>
-<text x="77" y="59" font-size="3"> 4. Response </text>
+<text x="77" y="59" font-size="3"> 4. Pipeline </text>
+<text x="82.5" y="63" font-size="3"> Product </text>
 
 </svg>

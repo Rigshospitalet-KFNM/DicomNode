@@ -99,7 +99,11 @@ DIMSE messages. The retrieved data will be referred to as **historic** series.
 
 In general it's assumed that the studies we retrieve will go into the historic
 input and not in the normal abstract inputs, while the historic input will only
-contain historic datasets
+contain historic datasets.
+
+For those with limited dicom terminology a `SCP` is just a program, that you can
+send C-FIND's and C-MOVE's to and it responds like expected. These are often
+specialized databases that work with dicom images.
 
 ### Goal
 
@@ -165,6 +169,52 @@ The Historic gets a dataset and, sets it status to **Fetching** spawns a thread,
 that generates a query Dataset and sends a C-FIND to the SCP. We get some
 answers and we pick the studies that we need, and send a C-MOVE for the studies
 we need. The connection closes and we set the Input as filled.
+
+### The nitty-gritty implementation details
+
+#### Historic Attributes
+
+A historic input have different requirements to a standard abstract input.
+First of all a historic endpoint need an `address` attribute of type:
+`dicomnode.dicom.dimse.Address`. This address must accept C-FIND and C-MOVE from
+the node using the nodes AE title. The node must also have been created as a
+move destination in the SCP.
+
+Unlike normal inputs you should **NOT** overwrite the validate function. A
+historic input validates to true when It has finished a single connection to the
+`SCP`.
+
+#### C-FIND, C-MOVE - Query and Retrieve
+
+When dicom datasets are send from the source, the `add_image` is called for all
+`AbstractInput`s are called. The historic inputs `add_image` is a tad different.
+Instead of trying to add it calls:
+  `check_query_dataset(self, current_study: Dataset) -> Optional[Dataset]`
+Where the `current_study` argument is the dataset send by the source.
+
+**You must overwrite this function yourself**. If it returns `None` it indicates
+that the source dataset couldn't be used to generate the query dataset and
+nothing else happens. If you return a dataset, it's used to as the query dataset
+for a C-FIND against the `SCP` in the `address` attribute.
+
+Note that you can use `dicomnode.dicom.dimse.create_query_dataset` to easily
+create a valid query dataset. I recommend using `SERIES` level querying for the
+most precise control over which studies to retrieve.
+
+You can see what Tags are relevant in the Conformance statement of your SCP.
+
+It's often difficult to craft a C-FIND query, that only includes exactly what
+you want, as a matter of fact it's ill advised, since there might a type of
+dataset, that you fail to account for. Instead you should craft a query dataset
+from each relevant find response.
+
+This is what:
+`handle_found_dataset(self, found_dataset: Dataset) -> Optional[Dataset]:`
+method is for which is another method you **MUST** implement in your historic
+input.
+
+Again if you return a dataset that will be used for a C-Move, while if you
+return, the node considers the series irrelevant.
 
 ### What is going to go wrong:
 

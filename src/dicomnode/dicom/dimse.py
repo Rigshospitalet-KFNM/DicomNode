@@ -13,8 +13,7 @@ from pydicom import Dataset, DataElement
 from pydicom.datadict import tag_for_keyword, dictionary_VR
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
-from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove # type: ignore
-
+from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, StudyRootQueryRetrieveInformationModelMove, SeriesRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind, StudyRootQueryRetrieveInformationModelFind, SeriesRootQueryRetrieveInformationModelFind # type: ignore
 # Dicomnode packages
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.dicom import make_meta
@@ -28,6 +27,15 @@ class QueryLevels(Enum):
   PATIENT="PATIENT"
   STUDY="STUDY"
   SERIES="SERIES"
+
+  def find_sop_class(self) -> UID:
+    mapping = {
+      QueryLevels.PATIENT : PatientRootQueryRetrieveInformationModelFind,
+      QueryLevels.STUDY : StudyRootQueryRetrieveInformationModelFind,
+      QueryLevels.SERIES : SeriesRootQueryRetrieveInformationModelMove
+    }
+
+    return mapping[self]
 
 class DIMSE_StatusCodes(Enum):
   SUCCESS = 0x0000
@@ -177,6 +185,11 @@ def send_images(SCU_AE: str,
     raise CouldNotCompleteDIMSEMessage("Could not connect")
   return 0x0000
 
+def create_query_ae(ae_title: str, query_level: QueryLevels) -> ApplicationEntity:
+  ae = ApplicationEntity(ae_title)
+
+  return ae
+
 def validate_query_dataset(dataset: Dataset):
   if "QueryRetrieveLevel" not in dataset:
     return False
@@ -216,6 +229,21 @@ def create_query_dataset(query_level=QueryLevels.STUDY, **kwargs):
   dataset = Dataset()
 
   dataset.QueryRetrieveLevel = query_level.value
+
+  # Patient Level
+  dataset.PatientName = None
+  dataset.PatientID = None
+  dataset.PatientBirthDate = None
+
+  # Study Level
+  dataset.AccessionNumber = None
+  dataset.StudyDate = None
+  dataset.StudyDescription = None
+  dataset.StudyID = None
+
+  # Series Level
+  dataset.SeriesDescription = None
+  dataset.SeriesNumber = None
 
   for tag_name, value in kwargs.items():
     tag = tag_for_keyword(tag_name)
@@ -264,7 +292,7 @@ def send_move(SCU_AE: str,
     InvalidQueryDataset:
   """
   if 'QueryRetrieveLevel' not in dataset:
-    dataset.QueryRetrieveLevel = query_level
+    dataset.QueryRetrieveLevel = query_level.value
 
   if not validate_query_dataset(dataset):
     raise InvalidQueryDataset(f"Incoming Dataset is not valid")

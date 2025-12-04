@@ -175,3 +175,7 @@ def spawn_process(process_function, *args, start=True,name=None, **kwargs):
   logger.debug(log_message)
 
   return process
+
+def name(obj) -> str:
+  """Returns the name of a class"""
+  return obj.__class__.__name__

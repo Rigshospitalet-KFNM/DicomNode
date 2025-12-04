@@ -24,13 +24,15 @@ from pydicom.uid import UID
 
 # Dicomnode packages
 from dicomnode.data_structures.image_tree import ImageTreeInterface
-from dicomnode.dicom.dimse import Address, send_move_thread, QueryLevels
+from dicomnode.dicom.dimse import Address, QueryLevels,\
+  AssociationContextManager, create_query_ae
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.logging import get_logger
+from dicomnode.lib.utils import name
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
 # Baby here we go!
@@ -127,7 +129,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     # Tag for SOPInstance is (0x0008,0018)
     if 0x0008_0018 not in self.required_tags:
-      self.logger.info(f"You should add SOPInstanceUID to required tags for {self.__class__.__name__}")
+      self.logger.info(f"You should add SOPInstanceUID to required tags for {name(self)}")
       self.required_tags.append(0x0008_0018)
 
     if self.path is not None:
@@ -438,11 +440,16 @@ class HistoricAbstractInput(AbstractInput):
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
 
+    if self.options.ae_title is None:
+      raise IncorrectlyConfigured(f"The historic Input: {name(self)} have been not parsed an AE title. This is violation from containing PatientNode!")
+    self.ae_title = self.options.ae_title
+
     if self.address is None or not isinstance(self.address, Address):
-      raise IncorrectlyConfigured("The historic Input needs an address to send images to!")
+      raise IncorrectlyConfigured(f"{name(self)} needs an address to send images to!")
+    self._address = self.address # This reassignment is really just for the linter, it assumes that
 
     if self.enforce_single_study_date:
-      self.logger.warning(f"In {self.__class__.__name__} enforce_single_study_date have been set, which is redundant for a historic input")
+      self.logger.warning(f"In {name(self)} enforce_single_study_date have been set, which is redundant for a historic input")
 
     self.historic_dataset: Dict[date, Dict[str, List[Dataset]]] = {}
     self.state = HistoricAbstractInput.HistoricInputState.EMPTY
@@ -460,30 +467,94 @@ class HistoricAbstractInput(AbstractInput):
 
     return True
 
-  def check_query_dataset(self, dicom: Dataset) -> Optional[Dataset]:
+  def check_query_dataset(self, current_study: Dataset) -> Optional[Dataset]:
+    return None
+
+  def handle_found_dataset(self, found_dataset: Dataset) -> Optional[Dataset]:
     return None
 
   def thread_target(self, query_data):
+    query_level = QueryLevels(query_data.QueryRetrieveLevel)
+
+    with AssociationContextManager(
+      create_query_ae(self.ae_title, query_level),
+      self._address.ip,
+      self._address.port,
+      ae_title=self._address.ae_title
+    ) as assoc:
+      logger = get_logger() # this should be self.logger maybe?
+      if assoc is None:
+        logger.error(f"{name(self)} could connect to {self.ae_title} : ({self._address.ip},{self._address.port})")
+        return
+
+      find_response = assoc.send_c_find(query_data, query_level.find_sop_class())
+
+      studies_to_be_moved: List[Dataset] = []
+
+      for (status, incoming_dataset) in find_response:
+        if status.Status not in [0xFF00, 0x0000]:
+          logger.error(f"While C-FIND'ing {name(self)} encountered a problem: {status}")
+
+        if incoming_dataset is None:
+          continue
+
+        if (moved_dataset := self.handle_found_dataset(incoming_dataset)) is not None:
+          studies_to_be_moved.append(moved_dataset)
+
+      logger.info(f"{name(self)} found {len(studies_to_be_moved)}")
+
+      for study in studies_to_be_moved:
+        move_responses = assoc.send_c_move(study, self.ae_title, query_level.find_sop_class())
+        for status, move_response in move_responses:
+          if status.Status not in [0xFF00, 0x0000]:
+            logger.error(f"While C-Move'ing {name(self)} encountered a problem: {status}")
+
+      # The datasets will then be added in add image
+
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def add_image(self, dicom: Dataset) -> int:
     if self.state == HistoricAbstractInput.HistoricInputState.EMPTY:
-      if query_dataset := self.check_query_dataset(dicom):
+      if (query_dataset := self.check_query_dataset(dicom)) is not None:
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
         self.thread = Thread(group=None, name="Historic Input", target=self.thread_target, args=(query_dataset,))
         self.thread.start()
       return 0
 
 
-    if not self.validate_image(dicom):
-      raise InvalidDataset
-
     if not self._state_based_validation(dicom):
       raise InvalidDataset
 
-    return 0
+    if not self.validate_image(dicom):
+      raise InvalidDataset
+
+    # This is mostly done to keep it simple
+    self._store_historic_dataset(dicom)
+
+    return 1
+
+  def _store_historic_dataset(self, historic_dataset: Dataset):
+    if 'StudyDate' not in historic_dataset or 'SeriesDescription' not in historic_dataset:
+      raise InvalidDataset
+
+    study_date: date = historic_dataset.StudyDate # this might be a data-element
+    if study_date not in self.historic_dataset:
+      self.historic_dataset[study_date] = {}
+
+    study_date_series = self.historic_dataset[study_date]
+
+    series_description: str = historic_dataset.SeriesDescription
+    if series_description not in study_date_series:
+      study_date_series[series_description] = []
+
+    datasets = study_date_series[series_description]
+    datasets.append(historic_dataset)
+
 
   def validate(self) -> bool:
+    if self.state == HistoricAbstractInput.HistoricInputState.FETCHING:
+      if self.thread is not None and self.thread.is_alive():
+        self.thread.join()
     return self.state == HistoricAbstractInput.HistoricInputState.FILLED
 
 class AbstractInputProxy(AbstractInput):
