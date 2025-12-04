@@ -607,11 +607,14 @@ class HistoricInput(HistoricAbstractInput):
     0x0008103E : SERIES_DESCRIPTION
   }
 
-  def check_query_dataset(self, dicom: Dataset) -> Dataset | None:
-    if 'PatientID' not in dicom:
+  def check_query_dataset(self, current_study: Dataset) -> Dataset | None:
+    if 'PatientID' not in current_study:
       return None
 
-    return create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=dicom.PatientID)
+    return create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=current_study.PatientID)
+
+  def handle_found_dataset(self, found_dataset: Dataset) -> Dataset | None:
+    return super().handle_found_dataset(found_dataset)
 
 
   address = Address('localhost', 51211, "ENDPOINT")

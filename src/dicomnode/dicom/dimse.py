@@ -20,7 +20,6 @@ from dicomnode.dicom import make_meta
 from dicomnode.lib.utils import ThreadWithReturnValue
 from dicomnode.lib.logging import get_logger
 
-
 logger = get_logger()
 
 class QueryLevels(Enum):
@@ -71,7 +70,11 @@ class AssociationContextManager:
       return None
 
   def __exit__(self, exception_type, exception, traceback):
+    print(f"Leaving Association: {exception_type}, {exception}, {traceback}")
+    print(f"Assoc: {self.assoc is not None}")
     if self.assoc is not None and self.assoc.is_established:
+
+      print(f"Releasing Assoc: {self.assoc}")
       self.assoc.release()
 
 

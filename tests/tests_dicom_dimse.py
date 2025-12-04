@@ -21,10 +21,11 @@ from dicomnode.dicom.dimse import send_move, Address, QueryLevels
 
 # Dicomnode tests helpers
 from tests.helpers import get_test_ae
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 logger = get_logger()
 
-class DIMSETestCases(TestCase):
+class DIMSETestCases(DicomnodeTestCase):
   TEST_CASE_AE = "TEST_CASE"
 
   def test_send_move(self):

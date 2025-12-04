@@ -31,6 +31,8 @@ from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 from dicomnode.report.plot.triple_plot import TriplePlot
 
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
 if validate_compiler_installed(LaTeXCompilers.XELATEX):
   SKIP_REPORT_TESTS = True
 else:
@@ -44,7 +46,7 @@ if nifti_path.exists():
 else:
   nifti_image = None
 
-class GeneratorTestCase(TestCase):
+class GeneratorTestCase(DicomnodeTestCase):
   @skipIf(SKIP_REPORT_TESTS, "You do not have a valid Latex compiler")
   def test_empty_report(self):
     test_file = f"{library_paths.report_directory}/test_empty_file"

@@ -10,7 +10,9 @@ from dicomnode.dicom.anonymization import anonymize_dicom_tree, anonymize_datase
 from dicomnode.dicom import gen_uid
 from dicomnode.data_structures.image_tree import DicomTree, IdentityMapping
 
-class Lib_anonymization(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class Lib_anonymization(DicomnodeTestCase):
   def setUp(self) -> None:
     self.patientID_1 = "testID_1"
     self.patientID_2 = "testID_2"

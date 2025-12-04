@@ -7,8 +7,9 @@ from pydicom import Dataset
 # Dicomnode package
 from dicomnode.math.space import Space
 
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class AffineTestCases(TestCase):
+class AffineTestCases(DicomnodeTestCase):
   def test_construct_affine(self):
     def build_dataset(i):
       ds = Dataset()

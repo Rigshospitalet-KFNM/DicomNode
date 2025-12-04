@@ -5,7 +5,9 @@ from unittest import TestCase, main
 # Dicomnode package
 import dicomnode
 
-class InitTestCase(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class InitTestCase(DicomnodeTestCase):
   def test_version(self):
     self.assertEqual(dicomnode.version(), dicomnode.__version__)
 

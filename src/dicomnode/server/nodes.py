@@ -298,6 +298,16 @@ class AbstractPipeline():
 
   def _handle_connection_closed(self, event: evt.Event):
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
+    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
+
+    released_event = self._association_event_factory.build_association_released(event)
+
+    for association_type in released_event.association_types:
+      handler = self._release_handlers.get(association_type, None)
+      if handler is not None:
+        handler(self, released_event)
+      else:
+        self.logger.critical(f"Missing Release Handler for {association_type}!") # pragma: no cover
 
   def _handle_association_rejected(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} rejected a connection") #type: ignore
@@ -454,6 +464,10 @@ class AbstractPipeline():
         event (evt.Event):
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
+
+    return
+
+    # This is on purpose!
     released_event = self._association_event_factory.build_association_released(event)
 
     for association_type in released_event.association_types:

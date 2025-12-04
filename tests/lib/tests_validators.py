@@ -9,7 +9,9 @@ from dicomnode.lib.validators import EqualityValidator, RegexValidator,\
   OptionsValidator, get_validator_for_value, NegatedValidator,\
   CaselessRegexValidator
 
-class ValidatorsTestCases(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class ValidatorsTestCases(DicomnodeTestCase):
   def test_validator(self):
     eq_validator = EqualityValidator(1)
 

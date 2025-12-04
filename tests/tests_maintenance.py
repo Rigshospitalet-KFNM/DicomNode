@@ -15,7 +15,9 @@ from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.pipeline_tree import PipelineTree
 from dicomnode.server.input import AbstractInput
 
-class MaintenanceTestCases(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class MaintenanceTestCases(DicomnodeTestCase):
   def test_calculate_time_from_1_before_midnight(self):
     pipeline_tree = PipelineTree(0x00100020, {})
     maintenance_thread = MaintenanceThread(pipeline_tree, 1)
@@ -62,5 +64,3 @@ class MaintenanceTestCases(TestCase):
       maintenance_thread.maintenance()
 
     self.assertEqual(pipeline_tree.images, 0)
-
-

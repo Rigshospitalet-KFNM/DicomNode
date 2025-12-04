@@ -11,7 +11,9 @@ from pydicom.datadict import DicomDictionary, keyword_dict # type: ignore
 # Dicomnode packages
 from dicomnode.lib import io
 
-class lib_io_test_case(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class lib_io_test_case(DicomnodeTestCase):
   test_tag = 0x13374269
   test_tag_sq = 0x13375005
   test_string = "hello world"

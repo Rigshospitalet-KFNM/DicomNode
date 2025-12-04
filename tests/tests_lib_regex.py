@@ -1,12 +1,13 @@
 # Python standard library
-from unittest import TestCase
 
 # Third module
 
 # Dicomnode modules
 from dicomnode.lib.regex import from_wildcard
 
-class RegexTestCases(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class RegexTestCases(DicomnodeTestCase):
   def test_regex_use_case(self):
     file_str = "dicomnode/*"
 

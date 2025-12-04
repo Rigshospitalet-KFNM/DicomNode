@@ -18,9 +18,9 @@ from dicomnode.lib.utils import str2bool
 
 # Testing helpers
 from tests.helpers import bench
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-
-class Lib_util_TestCase(TestCase):
+class Lib_util_TestCase(DicomnodeTestCase):
   def test_str2bool(self):
     # Trues
     self.assertTrue(str2bool(True))
@@ -46,7 +46,7 @@ class Lib_util_TestCase(TestCase):
     self.assertRaises(ArgumentTypeError, str2bool, "Alternative Facts!")
     self.assertRaises(ArgumentTypeError, str2bool, "YES!")
 
-class pydicomTestCases(TestCase):
+class pydicomTestCases(DicomnodeTestCase):
   @bench
   def performance_1000_datasets_method_1(self): # This is marginally Slower
     datasets = []

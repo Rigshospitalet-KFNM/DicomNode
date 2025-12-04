@@ -15,8 +15,9 @@ from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.io import save_dicom, load_dicom
 
 from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class LazyDatasetTestCase(TestCase):
+class LazyDatasetTestCase(DicomnodeTestCase):
   def setUp(self):
     self.path = Path(f"{self._testMethodName}")
     self.path.mkdir()

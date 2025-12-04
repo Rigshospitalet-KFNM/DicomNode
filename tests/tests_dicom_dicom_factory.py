@@ -31,8 +31,9 @@ from dicomnode.dicom.blueprints import add_UID_tag, general_image_blueprint
 from dicomnode.dicom.series import DicomSeries
 
 from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class BlueprintTestCase(TestCase):
+class BlueprintTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.virtual_study_date = StaticElement(0x00080020, 'DA', date.today())
     self.virtual_patient_name = StaticElement(0x00100010, 'PN', 'Face^Testy^Mac')
@@ -186,7 +187,7 @@ class BlueprintTestCase(TestCase):
       copy.corporealialize([])
 
 
-class DicomFactoryTestCase(TestCase):
+class DicomFactoryTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.factory = DicomFactory()
 

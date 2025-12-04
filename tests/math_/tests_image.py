@@ -12,8 +12,9 @@ from dicomnode.math.image import fit_image_into_unsigned_bit_range, Image
 
 # Test helper modules
 from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class ImageTestCase(TestCase):
+class ImageTestCase(DicomnodeTestCase):
   def setUp(self):
     self.ras_image_data = numpy.array([
       [

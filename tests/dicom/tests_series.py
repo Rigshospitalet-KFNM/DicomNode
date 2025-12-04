@@ -24,8 +24,9 @@ from dicomnode.math.space import Space
 
 # Test stuff
 from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class DicomSeriesTestCase(TestCase):
+class DicomSeriesTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.num_datasets = 3
 

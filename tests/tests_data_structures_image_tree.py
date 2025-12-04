@@ -7,6 +7,7 @@ from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImage
 from unittest import TestCase, skip
 
 from tests.helpers import generate_numpy_datasets, bench
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.io import load_dicom
@@ -18,7 +19,7 @@ def get_test_dataset() -> Dataset:
 
   return dataset
 
-class lib_imageTree(TestCase):
+class lib_imageTree(DicomnodeTestCase):
   def setUp(self) -> None:
     self.patientID_1 = "testID_1"
     self.patientID_2 = "testID_2"

@@ -554,9 +554,6 @@ class HistoricAbstractInput(AbstractInput):
 
 
   def validate(self) -> bool:
-    if self.state == HistoricAbstractInput.HistoricInputState.FETCHING:
-      if self.thread is not None and self.thread.is_alive():
-        self.thread.join()
     return self.state == HistoricAbstractInput.HistoricInputState.FILLED
 
 class AbstractInputProxy(AbstractInput):

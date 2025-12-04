@@ -11,10 +11,10 @@ import numpy
 from dicomnode.math import CUDA, _bounding_box_cpu, _bounding_box_gpu, bounding_box
 
 # Testing modules
-
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 # region Tests
-class BoundingBoxTestCase(TestCase):
+class BoundingBoxTestCase(DicomnodeTestCase):
   def test_line(self):
     array = numpy.zeros((10))
 

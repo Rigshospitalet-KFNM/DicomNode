@@ -14,10 +14,11 @@ from dicomnode.math.types import MirrorDirection
 
 # Test helper packages
 from tests.helpers import bench
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 test_iterations = 5
 
-class MirrorTestCase(TestCase):
+class MirrorTestCase(DicomnodeTestCase):
 
   @skipIf(not math.CUDA, "Needs Cuda compare functionality between cuda and Numpy")
   def test_mirror_x(self):

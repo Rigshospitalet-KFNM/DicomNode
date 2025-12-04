@@ -7,7 +7,9 @@ from unittest import TestCase
 from dicomnode.math.types import PerformanceException, CudaException,\
     CudaErrorEnum
 
-class ExceptionsTestCase(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class ExceptionsTestCase(DicomnodeTestCase):
   def test_normal_performance_exceptions(self):
     """Normal Performance exceptions are not fatal as they do not interact
     with a driver that can die"""

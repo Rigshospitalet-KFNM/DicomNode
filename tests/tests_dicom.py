@@ -12,7 +12,9 @@ from dicomnode.dicom import get_tag, make_meta, gen_uid, extrapolate_image_posit
   extrapolate_image_position_patient_dataset, format_from_patient_name_str, format_from_patient_name
 from dicomnode.lib.exceptions import InvalidDataset
 
-class DicomTestCase(TestCase):
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class DicomTestCase(DicomnodeTestCase):
   def test_getTag_success(self):
     ds = Dataset()
     pid = "TestID"

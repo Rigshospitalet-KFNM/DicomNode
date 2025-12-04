@@ -18,6 +18,7 @@ from dicomnode.server.grinders import IdentityGrinder, ListGrinder,\
 
 # Test Helper functions
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
@@ -26,7 +27,7 @@ def get_test_dataset() -> Dataset:
   return dataset
 
 
-class GrinderTests(TestCase):
+class GrinderTests(DicomnodeTestCase):
   """
   Grinders are unrelated to any dating websites.
   """
@@ -342,7 +343,7 @@ class GrinderTests(TestCase):
     self.assertRaises(InvalidDataset, grinder, [dataset])
 
 
-class NiftyGrinderTestCase(TestCase):
+class NiftyGrinderTestCase(DicomnodeTestCase):
   def test_invalid_configuration_for_grinder(self):
     self.assertRaises(IncorrectlyConfigured, NiftiGrinder, None, True)
 

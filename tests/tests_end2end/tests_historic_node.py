@@ -26,6 +26,7 @@ from dicomnode.server.input import HistoricAbstractInput
 from tests.helpers import get_test_ae
 from tests.helpers.storage_endpoint import TestStorageEndpoint, ENDPOINT_PORT
 from tests.helpers.inputs import NeverValidatingInput
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 # Constants
 TEST_AE_TITLE = "TEST_AE"
@@ -89,7 +90,7 @@ class HistoricPipeline(AbstractPipeline):
   def process(self, input_data: InputContainer) -> PipelineOutput:
     return NoOutput()
 
-class HistoricTestCase(TestCase):
+class HistoricTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     self.node = HistoricPipeline()
     self.test_port = randint(1025,65535)

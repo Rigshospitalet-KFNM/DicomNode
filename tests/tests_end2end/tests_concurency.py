@@ -24,6 +24,7 @@ from tests.helpers import generate_numpy_datasets, personify
 from tests.helpers.inputs import ListInput
 from tests.helpers.storage_endpoint import ENDPOINT_AE_TITLE, ENDPOINT_PORT,\
   TestStorageEndpoint
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 INPUT_KW = "input"
 TEST_AE_TITLE = "TEST_AE"
@@ -57,7 +58,7 @@ class ConcurrencyNode(AbstractPipeline):
     return DicomOutput([(Address('127.0.0.1', ENDPOINT_PORT, ENDPOINT_AE_TITLE), image_list)], self.ae_title)
 
 
-class ConcurrencyTestCase(TestCase):
+class ConcurrencyTestCase(DicomnodeTestCase):
   """These test are similar to the concurrent test earlier but with focus on
      some production issues from multiple assocation sending to the same
      input"""

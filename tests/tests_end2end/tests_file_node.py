@@ -19,6 +19,7 @@ from dicomnode.server.output import NoOutput, PipelineOutput
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, bench,\
   generate_numpy_datasets, personify
 from tests.helpers.inputs import NeverValidatingInput
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 DICOM_STORAGE_PATH = Path(f"{TESTING_TEMPORARY_DIRECTORY}/file_storage")
 PROCESSING_DIRECTORY = Path(f"{TESTING_TEMPORARY_DIRECTORY}/working_directory")
@@ -49,7 +50,7 @@ class StallingFileStorageNode(AbstractPipeline):
     return NoOutput()
 
 
-class StallingFileStorageTestCase(TestCase):
+class StallingFileStorageTestCase(DicomnodeTestCase):
   def setUp(self):
     DICOM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     self.node = StallingFileStorageNode()
