@@ -14,6 +14,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from pynetdicom import build_context
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dimse import Address, send_image, create_query_dataset,\
   QueryLevels
@@ -23,9 +24,9 @@ from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.input import HistoricAbstractInput
 
 # Testing Packages
-from tests.helpers import get_test_ae
+from tests.helpers import get_test_ae, clear_logger
 from tests.helpers.storage_endpoint import TestStorageEndpoint, ENDPOINT_PORT
-from tests.helpers.inputs import NeverValidatingInput
+from tests.helpers.inputs import TestInput
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 # Constants
@@ -62,8 +63,6 @@ class TestCaseStorageEndpoint(TestStorageEndpoint):
     yield (0xFF00, historic_dataset)
 
 
-
-
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
 
@@ -77,7 +76,7 @@ class TestHistoricInput(HistoricAbstractInput):
 class HistoricPipeline(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {
-    INPUT_KW : NeverValidatingInput,
+    INPUT_KW : TestInput,
     HISTORIC_KW : TestHistoricInput
   }
   require_calling_aet = []
@@ -88,6 +87,10 @@ class HistoricPipeline(AbstractPipeline):
   log_output = None
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
+    historic = input_data[HISTORIC_KW]
+
+    self.logger.info(f"Found: {historic}")
+
     return NoOutput()
 
 class HistoricTestCase(DicomnodeTestCase):
@@ -104,6 +107,8 @@ class HistoricTestCase(DicomnodeTestCase):
   def tearDown(self) -> None:
     self.node.close()
     self.endpoint.close()
+
+
     super().tearDown()
 
 
@@ -121,7 +126,7 @@ class HistoricTestCase(DicomnodeTestCase):
 
     with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
       response = send_image(SENDER_AE_TITLE, address, dataset)
-      sleep(3.25) # wait for all the threads to be done
+      sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
 

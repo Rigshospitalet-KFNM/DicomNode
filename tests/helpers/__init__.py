@@ -2,7 +2,7 @@
 import cProfile
 from functools import wraps
 import os
-from logging import Logger
+from logging import Logger, getLogger
 from pathlib import Path
 import pstats
 import threading
@@ -279,6 +279,15 @@ def process_thread_check_leak(func):
     return return_value
 
   return wrapper
+
+def clear_logger(logger_name: str):
+  logger = getLogger(logger_name)
+
+  for filter in logger.filters:
+    logger.removeFilter(filter)
+
+  for handler in logger.handlers:
+    logger.removeHandler(handler)
 
 
 from . import dicomnode_test_case

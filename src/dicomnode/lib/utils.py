@@ -9,9 +9,13 @@ from logging import Logger, getLogger
 import inspect
 import sys
 import io
+from enum import Enum
 from contextlib import contextmanager
 from threading import Thread
 from typing import Any, Optional, Type, Union
+
+# Third party packages
+from psutil import Process, STATUS_RUNNING, STATUS_DEAD, STATUS_DISK_SLEEP, STATUS_IDLE, STATUS_LOCKED, STATUS_PARKED, STATUS_SLEEPING, STATUS_STOPPED, STATUS_TRACING_STOP, STATUS_WAITING, STATUS_WAKING, STATUS_ZOMBIE
 
 try:
   from os import getuid, setuid
@@ -162,6 +166,8 @@ def spawn_thread(thread_function, *args, name=None, **kwargs):
 def spawn_process(process_function, *args, start=True,name=None, **kwargs):
   logger = kwargs['logger'] if 'logger' in kwargs else getLogger()
 
+  #multiprocessing_context = multiprocessing.get_context('spawn')
+
   process = multiprocessing.Process(
     target=process_function, args=args, name=name
   )
@@ -170,7 +176,6 @@ def spawn_process(process_function, *args, start=True,name=None, **kwargs):
     process.start()
 
   log_message = f"Spawned Process {process.pid} with {process_function.__name__}"
-  print("")
 
   logger.debug(log_message)
 
@@ -179,3 +184,21 @@ def spawn_process(process_function, *args, start=True,name=None, **kwargs):
 def name(obj) -> str:
   """Returns the name of a class"""
   return obj.__class__.__name__
+
+
+class ProcessStatus(Enum):
+  RUNNING = STATUS_RUNNING
+  DEAD = STATUS_DEAD
+  DISK_SLEEP = STATUS_DISK_SLEEP
+  IDLE = STATUS_IDLE
+  LOCKED = STATUS_LOCKED
+  PARKED = STATUS_PARKED
+  SLEEPING = STATUS_SLEEPING
+  STOPPED = STATUS_STOPPED
+  TRACING_STOP = STATUS_TRACING_STOP
+  WAITING =STATUS_WAITING
+  WAKING = STATUS_WAKING
+  ZOMBIE = STATUS_ZOMBIE
+
+def process_status(process: Process):
+  return ProcessStatus(process.status())

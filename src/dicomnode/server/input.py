@@ -430,12 +430,19 @@ class HistoricAbstractInput(AbstractInput):
 
   """
 
+  class HistoricGrinder(Grinder):
+    def __call__(self, image_generator: Iterable[Dataset]) -> Any:
+      if not isinstance(image_generator, HistoricAbstractInput):
+        raise TypeError("The HistoricGrinder requires a HistoricAbstractInput")
+      return image_generator.historic_dataset
+
   class HistoricInputState(Enum):
     EMPTY = 1
     FETCHING = 2
     FILLED = 3
 
   address: Optional[Address] = None
+  image_grinder = HistoricGrinder()
 
   def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
     super().__init__(options)
