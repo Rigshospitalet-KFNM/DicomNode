@@ -31,7 +31,7 @@ from dicomnode.server.pipeline_tree import InputContainer
 
 # Testing packages
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets,\
-  process_thread_check_leak
+  process_thread_check_leak, clear_logger
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 blueprint = Blueprint([
@@ -114,6 +114,11 @@ class NiftiNode(AbstractPipeline):
 
 
 class End2EndNiftiTestCase(DicomnodeTestCase):
+  def tearDown(self) -> None:
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
+    return super().tearDown()
+
   #@skip("This caused a cascade of bugs")
   @process_thread_check_leak
   def test_end2end_nifti_plus(self):
