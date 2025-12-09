@@ -4,9 +4,11 @@
 from datetime import date
 from random import randint
 import logging
+from typing import Sequence
+
 from time import sleep
 from sys import stdout
-from unittest import TestCase, skip
+
 
 # Third party Packages
 from pydicom import Dataset
@@ -21,12 +23,11 @@ from dicomnode.dicom.dimse import Address, send_image, create_query_dataset,\
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
-from dicomnode.server.input import HistoricAbstractInput
+from dicomnode.server.input import HistoricAbstractInput, AbstractInput
 
 # Testing Packages
 from tests.helpers import get_test_ae, clear_logger
-from tests.helpers.storage_endpoint import TestStorageEndpoint, ENDPOINT_PORT
-from tests.helpers.inputs import TestInput
+from tests.helpers.storage_endpoint import ENDPOINT_AE_TITLE, MOVE_ENDPOINT, TestStorageEndpoint, ENDPOINT_PORT
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 # Constants
@@ -48,20 +49,33 @@ historic_dataset.StudyDate = historic_date
 historic_dataset.SOPInstanceUID = historic_uid
 historic_dataset.SOPClassUID = SecondaryCaptureImageStorage
 historic_dataset.PatientID = test_patient_id
+historic_dataset.PatientSex = "M"
 historic_dataset.SeriesDescription = "Historic"
 make_meta(historic_dataset)
 
 
 class TestCaseStorageEndpoint(TestStorageEndpoint):
+  def __init__(self, datasets: Sequence[Dataset], **kwargs) -> None:
+    self.datasets = datasets
+    super().__init__(**kwargs)
+
   def handle_C_find(self, evt): #type: ignore
-    yield (0xFF00, historic_dataset)
+    for dataset in self.datasets:
+      yield (0xFF00, dataset)
 
   def handle_C_move(self, evt): # type: ignore
     ip, port = self.move_target
     yield ip, port, { "contexts" : [build_context(historic_dataset.SOPClassUID)], "ae_title" : TEST_AE_TITLE}
-    yield 1
-    yield (0xFF00, historic_dataset)
+    yield len(self.datasets)
+    for dataset in self.datasets:
+      yield (0xFF00, dataset)
 
+
+class PresentInput(AbstractInput):
+  enforce_single_study_date = True
+
+  def validate(self) -> bool:
+    return True
 
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
@@ -76,7 +90,7 @@ class TestHistoricInput(HistoricAbstractInput):
 class HistoricPipeline(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {
-    INPUT_KW : TestInput,
+    INPUT_KW : PresentInput,
     HISTORIC_KW : TestHistoricInput
   }
   require_calling_aet = []
@@ -89,7 +103,9 @@ class HistoricPipeline(AbstractPipeline):
   def process(self, input_data: InputContainer) -> PipelineOutput:
     historic = input_data[HISTORIC_KW]
 
-    self.logger.info(f"Found: {historic}")
+    print(f"HISTORIC PROCESSING WITH DATA: {historic}")
+
+    self.logger.info(f"HISTORIC PROCESSING WITH DATA: {historic}")
 
     return NoOutput()
 
@@ -101,18 +117,22 @@ class HistoricTestCase(DicomnodeTestCase):
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
-    self.endpoint = TestCaseStorageEndpoint(move_endpoint=self.test_port)
-    self.endpoint.open()
+
 
   def tearDown(self) -> None:
     self.node.close()
     self.endpoint.close()
 
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
 
     super().tearDown()
 
 
   def test_end_2_end_historic_input(self):
+    self.endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=self.test_port)
+    self.endpoint.open()
+
     address = Address("localhost", self.test_port, TEST_AE_TITLE)
 
     dataset = Dataset()
@@ -120,6 +140,7 @@ class HistoricTestCase(DicomnodeTestCase):
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     dataset.StudyDate = current_date
     dataset.PatientID = test_patient_id
+    dataset.PatientSex = "M"
 
     make_meta(dataset)
 
@@ -129,5 +150,30 @@ class HistoricTestCase(DicomnodeTestCase):
       sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
-
     print(logs)
+    self.endpoint.close()
+
+
+  def test_end_2_end_historic_input_empty(self):
+    self.endpoint = TestCaseStorageEndpoint([], move_endpoint=self.test_port)
+    self.endpoint.open()
+
+    address = Address("localhost", self.test_port, TEST_AE_TITLE)
+
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    dataset.StudyDate = current_date
+    dataset.PatientID = test_patient_id
+    dataset.PatientSex = "M"
+
+    make_meta(dataset)
+
+
+    with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
+      response = send_image(SENDER_AE_TITLE, address, dataset)
+      sleep(1.25) # wait for all the threads to be done
+
+    logs = "\n".join(cm.output)
+    print(logs)
+    self.endpoint.close()

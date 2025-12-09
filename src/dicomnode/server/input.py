@@ -115,8 +115,11 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     ):
     super().__init__()
     self.options = options
-    self._study_date: Optional[date] = None # This gets updated by the PatientNode
-    "Options for this Abstract input"
+
+    self._study_date: Optional[str] = None # This gets updated by the PatientNode
+    """Date for study, used with enforce. String is in format YYYYMMDD"""
+    # There's something to be said about keeping it as string, because it's
+    # objectively wrong that it's not a date object, but it's what dicom uses
 
     self.single_series_uid: Optional[UID] = None
 
@@ -491,9 +494,8 @@ class HistoricAbstractInput(AbstractInput):
       self._address.port,
       ae_title=self._address.ae_title
     ) as assoc:
-      logger = get_logger() # this should be self.logger maybe?
       if assoc is None:
-        logger.error(f"{name(self)} could connect to {self.ae_title} : ({self._address.ip},{self._address.port})")
+        self.logger.error(f"{name(self)} could connect to {self.ae_title} : ({self._address.ip},{self._address.port})")
         return
 
       find_response = assoc.send_c_find(query_data, query_level.find_sop_class())
@@ -502,7 +504,7 @@ class HistoricAbstractInput(AbstractInput):
 
       for (status, incoming_dataset) in find_response:
         if status.Status not in [0xFF00, 0x0000]:
-          logger.error(f"While C-FIND'ing {name(self)} encountered a problem: {status}")
+          self.logger.error(f"While C-FIND'ing {name(self)} encountered a problem: {status}")
 
         if incoming_dataset is None:
           continue
@@ -510,34 +512,38 @@ class HistoricAbstractInput(AbstractInput):
         if (moved_dataset := self.handle_found_dataset(incoming_dataset)) is not None:
           studies_to_be_moved.append(moved_dataset)
 
-      logger.info(f"{name(self)} found {len(studies_to_be_moved)}")
+      self.logger.info(f"{name(self)} found {len(studies_to_be_moved)} series to query for!")
 
       for study in studies_to_be_moved:
         move_responses = assoc.send_c_move(study, self.ae_title, query_level.move_sop_class())
         for status, move_response in move_responses:
           if status.Status not in [0xFF00, 0x0000]:
-            logger.error(f"While C-Move'ing {name(self)} encountered a problem: {status}")
+            self.logger.error(f"While C-Move'ing {name(self)} encountered a problem: {status}")
+
 
       # The datasets will then be added in add image
-
+    self.logger.info("Historic input finished fetching historcy")
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def add_image(self, dicom: Dataset) -> int:
     if self.state == HistoricAbstractInput.HistoricInputState.EMPTY:
       if (query_dataset := self.check_query_dataset(dicom)) is not None:
+        self.logger.debug("Historic input is now Fetching!")
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
         self.thread = Thread(group=None, name="Historic Input", target=self.thread_target, args=(query_dataset,))
         self.thread.start()
       return 0
 
-
     if not self._state_based_validation(dicom):
+      self.logger.debug(f"Historic Input rejecting dataset: {dicom.StudyDate} based on state: {self.study_date}")
       raise InvalidDataset
 
     if not self.validate_image(dicom):
+      self.logger.debug("Historic Input rejecting dataset based on static")
       raise InvalidDataset
 
     # This is mostly done to keep it simple
+    self.logger.debug("Historic input storing dataset")
     self._store_historic_dataset(dicom)
 
     return 1
@@ -558,9 +564,13 @@ class HistoricAbstractInput(AbstractInput):
 
     datasets = study_date_series[series_description]
     datasets.append(historic_dataset)
+    self.images += 1
 
 
   def validate(self) -> bool:
+    if self.thread is not None and self.state != HistoricAbstractInput.HistoricInputState.FILLED:
+      self.thread.join(1.0)
+
     return self.state == HistoricAbstractInput.HistoricInputState.FILLED
 
 class AbstractInputProxy(AbstractInput):
