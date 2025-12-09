@@ -48,7 +48,7 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile
 from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
-  listener_logger, set_queue_handler, set_writer_handler
+  listener_logger, set_queue_handler, set_writer_handler, get_response_logger
 from dicomnode.server.factories.association_events import AcceptedEvent, \
   AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
 from dicomnode.server.input import AbstractInput
@@ -508,7 +508,11 @@ class AbstractPipeline():
 
     """
     signal.signal(signal.SIGINT, self.process_signal_handler_SIGINT)
-    self.logger = get_logger() # Reset loggers as
+
+    # WE HAVE A FUCKING DEADLOCK ISSUE WITHOUT THIS
+    #print("Hello world from new process!")
+
+    #self.logger = get_response_logger() # Reset loggers as
     if len(input_containers) == 0:
       self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
       return

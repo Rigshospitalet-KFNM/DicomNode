@@ -103,8 +103,6 @@ class HistoricPipeline(AbstractPipeline):
   def process(self, input_data: InputContainer) -> PipelineOutput:
     historic = input_data[HISTORIC_KW]
 
-    print(f"HISTORIC PROCESSING WITH DATA: {historic}")
-
     self.logger.info(f"HISTORIC PROCESSING WITH DATA: {historic}")
 
     return NoOutput()
@@ -150,7 +148,6 @@ class HistoricTestCase(DicomnodeTestCase):
       sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
-    print(logs)
     self.endpoint.close()
 
 
@@ -175,5 +172,4 @@ class HistoricTestCase(DicomnodeTestCase):
       sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
-    print(logs)
     self.endpoint.close()

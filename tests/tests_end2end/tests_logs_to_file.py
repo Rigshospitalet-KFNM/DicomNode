@@ -21,8 +21,16 @@ from dicomnode.server.output import NoOutput
 # Testing Packages
 from helpers import process_thread_check_leak
 from helpers.dicomnode_test_case import DicomnodeTestCase
+from helpers import clear_logger
 
 class LogFileIsWritten(DicomnodeTestCase):
+  def tearDown(self) -> None:
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
+
+    return super().tearDown()
+
+
   #@skip("Something doesn't work here")
   @process_thread_check_leak
   def test_end2end_log_file_written(self):

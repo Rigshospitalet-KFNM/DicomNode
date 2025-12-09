@@ -224,7 +224,7 @@ class PipelineTestCase(DicomnodeTestCase):
     with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG) as logs:
       self.pipeline_tree.clean_up_patients([CPR_1, CPR_2])
 
-    self.assertRegexIn("Removed 2 of 3 Patients", logs.output)
+    self.assertRegexIn("Removed 2 images of 3 Patients", logs.output)
 
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)

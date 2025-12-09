@@ -199,8 +199,7 @@ class PatientNode(ImageTreeInterface):
       raise InvalidDataset()
     if self.study_date is None and 'StudyDate' in dicom:
       self._patch_study_date_for_inputs(dicom.StudyDate)
-    else:
-      self.logger.debug(f"No patching of Patient Node: {self.study_date if self.study_date is not None else 'None'} and {'StudyDate' in dicom}")
+
     self.images += added # This is not true, because of replacement
     return added
 
@@ -213,7 +212,6 @@ class PatientNode(ImageTreeInterface):
       )
 
   def _patch_study_date_for_inputs(self, patch_date: str):
-    self.logger.debug(f"Patching patient node with: {patch_date}")
     if self.study_date is not None:
       return
 
