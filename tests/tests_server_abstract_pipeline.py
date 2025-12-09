@@ -275,15 +275,15 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
     self.node._patient_locks[TEST_CPR] = (set([self.thread_id]), threading.Lock())
     self.node.data_state.add_images(DATASETS)
-    input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
-    container = ReleasedEvent(
-      association_id=self.thread_id,
-      association_ip=None,
-      association_ae="AE",
-      association_types=set([AssociationTypes.STORE_ASSOCIATION])
-    )
-
     with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
+      input_container = self.node.data_state.get_patient_input_container(TEST_CPR)
+      container = ReleasedEvent(
+        association_id=self.thread_id,
+        association_ip=None,
+        association_ae="AE",
+        association_types=set([AssociationTypes.STORE_ASSOCIATION])
+      )
+
       self.node._process_entry_point(container, [(TEST_CPR, input_container)])
 
     log_process = f"Processing {TEST_CPR}"

@@ -480,7 +480,9 @@ class PipelineTree(ImageTreeInterface):
 
     self.images -= removed_images
     self.data = new_data_dict
-    self.logger.debug(f"Removed {removed_images} images of {old_size} Patients")
+
+    new_size = len(self.data)
+    self.logger.debug(f"Removed {removed_images} images from {old_size - new_size} Patients")
 
   def clean_up_patient(self, patient_id: str) -> None:
     """Removes a patient from the tree, and removes any files stored under the patient

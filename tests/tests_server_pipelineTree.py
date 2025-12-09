@@ -50,7 +50,7 @@ class TestGrinder(Grinder):
     return "GrinderString"
 
 class TestInput1(AbstractInput):
-  required_tags = []
+  required_tags = [0x0008_0018]
   required_values = {
     0x0008103E : SERIES_DESCRIPTION
   }
@@ -59,7 +59,7 @@ class TestInput1(AbstractInput):
     return True
 
 class TestInput2(AbstractInput):
-  required_tags = [0x0010_0010]
+  required_tags = [0x0010_0010, 0x0008_0018]
   required_values = {
     0x0008103E : SERIES_DESCRIPTION
   }
@@ -71,7 +71,7 @@ class TestInput2(AbstractInput):
 
 
 class TestDynamicInput(DynamicInput):
-  required_tags = [0x00100010]
+  required_tags = [0x00100010, 0x0008_0018]
   required_values = {}
 
   def validate(self) -> bool:
@@ -155,7 +155,8 @@ class PipelineTestCase(DicomnodeTestCase):
 
     expiry_time = datetime.datetime(2002,5,15)
 
-    self.pipeline_tree.remove_expired_studies(expiry_time)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
+      self.pipeline_tree.remove_expired_studies(expiry_time)
 
     self.assertNotIn(CPR_1, self.pipeline_tree)
     self.assertIn(CPR_2, self.pipeline_tree)
@@ -224,7 +225,7 @@ class PipelineTestCase(DicomnodeTestCase):
     with self.assertLogs(DICOMNODE_LOGGER_NAME, level=logging.DEBUG) as logs:
       self.pipeline_tree.clean_up_patients([CPR_1, CPR_2])
 
-    self.assertRegexIn("Removed 2 images of 3 Patients", logs.output)
+    self.assertRegexIn("Removed 2 images from 2 Patients", logs.output)
 
     self.assertNotIn(CPR_1, self.pipeline_tree.data)
     self.assertNotIn(CPR_2, self.pipeline_tree.data)
@@ -236,8 +237,8 @@ class PipelineTestCase(DicomnodeTestCase):
     dataset.PatientID = None
     dataset.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset)
-
-    self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertRaises(InvalidDataset, self.pipeline_tree.add_image, dataset)
 
   def test_pipeline_tree_to_string(self):
     class DummyInput(AbstractInput):
@@ -338,8 +339,10 @@ class PatientNodeTestCase(DicomnodeTestCase):
     make_meta(dataset)
 
     patient_node.add_image(dataset)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
+      input_container = patient_node.extract_input_container()
 
-    input_container = patient_node.extract_input_container()
+    self.assertIsInstance(input_container, InputContainer)
 
   def test_header_creation_with_pivot_input(self):
     options = PatientNode.Options()
@@ -358,8 +361,10 @@ class PatientNodeTestCase(DicomnodeTestCase):
     make_meta(dataset)
 
     patient_node.add_image(dataset)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
+      input_container = patient_node.extract_input_container()
 
-    input_container = patient_node.extract_input_container()
+    self.assertIsInstance(input_container, InputContainer)
 
   def test_header_creation_with_dynamic_input(self):
     options = PatientNode.Options()
@@ -389,7 +394,10 @@ class PatientNodeTestCase(DicomnodeTestCase):
     make_meta(dataset_2)
     patient_dynamic_node.add_image(dataset_2)
 
-    input_container = patient_dynamic_node.extract_input_container()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
+      input_container = patient_dynamic_node.extract_input_container()
+
+    self.assertIsInstance(input_container, InputContainer)
 
   def test_patient_node_to_string(self):
     node = PatientNode({
@@ -435,10 +443,10 @@ class PatientNodeTestCase(DicomnodeTestCase):
 
     series = DicomSeries([ds for ds in generate_numpy_datasets(10, Rows=10, Cols=10, PatientID="test")])
     series["Modality"] = "CT"
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
+      added_images = node.add_images(series)
+      self.assertEqual(added_images, 10)
 
-    added_images = node.add_images(series)
-    self.assertEqual(added_images, 10)
-
-    input_container = node.get_patient_input_container("test")
+      input_container = node.get_patient_input_container("test")
     self.assertIn("test", input_container)
     self.assertIsInstance(input_container["test"], List)

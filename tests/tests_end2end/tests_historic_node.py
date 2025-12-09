@@ -148,6 +148,8 @@ class HistoricTestCase(DicomnodeTestCase):
       sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
+
+    self.assertEqual(self.node.data_state.images, 0)
     self.endpoint.close()
 
 
@@ -168,8 +170,11 @@ class HistoricTestCase(DicomnodeTestCase):
 
 
     with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
+
       response = send_image(SENDER_AE_TITLE, address, dataset)
       sleep(1.25) # wait for all the threads to be done
 
     logs = "\n".join(cm.output)
+
+    self.assertEqual(self.node.data_state.images, 0)
     self.endpoint.close()

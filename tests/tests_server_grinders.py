@@ -10,6 +10,7 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patient
@@ -206,9 +207,9 @@ class GrinderTests(DicomnodeTestCase):
     del ds[2].InstanceNumber
 
     grinder = NumpyGrinder()
-    cube = grinder(ds)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.WARNING) as cm:
+      cube = grinder(ds)
 
-    self.assertLogs("Instance Number not present in dataset, arbitrary ordering of datasets", logging.WARNING)
     self.assertTrue((cube == numpy.array([[[1,1],[2,2]],[[5,5],[6,6]],[[3,3],[4,4]]])).all())
 
   # Numpy Grinder edge cases
@@ -286,7 +287,7 @@ class GrinderTests(DicomnodeTestCase):
     ds[2].SamplesPerPixel = 4
 
     grinder = NumpyGrinder()
-    with self.assertLogs('dicomnode') as recorded_logs:
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as recorded_logs:
       self.assertRaises(InvalidDataset, grinder, ds)
     self.assertEqual(recorded_logs.output[0], "ERROR:dicomnode:Dataset contains"
                      " a retired value for Samples Per Pixel, which is not"
@@ -300,7 +301,7 @@ class GrinderTests(DicomnodeTestCase):
     ds[2].SamplesPerPixel = 12
 
     grinder = NumpyGrinder()
-    with self.assertLogs('dicomnode') as recorded_logs:
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as recorded_logs:
       self.assertRaises(InvalidDataset, grinder, ds)
     self.assertEqual(recorded_logs.output[0], "ERROR:dicomnode:Dataset contains"
                      " a invalid value for Samples Per Pixel")
@@ -345,7 +346,8 @@ class GrinderTests(DicomnodeTestCase):
 
 class NiftyGrinderTestCase(DicomnodeTestCase):
   def test_invalid_configuration_for_grinder(self):
-    self.assertRaises(IncorrectlyConfigured, NiftiGrinder, None, True)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertRaises(IncorrectlyConfigured, NiftiGrinder, None, True)
 
   def test_nifti_grinder_MR_no_resampling(self):
     grinder = NiftiGrinder(None, False)
