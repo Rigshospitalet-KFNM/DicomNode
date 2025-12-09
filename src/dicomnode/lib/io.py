@@ -3,18 +3,16 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
-from datetime import datetime, timedelta
-from warnings import warn
-from argparse import Namespace
+from enum import Enum
 import errno
 import fcntl
-import time
 from logging import Logger
-from pathlib import Path
 import os
+from pathlib import Path
 import random
-from typing import Dict, List, Optional, Tuple, Type, Union
+import time
 import shutil
+from typing import Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 # Thrid party Packages
 import pydicom
@@ -274,3 +272,83 @@ class ResourceFile:
       fcntl.flock(self.resource_file, fcntl.LOCK_UN)
       self.resource_file.close()
       self.locked = False
+
+
+class IOObject():
+  def __init__(self, path: str | Path) -> None:
+    if isinstance(path, str):
+      self._path = Path(path)
+    else:
+      self._path = path
+
+  @property
+  def path(self):
+    return self._path
+
+  def __eq__(self, value: object) -> bool:
+    if not isinstance(value, IOObject):
+      raise TypeError("Cannot compare IOObject to non objects")
+
+    return self.path == value.path
+
+
+class File(IOObject):
+  pass
+
+class Directory(IOObject):
+  def __init__(self, path: str | Path, create_if_missing=True) -> None:
+    super().__init__(path)
+
+    if self.path.exists():
+      if not self.path.is_dir():
+        raise IOError(f"Path {self.path} is not a directory!")
+
+    elif create_if_missing:
+      self.path.mkdir(parents=True, exist_ok=True)
+    else:
+      raise FileNotFoundError(f"Path {self.path} should exists as directory but it doesn't!")
+
+  def __truediv__(self, arg) -> Path:
+    return self.path / arg
+
+  def __iter__(self):
+    return self.path.iterdir()
+
+
+class FileType(Enum):
+  FILE = 1
+  DIRECTORY = 2
+
+def verify_path(path: Path | str, file_type: FileType) -> bool:
+  """Checks if a path is as the expected file type
+
+  Args:
+    path: (Path | str) - The path to check
+    file_type: (FileType) - The expected content of the path
+
+  Returns:
+    boolean: True if the path holds expected IO object
+
+  """
+  if isinstance(path, str):
+    path = Path(path)
+
+  if not path.exists():
+    return False
+
+  match file_type:
+    case FileType.FILE:
+      if not path.is_file():
+        return False
+
+    case FileType.DIRECTORY:
+      if not path.is_dir():
+        return False
+
+  return True
+
+
+TIOObject = TypeVar('TIOObject', bound=IOObject)
+
+def parse_path(path: str | Path, file_type: Type[TIOObject]) -> TIOObject:
+  return file_type(path)

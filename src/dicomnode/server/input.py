@@ -29,7 +29,7 @@ from dicomnode.dicom.dimse import Address, QueryLevels,\
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
-from dicomnode.lib.io import load_dicom, save_dicom
+from dicomnode.lib.io import load_dicom, save_dicom, Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.utils import name
@@ -105,7 +105,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     # these options.
     ae_title: Optional[str] = None
     logger: Optional[Logger] = None
-    data_directory: Optional[Path]  = None
+    data_directory: Optional[Directory]  = None
     lazy: bool = False
     "Indicate if the Abstract input should keep an ethereal handle to the dataset"
 
@@ -123,7 +123,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     self.single_series_uid: Optional[UID] = None
 
-    self.path: Optional[Path] = options.data_directory
+    self.container: Optional[Directory] = options.data_directory
     if self.options.logger is not None:
       self.logger = self.options.logger
       "Logger for logging"
@@ -135,10 +135,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
       self.logger.info(f"You should add SOPInstanceUID to required tags for {name(self)}")
       self.required_tags.append(0x0008_0018)
 
-    if self.path is not None:
-      if not self.path.exists():
-        self.path.mkdir(exist_ok=True)
-      for image_path in self.path.iterdir():
+    if self.container is not None:
+      for image_path in self.container:
         dcm = load_dicom(image_path)
         self.add_image(dcm)
 
@@ -155,7 +153,7 @@ processing, `False` otherwise.
 
   def clean_up(self) -> int:
     """Removes any files, stored by the Input"""
-    if self.path is not None:
+    if self.container is not None:
       for dicom in self:
         path = self.get_path(dicom)
         path.unlink()
@@ -185,7 +183,7 @@ processing, `False` otherwise.
     Raises:
       IncorrectlyConfigured : Calls to this function require a directory
     """
-    if self.path is None:
+    if self.container is None:
       raise IncorrectlyConfigured
 
     image_name: str = ""
@@ -200,7 +198,7 @@ processing, `False` otherwise.
 
     image_name += ".dcm"
 
-    return self.path / image_name
+    return self.container / image_name
 
   @classmethod
   def _validate_value(cls, value, target):
@@ -298,7 +296,7 @@ processing, `False` otherwise.
     replaced = dicom.SOPInstanceUID.name in self
     # Save the dataset
     if self.options.lazy:
-      if self.path is None:
+      if self.container is None:
         raise IncorrectlyConfigured("Lazy object require file storage")
       dicom_path = self.get_path(dicom)
       if not dicom_path.exists():
@@ -306,7 +304,7 @@ processing, `False` otherwise.
       self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
     else:
       self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
-      if self.path is not None:
+      if self.container is not None:
         dicom_path = self.get_path(dicom)
         if not dicom_path.exists():
           save_dicom(dicom_path, dicom)
@@ -411,8 +409,8 @@ class DynamicInput(AbstractInput):
     else:
       # Don't use the add image functionality of the constructor due to fact
       # that, it's return value is needed
-      if self.path is not None:
-        leaf_path = self.path / key
+      if self.container is not None:
+        leaf_path = self.container / key
         leaf_path.mkdir(parents=True, exist_ok=True)
       else:
         leaf_path = None

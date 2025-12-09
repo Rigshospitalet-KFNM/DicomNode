@@ -116,3 +116,13 @@ def worker(queue: Queue):
       send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
 
       instance.close()
+
+class LoggingExperiment(DicomnodeTestCase):
+  def test_logging_experiment(self):
+    def print_hello_world():
+      logger = logging.getLogger()
+      logger.info("Hello world")
+
+    process = spawn_process(print_hello_world)
+
+    process.join()

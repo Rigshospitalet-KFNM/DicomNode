@@ -16,7 +16,6 @@ __author__ = "Christoffer Vilstrup Jensen"
 from enum import Enum
 import logging
 from logging import getLogger, LogRecord
-import multiprocessing
 from multiprocessing import Queue as MPQueue
 from os import chdir, getcwd, getpid
 from pathlib import Path
@@ -46,7 +45,8 @@ from dicomnode.lib.utils import spawn_process, spawn_thread
 from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
-from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile
+from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile,\
+  parse_path, Directory, File
 from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
   listener_logger, set_queue_handler, set_writer_handler, get_response_logger
 from dicomnode.server.factories.association_events import AcceptedEvent, \
@@ -221,22 +221,17 @@ class AbstractPipeline():
 
     self.__cwd = getcwd()
     # Load any previous state
-    if self.data_directory is not None:
-      if not isinstance(self.data_directory, Path):
-        self.data_directory = Path(self.data_directory)
+    self._data_directory = parse_path(self.data_directory, Directory) if self.data_directory is not None else None
+    self._processing_directory = parse_path(self.processing_directory, Directory) if self.processing_directory is not None else None
 
-      if self.data_directory.is_file():
-        raise IncorrectlyConfigured("The root data directory exists as a file.")
+    if self._data_directory == self._processing_directory:
+      raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
-      if not self.data_directory.exists():
-        self.data_directory.mkdir(parents=True)
 
-      if self.data_directory == self.processing_directory:
-        raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
     pipeline_tree_options = self.pipeline_tree_type.Options(
       ae_title=self.ae_title,
-      data_directory=self.data_directory,
+      data_directory=self._data_directory,
       lazy=self.lazy_storage,
       input_container_type=self.input_container_type,
       patient_container=self.patient_container_type,
@@ -467,15 +462,6 @@ class AbstractPipeline():
 
     return
 
-    # This is on purpose!
-    released_event = self._association_event_factory.build_association_released(event)
-
-    for association_type in released_event.association_types:
-      handler = self._release_handlers.get(association_type, None)
-      if handler is not None:
-        handler(self, released_event)
-      else:
-        self.logger.critical(f"Missing Release Handler for {association_type}!") # pragma: no cover
 
   def _release_store_handler(self, released_event: ReleasedEvent):
     input_containers = self._extract_input_containers(released_event)
@@ -765,7 +751,7 @@ class AbstractPipeline():
 
     raise TypeError("Unknown identifier type")
 
-  def get_storage_directory(self, identifier: Any) -> Optional[Path]:
+  def get_storage_directory(self, identifier: Any) -> Optional[Directory]:
     return self.data_state.get_storage_directory(identifier)
 
   def _build_error_dataset(self, blueprint: Blueprint,

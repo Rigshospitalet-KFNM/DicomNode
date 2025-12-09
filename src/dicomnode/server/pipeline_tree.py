@@ -21,8 +21,9 @@ from pydicom import Dataset
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dimse import Address
-from dicomnode.lib.exceptions import (InvalidDataset, InvalidRootDataDirectory,
-                                      InvalidTreeNode)
+from dicomnode.lib.io import Directory
+from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory,\
+                                      InvalidTreeNode
 from dicomnode.lib.logging import log_traceback, get_logger
 from dicomnode.server.input import AbstractInput
 
@@ -34,7 +35,7 @@ class InputContainer:
   def __init__(self,
                data: Dict[str, Any],
                datasets: Dict[str, List[Dataset]] = {},
-               paths: Optional[Dict[str, Path]] = None,
+               paths: Optional[Dict[str, Directory]] = None,
                ) -> None:
     self.__data = data
     self.datasets = datasets
@@ -66,7 +67,7 @@ class PatientNode(ImageTreeInterface):
     InputContainerType: Type[InputContainer] = InputContainer
     "Type that this node should return from a extract_input_container call"
 
-    container_path: Optional[Path] = None
+    container_path: Optional[Directory] = None
     """Path to permanent storage
     If None no permanent storage will be
     """
@@ -82,7 +83,6 @@ class PatientNode(ImageTreeInterface):
     """
 
     ae_title: Optional[str] = None
-    container_path: Optional[Path] = None
 
     lazy: bool = False
 
@@ -99,15 +99,10 @@ class PatientNode(ImageTreeInterface):
     self.creation_time = datetime.now()
     self.study_date = None
 
-    if self.options.container_path is not None:
-      if self.options.container_path.is_file():
-        raise InvalidRootDataDirectory
-      self.options.container_path.mkdir(exist_ok=True)
-
     for arg_name, dicomnode_input_type in args.items():
-      input_path: Optional[Path] = None
+      input_path: Optional[Directory] = None
       if self.options.container_path is not None:
-        input_path = self.options.container_path / arg_name
+        input_path = Directory(self.options.container_path / arg_name)
 
       input_options = self._get_input_options(dicomnode_input=dicomnode_input_type,
                                               input_path=input_path)
@@ -132,7 +127,7 @@ class PatientNode(ImageTreeInterface):
       else:
         raise InvalidTreeNode # pragma: no cover
     if self.options.container_path is not None:
-      shutil.rmtree(self.options.container_path)
+      shutil.rmtree(self.options.container_path.path)
     return images_removed
 
   def validate_inputs(self) -> bool:
@@ -158,7 +153,7 @@ class PatientNode(ImageTreeInterface):
     data_directory: Dict[str, Any] = {}
     series = {}
 
-    path_directory: Optional[Dict[str, Path]] = None
+    path_directory: Optional[Dict[str, Directory]] = None
     if self.options.container_path is not None:
       path_directory = {}
 
@@ -167,8 +162,8 @@ class PatientNode(ImageTreeInterface):
         self.logger.debug(f"Extracting input from {dicomnode_input.__class__.__name__}")
         data_directory[arg_name] = dicomnode_input.get_data()
         series[arg_name] = dicomnode_input.get_datasets()
-        if path_directory is not None and dicomnode_input.path is not None:
-          path_directory[arg_name] = dicomnode_input.path
+        if path_directory is not None and dicomnode_input.container is not None:
+          path_directory[arg_name] = dicomnode_input.container
       else:
         raise InvalidTreeNode # pragma: no cover
 
@@ -203,7 +198,7 @@ class PatientNode(ImageTreeInterface):
     self.images += added # This is not true, because of replacement
     return added
 
-  def _get_input_options(self, dicomnode_input: Type[AbstractInput], input_path: Optional[Path]):
+  def _get_input_options(self, dicomnode_input: Type[AbstractInput], input_path: Optional[Directory]):
     return dicomnode_input.Options(
         ae_title=self.options.ae_title,
         data_directory = input_path,
@@ -260,7 +255,7 @@ class PipelineTree(ImageTreeInterface):
     ae_title: Optional[str] = None
     "AE title of node"
 
-    data_directory: Optional[Path] = None
+    data_directory: Optional[Directory] = None
     "Root directory for file storage"
 
     lazy: bool = False
@@ -311,16 +306,8 @@ class PipelineTree(ImageTreeInterface):
       # There are no files to load if it's in memory
       return
 
-    if not self.options.data_directory.exists():
-      self.options.data_directory.mkdir()
-
-    for patient_directory in self.options.data_directory.iterdir():
-      if patient_directory.is_file():
-        self.logger.error(f"{patient_directory.name} in\
-                           root_data_directory is a file not a directory")
-        raise InvalidRootDataDirectory()
-
-      options = self._get_patient_container_options(patient_directory)
+    for patient_directory in self.options.data_directory:
+      options = self._get_patient_container_options(Directory(patient_directory))
 
       self[patient_directory.name] = PatientNode(self.tree_node_definition, options)
 
@@ -328,9 +315,9 @@ class PipelineTree(ImageTreeInterface):
     key = self.get_patient_id(dicom)
 
     if key not in self:
-      input_container_path: Optional[Path] = None
+      input_container_path: Optional[Directory] = None
       if self.options.data_directory is not None:
-        input_container_path = self.options.data_directory / key
+        input_container_path = Directory(self.options.data_directory / key)
 
       options = self._get_patient_container_options(input_container_path)
       self[key] = PatientNode(self.tree_node_definition, options)
@@ -343,22 +330,22 @@ class PipelineTree(ImageTreeInterface):
 
     raise InvalidTreeNode # pragma: no cover
 
-  def get_storage_directory(self, identifier: Any) -> Optional[Path]:
+  def get_storage_directory(self, identifier: Any) -> Optional[Directory]:
     if self.options.data_directory is None:
       return None
 
     if isinstance(identifier, DicomSeries):
       val = identifier[self.patient_identifier_tag]
       if val is not None and not isinstance(val, List):
-        return self.options.data_directory / str(val.value)
+        return Directory(self.options.data_directory / str(val.value))
       else:
         return None
 
     if isinstance(identifier, Dataset):
-      return self.options.data_directory / str(identifier[self.patient_identifier_tag].value)
+      return Directory(self.options.data_directory / str(identifier[self.patient_identifier_tag].value))
 
     if isinstance(identifier, str):
-      return self.options.data_directory / identifier
+      return Directory(self.options.data_directory / identifier)
 
     raise TypeError("Unknown identifier type")
 
@@ -512,7 +499,7 @@ class PipelineTree(ImageTreeInterface):
 
     self.logger.debug(f"Removed {patient_id} and {removed_images} images from Pipeline")
 
-  def _get_patient_container_options(self, container_path: Optional[Path]) -> PatientNode.Options:
+  def _get_patient_container_options(self, container_path: Optional[Directory]) -> PatientNode.Options:
     """Creates the options for the underlying Patient Container
 
     Args:
