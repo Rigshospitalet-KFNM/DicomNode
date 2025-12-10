@@ -46,7 +46,7 @@ from dicomnode.lib import config_parser
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile,\
-  parse_path, Directory, File
+  Directory, File
 from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
   listener_logger, set_queue_handler, set_writer_handler, get_response_logger
 from dicomnode.server.factories.association_events import AcceptedEvent, \
@@ -221,8 +221,8 @@ class AbstractPipeline():
 
     self.__cwd = getcwd()
     # Load any previous state
-    self._data_directory = parse_path(self.data_directory, Directory) if self.data_directory is not None else None
-    self._processing_directory = parse_path(self.processing_directory, Directory) if self.processing_directory is not None else None
+    self._data_directory = Directory(self.data_directory) if self.data_directory is not None else None
+    self._processing_directory = Directory(self.processing_directory) if self.processing_directory is not None else None
 
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
@@ -498,7 +498,7 @@ class AbstractPipeline():
     #print("Hello world from new process!")
 
     #self.logger = get_response_logger() # Reset loggers as
-    if len(input_containers) == 0:
+    if len(input_containers) == 0: #pragma: no cover # this is covered in calling and exists as a defensive statement
       self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
       return
 

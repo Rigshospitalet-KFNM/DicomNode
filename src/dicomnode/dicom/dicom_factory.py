@@ -457,7 +457,7 @@ class DicomFactory():
     self.default_pixel_representation = DicomFactory.PixelRepresentation.UNSIGNED
     self.default_photometric_interpretation = DicomFactory.PhotometricInterpretation.MONOCHROME_BLACK
 
-  def store_image_in_dataset(self, dataset: Dataset, image: ndarray[Tuple[int,int], Any]):
+  def store_image_in_dataset(self, dataset: Dataset, image: ndarray):
     if len(image.shape) != 2:
       raise ValueError("You can only store an 2D image using this function")
 
@@ -639,6 +639,8 @@ class DicomFactory():
             )
 
         datasets.append(ds)
+    else:
+      raise NotImplementedError("None 3D Nifti images are not supported")
 
     return DicomSeries(datasets)
 

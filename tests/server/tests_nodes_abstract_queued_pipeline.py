@@ -7,9 +7,10 @@ from pydicom import DataElement, Dataset
 from pynetdicom.association import Association
 from pynetdicom import events as evt
 
-from tests.helpers import generate_numpy_datasets
+from tests.helpers import generate_numpy_datasets, clear_logger
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.factories.association_events import ReleasedEvent, AssociationTypes
 from dicomnode.server.grinders import ListGrinder
@@ -60,8 +61,11 @@ class QueuedPipelineTestCase(DicomnodeTestCase):
     self.node = TestPipeline()
 
   def tearDown(self) -> None:
-    super().tearDown()
     self.node.close()
+
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    super().tearDown()
 
   def test_real_dumb(self):
     self.assertEqual(inspect.getsource(self.node._handle_association_released),

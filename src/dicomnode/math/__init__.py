@@ -27,9 +27,9 @@ try:
   cudaError, device_prop = _cuda.get_device_properties()
   if not cudaError:
     CUDA = True
-  else:
+  else: #pragma: no cover
     CUDA = False
-except Exception:
+except Exception: #pragma: no cover
   CUDA = False
 
 from . import _cpp
@@ -94,7 +94,7 @@ def mirror_inplace_gpu(arr: numpy_image, direction: MirrorDirection):
   Raises:
       CudaException: _description_
   """
-  if not CUDA:
+  if not CUDA: #pragma no cover
     raise Exception("You need GPU for this")
 
   from dicomnode.math import _cuda
@@ -117,7 +117,7 @@ def mirror_inplace_gpu(arr: numpy_image, direction: MirrorDirection):
 
   error = CudaErrorEnum(func(arr))
 
-  if error != CudaErrorEnum.cudaSuccess:
+  if error != CudaErrorEnum.cudaSuccess: #pragma: no cover
     raise CudaException(error)
 
 
@@ -169,13 +169,13 @@ def _bounding_box_cpu(array : numpy.ndarray):
   return bounding_box_list
 
 def _bounding_box_gpu(array):
-  if not CUDA:
+  if not CUDA: # pragma: no cover
     raise Exception("GPU code call without working GPU driver")
 
   from dicomnode.math import _cuda
 
   error, (x_min, x_max, y_min, y_max, z_min, z_max) = _cuda.bounding_box(array)
-  if error:
+  if error: # pragma: no cover
     raise CudaException(CudaErrorEnum(int(error)))
 
   return (x_min, x_max), (y_min, y_max), (z_min, z_max)
@@ -192,19 +192,18 @@ def bounding_box(array):
 
   if CUDA:
     return _bounding_box_gpu(array)
-  else:
+  else:# pragma: no cover
     return _bounding_box_cpu(array)
 
 from . import labeling
 from . import space
 
-def __all__():
-  return [
-    labeling,
-    space,
-    CUDA,
-    image,
-    mirror,
-    types,
-    bounding_box,
+__all__ = [
+    "labeling",
+    "space",
+    "CUDA",
+    "image",
+    "mirror",
+    "types",
+    "bounding_box",
   ]

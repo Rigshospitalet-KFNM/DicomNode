@@ -7,7 +7,7 @@ import importlib
 # Third party Packages
 
 # Dicomnode packages
-from dicomnode.lib.io import FileType, verify_path
+from dicomnode.lib.io import File
 
 HELP_MESSAGE = dedent("""
 This programs takes a python file and in that file a single AbstractPipeline
@@ -28,5 +28,4 @@ def entry_func(args: Namespace): #pragma: no cover
 
 
 def main(pipeline_path: Path):
-  if not verify_path(pipeline_path, FileType.FILE):
-    raise FileNotFoundError(f"{pipeline_path} is not a file!")
+  file = File(pipeline_path)

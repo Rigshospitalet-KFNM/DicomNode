@@ -22,7 +22,7 @@ except ImportError:
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import IncorrectlyConfigured,\
-  ConstructionFailure, MissingPivotDataset
+  ConstructionFailure, MissingPivotDataset, InvalidDataset
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement,\
   Blueprint, SeriesElement, StaticElement, InstanceCopyElement,\
@@ -200,6 +200,12 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     self.parent_series = DicomSeries([
       gen_dataset(i) for i in range(13)
     ])
+
+  def test_cannot_store_3D_images_in_datasets(self):
+    ds = Dataset()
+    image = numpy.random.beta(1, 2, (2,3,4))
+    with self.assertRaises(ValueError):
+      self.factory.store_image_in_dataset(ds, image)
 
 
   def test_CopyElementCorporealialize(self):
@@ -481,3 +487,63 @@ class DicomFactoryTestCase(DicomnodeTestCase):
                       [],
                       Blueprint([]), bytes([0,0,0,0]), {}
     )
+
+  def test_build_series_without_image_encoding_blank_inputl(self):
+    images = [numpy.arange((10 * 10)).reshape((10,10)) for _ in range(10)]
+
+    datasets = [ds for ds in generate_numpy_datasets(10)]
+
+    bp = Blueprint()
+    with self.assertRaises(InvalidDataset):
+      self.factory.build_series_without_image_encoding(
+        images,
+        bp,
+        datasets,
+        {}
+      )
+
+    # Fails due to missing SOPClass
+
+  def test_build_series_without_image_encoding_minimal(self):
+    images = [numpy.arange((10 * 10)).reshape((10,10)) for _ in range(10)]
+
+    datasets = [ds for ds in generate_numpy_datasets(10)]
+
+    bp = Blueprint([
+      FunctionalElement(0x0008_0016, 'UI', add_UID_tag),
+      StaticElement(0x0008_0018, 'UI', SecondaryCaptureImageStorage)
+    ])
+
+
+    build_series =  self.factory.build_series_without_image_encoding(
+        images,
+        bp,
+        datasets,
+        {}
+      )
+
+    self.assertIsInstance(build_series, DicomSeries)
+
+    # Fails due to missing SOPClass
+
+  def test_build_series_without_image_encoding_minimal_with_mismatching_datasets(self):
+    images = [numpy.arange((10 * 10)).reshape((10,10)) for _ in range(10)]
+
+    datasets = DicomSeries([ds for ds in generate_numpy_datasets(5)])
+
+    bp = Blueprint([
+      FunctionalElement(0x0008_0016, 'UI', add_UID_tag),
+      StaticElement(0x0008_0018, 'UI', SecondaryCaptureImageStorage)
+    ])
+
+
+    build_series =  self.factory.build_series_without_image_encoding(
+        images,
+        bp,
+        datasets,
+        {}
+      )
+
+    self.assertIsInstance(build_series, DicomSeries)
+
+    # Fails due to missing SOPClass

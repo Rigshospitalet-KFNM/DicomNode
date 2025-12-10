@@ -306,49 +306,10 @@ class Directory(IOObject):
     elif create_if_missing:
       self.path.mkdir(parents=True, exist_ok=True)
     else:
-      raise FileNotFoundError(f"Path {self.path} should exists as directory but it doesn't!")
+      raise NotADirectoryError(f"Path {self.path} should exists as directory but it doesn't!")
 
   def __truediv__(self, arg) -> Path:
     return self.path / arg
 
   def __iter__(self):
     return self.path.iterdir()
-
-
-class FileType(Enum):
-  FILE = 1
-  DIRECTORY = 2
-
-def verify_path(path: Path | str, file_type: FileType) -> bool:
-  """Checks if a path is as the expected file type
-
-  Args:
-    path: (Path | str) - The path to check
-    file_type: (FileType) - The expected content of the path
-
-  Returns:
-    boolean: True if the path holds expected IO object
-
-  """
-  if isinstance(path, str):
-    path = Path(path)
-
-  if not path.exists():
-    return False
-
-  match file_type:
-    case FileType.FILE:
-      if not path.is_file():
-        return False
-
-    case FileType.DIRECTORY:
-      if not path.is_dir():
-        return False
-
-  return True
-
-
-TIOObject = TypeVar('TIOObject', bound=IOObject)
-
-def parse_path(path: str | Path, file_type: Type[TIOObject]) -> TIOObject:
-  return file_type(path)

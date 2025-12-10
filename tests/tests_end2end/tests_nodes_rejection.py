@@ -17,10 +17,12 @@ from pynetdicom.ae import ApplicationEntity
 from pynetdicom.sop_class import Verification # type: ignore
 
 # Dicomnode Modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 
 # Test packages
+from tests.helpers import clear_logger
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers.inputs import NeverValidatingInput
 
@@ -53,8 +55,9 @@ class RejectionTestCase(DicomnodeTestCase):
 
 
   def tearDown(self) -> None:
-    while self.node.dicom_application_entry.active_associations != []:
-      sleep(0.005) #pragma: no cover
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
+
     self.node.close()
     super().tearDown()
 

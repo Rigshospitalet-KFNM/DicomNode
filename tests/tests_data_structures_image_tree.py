@@ -457,6 +457,15 @@ class lib_imageTree(DicomnodeTestCase):
     for image in DT:
       self.assertIn(image, self.datasets)
 
+    for series in DT.series():
+      self.assertIsInstance(series, SeriesTree)
+
+    for series in DT.studies():
+      self.assertIsInstance(series, StudyTree)
+
+    for PT in DT.patients():
+      self.assertIsInstance(PT, PatientTree)
+
 
   def test_image_tree_contains(self):
     series_tree = SeriesTree([self.dataset_1])

@@ -7,14 +7,17 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Python Standard Library
 from argparse import ArgumentTypeError
 from unittest import TestCase
+from logging import getLogger
 
 # Thrid Party packages
 import numpy
 from pydicom import Dataset
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid
-from dicomnode.lib.utils import str2bool
+from dicomnode.lib.utils import str2bool, spawn_thread,\
+  human_readable_byte_count, ThreadWithReturnValue
 
 # Testing helpers
 from tests.helpers import bench
@@ -68,3 +71,29 @@ class pydicomTestCases(DicomnodeTestCase):
       dataset.add_new(0x00080016,'UI',gen_uid())
       dataset.add_new(0x00100020,'LO',"Helloworld")
       datasets.append(dataset)
+
+  def test_spawning_a_thread(self):
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
+    message = "Hello from thread"
+    def func():
+      logger.info(message)
+
+    with self.assertLogs(logger) as captured_logs:
+      thread = spawn_thread(func, logger=logger)
+      thread.join()
+
+    self.assertRegexIn(message, captured_logs.output)
+
+  def test_human_read_able_0kb(self):
+    self.assertEqual("0 KB", human_readable_byte_count(0))
+    self.assertEqual("1 bytes", human_readable_byte_count(1))
+
+  def test_thread_with_return_value(self):
+    def func():
+      return 1
+
+    thread = ThreadWithReturnValue(target=func)
+    thread.start()
+    thread.join()
+
+    self.assertEqual(thread.join(), 1)

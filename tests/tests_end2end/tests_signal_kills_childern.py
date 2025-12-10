@@ -27,7 +27,8 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import PipelineOutput, NoOutput
 
 # Testing Packages
-from helpers.dicomnode_test_case import DicomnodeTestCase
+from tests.helpers import clear_logger
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class SignalKillsChildrenWritten(DicomnodeTestCase):
   def setUp(self) -> None:
@@ -53,6 +54,9 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     self.logging_queue.put(None)
     self.listener_thread.join()
     sys.stdout = sys.__stdout__
+
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
     super().tearDown()
 
 

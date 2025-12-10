@@ -283,11 +283,8 @@ def process_thread_check_leak(func):
 def clear_logger(logger_name: str):
   logger = getLogger(logger_name)
 
-  for filter in logger.filters:
-    logger.removeFilter(filter)
-
-  for handler in logger.handlers:
-    logger.removeHandler(handler)
+  logger.filters.clear()
+  logger.handlers.clear()
 
 
 from . import dicomnode_test_case

@@ -85,3 +85,7 @@ class lib_io_test_case(DicomnodeTestCase):
     io.apply_private_tags(ds, self.test_private_tag_dict)
     self.assertEqual(ds.Modality, 'OT')
     self.assertEqual(ds[0x0008_0060].VR, 'CS')
+
+  def test_missing_directory_throws_an_exception(self):
+    with self.assertRaises(NotADirectoryError):
+      io.Directory("THIS DOESN'T EXISTS", False)

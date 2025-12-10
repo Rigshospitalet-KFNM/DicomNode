@@ -43,7 +43,8 @@ from dicomnode.server.factories.association_events import CStoreEvent,\
 
 # Test Helpers #
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
-from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets
+from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets,\
+  clear_logger
 from tests.helpers.storage_endpoint import TestStorageEndpoint
 
 # Constants declarations #
@@ -138,6 +139,8 @@ class PipeLineTestCase(DicomnodeTestCase):
     self.thread_id = threading.get_native_id()
 
   def tearDown(self) -> None:
+    clear_logger(DICOMNODE_LOGGER_NAME)
+
     super().tearDown()
 
     storage = self.node.get_storage_directory(TEST_CPR)

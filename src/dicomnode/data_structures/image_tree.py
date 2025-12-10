@@ -490,9 +490,9 @@ class DicomTree(ImageTreeInterface):
       patientStr += f"  {patientTree}"
     return f"Dicom Tree with {self.images} images\n{patientStr}"
 
-  def patients(self) -> Iterable[PatientTree]: #pragma: no cover
+  def patients(self) -> Iterable[PatientTree]:
     for patient in self.data.values():
-      if not isinstance(patient, PatientTree):
+      if not isinstance(patient, PatientTree): #pragma: no cover
         raise InvalidTreeNode
       yield patient
 

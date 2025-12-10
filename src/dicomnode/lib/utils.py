@@ -20,7 +20,7 @@ from psutil import Process, STATUS_RUNNING, STATUS_DEAD, STATUS_DISK_SLEEP, STAT
 try:
   from os import getuid, setuid
   UNIX = True
-except ImportError:
+except ImportError: #pragma: no cover
   UNIX = False
 
 from warnings import warn
@@ -76,7 +76,7 @@ class ThreadWithReturnValue(Thread):
     Thread.join(self, *args)
     return self._return
 
-def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None:
+def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None: #pragma: no cover
   """Drops privileges of program to run as a user
 
   An issue with this is that you have to open the socket / files and then drop
@@ -96,7 +96,7 @@ def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0)
       else:
         logger.info("Cannot drop privileges, Not on a unix system")
 
-def deprecation_message(deprecated_module_path, new_module_path) -> None:
+def deprecation_message(deprecated_module_path, new_module_path) -> None: #pragma: no cover
   warn(f"{deprecated_module_path} has been moved to {new_module_path}", DeprecationWarning)
 
 def type_corrosion(*types: Type):
@@ -130,10 +130,10 @@ def human_readable_byte_count(number_of_bytes: int):
   """
 
   units = [
-    (1024**3, 'TB'),  # Terabytes
-    (1024**2, 'GB'),  # Gigabytes
-    (1024, 'MB'),     # Megabytes
-    (1, 'kB')         # Kilobytes
+    (1024 ** 4, 'TB'),  # Terabytes
+    (1024** 3, 'GB'),  # Gigabytes
+    (1024 ** 2, 'MB'),     # Megabytes
+    (1024, 'kB')         # Kilobytes
   ]
 
   if number_of_bytes <= 0:
@@ -196,7 +196,7 @@ class ProcessStatus(Enum):
   SLEEPING = STATUS_SLEEPING
   STOPPED = STATUS_STOPPED
   TRACING_STOP = STATUS_TRACING_STOP
-  WAITING =STATUS_WAITING
+  WAITING = STATUS_WAITING
   WAKING = STATUS_WAKING
   ZOMBIE = STATUS_ZOMBIE
 
