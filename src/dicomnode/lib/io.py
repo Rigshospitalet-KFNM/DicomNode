@@ -301,7 +301,7 @@ class Directory(IOObject):
 
     if self.path.exists():
       if not self.path.is_dir():
-        raise IOError(f"Path {self.path} is not a directory!")
+        raise NotADirectoryError(f"Path {self.path} is not a directory!")
 
     elif create_if_missing:
       self.path.mkdir(parents=True, exist_ok=True)

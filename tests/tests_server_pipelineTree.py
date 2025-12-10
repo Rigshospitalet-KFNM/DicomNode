@@ -20,6 +20,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.lib.io import Directory
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory
 from dicomnode.server.grinders import Grinder, ListGrinder
 from dicomnode.server.input import AbstractInput, DynamicInput
@@ -80,9 +81,9 @@ class TestDynamicInput(DynamicInput):
 
 class PipelineTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
-    self.path = Path(self._testMethodName)
+    self.pipeline_tree_directory = Directory(Path(self._testMethodName))
     self.options = PipelineTree.Options(
-      data_directory=self.path
+      data_directory=self.pipeline_tree_directory
     )
     self.pipeline_tree = PipelineTree(
       0x00100020, {
@@ -93,7 +94,7 @@ class PipelineTestCase(DicomnodeTestCase):
 
   def tearDown(self) -> None:
     super().tearDown()
-    shutil.rmtree(self.path)
+    shutil.rmtree(self.pipeline_tree_directory.path)
 
   def test_add_image(self):
     CPR = "1502799995"
@@ -305,18 +306,20 @@ class PatientNodeTestCase(DicomnodeTestCase):
     self.assertIsInstance(self.PatientNode['arg_2'], TestInput2)
 
   def test_raises_error_on_file_existence(self):
+    """Old test - should be moved into some IO test"""
     path = self.path / "test"
     with path.open(mode="w") as f:
       f.write("asdf")
-    options = PatientNode.Options(container_path=path)
-    self.assertRaises(InvalidRootDataDirectory, PatientNode,{ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, options)
+    with self.assertRaises(NotADirectoryError):
+      Directory(path)
+
     path.unlink(missing_ok=True)
 
   def test_IC_cleanup(self):
     path = self.path / "test"
     path.mkdir()
     options = PatientNode.Options(
-      container_path=path
+      container_path=Directory(path)
     )
     input_container = PatientNode({ 'arg_1' : TestInput1, 'arg_2' : TestInput2}, options)
     input_container.clean_up()

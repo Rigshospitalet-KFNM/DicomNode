@@ -45,8 +45,8 @@ class TestPipeline(AbstractQueuedPipeline):
   }
   log_output=None
 
-  def process(self, input_container: InputContainer):
-    datasets: List[Dataset] = input_container["dicoms"]
+  def process(self, input_data: InputContainer):
+    datasets: List[Dataset] = input_data["dicoms"]
 
     pivot = datasets[0]
     sleep(pivot[0x0011_0100].value)

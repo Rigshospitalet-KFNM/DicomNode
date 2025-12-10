@@ -32,6 +32,7 @@ from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dicom_factory import DicomFactory
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom.blueprints.error_blueprint_english import ERROR_BLUEPRINT
+from dicomnode.lib.io import Directory
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.grinders import SeriesGrinder
@@ -140,8 +141,8 @@ class PipeLineTestCase(DicomnodeTestCase):
     super().tearDown()
 
     storage = self.node.get_storage_directory(TEST_CPR)
-    if storage is not None and storage.exists():
-      rmtree(storage)
+    if storage is not None:
+      rmtree(storage.path)
 
   def test_consume_c_store_missing_Patient_ID(self):
     # Setup

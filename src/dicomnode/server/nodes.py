@@ -224,9 +224,8 @@ class AbstractPipeline():
     self._data_directory = parse_path(self.data_directory, Directory) if self.data_directory is not None else None
     self._processing_directory = parse_path(self.processing_directory, Directory) if self.processing_directory is not None else None
 
-    if self._data_directory == self._processing_directory:
+    if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
-
 
 
     pipeline_tree_options = self.pipeline_tree_type.Options(

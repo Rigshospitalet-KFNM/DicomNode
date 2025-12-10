@@ -29,7 +29,7 @@ from dicomnode.dicom.dimse import Address, create_query_dataset, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.server.grinders import NumpyGrinder
-from dicomnode.lib.io import save_dicom
+from dicomnode.lib.io import save_dicom, Directory
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf, AbstractInputProxy
 
@@ -78,16 +78,16 @@ class TestLazyDynamicMissingPathInput(DynamicInput):
 class InputTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     os.chdir(TESTING_TEMPORARY_DIRECTORY)
-    self.path = Path(self._testMethodName)
+    self.input_directory = Directory(Path(self._testMethodName))
     self.options = TestInput.Options(
-      data_directory=self.path
+      data_directory=self.input_directory
     )
     self.test_input = TestInput(self.options)
     self.logger = logger
 
   def tearDown(self) -> None:
     super().tearDown()
-    shutil.rmtree(self.path)
+    shutil.rmtree(self.input_directory.path)
 
   def test_SOPInstanceUID_is_required(self):
     self.assertIn(0x00080018, self.test_input.required_tags)
@@ -147,7 +147,7 @@ class InputTestCase(DicomnodeTestCase):
     dataset_1.SeriesDescription = SERIES_DESCRIPTION
     dataset_1.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset_1)
-    ds_1_path = self.path / "ds_1.dcm"
+    ds_1_path = self.input_directory / "ds_1.dcm"
     save_dicom(ds_1_path, dataset_1)
 
     dataset_2 = Dataset()
@@ -155,10 +155,10 @@ class InputTestCase(DicomnodeTestCase):
     dataset_2.SeriesDescription = SERIES_DESCRIPTION
     dataset_2.SOPClassUID = SecondaryCaptureImageStorage
     make_meta(dataset_2)
-    ds_2_path = self.path / "ds_2.dcm"
+    ds_2_path = self.input_directory / "ds_2.dcm"
     save_dicom(ds_2_path, dataset_2)
 
-    test_input = TestInput(options=TestInput.Options(data_directory=self.path))
+    test_input = TestInput(options=TestInput.Options(data_directory=self.input_directory))
 
     self.assertEqual(len(test_input),2)
     self.assertIn(dataset_1.SOPInstanceUID, test_input)
@@ -181,7 +181,7 @@ class InputTestCase(DicomnodeTestCase):
     self.assertIs(input.logger, logger)
 
   def test_lazy_testInput(self):
-    input = TestInput(options=TestInput.Options(data_directory=self.path, lazy=True))
+    input = TestInput(options=TestInput.Options(data_directory=self.input_directory, lazy=True))
 
     dataset = Dataset()
     dataset.SOPInstanceUID = gen_uid()
@@ -239,7 +239,7 @@ class InputTestCase(DicomnodeTestCase):
     datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3,
                                          Cols=10, Rows=10, PatientID = patient_ID)
 
-    options = TestDynamicInput.Options(data_directory=self.path)
+    options = TestDynamicInput.Options(data_directory=self.input_directory)
 
     TDI = TestDynamicInput(options=options)
 
@@ -264,7 +264,7 @@ class InputTestCase(DicomnodeTestCase):
     datasets_3 = generate_numpy_datasets(2, StudyUID=studyUID, SeriesUID=seriesUID_3,
                                          Cols=10, Rows=10, PatientID = patient_ID)
 
-    options = TestDynamicInput.Options(data_directory=self.path, lazy=True)
+    options = TestDynamicInput.Options(data_directory=self.input_directory, lazy=True)
 
     TDI = TestDynamicInput(options=options)
 
