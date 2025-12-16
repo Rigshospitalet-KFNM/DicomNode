@@ -7,10 +7,10 @@
 
 template<typename OP, typename T>
 concept CBinaryOperator = requires (OP op, T a, T b) {
-  {OP::apply(a, b) } -> std::same_as<T>;
-  {OP::equals(a, b) } -> std::same_as<bool>;
-  {OP::identity() } -> std::same_as<T>;
-  {OP::remove_volatile(a)} -> std::same_as<T>;
+  { OP::apply(a, b) } -> std::same_as<T>;
+  { OP::equals(a, b) } -> std::same_as<bool>;
+  { OP::identity() } -> std::same_as<T>;
+  { OP::remove_volatile(a)} -> std::same_as<T>;
 };
 
 template<typename OP, typename T_IN, typename T_OUT, typename... Args>

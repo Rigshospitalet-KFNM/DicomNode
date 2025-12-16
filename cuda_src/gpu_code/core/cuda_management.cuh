@@ -118,7 +118,7 @@ class DicomNodeRunner{
     return *this;
   }
 
-  dicomNodeError_t error() const {
+  constexpr dicomNodeError_t error() const noexcept {
     return m_error;
   }
 

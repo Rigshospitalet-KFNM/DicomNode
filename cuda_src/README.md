@@ -17,3 +17,5 @@ limits of the data stores.
 
 Rules:
   All classes must be default constructable with all zeroes!
+
+Also make sure code compiles with older versions of cuda, I.E. cuda 12.9

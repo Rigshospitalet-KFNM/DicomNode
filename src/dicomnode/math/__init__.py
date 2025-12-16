@@ -10,6 +10,7 @@ that for you.
   """
 
 # Python standard library
+from dataclasses import dataclass
 from typing import List, Literal, Tuple
 
 # Third party packages
@@ -195,8 +196,19 @@ def bounding_box(array):
   else:# pragma: no cover
     return _bounding_box_cpu(array)
 
+@dataclass(slots=True, frozen=True)
+class Coordinate:
+  x: int
+  y: int
+  z: int
+
+  def __str__(self) -> str:
+    return f"({self.z},{self.y},{self.x})"
+
+
 from . import labeling
 from . import space
+
 
 __all__ = [
     "labeling",

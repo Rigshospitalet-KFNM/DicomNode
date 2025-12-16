@@ -12,7 +12,7 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
-from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.exceptions import DimensionalityError
 from dicomnode import math
 from dicomnode.math.types import numpy_image, raw_image_frames
 from dicomnode.math.types import MirrorDirection
@@ -146,6 +146,30 @@ class Image:
         raise Exception("")
 
 
+  def embed_image(self, start_coord: 'math.Coordinate', embedding: ndarray):
+    if embedding.ndim != 3:
+      raise DimensionalityError(f"Embedding doesn't have 3 dimensions, but {embedding.ndim}")
+
+    x_dim, y_dim, z_dim = self.shape
+
+    x_embedding_dim, y_embedding_dim, z_embedding_dim = embedding.shape
+
+    end_coord = math.Coordinate(
+      min(start_coord.x + x_embedding_dim, x_dim),
+      min(start_coord.y + y_embedding_dim, y_dim),
+      min(start_coord.z + z_embedding_dim, z_dim)
+    )
+
+    d_s_z = slice(start_coord.z, end_coord.z) # Destination_source_z_dimension
+    d_s_y = slice(start_coord.y, end_coord.y)
+    d_s_x = slice(start_coord.x, end_coord.x)
+
+    s_s_z = slice(0, min(z_embedding_dim, z_dim - start_coord.z))
+    s_s_y = slice(0, min(y_embedding_dim, y_dim - start_coord.y))
+    s_s_x = slice(0, min(x_embedding_dim, x_dim - start_coord.x))
+
+
+    self.raw[d_s_z, d_s_y, d_s_x] = embedding[s_s_z, s_s_y, s_s_x]
 
 
   @classmethod

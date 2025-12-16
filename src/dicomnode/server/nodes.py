@@ -494,9 +494,9 @@ class AbstractPipeline():
     """
     signal.signal(signal.SIGINT, self.process_signal_handler_SIGINT)
 
-    # WE HAVE A FUCKING DEADLOCK ISSUE WITHOUT THIS
     #print("Hello world from new process!")
 
+    # This causes problems
     #self.logger = get_response_logger() # Reset loggers as
     if len(input_containers) == 0: #pragma: no cover # this is covered in calling and exists as a defensive statement
       self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
@@ -504,7 +504,7 @@ class AbstractPipeline():
 
     for patient_id, input_container in input_containers:
       self.logger.debug(f"Started to process {patient_id}")
-      processing_directory = self.get_processing_directory(patient_id)
+      processing_directory = self.get_processing_directory_path(patient_id)
       if processing_directory is not None:
         with TemporaryWorkingDirectory(processing_directory):
           self._pipeline_processing(patient_id, released_event, input_container)
@@ -731,22 +731,23 @@ class AbstractPipeline():
   def open_cm(self):
     return self.ConnectionContextManager(self)
 
-  def get_processing_directory(self, identifier) -> Optional[Path]:
-    if self.processing_directory is None:
+  def get_processing_directory_path(self, identifier) -> Optional[Path]:
+
+    if self._processing_directory is None:
       return None
 
     if isinstance(identifier, DicomSeries):
       val = identifier[self.patient_identifier_tag]
       if val is not None and not isinstance(val, List):
-        return self.processing_directory / str(val.value)
+        return self._processing_directory / str(val.value)
       else:
         return None
 
     if isinstance(identifier, Dataset):
-      return self.processing_directory / str(identifier[self.patient_identifier_tag].value)
+      return self._processing_directory / str(identifier[self.patient_identifier_tag].value)
 
     if isinstance(identifier, str):
-      return self.processing_directory / identifier
+      return self._processing_directory / identifier
 
     raise TypeError("Unknown identifier type")
 
@@ -763,7 +764,15 @@ class AbstractPipeline():
       }
     )
 
-  def node_signal_handler_SIGINT(self, signal_, frame):
+  def node_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
+    """Signal handler for a running dicom node. Kills alls children processes.
+
+    Args:
+        signal_ (signal.Signame): The signal that this process should send to it
+          children
+        frame (_type_): I have no clue what this arg is
+    """
+    # this code is tested, but because it's not run covering
     pid = getpid()
 
     self.logger.critical(f"Process {pid} Received Signal {signal_}")
@@ -791,7 +800,9 @@ class AbstractPipeline():
     exit(1)
 
 
-  def process_signal_handler_SIGINT(self, signal_, frame):
+  def process_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
+
+    # Same as above
     self.logger.critical("Process killed by Parent")
     exit(1)
 

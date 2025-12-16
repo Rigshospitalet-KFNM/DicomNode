@@ -63,3 +63,8 @@ class NonReducedBasis(Exception):
 
   is Invalid because the second axis is equal in 1 and 2 row.
   """
+
+class DimensionalityError(Exception):
+  """Raised when an object is expected to have a dimension of a certain degree
+  but doesn't
+  """

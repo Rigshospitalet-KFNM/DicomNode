@@ -4,6 +4,10 @@ dicomNodeError_t _load_into_host_space(
   Space<3>* host_space,
   const pybind11::object& space
 ){
+  if(host_space == nullptr){
+    return ARG_IS_NULL_POINTER;
+  }
+
   const python_array<float>& starting_point = space.attr("starting_point").cast<python_array<float>>();
   const python_array<float>& basis = space.attr("basis").cast<python_array<float>>();
   const python_array<float>& inv_basis = space.attr("inverted_basis").cast<python_array<float>>();
@@ -54,6 +58,10 @@ dicomNodeError_t _load_into_device_space(
   Space<3>* device_space,
   const pybind11::object& space
 ){
+  if(device_space == nullptr){
+    return ARG_IS_NULL_POINTER;
+  }
+
   const python_array<float>& starting_point = space.attr("starting_point").cast<python_array<float>>();
   const python_array<float>& inv_basis = space.attr("inverted_basis").cast<python_array<float>>();
   const python_array<float>& basis = space.attr("basis").cast<python_array<float>>();
@@ -167,6 +175,10 @@ std::string get_byte_string (size_t bytes){
 }
 
 dicomNodeError_t load_space(Space<3>* space, const pybind11::object& python_space){
+  if(space == nullptr){
+    return ARG_IS_NULL_POINTER;
+  }
+
   cudaPointerAttributes attr;
   DicomNodeRunner runner{
     [](const dicomNodeError_t& error){

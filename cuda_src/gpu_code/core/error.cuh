@@ -23,7 +23,7 @@ enum dicomNodeError_t: uint32_t {
   UNABLE_TO_ACQUIRE_BUFFER = 5,
   INPUT_SIZE_MISMATCH = 6,
   ALREADY_ALLOCATED_OBJECT = 7, // This is triggered if you try to allocate to an object that's already alocated
-
+  ARG_IS_NULL_POINTER = 8,
   // Note that the specific cuda error is encoded
   cudaError = cudaErrorFlag
 };

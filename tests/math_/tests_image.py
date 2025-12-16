@@ -6,6 +6,8 @@ from unittest import TestCase
 import numpy
 
 # Dicomnode modules
+from dicomnode.lib.exceptions import DimensionalityError
+from dicomnode.math import Coordinate
 from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import fit_image_into_unsigned_bit_range, Image
@@ -423,3 +425,74 @@ class ImageTestCase(DicomnodeTestCase):
     self.assertEqual(image_rps.space.reference_space, ReferenceSpace.RAS)
     self.assertEqual(self.space_ras, image_rps.space)
     self.assertTrue((image_rps.raw == self.ras_image_data).all())
+
+  def test_embed_image_everybody_dreams(self):
+    image_data = numpy.zeros((4,4,4))
+    image = Image(image_data, self.space_ras)
+
+    coord = Coordinate(1,1,1)
+    slice_to_embed = numpy.ones((2,2,2))
+
+    image.embed_image(coord, slice_to_embed)
+
+    self.assertTrue((image.raw == numpy.array([
+      [[0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0]],
+
+      [[0, 0, 0, 0],
+       [0, 1, 1, 0],
+       [0, 1, 1, 0],
+       [0, 0, 0, 0]],
+
+      [[0, 0, 0, 0],
+       [0, 1, 1, 0],
+       [0, 1, 1, 0],
+       [0, 0, 0, 0]],
+
+      [[0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0]]
+    ])).all())
+
+  def test_embed_image_image_slice_errors_out(self):
+    image_data = numpy.zeros((4,4,4))
+    image = Image(image_data, self.space_ras)
+
+    coord = Coordinate(1,1,1)
+    slice_to_embed = numpy.ones((2,2))
+
+    self.assertRaises(DimensionalityError, image.embed_image, coord, slice_to_embed)
+
+  def test_embed_image_oversized_image(self):
+    image_data = numpy.zeros((4,4,4))
+    image = Image(image_data, self.space_ras)
+
+    coord = Coordinate(1,1,1)
+    slice_to_embed = numpy.ones((5,5,5))
+
+    image.embed_image(coord, slice_to_embed)
+
+    self.assertTrue((image.raw == numpy.array([
+      [[0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0],
+       [0, 0, 0, 0]],
+
+      [[0, 0, 0, 0],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1]],
+
+      [[0, 0, 0, 0],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1]],
+
+      [[0, 0, 0, 0],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1],
+       [0, 1, 1, 1]]
+    ])).all() )

@@ -312,6 +312,10 @@ dicomNodeError_t load_texture_from_python_image(
   Texture<3, T>* texture,
   const pybind11::object& python_image
 ){
+  if(texture == nullptr){
+    return ARG_IS_NULL_POINTER;
+  }
+
   DicomNodeRunner runner{
     [](const dicomNodeError_t& error){
       std::cout << "load_python_texture encountered error: " << (uint32_t)error << "\n";
