@@ -19,7 +19,7 @@
 
 
 template<typename T>
-T shuffle_up(T* val, i32 delta){
+__device__ T shuffle_up(T* val, i32 delta){
   static_assert(false, "You need to specialize this function");
 }
 
