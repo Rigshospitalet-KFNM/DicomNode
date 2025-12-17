@@ -21,21 +21,16 @@ static bool is_host_pointer(const void* ptr){
 template<typename... Ts>
 void free_device_memory(Ts** && ... device_pointer){
   ([&]{
-    if(!(*device_pointer)){
-      return;
+    cudaError_t error = cudaFree(*device_pointer);
+    if(error != cudaSuccess){
+      const char* error_name = cudaGetErrorName(error);
+      const char* error_desc = cudaGetErrorString(error);
+      printf("Freeing %p failed with %s - %s\n", *device_pointer, error_name, error_desc);
     }
-
-    if(!is_host_pointer(device_pointer)){
-      cudaError_t error = cudaFree(*device_pointer);
-      if(error != cudaSuccess){
-        const char* error_name = cudaGetErrorName(error);
-        const char* error_desc = cudaGetErrorString(error);
-        printf("Freeing %p failed with %s - %s\n", *device_pointer, error_name, error_desc);
-      }
-      *device_pointer = nullptr;
-    }
+    *device_pointer = nullptr;
   }(), ...);
 }
+
 
 class CudaRunner{
   public:

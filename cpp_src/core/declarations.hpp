@@ -16,7 +16,7 @@ using f32 = float;
 using f64 = double;
 
 constexpr ssize_t SSIZE_ERROR = -1;
-
+constexpr u32 FULL_MASK = 0xFFFFFFFF;
 
 template<u8 DIMENSIONS>
 struct Extent;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include"constants.cuh"
+#include"declarations.cuh"
 #include"error.cuh"
 #include"memory.cuh"
 #include"concepts.cuh"

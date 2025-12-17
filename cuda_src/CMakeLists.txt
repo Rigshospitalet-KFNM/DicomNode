@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(dicomnode_c LANGUAGES CUDA)
+project(dicomnode_c LANGUAGES CUDA CXX)
 
 include(ProcessorCount)
 
@@ -94,28 +94,39 @@ if(CMAKE_CUDA_COMPILER)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
-    FetchContent_Declare(
-      googletest
-      GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG 52eb810
-      )
-      # For Windows: Prevent overriding the parent project's compiler/linker settings
-      #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-      FetchContent_MakeAvailable(googletest)
-      enable_testing()
+    include(FetchContent)
+    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
+      message(STATUS "Downloading CPM.cmake")
+      file(DOWNLOAD
+      https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.0/CPM.cmake
+      "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake"
+    )
+    endif()
+    include("${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
 
-      add_executable(cu_tests test_initiator.cu)
-      target_link_libraries(
-        cu_tests
-        GTest::gtest_main
-        pybind11::module
-        Python::Python
-        utilities
-      )
-      include(GoogleTest)
-      gtest_discover_tests(cu_tests)
-      # Sadly Coverage for GPU code is not supported...
-      # https://docs.nvidia.com/cuda/cuda-features-archive/index.html#bullseye-support
+    CPMAddPackage(
+      NAME googletest
+      GITHUB_REPOSITORY google/googletest
+      VERSION 1.14.0
+      OPTIONS
+        "INSTALL_GTEST OFF"
+        "gtest_force_shared_crt ON"
+    )
+
+    enable_testing()
+
+    add_executable(cu_tests test_initiator.cu)
+    target_link_libraries(
+      cu_tests
+      GTest::gtest_main
+      pybind11::module
+      Python::Python
+      utilities
+    )
+    #include(GoogleTest)
+    #gtest_discover_tests(cu_tests)
+    #  # Sadly Coverage for GPU code is not supported...
+    #  # https://docs.nvidia.com/cuda/cuda-features-archive/index.html#bullseye-support
 
   endif()
 else()
