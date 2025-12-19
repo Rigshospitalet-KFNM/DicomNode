@@ -313,3 +313,7 @@ class Directory(IOObject):
 
   def __iter__(self):
     return self.path.iterdir()
+
+  def __str__(self):
+    return str(self.path)
+
