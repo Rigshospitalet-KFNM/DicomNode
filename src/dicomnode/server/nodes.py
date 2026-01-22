@@ -501,11 +501,10 @@ class AbstractPipeline():
     timeout_seconds = 1.0
     processed_finished = False
 
-    while not processed_finished:
-      try:
-        process.join(timeout_seconds)
-        processed_finished = True
-      except TimeoutError:
+    while process.is_alive():
+      process.join(timeout_seconds)
+
+      if process.is_alive():
         timeouts += 1
         self.logger.info(f"Process started at {started_process.time()} encountered timeout {timeouts}")
         timeout_seconds = (timeout_seconds * 2) ** 2
