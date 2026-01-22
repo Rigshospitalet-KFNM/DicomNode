@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 from inspect import getfullargspec
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
     Optional,Sequence as TypingSequence, Tuple, TypeVar, Union, TypeAlias
@@ -22,15 +23,14 @@ from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
-from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING, DICOMNODE_PRIVATE_TAG_VERSION, DICOMNODE_PRIVATE_TAG_HEADER
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING, DICOMNODE_PRIVATE_TAG_VERSION, DICOMNODE_PRIVATE_TAG_HEADER, DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import make_meta, Reserved_Tags
 from dicomnode.dicom.series import DicomSeries, NiftiSeries
 from dicomnode.math.image import fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
-from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import MissingPivotDataset, ConstructionFailure
 
-logger = get_logger()
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 T = TypeVar('T')
 

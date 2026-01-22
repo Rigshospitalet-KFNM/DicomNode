@@ -18,7 +18,6 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dimse import send_images, Address
 
-from dicomnode.lib import logging as dnl
 from dicomnode.lib.utils import spawn_process, spawn_thread
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.server.nodes import AbstractPipeline
@@ -44,31 +43,7 @@ def worker(queue: Queue):
     message = f"Logger {name} - {pid}: message {i}"
     logger.info(message)
 
-  @process_thread_check_leak
-  def test_sample_queue_logging(self):
-    queue = Queue()
-    listener = spawn_thread(
-      dnl.listener_logger,
-      queue
-    )
-    logger = logging.getLogger(DICOMNODE_PROCESS_LOGGER)
 
-    with self.assertLogs(logger) as ctx:
-      workers: List[Process] = []
-      for i in range(3):
-        worker_process = spawn_process(
-          worker, queue, logger=logger, start=False
-        )
-        workers.append(worker_process)
-
-      for w in workers:
-        w.start()
-
-      for w in workers:
-        w.join()
-
-      queue.put_nowait(None)
-      listener.join()
 
   @process_thread_check_leak
   def test_queue_logging_end2end(self):
@@ -121,7 +96,7 @@ class LoggingExperiment(DicomnodeTestCase):
   def test_logging_experiment(self):
     def print_hello_world():
       logger = logging.getLogger()
-      logger.info("Hello world")
+      logger.info("Hello world from logging experiment!")
 
     process = spawn_process(print_hello_world)
 

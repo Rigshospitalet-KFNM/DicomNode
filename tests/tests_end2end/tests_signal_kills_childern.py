@@ -36,27 +36,11 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
 
     buf = io.StringIO()
     sys.stdout = buf
+    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     self.logging_queue = Queue()
 
-    self.logger = getLogger(DICOMNODE_PROCESS_LOGGER)
-
-    logging.set_logger(sys.stdout, queue=self.logging_queue)
-
-    logger = logging.get_logger()
-    logging.set_queue_handler(logger)
-
-    self.listener_thread = Thread(target=logging.listener_logger, args=(self.logging_queue,self.logger))
-    self.listener_thread.start()
-
-
   def tearDown(self) -> None:
-    self.logging_queue.put(None)
-    self.listener_thread.join()
-    sys.stdout = sys.__stdout__
-
-    clear_logger(DICOMNODE_LOGGER_NAME)
-    clear_logger(DICOMNODE_PROCESS_LOGGER)
     super().tearDown()
 
 
@@ -78,80 +62,80 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     with self.assertLogs(self.logger, level=DEBUG) as captured_logs:
       # So this line, somehow captures the logs from the other process, although
       # it doesn't register that it did indeed catch them
-      with self.assertNonCapturingNoLogs(DICOMNODE_LOGGER_NAME):
-        def process_function(queue: Queue):
-          class DumbInput(AbstractInput):
-            def validate(self) -> bool:
-              return True
 
-          class DummyPipeline(AbstractPipeline):
-            port = test_port
-            ae_title = "TEST"
+      def process_function(queue: Queue):
+        class DumbInput(AbstractInput):
+          def validate(self) -> bool:
+            return True
 
-            input = {
-              "input" : DumbInput
-            }
+        class DummyPipeline(AbstractPipeline):
+          port = test_port
+          ae_title = "TEST"
+          log_output = None
 
-            def __init__(self, config=None) -> None:
-              self._log_queue = queue
-              super().__init__(config)
-              self.logger.info(f"Pipeline process pid: {getpid()}")
-              self.logger.info(f"Current handlers: {self.logger.handlers}")
+          input = {
+            "input" : DumbInput
+          }
 
-            log_output = None
-
-            def process(self, input_data):
-              self.logger.info(f"Processing Process {getpid()} starting")
-              sleep(10)
-              return NoOutput()
-
-          instance = DummyPipeline()
-          instance.open(blocking=True)
-
-        victim_process = spawn_process(process_function, self.logging_queue)
-
-        victim_pid = victim_process.pid
-        if victim_pid is None:
-          raise AssertionError("Failed to start the process")
-
-        dataset = Dataset()
-        dataset.SOPInstanceUID = gen_uid()
-        dataset.SOPClassUID = SecondaryCaptureImageStorage
-        dataset.PatientID = "Patient^ID"
-        dataset.InstanceNumber = 1
-        make_meta(dataset)
-
-        # Need a small delay
-        sleep(start_up_delay)
-
-        send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
-
-        # Wait for processing to begin. Although I am not sure why there's 2?
-        sleep(start_up_delay)
-
-        kill(victim_pid, signal.SIGINT)
-
-        process_is_alive_count = 0
-
-        killed_successful = True
-
-        for process in PS_Process(victim_process.pid).children(True):
-          while process.is_running():
-            if process_is_alive_count < 100:
-              process_is_alive_count += 1
-              sleep(0.01)
-            else:
-              killed_successful = False
-              kill(process.pid, signal.SIGKILL)
+          def __init__(self, config=None) -> None:
+            self._log_queue = queue
+            super().__init__(config)
+            self.logger.info(f"Pipeline process pid: {getpid()}")
+            self.logger.info(f"Current handlers: {self.logger.handlers}")
 
 
-        while victim_process.is_alive():
+          def process(self, input_data):
+            self.logger.info(f"Processing Process {getpid()} starting")
+            sleep(10)
+            return NoOutput()
+
+        instance = DummyPipeline()
+        instance.open(blocking=True)
+
+      victim_process = spawn_process(process_function, self.logging_queue)
+
+      victim_pid = victim_process.pid
+      if victim_pid is None:
+        raise AssertionError("Failed to start the process")
+
+      dataset = Dataset()
+      dataset.SOPInstanceUID = gen_uid()
+      dataset.SOPClassUID = SecondaryCaptureImageStorage
+      dataset.PatientID = "Patient^ID"
+      dataset.InstanceNumber = 1
+      make_meta(dataset)
+
+      # Need a small delay
+      sleep(start_up_delay)
+
+      send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
+
+      # Wait for processing to begin. Although I am not sure why there's 2?
+      sleep(start_up_delay)
+
+      kill(victim_pid, signal.SIGINT)
+
+      process_is_alive_count = 0
+
+      killed_successful = True
+
+      for process in PS_Process(victim_process.pid).children(True):
+        while process.is_running():
           if process_is_alive_count < 100:
             process_is_alive_count += 1
             sleep(0.01)
           else:
             killed_successful = False
-            kill(victim_pid, signal.SIGKILL)
+            kill(process.pid, signal.SIGKILL)
+
+
+      while victim_process.is_alive():
+        if process_is_alive_count < 100:
+          process_is_alive_count += 1
+          sleep(0.01)
+        else:
+          killed_successful = False
+          kill(victim_pid, signal.SIGKILL)
 
     if not killed_successful:
       raise AssertionError("Was unable to kill the processes!")

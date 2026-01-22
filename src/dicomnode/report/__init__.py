@@ -4,6 +4,7 @@
 from dataclasses import dataclass as _dataclass
 from importlib import import_module
 from os import environ as _environ
+from logging import getLogger
 import platform as _platform
 from shutil import which as _which
 from typing import List as _List, Optional as _Optional, Type as _Type
@@ -14,8 +15,7 @@ from pylatex import Command as _Command, Document as _Document, LineBreak as _Li
 from pylatex.base_classes import Container as _Container
 
 # Private dicomnode imports
-from dicomnode.constants import DICOMNODE_ENV_FONT as _DICOMNODE_ENV_FONT
-from dicomnode.lib.logging import get_logger as _get_logger
+from dicomnode.constants import DICOMNODE_ENV_FONT as _DICOMNODE_ENV_FONT, DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidLatexCompiler as _InvalidLatexCompiler
 
 from . import base_classes
@@ -68,8 +68,7 @@ class Report(_Document):
         "includeheadfoot" : True,
         "head": "40pt"
     })
-    logger = _get_logger()
-
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     self._loaded_preambles = set()
 
@@ -95,8 +94,8 @@ class Report(_Document):
         logger.error("sudo yum install texlive-*")
       raise _InvalidLatexCompiler
 
-  def generate_pdf(self, filepath=None, *, clean=True, clean_tex=True, compiler_args=None, silent=True):
-    logger = _get_logger()
+  def generate_pdf(self, filepath=None, *, clean=True, clean_tex=True, compiler_args=None, silent=True, compiler=None):
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
     logger.info(f"Calling with compiler: {self.__compiler.value}")
     # Note that the super class will read from class
     return super().generate_pdf(filepath,

@@ -4,12 +4,13 @@ Or if you have multiple nodes which must share a resource (Think GPU)
 """
 
 # Python Standard Library
+from logging import getLogger
 from typing import Dict, List, Optional, Type, TypeAlias, Union
 
 # Third party packages
 
 # Dicomnode packages
-from dicomnode.lib.logging import get_logger
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.server.nodes import AbstractPipeline, AbstractQueuedPipeline
 
@@ -40,7 +41,7 @@ class Cluster:
       self._nodes[node.ae_title] = node
 
   def __init__(self, nodes: Optional[cluster_node_list] = None) -> None:
-    self.logger = get_logger()
+    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
     if nodes is not None:
       self.__init_nodes(nodes)
     elif self.nodes is not None:

@@ -131,7 +131,9 @@ class End2EndNiftiTestCase(DicomnodeTestCase):
 
           address = Address('localhost', port, TEST_AE_TITLE)
           slices = 50
+          t_image_orientation = (1.0,0.0,0.0,0.0,1.0,0.0)
           image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
+
 
           slice_x = 2.0
           slice_y = 2.0
@@ -152,7 +154,7 @@ class End2EndNiftiTestCase(DicomnodeTestCase):
             slice_thickness=slice_z,
             orientation=1,
             initial_position=(0.0,0.0,0.0),
-            image_orientation=tuple(image_orientation),
+            image_orientation=t_image_orientation,
             image_number=1,
             slices=slices
           )

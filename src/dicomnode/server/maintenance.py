@@ -7,6 +7,7 @@ __author__ = "Christoffer"
 
 # Python3 standard Library
 from datetime import datetime, timedelta
+from logging import getLogger
 from threading import Thread, Event
 from typing import Any, Iterable, Mapping, Optional
 
@@ -14,8 +15,8 @@ from typing import Any, Iterable, Mapping, Optional
 import psutil
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.utils import human_readable_byte_count
-from dicomnode.lib.logging import get_logger
 from dicomnode.server.pipeline_tree import PipelineTree
 
 class MaintenanceThread(Thread):
@@ -40,7 +41,7 @@ class MaintenanceThread(Thread):
     self.study_expiration_days = study_expiration_days
     self._running = True
     self.waiting_event = None
-    self.logger = get_logger()
+    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 
   def run(self): # pragma: no cover

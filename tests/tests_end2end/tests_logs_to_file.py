@@ -2,6 +2,7 @@
 
 # Python3 standard library
 import logging
+import os
 from pathlib import Path
 from random import randint
 from unittest import skip
@@ -23,6 +24,27 @@ from helpers import process_thread_check_leak
 from helpers.dicomnode_test_case import DicomnodeTestCase
 from helpers import clear_logger
 
+class DumbInput(AbstractInput):
+      def validate(self) -> bool:
+        return True
+
+class LoggingPipeline(AbstractPipeline):
+
+  ae_title = "TEST"
+
+  input = {
+    "input" : DumbInput
+  }
+
+  log_format = "%(process)d %(message)s"
+
+  log_output = "log.log"
+
+  def process(self, input_data):
+
+    self.logger.critical(f"Can we find the file in {os.getgid()}?")
+    return NoOutput()
+
 class LogFileIsWritten(DicomnodeTestCase):
   def tearDown(self) -> None:
     clear_logger(DICOMNODE_LOGGER_NAME)
@@ -30,49 +52,28 @@ class LogFileIsWritten(DicomnodeTestCase):
 
     return super().tearDown()
 
-
-  #@skip("Something doesn't work here")
   @process_thread_check_leak
   def test_end2end_log_file_written(self):
 
     test_port = randint(1024, 45000)
-
-    class DumbInput(AbstractInput):
-      def validate(self) -> bool:
-        return True
-
-    class LoggingPipeline(AbstractPipeline):
-      port = test_port
-      ae_title = "TEST"
-
-      input = {
-        "input" : DumbInput
-      }
-
-      log_output = "log.log"
-
-      def process(self, input_data):
-        self.logger.setLevel(10)
-        self.logger.info("Can we find the file?")
-        return NoOutput()
-
     instance = LoggingPipeline()
-    with self.assertLogs(DICOMNODE_LOGGER_NAME, logging.DEBUG):
-      instance.open(blocking=False)
-      with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER, logging.DEBUG):
-        dataset = Dataset()
-        dataset.SOPInstanceUID = gen_uid()
-        dataset.SOPClassUID = SecondaryCaptureImageStorage
-        dataset.PatientID = "Patient^ID"
-        dataset.InstanceNumber = 1
-        make_meta(dataset)
+    instance.port = test_port
 
-        send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
+    instance.open(blocking=False)
 
-        instance.close()
+    dataset = Dataset()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.SOPClassUID = SecondaryCaptureImageStorage
+    dataset.PatientID = "Patient^ID"
+    dataset.InstanceNumber = 1
+    make_meta(dataset)
 
-        self.assertTrue(Path("log.log").exists())
-        with open('log.log', 'r') as log_file:
-          lines = log_file.readlines()
+    send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
 
-        self.assertGreater(len(lines),0)
+    instance.close()
+
+    self.assertTrue(Path("log.log").exists())
+    with open('log.log', 'r') as log_file:
+      lines = log_file.readlines()
+
+    self.assertGreater(len(lines),0)

@@ -9,6 +9,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from abc import ABC, abstractmethod
+from logging import getLogger
 from pathlib import Path
 from typing import Any, List, Iterable, Tuple, Callable
 
@@ -20,7 +21,6 @@ from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.lib.io import save_dicom
-from dicomnode.lib.logging import get_logger
 
 
 class PipelineOutput(ABC):
@@ -70,7 +70,7 @@ class DicomOutput(PipelineOutput):
 
   def send(self) -> bool:
     success = True
-    logger = get_logger()
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     for address, datasets in self:
       datasets_list = [dataset for dataset in datasets]

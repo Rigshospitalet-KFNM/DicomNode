@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from math import ceil, log10
 from pathlib import Path
 from pprint import pformat
+from logging import getLogger
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Union
 
 # Third party Packages
@@ -16,15 +17,16 @@ from pydicom.errors import InvalidDicomError
 from pydicom.uid import UID
 
 # Dicom node packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom
-from dicomnode.lib.logging import get_logger
+
 from dicomnode.lib.utils import prefixInt
 
 _PPrefix = "AnonymizedPatientID_"
 
-logger = get_logger()
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 class IdentityMapping():
   """Class for containing an identity mapping then anonymising a dicom series

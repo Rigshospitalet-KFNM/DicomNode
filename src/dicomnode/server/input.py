@@ -11,7 +11,7 @@ from abc import abstractmethod, ABC, ABCMeta
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
-from logging import Logger
+from logging import Logger, getLogger
 from pathlib import Path
 from threading import Thread
 from types import UnionType
@@ -23,6 +23,7 @@ from pydicom.datadict import tag_for_keyword
 from pydicom.uid import UID
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dimse import Address, QueryLevels,\
   AssociationContextManager, create_query_ae
@@ -31,7 +32,6 @@ from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom, Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
-from dicomnode.lib.logging import get_logger
 from dicomnode.lib.utils import name
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
@@ -128,7 +128,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
       self.logger = self.options.logger
       "Logger for logging"
     else:
-      self.logger = get_logger()
+      self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     # Tag for SOPInstance is (0x0008,0018)
     if 0x0008_0018 not in self.required_tags:

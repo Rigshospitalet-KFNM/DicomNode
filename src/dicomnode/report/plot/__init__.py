@@ -17,7 +17,6 @@ from pylatex import StandAloneGraphic, LineBreak
 
 # Dicomnode packages
 from dicomnode import library_paths
-from dicomnode.lib.logging import get_logger
 from dicomnode.report import Report
 from dicomnode.report.base_classes import LaTeXComponent
 

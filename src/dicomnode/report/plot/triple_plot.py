@@ -1,5 +1,6 @@
 # Python Standard Library
 from dataclasses import dataclass, field
+from logging import getLogger
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -9,10 +10,9 @@ from pydicom import Dataset
 from matplotlib.gridspec import GridSpec
 
 # Dicomnode packages
-
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.math.image import build_image_from_datasets
 from dicomnode.lib.exceptions import MissingNiftiImage
-from dicomnode.lib.logging import get_logger
 from dicomnode.report.base_classes import Selector
 from dicomnode.report.plot import Plot, rotate_image_90
 from dicomnode.report.plot.anatomical_plot import AnatomicalPlot
@@ -32,7 +32,7 @@ class TriplePlot(Plot):
   def __init__(self,
                images: Union[nibabel.nifti1.Nifti1Image, List[Dataset]],
                options = Options()) -> None:
-    logger = get_logger()
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
     super().__init__(file_path=options.file_path)
     self.figure.set_figheight(6.0)
     self.figure.set_figwidth(15.0)

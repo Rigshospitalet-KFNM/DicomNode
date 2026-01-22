@@ -3,6 +3,7 @@
 # Python standard library
 from datetime import date, time
 from typing import List
+from logging import getLogger
 from unittest import TestCase
 
 # Third party module
@@ -12,7 +13,8 @@ from pydicom import Dataset, DataElement
 from pydicom.tag import Tag
 
 # Dicomnode
-from dicomnode.lib.logging import get_logger
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
+
 from dicomnode.lib.exceptions import IncorrectlyConfigured,\
   MissingPivotDataset, InvalidDataset
 from dicomnode.dicom import gen_uid
@@ -279,8 +281,7 @@ class DicomSeriesTestCase(DicomnodeTestCase):
 
   def test_extracting_image_from_framed_image_fails(self):
     framed_image = self.create_dynamic_pet_series()
-    logger = get_logger()
-    with self.assertLogs(logger) as cm:
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as cm:
       self.assertRaises(TypeError,extract_image, framed_image)
 
     self.assertEqual(len(cm.output), 1)

@@ -13,7 +13,6 @@ from typing import Union
 import numpy
 
 # Dicomnode modules
-from dicomnode.lib.logging import get_logger
 from dicomnode.dicom.series import extract_image, ImageContainerType, extract_space
 from dicomnode.math import CUDA, switch_ordering, _cpp
 from dicomnode.math.space import Space

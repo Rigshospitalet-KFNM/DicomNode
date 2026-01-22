@@ -18,6 +18,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from abc import ABC, abstractmethod
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
 
@@ -30,12 +31,12 @@ from rt_utils import RTStruct
 from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicom node package
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom.series import DicomSeries, FramedDicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, MissingPivotDataset
-from dicomnode.lib.logging import get_logger
 
-logger = get_logger()
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 class Grinder(ABC):
   """Interface for injection of grinding method

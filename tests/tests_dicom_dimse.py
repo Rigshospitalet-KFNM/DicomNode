@@ -4,6 +4,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 import logging
+from logging import getLogger, DEBUG
 from pprint import pprint, pformat
 from random import randint
 from unittest import skip, TestCase
@@ -14,8 +15,8 @@ from pydicom.uid import SecondaryCaptureImageStorage
 from pynetdicom import debug_logger
 
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidQueryDataset, CouldNotCompleteDIMSEMessage
-from dicomnode.lib.logging import get_logger, DEBUG
 from dicomnode.dicom import make_meta
 from dicomnode.dicom.dimse import send_move, Address, QueryLevels
 
@@ -23,7 +24,7 @@ from dicomnode.dicom.dimse import send_move, Address, QueryLevels
 from tests.helpers import get_test_ae
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-logger = get_logger()
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 class DIMSETestCases(DicomnodeTestCase):
   TEST_CASE_AE = "TEST_CASE"

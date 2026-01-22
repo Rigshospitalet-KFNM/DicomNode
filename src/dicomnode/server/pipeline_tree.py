@@ -9,7 +9,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Python Standard Library
 from dataclasses import dataclass
 from datetime import datetime, date
-from logging import Logger
+from logging import Logger, getLogger
 from pathlib import Path
 import shutil
 from typing import Any, Dict, List, Optional, Type, Iterable, Set
@@ -18,13 +18,14 @@ from typing import Any, Dict, List, Optional, Type, Iterable, Set
 from pydicom import Dataset
 
 # Dicomnode Library Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dimse import Address
 from dicomnode.lib.io import Directory
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory,\
                                       InvalidTreeNode
-from dicomnode.lib.logging import log_traceback, get_logger
+
 from dicomnode.server.input import AbstractInput
 
 class InputContainer:
@@ -112,7 +113,7 @@ class PatientNode(ImageTreeInterface):
     if self.options.logger is not None:
       self.logger = self.options.logger
     else:
-      self.logger = get_logger()
+      self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
   def clean_up(self) -> int:
     """This function cleans up the patient node and owned all inputs
@@ -297,7 +298,7 @@ class PipelineTree(ImageTreeInterface):
 
     #Logger Setup
     if self.options.logger is None:
-      self.logger = get_logger()
+      self.logger = getLogger(DICOMNODE_LOGGER_NAME)
     else:
       self.logger = self.options.logger
 

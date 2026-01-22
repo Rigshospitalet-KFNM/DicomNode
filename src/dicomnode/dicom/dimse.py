@@ -6,6 +6,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 # Python Standard Library
 from dataclasses import dataclass
 from enum import Enum
+from logging import getLogger
 from typing import Iterable, Callable, Optional
 
 # Third party packages
@@ -14,13 +15,14 @@ from pydicom.datadict import tag_for_keyword, dictionary_VR
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind # type: ignore
+
 # Dicomnode packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.dicom import make_meta
 from dicomnode.lib.utils import ThreadWithReturnValue
-from dicomnode.lib.logging import get_logger
 
-logger = get_logger()
+logger = getLogger(DICOMNODE_LOGGER_NAME)
 
 class QueryLevels(Enum):
   PATIENT="PATIENT"
@@ -137,7 +139,7 @@ def send_images(SCU_AE: str,
   """
 
   if logger is None:
-    logger = get_logger()
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
   ae = ApplicationEntity(ae_title=SCU_AE)
   added_contexts = set()
   for image in dicom_images:

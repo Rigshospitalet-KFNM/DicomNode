@@ -2,7 +2,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from datetime import datetime, date, time
-from logging import ERROR
+from logging import ERROR, getLogger
 from typing import Any, List, Tuple
 from random import randint
 from unittest import TestCase, skipIf
@@ -19,8 +19,7 @@ except ImportError:
   PDF2IMAGE_INSTALLED = False
 
 # Dicomnode modules
-from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID
-from dicomnode.lib.logging import get_logger
+from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import IncorrectlyConfigured,\
   ConstructionFailure, MissingPivotDataset, InvalidDataset
 from dicomnode.dicom import gen_uid
@@ -169,7 +168,7 @@ class BlueprintTestCase(DicomnodeTestCase):
     self.assertIs(get_pivot(test_dataset),test_dataset)
 
   def test_blueprint_with_long_customer_name(self):
-    with self.assertLogs(get_logger()) as cm:
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as cm:
       StaticElement(0x0011_1099, 'IS',1, name="a" * 1000)
 
     self.assertEqual(len(cm.output), 1)
@@ -351,7 +350,7 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     ])
 
     # Note that images are store z,y,x
-    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11))
+    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11)) # type: ignore
 
     produced_series = self.factory.build_series(
       test_image,
@@ -378,7 +377,7 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     ])
 
     # Note that images are store z,y,x
-    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11))
+    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11)) # type: ignore
 
     produced_series = self.factory.build_series(
       test_image,

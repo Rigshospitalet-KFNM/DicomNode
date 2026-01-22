@@ -149,7 +149,7 @@ def human_readable_byte_count(number_of_bytes: int):
   return f"{number_of_bytes} bytes"
 
 def spawn_thread(thread_function, *args, name=None, **kwargs):
-  logger = kwargs['logger'] if 'logger' in kwargs else getLogger()
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
 
   thread = Thread(
     target=thread_function, args=args, name=name
@@ -164,7 +164,7 @@ def spawn_thread(thread_function, *args, name=None, **kwargs):
   return thread
 
 def spawn_process(process_function, *args, start=True,name=None, **kwargs):
-  logger = kwargs['logger'] if 'logger' in kwargs else getLogger()
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
 
   #multiprocessing_context = multiprocessing.get_context('spawn')
 

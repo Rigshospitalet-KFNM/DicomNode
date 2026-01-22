@@ -13,6 +13,7 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Standard lib
+from datetime import datetime, timedelta
 from enum import Enum
 import logging
 from logging import getLogger, LogRecord
@@ -47,8 +48,9 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile,\
   Directory, File
-from dicomnode.lib.logging import log_traceback, set_logger, get_logger,\
-  listener_logger, set_queue_handler, set_writer_handler, get_response_logger
+
+from dicomnode.lib.logging import queue_logger_thread_target, set_logger as set_logger2,\
+  LoggerConfig, log_traceback
 from dicomnode.server.factories.association_events import AcceptedEvent, \
   AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
 from dicomnode.server.input import AbstractInput
@@ -185,21 +187,43 @@ class AbstractPipeline():
   """
 
   # End of Attributes definitions.
-  def _setup_logger(self):
-    if isinstance(self.log_output, str):
-      self.log_output = Path(self.log_output)
+  def exporting_logging_config(self):
+    if isinstance(self.log_output,str):
+      output = Path(self.log_output)
+    else:
+      output = self.log_output
 
-
-    self.logger = set_logger(
-      log_output=self.log_output,
+    return LoggerConfig(
       log_level=self.log_level,
-      format=self.log_format,
       date_format=self.log_date_format,
-      backupCount=self.number_of_backups,
+      format=self.log_format,
+      log_output=output,
       when=self.log_when,
-      queue=self._log_queue,
+      number_of_backups=self.number_of_backups,
     )
-    set_writer_handler(self.logger)
+
+  def queue_logging_config(self):
+    return LoggerConfig(
+      log_level=self.log_level,
+      date_format=self.log_date_format,
+      format=self.log_format,
+      log_output=self._log_queue,
+      when=self.log_when,
+      number_of_backups=self.number_of_backups
+    )
+
+
+  def _setup_logger(self):
+    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
+
+    # If the logger is empty fill it with the current config
+    if not len(self.logger.handlers):
+      self._owns_dicomnode_logger = True
+      set_logger2(self.logger, self.exporting_logging_config())
+    else:
+      self._owns_dicomnode_logger = False
+
+    self.process_logger = getLogger(DICOMNODE_PROCESS_LOGGER)
 
     # Set pynetdicom logger
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
@@ -214,7 +238,7 @@ class AbstractPipeline():
     # logging
     if not hasattr(self, '_log_queue'):
       self._owning_queue = True
-      self._log_queue: MPQueue[Optional[LogRecord]] = MPQueue()
+      self._log_queue: MPQueue[LogRecord | None] = MPQueue()
     else:
       self._owning_queue = False
     self._setup_logger()
@@ -472,8 +496,20 @@ class AbstractPipeline():
     process = spawn_process(
       self._process_entry_point, released_event, input_containers
     )
+    timeouts = 0
+    started_process = datetime.now()
+    timeout_seconds = 1.0
+    processed_finished = False
 
-    process.join()
+    while not processed_finished:
+      try:
+        process.join(timeout_seconds)
+        processed_finished = True
+      except TimeoutError:
+        timeouts += 1
+        self.logger.info(f"Process started at {started_process.time()} encountered timeout {timeouts}")
+        timeout_seconds = (timeout_seconds * 2) ** 2
+
     if process.exitcode:
       self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
     else:
@@ -659,13 +695,13 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self._maintenance_thread.stop()
+
+    set_logger2(self.logger, self.exporting_logging_config())
+    self.process_logger.handlers.clear()
     if self._owning_queue:
       self._log_queue.put_nowait(None)
       self._logger_thread.join()
       self._log_queue.join_thread()
-
-    set_writer_handler(self.logger)
-
 
   def open(self, blocking=True) -> Optional[NoReturn]:
     """Opens all connections active connections.
@@ -687,18 +723,19 @@ class AbstractPipeline():
 
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
 
-    set_queue_handler(self.logger)
+    set_logger2(self.logger, self.queue_logging_config())
     if self._owning_queue:
+      set_logger2(self.process_logger, self.exporting_logging_config())
+
       self._logger_thread = Thread(
-        target=listener_logger,
-        args=(self._log_queue,),
+        target=queue_logger_thread_target,
+        args=(self._log_queue,self.process_logger),
         daemon=True
       )
       self._logger_thread.start()
 
     if self.processing_directory is not None:
       if not self.processing_directory.exists():
-        # Multiple Threads might attempt to create the directory at the same time
         self.processing_directory.mkdir(exist_ok=True)
       chdir(self.processing_directory)
 
