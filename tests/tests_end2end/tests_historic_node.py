@@ -24,6 +24,7 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.input import HistoricAbstractInput, AbstractInput
+from dicomnode.server.process_runner import ProcessRunner
 
 # Testing Packages
 from tests.helpers import get_test_ae, clear_logger
@@ -87,6 +88,14 @@ class TestHistoricInput(HistoricAbstractInput):
     return create_query_dataset(QueryLevels.PATIENT, PatientID=test_patient_id)
 
 
+class HistoricRunner(ProcessRunner):
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    historic = input_container[HISTORIC_KW]
+
+    self.logger.info(f"HISTORIC PROCESSING WITH DATA: {historic}")
+
+    return NoOutput()
+
 class HistoricPipeline(AbstractPipeline):
   ae_title = TEST_AE_TITLE
   input = {
@@ -99,6 +108,7 @@ class HistoricPipeline(AbstractPipeline):
   pynetdicom_logger_level = logging.ERROR
   processing_directory = None
   log_output = None
+  process_runner = HistoricRunner
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     historic = input_data[HISTORIC_KW]
@@ -108,18 +118,7 @@ class HistoricPipeline(AbstractPipeline):
     return NoOutput()
 
 class HistoricTestCase(DicomnodeTestCase):
-  def setUp(self) -> None:
-    self.node = HistoricPipeline()
-    self.test_port = randint(1025,65535)
-
-    self.node.port = self.test_port
-    self.node.open(blocking=False)
-
-
-
   def tearDown(self) -> None:
-    self.node.close()
-    self.endpoint.close()
 
     clear_logger(DICOMNODE_LOGGER_NAME)
     clear_logger(DICOMNODE_PROCESS_LOGGER)
@@ -128,53 +127,59 @@ class HistoricTestCase(DicomnodeTestCase):
 
 
   def test_end_2_end_historic_input(self):
-    self.endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=self.test_port)
-    self.endpoint.open()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      node = HistoricPipeline()
+      test_port = randint(40000,49999)
 
-    address = Address("localhost", self.test_port, TEST_AE_TITLE)
+      node.port = test_port
+      node.open(blocking=False)
+      with self.assertLogs(DICOMNODE_PROCESS_LOGGER):
+        endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=test_port)
+        endpoint.open()
 
-    dataset = Dataset()
-    dataset.SOPInstanceUID = gen_uid()
-    dataset.SOPClassUID = SecondaryCaptureImageStorage
-    dataset.StudyDate = current_date
-    dataset.PatientID = test_patient_id
-    dataset.PatientSex = "M"
+        address = Address("localhost", test_port, TEST_AE_TITLE)
+        dataset = Dataset()
+        dataset.SOPInstanceUID = gen_uid()
+        dataset.SOPClassUID = SecondaryCaptureImageStorage
+        dataset.StudyDate = current_date
+        dataset.PatientID = test_patient_id
+        dataset.PatientSex = "M"
 
-    make_meta(dataset)
+        make_meta(dataset)
 
+        response = send_image(SENDER_AE_TITLE, address, dataset)
+        sleep(0.005)
+        while node.processes:
+          sleep(0.005)
 
-    with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
-      response = send_image(SENDER_AE_TITLE, address, dataset)
-      sleep(1.25) # wait for all the threads to be done
-
-    logs = "\n".join(cm.output)
-
-    self.assertEqual(self.node.data_state.images, 0)
-    self.endpoint.close()
-
+        node.close()
+        endpoint.close()
 
   def test_end_2_end_historic_input_empty(self):
-    self.endpoint = TestCaseStorageEndpoint([], move_endpoint=self.test_port)
-    self.endpoint.open()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      node = HistoricPipeline()
+      test_port = randint(40000,49999)
 
-    address = Address("localhost", self.test_port, TEST_AE_TITLE)
+      node.port = test_port
+      node.open(blocking=False)
+      with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER):
+        endpoint = TestCaseStorageEndpoint([], move_endpoint=test_port)
+        endpoint.open()
 
-    dataset = Dataset()
-    dataset.SOPInstanceUID = gen_uid()
-    dataset.SOPClassUID = SecondaryCaptureImageStorage
-    dataset.StudyDate = current_date
-    dataset.PatientID = test_patient_id
-    dataset.PatientSex = "M"
+        address = Address("localhost", test_port, TEST_AE_TITLE)
 
-    make_meta(dataset)
+        dataset = Dataset()
+        dataset.SOPInstanceUID = gen_uid()
+        dataset.SOPClassUID = SecondaryCaptureImageStorage
+        dataset.StudyDate = current_date
+        dataset.PatientID = test_patient_id
+        dataset.PatientSex = "M"
+
+        make_meta(dataset)
+        response = send_image(SENDER_AE_TITLE, address, dataset)
+        sleep(1.25) # wait for all the threads to be done
 
 
-    with self.assertLogs(self.node.logger, logging.DEBUG) as cm:
-
-      response = send_image(SENDER_AE_TITLE, address, dataset)
-      sleep(1.25) # wait for all the threads to be done
-
-    logs = "\n".join(cm.output)
-
-    self.assertEqual(self.node.data_state.images, 0)
-    self.endpoint.close()
+        self.assertEqual(node.data_state.images, 0)
+        node.close()
+        endpoint.close()

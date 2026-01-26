@@ -2,7 +2,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 from datetime import datetime, date, time
-from logging import ERROR, getLogger
+from logging import DEBUG, ERROR, getLogger
 from typing import Any, List, Tuple
 from random import randint
 from unittest import TestCase, skipIf
@@ -370,20 +370,22 @@ class DicomFactoryTestCase(DicomnodeTestCase):
       #self.assertGreaterEqual(dataset.LargestImagePixelValue, 65534)
 
   def test_build_a_series_from_list_with_rescaling(self):
-    test_blueprint = general_image_blueprint + Blueprint([
-      CopyElement(0x00100010),
-      StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
-      InstanceCopyElement(0x0020_0032, 'DS'),
-    ])
 
-    # Note that images are store z,y,x
-    test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11)) # type: ignore
+    with self.assertNoLogs(DICOMNODE_LOGGER_NAME, DEBUG):
+      test_blueprint = general_image_blueprint + Blueprint([
+        CopyElement(0x00100010),
+        StaticElement(0x0008_0016, 'UI', SecondaryCaptureImageStorage),
+        InstanceCopyElement(0x0020_0032, 'DS'),
+      ])
 
-    produced_series = self.factory.build_series(
-      test_image,
-      test_blueprint,
-      self.parent_series
-    )
+      # Note that images are store z,y,x
+      test_image: numpy.ndarray[Tuple[int,int,int], Any] = numpy.random.normal(0,1,(13, 12, 11)) # type: ignore
+
+      produced_series = self.factory.build_series(
+        test_image,
+        test_blueprint,
+        self.parent_series
+      )
 
     self.assertEqual(len(produced_series), 13)
     for i, dataset in enumerate(produced_series.datasets):

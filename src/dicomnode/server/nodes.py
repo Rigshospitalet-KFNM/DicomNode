@@ -17,7 +17,9 @@ from datetime import datetime, timedelta
 from enum import Enum
 import logging
 from logging import getLogger, LogRecord
+import multiprocessing
 from multiprocessing import Queue as MPQueue
+import os
 from os import chdir, getcwd, getpid
 from pathlib import Path
 from queue import Queue, Empty
@@ -48,8 +50,7 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile,\
   Directory, File
-
-from dicomnode.lib.logging import queue_logger_thread_target, set_logger as set_logger2,\
+from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
   LoggerConfig, log_traceback
 from dicomnode.server.factories.association_events import AcceptedEvent, \
   AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
@@ -57,8 +58,11 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
+from dicomnode.server.process_runner import ProcessRunner, ProcessRunnerArgs
 
 default_sigint_handler = signal.getsignal(signal.SIGINT)
+
+multiprocessing_context = multiprocessing.get_context('spawn')
 
 class ProcessingDirectoryOptions(Enum):
   NO_PROCESSING_DIRECTORY = 0
@@ -186,6 +190,8 @@ class AbstractPipeline():
   dataset were accepted by the inputs, if false it will send an accepted image
   """
 
+  process_runner: Type[ProcessRunner] = ProcessRunner
+
   # End of Attributes definitions.
   def exporting_logging_config(self):
     if isinstance(self.log_output,str):
@@ -219,11 +225,11 @@ class AbstractPipeline():
     # If the logger is empty fill it with the current config
     if not len(self.logger.handlers):
       self._owns_dicomnode_logger = True
-      set_logger2(self.logger, self.exporting_logging_config())
+      set_logger(self.logger, self.exporting_logging_config())
     else:
       self._owns_dicomnode_logger = False
 
-    self.process_logger = getLogger(DICOMNODE_PROCESS_LOGGER)
+    self.__process_logger = getLogger(DICOMNODE_PROCESS_LOGGER)
 
     # Set pynetdicom logger
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
@@ -238,7 +244,7 @@ class AbstractPipeline():
     # logging
     if not hasattr(self, '_log_queue'):
       self._owning_queue = True
-      self._log_queue: MPQueue[LogRecord | None] = MPQueue()
+      self._log_queue: MPQueue[LogRecord | None] = multiprocessing_context.Queue()
     else:
       self._owning_queue = False
     self._setup_logger()
@@ -251,6 +257,7 @@ class AbstractPipeline():
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
+    self.processes: List[multiprocessing.Process] = []
 
     pipeline_tree_options = self.pipeline_tree_type.Options(
       ae_title=self.ae_title,
@@ -288,6 +295,9 @@ class AbstractPipeline():
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
 
+    if self.process_runner is ProcessRunner:
+      raise IncorrectlyConfigured("Missing Process Runner class member")
+
     # It's import that this is initialized here, because otherwise the self
     # argument is not passed properly.
     # If you need to replace these handler it's important to call super's init
@@ -303,9 +313,7 @@ class AbstractPipeline():
     }
 
     self.post_init()
-  # End def __init__
-  #region logging handlers
-
+    # End def __init__
 
   def _handle_c_echo(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} send an echo") #type: ignore
@@ -493,118 +501,41 @@ class AbstractPipeline():
                        " not return any input containers to be processed.")
       return
 
-    process = spawn_process(
-      self._process_entry_point, released_event, input_containers
-    )
-    timeouts = 0
-    started_process = datetime.now()
-    timeout_seconds = 1.0
-    processed_finished = False
-
-    while process.is_alive():
-      process.join(timeout_seconds)
-
-      if process.is_alive():
-        timeouts += 1
-        self.logger.info(f"Process started at {started_process.time()} encountered timeout {timeouts}")
-        timeout_seconds = (timeout_seconds * 2) ** 2
-
-    if process.exitcode:
-      self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
-    else:
-      patients_to_clean_up = [fst for fst, sec in input_containers]
-      self.logger.info(f"Removing {patients_to_clean_up}'s images")
-      self.data_state.clean_up_patients(patients_to_clean_up)
-
-  def _process_entry_point(
-      self, released_event: ReleasedEvent, input_containers: List[Tuple[str, InputContainer]] ) -> None:
-    """This function is called when an association, which stored
-    some datasets is released.
-
-    Args:
-      released_event (ReleasedEvent): Dataclass containing information
-        about the released association
-      input_containers (List[Tuple[str, InputContainer]]) - A list of
-
-    """
-    signal.signal(signal.SIGINT, self.process_signal_handler_SIGINT)
-
-    #print("Hello world from new process!")
-
-    # This causes problems
-    #self.logger = get_response_logger() # Reset loggers as
-    if len(input_containers) == 0: #pragma: no cover # this is covered in calling and exists as a defensive statement
-      self.logger.info(f"Connection from {released_event.association_ae} - {released_event.association_ip} contained no input containers to be processed!")
-      return
-
     for patient_id, input_container in input_containers:
-      self.logger.debug(f"Started to process {patient_id}")
-      processing_directory = self.get_processing_directory_path(patient_id)
-      if processing_directory is not None:
-        with TemporaryWorkingDirectory(processing_directory):
-          self._pipeline_processing(patient_id, released_event, input_container)
-      else:
-        self._pipeline_processing(patient_id, released_event, input_container)
-
-
-  def _pipeline_processing(self,
-                           patient_id: str,
-                           released_container: Optional[ReleasedEvent],
-                           patient_input_container: InputContainer):
-    """Processes a patient through the pipeline and exporting it
-
-    This function is not called directly, it's a target process is spawned,
-    when the data is spawned.
-
-    Args:
-      patient_ID (str): Identifier of the patient to be processed
-      released_container: (ReleasedContainer): data processing starts
-        after an association is released. This is the data from the released
-        association.
-    """
-    self.logger.info(f"Processing {patient_id}")
-    try:
-      if self.run_file is not None:
-        with ResourceFile(self.logger, self.run_file) as run_file:
-          result = self.process(patient_input_container)
-      else:
-          result = self.process(patient_input_container)
-      if result is None:
-        error_message = "You forgot to return a PipelineOutput object in the "\
-                        "process function. If output is handled by process, "\
-                        "return a NoOutput Object"
-        self.logger.warning(error_message)
-        result = NoOutput()
-    except Exception as exception:
-      log_traceback(self.logger, exception, "Exception in user Processing")
-      exception_handler = self.exception_handlers.get(
-        type(exception), self.exception_handler_respond_with_dataset
+      args = ProcessRunnerArgs(
+        patient_id=patient_id,
+        input_container=input_container,
+        log_config=self.queue_logging_config(),
+        process_path=self.get_processing_directory_path(patient_id)
       )
-      exception_handler(exception, released_container, patient_input_container)
-      exit(1) # This is okay because this function is called from another process
-    else:
-      self.logger.debug(f"Process {patient_id} Successful, Dispatching output!")
-      if self._dispatch(result):
-        self.logger.info(f"Dispatched {patient_id} Successful")
+
+      process = spawn_process(
+        self.process_runner, args, context=multiprocessing_context
+      )
+
+      self.processes.append(process) # type: ignore
+
+      timeouts = 0
+      started_process = datetime.now()
+      timeout_seconds = 1.0
+
+      while process.is_alive():
+        process.join(timeout_seconds)
+
+        if process.is_alive():
+          timeouts += 1
+          self.logger.info(f"Process {process.pid} started at {started_process.time()} encountered timeout {timeouts}")
+          self.logger.info(f"Process {process.pid} has status: {PS_UTIL_Process(process.pid).status}")
+          timeout_seconds = (timeout_seconds * 2)
+
+      self.processes.remove(process) # type: ignore
+
+      if process.exitcode:
+        self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
       else:
-        self.logger.error(f"Unable to dispatch output for {patient_id}")
-
-  def _dispatch(self, output: PipelineOutput) -> bool:
-    """This function is responsible for triggering exporting of data and handling errors.
-      You should consider if it's possible to create your own output
-      rather than overwriting this function
-
-      Args:
-        output: PipelineOutput - the output to be exported
-      Returns:
-        bool - If the output was successful in exporting the data.
-    """
-    try:
-      success = output.send()
-    except Exception as exception:
-      log_traceback(self.logger, exception, "Exception in user Output Send Function")
-      success = False
-    return success
+        patients_to_clean_up = [fst for fst, sec in input_containers]
+        self.logger.info(f"Removing {patients_to_clean_up}'s images")
+        self.data_state.clean_up_patients(patients_to_clean_up)
 
   def _get_input_container(self,
                            patient_id: str,
@@ -695,8 +626,9 @@ class AbstractPipeline():
 
     self._maintenance_thread.stop()
 
-    set_logger2(self.logger, self.exporting_logging_config())
-    self.process_logger.handlers.clear()
+
+    set_logger(self.logger, self.exporting_logging_config())
+    self.__process_logger.handlers.clear()
     if self._owning_queue:
       self._log_queue.put_nowait(None)
       self._logger_thread.join()
@@ -722,13 +654,13 @@ class AbstractPipeline():
 
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
 
-    set_logger2(self.logger, self.queue_logging_config())
+    set_logger(self.logger, self.queue_logging_config())
     if self._owning_queue:
-      set_logger2(self.process_logger, self.exporting_logging_config())
+      set_logger(self.__process_logger, self.exporting_logging_config())
 
       self._logger_thread = Thread(
         target=queue_logger_thread_target,
-        args=(self._log_queue,self.process_logger),
+        args=(self._log_queue,self.__process_logger),
         daemon=True
       )
       self._logger_thread.start()
@@ -837,7 +769,6 @@ class AbstractPipeline():
 
 
   def process_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
-
     # Same as above
     self.logger.critical("Process killed by Parent")
     exit(1)

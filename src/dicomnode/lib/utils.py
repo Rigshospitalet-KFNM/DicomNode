@@ -163,12 +163,13 @@ def spawn_thread(thread_function, *args, name=None, **kwargs):
 
   return thread
 
-def spawn_process(process_function, *args, start=True,name=None, **kwargs):
+def spawn_process(process_function, *args, start=True,name=None, context=None, **kwargs):
   logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
 
-  #multiprocessing_context = multiprocessing.get_context('spawn')
+  if context is None:
+    context = multiprocessing.get_context('spawn')
 
-  process = multiprocessing.Process(
+  process = context.Process(
     target=process_function, args=args, name=name
   )
 

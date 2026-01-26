@@ -14,8 +14,6 @@ from dicomnode.lib.regex import escape_pattern
 
 RegexAble = Union[Pattern, str]
 
-
-
 _LoggingWatcher = collections.namedtuple("_LoggingWatcher",
                                          ["records", "output"])
 

@@ -3,6 +3,7 @@ from logging import DEBUG, Formatter, Logger, LogRecord, NullHandler, StreamHand
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from pathlib import Path
 from multiprocessing.queues import Queue
+from queue import Empty
 from sys import stdout
 from threading import get_native_id
 from traceback import format_exc
@@ -51,7 +52,10 @@ def set_logger(logger: Logger, config: LoggerConfig):
 
 def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
   while True:
-    record = queue.get()
+    try:
+      record = queue.get(timeout=2.0)
+    except Empty:
+      continue
 
     if record is None:
       break

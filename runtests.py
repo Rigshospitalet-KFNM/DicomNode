@@ -4,6 +4,7 @@ import argparse
 import os
 import shutil
 import logging
+import subprocess
 import re
 import psutil
 import threading
@@ -114,7 +115,23 @@ if __name__ == "__main__":
   print(f"This process has id: {this_process.pid}")
 
   for process in this_process.children(True):
+    # Note that python spawns a resource tracker process, that we skip
+    if any(['multiprocessing.resource_tracker' in cmd for cmd in process.cmdline()]):
+      continue
+    else:
+      print(process.cmdline())
+
     print(f"DEADLOCKED PROCESS! : {process}")
+    try:
+      pyspy_process = subprocess.run(
+          ['py-spy', 'dump', '--pid', str(process.pid)],
+          capture_output=True,
+          text=True,
+          timeout=10
+      )
+      print(pyspy_process.stdout)
+    except Exception as e:
+      print(f"Encountered error: {e}", file=sys.stderr)
     # CLICK CLICK MOTHERFUCKER
     process.terminate()
 

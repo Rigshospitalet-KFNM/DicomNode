@@ -40,6 +40,7 @@ from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.factories.association_events import CStoreEvent,\
   ReleasedEvent, AssociationTypes
+from dicomnode.server.process_runner import ProcessRunner
 
 # Test Helpers #
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
@@ -103,11 +104,17 @@ class TestInput(AbstractInput):
     return super().add_image(dicom)
 
 
+class RaisingProcessor(ProcessRunner):
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    raise Exception("OOOOOH NOES")
+
 class TestPipeLine(AbstractPipeline):
   data_directory = DICOM_STORAGE_PATH
   processing_directory = PROCESSING_DIRECTORY
   log_level = logging.DEBUG
   log_output = "test_file.log"
+
+  process_runner = RaisingProcessor
 
   input = {
     INPUT_KW : TestInput
@@ -120,12 +127,6 @@ class TestPipeLine(AbstractPipeline):
       if dataset[0x00110101].value == 'ret_raise':
         raise Exception
     return True
-
-  def process(self, input_data: InputContainer):
-    if(self.raise_error):
-      raise Exception
-
-    return NoOutput()
 
   def __init__(self) -> None:
     super().__init__()
@@ -288,8 +289,6 @@ class PipeLineTestCase(DicomnodeTestCase):
         association_types=set([AssociationTypes.STORE_ASSOCIATION])
       )
 
-      self.node._process_entry_point(container, [(TEST_CPR, input_container)])
-
     log_process = f"Processing {TEST_CPR}"
     log_dispatch = f"Dispatched {TEST_CPR} Successful"
 
@@ -353,97 +352,6 @@ class PipeLineTestCase(DicomnodeTestCase):
       self.node._release_store_handler(container)
 
     # Note that you can't use the normal context handler to figure this out
-
-  def test_failed_processing_exit_with_code_1(self):
-    # Simulate there's another thread adding to TEST_CPR images
-    self.node._updated_patients[self.thread_id] = {TEST_CPR : 0}
-    self.node._patient_locks[TEST_CPR] = (set([self.thread_id]),
-                                          threading.Lock())
-    self.node.data_state.add_images(DATASETS)
-
-    input_containers = self.node.data_state.get_patient_input_container(TEST_CPR)
-
-    container = ReleasedEvent(
-      association_id=self.thread_id,
-      association_ip=None,
-      association_ae="AE",
-      association_types=set([AssociationTypes.STORE_ASSOCIATION])
-    )
-
-    self.node.raise_error = True
-    with self.assertLogs('dicomnode', logging.DEBUG):
-      with self.assertRaises(SystemExit) as cm:
-        self.node._pipeline_processing(TEST_CPR,  container, input_containers)
-
-    self.assertEqual(cm.exception.code, 1)
-
-    # Note that you can't use the normal context handler to figure this out
-
-  def test_dispatch(self):
-    class DumbOutput(PipelineOutput):
-      def __init__(self, val) -> None:
-        self.val = val
-
-      def send(self):
-        return self.val
-
-    self.assertTrue(self.node._dispatch(
-      DumbOutput(True)
-    ))
-    self.assertFalse(self.node._dispatch(
-      DumbOutput(False)
-    ))
-
-  def test_dispatch_raises(self):
-    class RasingOutput(PipelineOutput):
-      def __init__(self ) -> None:
-        pass
-
-      def send(self):
-        raise Exception
-
-    with self.assertLogs('dicomnode') as cm:
-      self.assertFalse(self.node._dispatch(RasingOutput()))
-
-    self.assertIn("CRITICAL:dicomnode:Exception in user Output Send Function",
-                  cm.output)
-
-  def test_missing_output_from_process(self):
-    class DumbPipeline(AbstractPipeline):
-      def process(self, *args): # type: ignore
-        return None
-    node = DumbPipeline()
-    with self.assertLogs(node.logger, DEBUG) as recorded_logs:
-      node._pipeline_processing(
-        'Test_patient',
-        ReleasedEvent(0, '127.0.0.1', "TEST", set()),
-        InputContainer({}, {}, None)
-      )
-    self.assertIn('WARNING:dicomnode:You forgot to return a PipelineOutput '
-                  'object in the process function. If output is handled by '
-                  'process, return a NoOutput Object', recorded_logs.output)
-
-  def test_double_failed_log(self):
-    class FalseOutput(PipelineOutput):
-      def __init__(self ) -> None:
-        pass
-
-      def send(self):
-        return False
-
-    class DumbPipeline(AbstractPipeline):
-      def process(self, *args): # type: ignore
-        return FalseOutput()
-
-    node = DumbPipeline()
-    with self.assertLogs(node.logger, DEBUG) as recorded_logs:
-      node._pipeline_processing(
-        'Test_patient',
-        ReleasedEvent(0, '127.0.0.1', "TEST", set()),
-        InputContainer({}, {}, None)
-      )
-    self.assertIn('ERROR:dicomnode:Unable to dispatch output for Test_patient', recorded_logs.output)
-
 
   def test_exception_handler(self):
     class HandlerPipeline(AbstractPipeline):
