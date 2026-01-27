@@ -129,4 +129,4 @@ multiprocessing.get_context('spawn').process(target=target, args=(arg,)) # NOT O
 
 You cannot send an object that have locks to new processes. Dicomnode have a
 neat little function `dicomnode.lib.utils.is_picklable` you can use to check if
-you can send the argument to another function.
+you can send an object to another process.
