@@ -20,7 +20,7 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.pipeline_tree import InputContainer
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 class TestInput(AbstractInput):
   def validate(self) -> bool:
@@ -60,7 +60,7 @@ class AssociationDummy():
     self.native_id = thread_id
 
 
-class TestProcessRunner(Processor):
+class TestProcessRunner(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     datasets: List[Dataset] = input_container["dicoms"]
 
@@ -77,7 +77,7 @@ class TestPipeline(AbstractQueuedPipeline):
   }
   log_output=None
 
-  process_runner = TestProcessRunner
+  Processor = TestProcessRunner
 
 
 class QueuedPipelineTestCase(DicomnodeTestCase):

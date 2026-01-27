@@ -58,7 +58,7 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
-from dicomnode.server.process_runner import Processor, ProcessRunnerArgs
+from dicomnode.server.processor import AbstractProcessor, ProcessRunnerArgs
 
 default_sigint_handler = signal.getsignal(signal.SIGINT)
 
@@ -190,7 +190,7 @@ class AbstractPipeline():
   dataset were accepted by the inputs, if false it will send an accepted image
   """
 
-  process_runner: Type[Processor] = Processor
+  Processor: Type[AbstractProcessor] = AbstractProcessor
 
   # End of Attributes definitions.
   def exporting_logging_config(self):
@@ -316,8 +316,8 @@ class AbstractPipeline():
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
 
-    if self.process_runner is Processor:
-      raise IncorrectlyConfigured("Missing Process Runner class member")
+    if self.Processor is AbstractProcessor or not issubclass(self.Processor, AbstractProcessor):
+      raise IncorrectlyConfigured("Missing Processor class!")
 
     # It's import that this is initialized here, because otherwise the self
     # argument is not passed properly.
@@ -531,10 +531,8 @@ class AbstractPipeline():
       )
 
       process = spawn_process(
-        self.process_runner, args, context=multiprocessing_context
+        self.Processor, args, context=multiprocessing_context
       )
-
-      self.processes.append(process) # type: ignore
 
       timeouts = 0
       started_process = datetime.now()
@@ -548,8 +546,6 @@ class AbstractPipeline():
           self.logger.info(f"Process {process.pid} started at {started_process.time()} encountered timeout {timeouts}")
           self.logger.info(f"Process {process.pid} has status: {PS_UTIL_Process(process.pid).status}")
           timeout_seconds = (timeout_seconds * 2)
-
-      self.processes.remove(process) # type: ignore
 
       if process.exitcode:
         self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")

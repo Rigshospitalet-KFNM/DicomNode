@@ -22,7 +22,7 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import PipelineOutput
 from dicomnode.server.pipeline_tree import InputContainer
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 # Test packages
 from tests.helpers import clear_logger
@@ -33,7 +33,7 @@ from tests.helpers.inputs import NeverValidatingInput
 #region Setup
 ACCEPTED_AE_TITLE = "AE_TITLE_!"
 
-class DummyRunner(Processor):
+class DummyRunner(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     return super().process(input_container)
 
@@ -45,7 +45,7 @@ class RejectionAETitle(AbstractPipeline):
   require_called_aet = True
   require_calling_aet = [ACCEPTED_AE_TITLE]
 
-  process_runner = DummyRunner
+  Processor = DummyRunner
 
 transfer_syntax = [
   ExplicitVRLittleEndian,

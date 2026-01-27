@@ -40,7 +40,7 @@ from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.factories.association_events import CStoreEvent,\
   ReleasedEvent, AssociationTypes
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 # Test Helpers #
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
@@ -104,11 +104,11 @@ class TestInput(AbstractInput):
     return super().add_image(dicom)
 
 
-class RaisingProcessor(Processor):
+class RaisingProcessor(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     raise Exception("OOOOOH NOES")
 
-class NoOpProcessor(Processor):
+class NoOpProcessor(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     return NoOutput()
 
@@ -118,7 +118,7 @@ class TestPipeLine(AbstractPipeline):
   log_level = logging.DEBUG
   log_output = "test_file.log"
 
-  process_runner = RaisingProcessor
+  Processor = RaisingProcessor
 
   input = {
     INPUT_KW : TestInput
@@ -361,7 +361,9 @@ class PipeLineTestCase(DicomnodeTestCase):
     class HandlerPipeline(AbstractPipeline):
       unhandled_error_blueprint = ERROR_BLUEPRINT
       default_response_port = 11112
-      process_runner = NoOpProcessor
+      class Processor(AbstractProcessor):
+        def process(self, input_container: InputContainer) -> PipelineOutput:
+          return super().process(input_container)
 
     node = HandlerPipeline()
     with self.assertLogs(node.logger) as recorded_log:

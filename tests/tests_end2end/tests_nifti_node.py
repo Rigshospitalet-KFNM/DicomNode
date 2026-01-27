@@ -23,7 +23,7 @@ from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patie
 from dicomnode.dicom.blueprints import add_UID_tag
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint, FunctionalElement, StaticElement, SeriesElement
 from dicomnode.dicom.dimse import Address, send_images
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
@@ -47,7 +47,7 @@ TEST_AE_TITLE = "NIFTYAE"
 SENDER_AE = "SENDERAE"
 INPUT_KW = "input"
 
-class NiftiRunner(Processor):
+class NiftiProcessor(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     nifti_object: Nifti1Image = input_container[INPUT_KW]
     data_array = nifti_object.get_fdata()
@@ -87,7 +87,6 @@ def save_instance_number(path: Path, datasets: Iterable[Dataset]):
   pass
 
 
-
 class NiftiNode(AbstractPipeline):
   # Directories
   output_dir = Path(f"{TESTING_TEMPORARY_DIRECTORY}/output")
@@ -103,7 +102,7 @@ class NiftiNode(AbstractPipeline):
     INPUT_KW : NiftiInput
   }
 
-  process_runner = NiftiRunner
+  Processor =NiftiProcessor
 
   def open(self, blocking=True) -> Optional[NoReturn]:
     if not self.output_dir.exists():

@@ -27,13 +27,13 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.pipeline_tree import InputContainer
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 # Testing Packages
 from tests.helpers import clear_logger
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
-class DumbProcessRunner(Processor):
+class DumbProcessRunner(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     sleep(10.0)
     return super().process(input_container)
@@ -50,7 +50,7 @@ class DummyPipeline(AbstractPipeline):
     "input" : DumbInput
   }
 
-  process_runner = DumbProcessRunner
+  Processor = DumbProcessRunner
 
   def __init__(self, config=None, queue: Any=None) -> None:
     self._log_queue = queue

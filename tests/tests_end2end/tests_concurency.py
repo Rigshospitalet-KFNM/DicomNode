@@ -19,7 +19,7 @@ from dicomnode.dicom.dimse import Address, send_images_thread
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import DicomOutput, PipelineOutput
-from dicomnode.server.process_runner import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 # Test packages
 from tests.helpers import generate_numpy_datasets, personify, clear_logger
@@ -32,7 +32,7 @@ INPUT_KW = "input"
 TEST_AE_TITLE = "TEST_AE"
 SENDER_AE_TITLE = "SENDER_AE"
 
-class ConcurrentRunner(Processor):
+class ConcurrentRunner(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     image_list = input_container[INPUT_KW]
 
@@ -53,18 +53,13 @@ class ConcurrencyNode(AbstractPipeline):
 
   patient_identifier_tag = 0x0020_000E
   ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : ListInput }
+  input = { INPUT_KW : ListInput }
   require_calling_aet = [SENDER_AE_TITLE]
   log_level: int = logging.DEBUG
   log_output = None
   images_processed: Optional[int] = None
   processing_directory = None
-  process_runner = ConcurrentRunner
-
-
-  def process(self, input_data: InputContainer) -> PipelineOutput:
-    image_list = input_data[INPUT_KW]
-    return DicomOutput([(Address('127.0.0.1', ENDPOINT_PORT, ENDPOINT_AE_TITLE), image_list)], self.ae_title)
+  Processor = ConcurrentRunner
 
 
 class ConcurrencyTestCase(DicomnodeTestCase):
