@@ -4,13 +4,15 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
 from argparse import ArgumentTypeError
-import multiprocessing
+from contextlib import contextmanager
+from enum import Enum
 from logging import Logger, getLogger
 import inspect
-import sys
 import io
-from enum import Enum
-from contextlib import contextmanager
+import multiprocessing
+import pickle
+import traceback
+import sys
 from threading import Thread
 from typing import Any, Optional, Type, Union
 
@@ -203,3 +205,21 @@ class ProcessStatus(Enum):
 
 def process_status(process: Process):
   return ProcessStatus(process.status())
+
+
+def is_picklable(obj):
+  try:
+    buffer = io.BytesIO()
+    pickler = pickle.Pickler(buffer, protocol=pickle.HIGHEST_PROTOCOL)
+    pickler.dump(obj)
+
+    buffer.seek(0)
+    unpicker = pickle.Unpickler(buffer)
+    result = unpicker.load()
+    return True
+
+  except Exception as E:
+    traceback_string = traceback.format_exception(type(E), E, tb=E.__traceback__)
+    print("".join(traceback_string))
+
+    return False

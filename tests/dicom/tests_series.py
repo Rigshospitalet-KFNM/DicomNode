@@ -2,8 +2,8 @@
 
 # Python standard library
 from datetime import date, time
-from typing import List
 from logging import getLogger
+from typing import List
 from unittest import TestCase
 
 # Third party module
@@ -23,6 +23,7 @@ from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag,\
   extract_space
 from dicomnode.math.image import Image, FramedImage
 from dicomnode.math.space import Space
+from dicomnode.lib.utils import is_picklable
 
 # Test stuff
 from tests.helpers import generate_numpy_datasets
@@ -305,3 +306,12 @@ class DicomSeriesTestCase(DicomnodeTestCase):
     self.assertIsInstance(extract_space(pet_series.frame(1)), Space)
     self.assertIsInstance(extract_space(series), Space)
     self.assertIsInstance(extract_space(series.datasets), Space)
+
+  def test_dicom_series_is_pickleable(self):
+    self.assertTrue(is_picklable(
+      DicomSeries([ds for ds in generate_numpy_datasets(
+        10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+        starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
+        slice_thickness=3
+    )])
+    ))

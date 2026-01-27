@@ -1,12 +1,17 @@
 import collections
 from enum import IntEnum
-from re import compile,Pattern
+from re import compile, Pattern
 from typing import List, Optional, Union
 from pprint import pformat
 import logging
+import threading
+import multiprocessing
 from unittest import TestCase
 from unittest.case import _BaseTestCaseContext
 from unittest.util import safe_repr
+
+# PS
+from psutil import Process
 
 # Dicomnode
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
@@ -109,6 +114,13 @@ class DicomnodeTestCase(TestCase):
     for handler in process_logger.handlers:
       print(f"test: {self.__class__.__name__}:{self._testMethodName} leaked a process handler")
       process_logger.removeHandler(handler)
+
+    for thread in threading.enumerate():
+      if 'MainThread' not in thread.name:
+        print(thread)
+
+    for child in multiprocessing.active_children():
+      print(child)
 
 
   def assertRegexIn(self, regex: RegexAble, container: List[str], msg=None):

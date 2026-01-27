@@ -1,14 +1,15 @@
 """This is a test case of a historic input"""
 
 # Python3 standard library
-from logging import DEBUG, getLogger
+from logging import DEBUG, getLogger, LogRecord
 import signal
 from os import kill, getpid
 from time import sleep
 import io
 import sys
 from random import randint
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, get_context
+from typing import Any, Optional
 from threading import Thread, get_native_id
 
 # Third party Packages
@@ -25,24 +26,48 @@ from dicomnode.lib import logging
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import PipelineOutput, NoOutput
+from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.process_runner import Processor
 
 # Testing Packages
 from tests.helpers import clear_logger
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
+class DumbProcessRunner(Processor):
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    sleep(10.0)
+    return super().process(input_container)
+
+class DumbInput(AbstractInput):
+          def validate(self) -> bool:
+            return True
+
+class DummyPipeline(AbstractPipeline):
+  ae_title = "TEST"
+  log_output = None
+
+  input = {
+    "input" : DumbInput
+  }
+
+  process_runner = DumbProcessRunner
+
+  def __init__(self, config=None, queue: Any=None) -> None:
+    self._log_queue = queue
+    super().__init__(config)
+    self.logger.info(f"Pipeline process pid: {getpid()}")
+    self.logger.info(f"Current handlers: {self.logger.handlers}")
+
+
+def process_function(queue: Queue, test_port):
+  instance = DummyPipeline(queue=queue)
+  instance.port = test_port
+  instance.open(blocking=True)
+
+
 class SignalKillsChildrenWritten(DicomnodeTestCase):
-  def setUp(self) -> None:
-    # So somewhere, somehow we print some good dam new line characters
-
-    buf = io.StringIO()
-    sys.stdout = buf
-    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
-
-    self.logging_queue = Queue()
-
   def tearDown(self) -> None:
     super().tearDown()
-
 
   def test_signal_kills_children(self):
     "This test checks if you send a SIGINT / SIGTERM / SIGKILL to the node"\
@@ -53,46 +78,22 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     # propagate. I have no idea why. An alternative would perhaps be you create
     # a shared flag with a thread, that repeatable checks it, and if signaled
     # Just calls exit
+    buf = io.StringIO()
+    sys.stdout = buf
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
+
+    logging_queue = get_context('spawn').Queue()
 
 
-    start_up_delay = 0.2
+    start_up_delay = 2.0
 
     test_port = randint(1024, 45000)
 
-    with self.assertLogs(self.logger, level=DEBUG) as captured_logs:
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, level=DEBUG) as captured_logs:
       # So this line, somehow captures the logs from the other process, although
       # it doesn't register that it did indeed catch them
 
-      def process_function(queue: Queue):
-        class DumbInput(AbstractInput):
-          def validate(self) -> bool:
-            return True
-
-        class DummyPipeline(AbstractPipeline):
-          port = test_port
-          ae_title = "TEST"
-          log_output = None
-
-          input = {
-            "input" : DumbInput
-          }
-
-          def __init__(self, config=None) -> None:
-            self._log_queue = queue
-            super().__init__(config)
-            self.logger.info(f"Pipeline process pid: {getpid()}")
-            self.logger.info(f"Current handlers: {self.logger.handlers}")
-
-
-          def process(self, input_data):
-            self.logger.info(f"Processing Process {getpid()} starting")
-            sleep(10)
-            return NoOutput()
-
-        instance = DummyPipeline()
-        instance.open(blocking=True)
-
-      victim_process = spawn_process(process_function, self.logging_queue)
+      victim_process = spawn_process(process_function, logging_queue, test_port)
 
       victim_pid = victim_process.pid
       if victim_pid is None:
@@ -136,6 +137,9 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
         else:
           killed_successful = False
           kill(victim_pid, signal.SIGKILL)
+
+    logging_queue.put_nowait(None)
+    logging_queue.close()
 
     if not killed_successful:
       raise AssertionError("Was unable to kill the processes!")

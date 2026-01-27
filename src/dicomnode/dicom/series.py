@@ -125,6 +125,8 @@ class DicomSeries(Series):
   datasets: List[Dataset]
   series_instance_UID: Optional[UID]
 
+  def _image_constructor(self):
+      return Image.from_datasets(self.datasets)
 
   def __init__(self, datasets: List[Dataset]) -> None:
     if len(datasets) == 0:
@@ -140,12 +142,10 @@ class DicomSeries(Series):
     else:
       self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
 
-    def image_constructor():
-      return Image.from_datasets(self.datasets)
 
     # It's forbidden to call method on self, since the object have not been
     # Constructed yet!
-    super().__init__(image_constructor)
+    super().__init__(self._image_constructor)
 
   def __iter__(self):
     for dataset in self.datasets:
@@ -167,6 +167,10 @@ class DicomSeries(Series):
     return self.pivot.get(tag, None)
 
   def __getattribute__(self, name: str) -> Any:
+    # This is here to ensure that a dicom series is picklable
+    if name.startswith('_'):
+      return super().__getattribute__(name)
+
     try:
       return super().__getattribute__(name)
     except AttributeError:

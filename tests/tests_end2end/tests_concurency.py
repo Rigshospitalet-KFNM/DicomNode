@@ -19,7 +19,7 @@ from dicomnode.dicom.dimse import Address, send_images_thread
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import DicomOutput, PipelineOutput
-from dicomnode.server.process_runner import ProcessRunner
+from dicomnode.server.process_runner import Processor
 
 # Test packages
 from tests.helpers import generate_numpy_datasets, personify, clear_logger
@@ -32,7 +32,7 @@ INPUT_KW = "input"
 TEST_AE_TITLE = "TEST_AE"
 SENDER_AE_TITLE = "SENDER_AE"
 
-class ConcurrentRunner(ProcessRunner):
+class ConcurrentRunner(Processor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     image_list = input_container[INPUT_KW]
 

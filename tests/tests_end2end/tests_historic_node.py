@@ -24,7 +24,7 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.input import HistoricAbstractInput, AbstractInput
-from dicomnode.server.process_runner import ProcessRunner
+from dicomnode.server.process_runner import Processor
 
 # Testing Packages
 from tests.helpers import get_test_ae, clear_logger
@@ -88,7 +88,7 @@ class TestHistoricInput(HistoricAbstractInput):
     return create_query_dataset(QueryLevels.PATIENT, PatientID=test_patient_id)
 
 
-class HistoricRunner(ProcessRunner):
+class HistoricRunner(Processor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     historic = input_container[HISTORIC_KW]
 

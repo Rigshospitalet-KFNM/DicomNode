@@ -20,7 +20,7 @@ class ProcessRunnerArgs:
   patient_id : str
 
 
-class ProcessRunner():
+class Processor():
   """Runner class for the processing.
   """
   def __init__(self, args : ProcessRunnerArgs) -> None:

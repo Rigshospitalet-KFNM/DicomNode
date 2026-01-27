@@ -19,7 +19,7 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import NoOutput, PipelineOutput
 from dicomnode.server.pipeline_tree import InputContainer
-from dicomnode.server.process_runner import ProcessRunner
+from dicomnode.server.process_runner import Processor
 
 # Testing Packages
 from helpers import process_thread_check_leak
@@ -30,7 +30,7 @@ class DumbInput(AbstractInput):
       def validate(self) -> bool:
         return True
 
-class LogRunner(ProcessRunner):
+class LogRunner(Processor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     self.logger.critical(f"Can we find the file in {os.getpid()}?")
     return NoOutput()

@@ -58,7 +58,7 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
-from dicomnode.server.process_runner import ProcessRunner, ProcessRunnerArgs
+from dicomnode.server.process_runner import Processor, ProcessRunnerArgs
 
 default_sigint_handler = signal.getsignal(signal.SIGINT)
 
@@ -190,7 +190,7 @@ class AbstractPipeline():
   dataset were accepted by the inputs, if false it will send an accepted image
   """
 
-  process_runner: Type[ProcessRunner] = ProcessRunner
+  process_runner: Type[Processor] = Processor
 
   # End of Attributes definitions.
   def exporting_logging_config(self):
@@ -233,6 +233,27 @@ class AbstractPipeline():
 
     # Set pynetdicom logger
     getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
+
+  def _start_queue_logging(self):
+    set_logger(self.logger, self.queue_logging_config())
+    if self._owning_queue:
+      set_logger(self.__process_logger, self.exporting_logging_config())
+
+      self._logger_thread = Thread(
+        target=queue_logger_thread_target,
+        args=(self._log_queue,self.__process_logger),
+        daemon=True
+      )
+      self._logger_thread.start()
+
+  def _stop_queue_logging(self):
+    set_logger(self.logger, self.exporting_logging_config())
+    self.__process_logger.handlers.clear()
+    if self._owning_queue:
+      self._log_queue.put_nowait(None)
+      self._logger_thread.join()
+      self._log_queue.join_thread()
+
 
   def __init__(self, config=None) -> None:
     # This function starts and opens the server
@@ -295,7 +316,7 @@ class AbstractPipeline():
     self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
     self._lock_key = Lock()
 
-    if self.process_runner is ProcessRunner:
+    if self.process_runner is Processor:
       raise IncorrectlyConfigured("Missing Process Runner class member")
 
     # It's import that this is initialized here, because otherwise the self
@@ -625,14 +646,8 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self._maintenance_thread.stop()
+    self._stop_queue_logging()
 
-
-    set_logger(self.logger, self.exporting_logging_config())
-    self.__process_logger.handlers.clear()
-    if self._owning_queue:
-      self._log_queue.put_nowait(None)
-      self._logger_thread.join()
-      self._log_queue.join_thread()
 
   def open(self, blocking=True) -> Optional[NoReturn]:
     """Opens all connections active connections.
@@ -653,17 +668,7 @@ class AbstractPipeline():
     self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
 
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
-
-    set_logger(self.logger, self.queue_logging_config())
-    if self._owning_queue:
-      set_logger(self.__process_logger, self.exporting_logging_config())
-
-      self._logger_thread = Thread(
-        target=queue_logger_thread_target,
-        args=(self._log_queue,self.__process_logger),
-        daemon=True
-      )
-      self._logger_thread.start()
+    self._start_queue_logging()
 
     if self.processing_directory is not None:
       if not self.processing_directory.exists():
@@ -761,9 +766,9 @@ class AbstractPipeline():
 
     self.logger.critical(f"Killed all subprocesses!")
 
-
     if signal_ in [signal.SIGTERM, signal.SIGINT] and self._owning_queue:
-      self._log_queue.put_nowait(None)
+      self._log_queue.put(None, timeout=1.0)
+
       self._logger_thread.join()
     exit(1)
 
@@ -891,14 +896,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
     self.running = False
     super().node_signal_handler_SIGINT(signal_, frame)
 
-  def __init__(self, master_queue: Optional[Queue[ReleasedEvent]]=None) -> None:
+  def __init__(self) -> None:
     self.running = True
-    if master_queue is None:
-      self.process_queue = Queue()
-    else:
-      self.process_queue = master_queue
-    self.process_thread = Thread(target=self.process_worker, daemon=False)
-    self.process_thread.start()
 
     # Super is called at the end of the function
     super().__init__()
@@ -906,6 +905,10 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
   def open(self, blocking=True):
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
+
+    self.process_queue = Queue()
+    self.process_thread = Thread(target=self.process_worker, daemon=False)
+    self.process_thread.start()
     super().open(blocking)
 
   def close(self) -> None:

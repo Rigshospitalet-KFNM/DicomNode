@@ -1,10 +1,16 @@
-from tests.helpers.dicomnode_test_case import DicomnodeTestCase
-
+# Python standard library
 import os
 import re
 import importlib
 import inspect
 from collections import defaultdict
+
+# Dicomnode modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+
+# Tests helpers
+from tests.helpers import clear_logger
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 
 class CircularImportDetector:
@@ -130,6 +136,10 @@ class CircularImportDetector:
 
 class CircularImportsTestCase(DicomnodeTestCase):
   """Test case for detecting circular imports in a package."""
+
+  def tearDown(self) -> None:
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
+    clear_logger(DICOMNODE_LOGGER_NAME)
 
   def test_no_circular_imports(self):
     """Test that there are no circular imports in the package."""

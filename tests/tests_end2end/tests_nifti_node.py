@@ -23,10 +23,11 @@ from dicomnode.dicom import gen_uid, make_meta, extrapolate_image_position_patie
 from dicomnode.dicom.blueprints import add_UID_tag
 from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint, FunctionalElement, StaticElement, SeriesElement
 from dicomnode.dicom.dimse import Address, send_images
+from dicomnode.server.process_runner import Processor
 from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.output import FileOutput, NoOutput
+from dicomnode.server.output import FileOutput, NoOutput, PipelineOutput
 from dicomnode.server.pipeline_tree import InputContainer
 
 # Testing packages
@@ -39,13 +40,30 @@ blueprint = Blueprint([
   StaticElement(0x0008_0018, 'UI', CTImageStorage),
   SeriesElement(0x0020_000D,'UI', add_UID_tag),
   SeriesElement(0x0020_000E,'UI', add_UID_tag),
-
 ])
 
 ##### Constants #####
 TEST_AE_TITLE = "NIFTYAE"
 SENDER_AE = "SENDERAE"
 INPUT_KW = "input"
+
+class NiftiRunner(Processor):
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    nifti_object: Nifti1Image = input_container[INPUT_KW]
+    data_array = nifti_object.get_fdata()
+    data_array += 1
+
+    dicom_factory = DicomFactory()
+
+    series = dicom_factory.build_series(
+      data_array,
+      blueprint,
+      input_container.datasets[INPUT_KW],
+    )
+
+    self.logger.debug("Build the thing")
+
+    return NoOutput()
 
 class NiftiInput(AbstractInput):
     required_tags = [
@@ -68,6 +86,8 @@ class NiftiInput(AbstractInput):
 def save_instance_number(path: Path, datasets: Iterable[Dataset]):
   pass
 
+
+
 class NiftiNode(AbstractPipeline):
   # Directories
   output_dir = Path(f"{TESTING_TEMPORARY_DIRECTORY}/output")
@@ -83,22 +103,7 @@ class NiftiNode(AbstractPipeline):
     INPUT_KW : NiftiInput
   }
 
-  def process(self, input_data: InputContainer):
-    nifti_object: Nifti1Image = input_data[INPUT_KW]
-    data_array = nifti_object.get_fdata()
-    data_array += 1
-
-    dicom_factory = DicomFactory()
-
-    series = dicom_factory.build_series(
-      data_array,
-      blueprint,
-      input_data.datasets[INPUT_KW],
-    )
-
-    self.logger.debug("Build the thing")
-
-    return NoOutput()
+  process_runner = NiftiRunner
 
   def open(self, blocking=True) -> Optional[NoReturn]:
     if not self.output_dir.exists():
