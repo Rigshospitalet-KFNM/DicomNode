@@ -48,6 +48,7 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.utils import spawn_process
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
+from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
 from dicomnode.lib.io import Directory, File
 from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
   LoggerConfig, log_traceback
@@ -527,44 +528,13 @@ class AbstractPipeline():
         process_path=self.get_processing_directory_path(patient_id)
       )
 
-      timeouts = 0
-      started_process = datetime.now()
-      timeout_seconds = 1.0
+      parallel_primitive = ParallelPrimitive.THREAD if self.processing_directory is None else ParallelPrimitive.PROCESS
+      primitive = Parallel(parallel_primitive, self.Processor, args)
+      primitive.join()
 
-
-      if self.processing_directory is not None:
-        process = spawn_process(
-          self.Processor, args, context=multiprocessing_context
-        )
-
-        while process.is_alive():
-          process.join(timeout_seconds)
-
-          if process.is_alive():
-            timeouts += 1
-            self.logger.info(f"Process {process.pid} started at {started_process.time()} encountered timeout {timeouts}")
-            self.logger.info(f"Process {process.pid} has status: {PS_UTIL_Process(process.pid).status}")
-            timeout_seconds = (timeout_seconds * 2)
-
-        if process.exitcode:
-          self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
-        else:
-          patients_to_clean_up = [fst for fst, sec in input_containers]
-          self.logger.info(f"Removing {patients_to_clean_up}'s images")
-          self.data_state.clean_up_patients(patients_to_clean_up)
-      else:
-        thread = Thread(target=self.Processor, args=(args,), name="DicomnodeThreadName") # There might no reason to spawn a thread here
-        thread.start()
-        while thread.is_alive():
-          thread.join(timeout=timeout_seconds)
-          if thread.is_alive():
-            timeouts += 1
-            self.logger.info(f"Thread {thread.native_id} started at {started_process.time()} encountered timeout {timeouts}")
-            timeout_seconds = (timeout_seconds * 2)
-
-          patients_to_clean_up = [fst for fst, sec in input_containers]
-          self.logger.info(f"Removing {patients_to_clean_up}'s images")
-          self.data_state.clean_up_patients(patients_to_clean_up)
+      patients_to_clean_up = [fst for fst, sec in input_containers]
+      self.logger.info(f"Removing {patients_to_clean_up}'s images")
+      self.data_state.clean_up_patients(patients_to_clean_up)
 
 
   def _get_input_container(self,
