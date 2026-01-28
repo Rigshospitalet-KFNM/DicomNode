@@ -245,6 +245,8 @@ class PipelineTree(ImageTreeInterface):
   The main responsibility of this class is to manage Patient Nodes: So
     - Creating new PatientNodes when needed
     - Deleting PatientNodes, when they're expired or processed
+
+  The pipeline tree is thread safe with locks
   """
 
   @dataclass
@@ -270,6 +272,7 @@ class PipelineTree(ImageTreeInterface):
 
     patient_container: Type[PatientNode] = PatientNode
     "Type of node that's under this tree."
+
 
 
   def __init__(self,

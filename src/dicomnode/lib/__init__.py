@@ -5,6 +5,7 @@ from . import logging
 from . import regex
 from . import utils
 from . import validators
+from . import parallelism
 
 __all__ = [
   'exceptions',
@@ -13,6 +14,7 @@ __all__ = [
   'io',
   'utils',
   'validators',
+  'parallelism'
 ]
 
 def __dir__():

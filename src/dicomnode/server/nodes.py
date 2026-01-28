@@ -33,23 +33,22 @@ from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
 from psutil import Process as PS_UTIL_Process
 
 # Third part packages
+from pydicom import Dataset
 from pynetdicom import evt
 from pynetdicom.ae import ApplicationEntity
 from pynetdicom.presentation import AllStoragePresentationContexts, PresentationContext,\
   VerificationPresentationContexts
-from pydicom import Dataset
+from pynetdicom.transport import ThreadedAssociationServer
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.lib.utils import spawn_process, spawn_thread
-from dicomnode.lib import config_parser
+from dicomnode.lib.utils import spawn_process
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
-from dicomnode.lib.io import TemporaryWorkingDirectory, ResourceFile,\
-  Directory, File
+from dicomnode.lib.io import Directory, File
 from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
   LoggerConfig, log_traceback
 from dicomnode.server.factories.association_events import AcceptedEvent, \
@@ -278,8 +277,6 @@ class AbstractPipeline():
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
-    self.processes: List[multiprocessing.Process] = []
-
     pipeline_tree_options = self.pipeline_tree_type.Options(
       ae_title=self.ae_title,
       data_directory=self._data_directory,
@@ -300,7 +297,7 @@ class AbstractPipeline():
 
     # Server validations and creation.
     self.dicom_application_entry = ApplicationEntity(ae_title = self.ae_title)
-    self.server_thread = None
+    self.server_thread: ThreadedAssociationServer | None = None
     # You need VerificationPresentationContexts for ECHOSCU
     # and you want ECHO-SCU
     contexts = VerificationPresentationContexts + self.supported_contexts
@@ -530,29 +527,45 @@ class AbstractPipeline():
         process_path=self.get_processing_directory_path(patient_id)
       )
 
-      process = spawn_process(
-        self.Processor, args, context=multiprocessing_context
-      )
-
       timeouts = 0
       started_process = datetime.now()
       timeout_seconds = 1.0
 
-      while process.is_alive():
-        process.join(timeout_seconds)
 
-        if process.is_alive():
-          timeouts += 1
-          self.logger.info(f"Process {process.pid} started at {started_process.time()} encountered timeout {timeouts}")
-          self.logger.info(f"Process {process.pid} has status: {PS_UTIL_Process(process.pid).status}")
-          timeout_seconds = (timeout_seconds * 2)
+      if self.processing_directory is not None:
+        process = spawn_process(
+          self.Processor, args, context=multiprocessing_context
+        )
 
-      if process.exitcode:
-        self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
+        while process.is_alive():
+          process.join(timeout_seconds)
+
+          if process.is_alive():
+            timeouts += 1
+            self.logger.info(f"Process {process.pid} started at {started_process.time()} encountered timeout {timeouts}")
+            self.logger.info(f"Process {process.pid} has status: {PS_UTIL_Process(process.pid).status}")
+            timeout_seconds = (timeout_seconds * 2)
+
+        if process.exitcode:
+          self.logger.critical(f"Sub process failed with exitcode {process.exitcode}")
+        else:
+          patients_to_clean_up = [fst for fst, sec in input_containers]
+          self.logger.info(f"Removing {patients_to_clean_up}'s images")
+          self.data_state.clean_up_patients(patients_to_clean_up)
       else:
-        patients_to_clean_up = [fst for fst, sec in input_containers]
-        self.logger.info(f"Removing {patients_to_clean_up}'s images")
-        self.data_state.clean_up_patients(patients_to_clean_up)
+        thread = Thread(target=self.Processor, args=(args,), name="DicomnodeThreadName") # There might no reason to spawn a thread here
+        thread.start()
+        while thread.is_alive():
+          thread.join(timeout=timeout_seconds)
+          if thread.is_alive():
+            timeouts += 1
+            self.logger.info(f"Thread {thread.native_id} started at {started_process.time()} encountered timeout {timeouts}")
+            timeout_seconds = (timeout_seconds * 2)
+
+          patients_to_clean_up = [fst for fst, sec in input_containers]
+          self.logger.info(f"Removing {patients_to_clean_up}'s images")
+          self.data_state.clean_up_patients(patients_to_clean_up)
+
 
   def _get_input_container(self,
                            patient_id: str,
@@ -592,18 +605,6 @@ class AbstractPipeline():
               if not it'll send a 0xB006 response.
     """
     return True
-
-  def process(self, input_data: InputContainer) -> PipelineOutput:
-    """Function responsible for doing post processing.
-
-    Args:
-      input_data: InputContainer - Acts much like a dict similar to the input attribute
-        containing the return data of the various input grinder functions
-    Returns:
-      PipelineOutput - The processed images of the pipeline
-    """
-
-    return NoOutput() # pragma: no cover
 
   def post_init(self) -> None:
     """This function is called just before the server is started.

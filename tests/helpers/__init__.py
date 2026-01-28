@@ -10,6 +10,8 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional,\
                     Tuple, Type, Union
 from unittest import TestCase
 
+
+
 # Third party Packages
 import numpy
 from pydicom import Dataset
@@ -285,6 +287,9 @@ def clear_logger(logger_name: str):
 
   logger.filters.clear()
   logger.handlers.clear()
+
+def wait_for_children():
+  [process.wait() for process in Process().children()]
 
 
 from . import dicomnode_test_case

@@ -27,7 +27,7 @@ from dicomnode.server.input import HistoricAbstractInput, AbstractInput
 from dicomnode.server.processor import AbstractProcessor
 
 # Testing Packages
-from tests.helpers import get_test_ae, clear_logger
+from tests.helpers import get_test_ae, clear_logger, process_thread_check_leak
 from tests.helpers.storage_endpoint import ENDPOINT_AE_TITLE, MOVE_ENDPOINT, TestStorageEndpoint, ENDPOINT_PORT
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -110,6 +110,7 @@ class HistoricPipeline(AbstractPipeline):
   log_output = None
   Processor = HistoricRunner
 
+
   def process(self, input_data: InputContainer) -> PipelineOutput:
     historic = input_data[HISTORIC_KW]
 
@@ -125,15 +126,15 @@ class HistoricTestCase(DicomnodeTestCase):
 
     super().tearDown()
 
-
-  def test_end_2_end_historic_input(self):
-    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+  @process_thread_check_leak
+  def test_end_2_end_historic_input_data(self):
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as logger_output:
       node = HistoricPipeline()
       test_port = randint(40000,49999)
 
       node.port = test_port
       node.open(blocking=False)
-      with self.assertLogs(DICOMNODE_PROCESS_LOGGER):
+      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as process_output:
         endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=test_port)
         endpoint.open()
 
@@ -148,21 +149,21 @@ class HistoricTestCase(DicomnodeTestCase):
         make_meta(dataset)
 
         response = send_image(SENDER_AE_TITLE, address, dataset)
-        sleep(0.005)
-        while node.processes:
-          sleep(0.005)
 
         node.close()
         endpoint.close()
 
+    log_output = logger_output.output + process_output.output
+    self.assertRegexIn(f"Process has handled {test_patient_id}" , log_output)
+
   def test_end_2_end_historic_input_empty(self):
-    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as logger_output:
       node = HistoricPipeline()
       test_port = randint(40000,49999)
 
       node.port = test_port
       node.open(blocking=False)
-      with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER):
+      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as process_output:
         endpoint = TestCaseStorageEndpoint([], move_endpoint=test_port)
         endpoint.open()
 
@@ -177,9 +178,9 @@ class HistoricTestCase(DicomnodeTestCase):
 
         make_meta(dataset)
         response = send_image(SENDER_AE_TITLE, address, dataset)
-        sleep(1.25) # wait for all the threads to be done
 
-
-        self.assertEqual(node.data_state.images, 0)
         node.close()
         endpoint.close()
+
+    log_output = logger_output.output + process_output.output
+    self.assertRegexIn(f"Process has handled {test_patient_id}" , log_output)

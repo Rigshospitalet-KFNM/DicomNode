@@ -3,12 +3,13 @@
 # Python3 standard library
 from logging import DEBUG, getLogger, LogRecord
 import signal
-from os import kill, getpid
+from os import kill, getpid, getcwd
 from time import sleep
 import io
-import sys
-from random import randint
 from multiprocessing import Process, Queue, get_context
+from random import randint
+from pathlib import Path
+import sys
 from typing import Any, Optional
 from threading import Thread, get_native_id
 
@@ -52,7 +53,9 @@ class DummyPipeline(AbstractPipeline):
 
   Processor = DumbProcessRunner
 
+
   def __init__(self, config=None, queue: Any=None) -> None:
+    self.processing_directory = Path(getcwd()) / "processing"
     self._log_queue = queue
     super().__init__(config)
     self.logger.info(f"Pipeline process pid: {getpid()}")
