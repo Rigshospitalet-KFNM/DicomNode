@@ -403,7 +403,7 @@ class Blueprint():
       # End private tag handling
     self._dict[virtual_element.tag] = virtual_element
 
-  def get_required_tags(self) -> List[int]:
+  def get_required_tags(self):
     return_list = []
     for virtual_element in self._dict.values():
       if isinstance(virtual_element, CopyElement):

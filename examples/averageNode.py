@@ -13,6 +13,7 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import DynamicInput
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.output import PipelineOutput, FileOutput, NoOutput
+from dicomnode.server.processor import AbstractProcessor
 
 from typing import Dict, Any
 
@@ -56,13 +57,12 @@ class AveragingPipeline(AbstractPipeline):
     INPUT_KW : SeriesInputs
   }
 
+  class Processor(AbstractProcessor):
+    def process(self, input_container: InputContainer):
+      studies = numpy.array(input_container[INPUT_KW])
+      result = studies.mean(axis=0)
 
-  def process(self, input_data: InputContainer):
-    if input_data is None or self.dicom_factory is None:
-      raise Exception
-
-    studies = numpy.array(input_data[INPUT_KW])
-    result = studies.mean(axis=0)
+      return NoOutput()
 
 if __name__ == "__main__":
   pipe = AveragingPipeline()

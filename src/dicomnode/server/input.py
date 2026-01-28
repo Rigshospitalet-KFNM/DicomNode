@@ -14,8 +14,7 @@ from enum import Enum
 from logging import Logger, getLogger
 from pathlib import Path
 from threading import Thread
-from types import UnionType
-from typing import List, Dict, Tuple, Any, Optional, Type, Iterable, Union
+from typing import Any, Dict,List, Optional, Iterable, Tuple, Type, Union
 
 # Third party packages
 from pydicom import Dataset
@@ -78,7 +77,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   # Private tags should be injected, rather than put into the input
   _private_tags: Dict[int, Tuple[str, str, str, str, str]] = {}
 
-  required_tags: List[Union[int,str]] = [0x00080018] # SOPInstanceUID
+  required_tags: List[Union[int,str]] | List[int] = [0x00080018] # SOPInstanceUID
   """The list of tags that must be present in a dataset to be accepted
   into the input. Consider checking SOP_mapping.py for collections of Tags."""
 

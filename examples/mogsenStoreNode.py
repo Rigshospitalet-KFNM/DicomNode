@@ -18,7 +18,7 @@ from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.pipeline_tree import InputContainer
 from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.output import FileOutput
-
+from dicomnode.server.processor import AbstractProcessor
 
 env_name = "STORENODE_ARCHIVE_PATH"
 env_default = "/raid/dicom/storenode/"
@@ -28,13 +28,11 @@ ARCHIVE_PATH = environ.get(env_name, env_default)
 INPUT_ARG: str = "dataset"
 
 class DicomObjectInput(AbstractInput):
-  required_tags: List[int] = [
+  required_tags = [
     0x00080016, # SOPInstanceUID
     0x0020000D, # StudyInstanceUID
     0x0020000E, # SeriesInstanceUID
   ]
-
-  required_values: Dict[int, Any]
 
   def validate(self):
     return True
@@ -124,6 +122,8 @@ def storeDataset(archive_path: Path, dataset: Dataset) -> None:
       save_dicom(dataset_path,  dataset)
       createSeriesFile(archive_path, dataset)
 
+archive_path: Path = Path(ARCHIVE_PATH)
+
 class StoreNode(AbstractPipeline):
   log_path: str = "/var/log/storenode.log"
   ae_title: str = "STORENODE"
@@ -138,16 +138,15 @@ class StoreNode(AbstractPipeline):
     INPUT_ARG : DicomObjectInput
   }
 
-  archive_path: Path = Path(ARCHIVE_PATH)
-
-  def process(self, input_data: InputContainer) -> FileOutput:
-    #create tab file
-    self.logger.info(f"Started to store {len(input_data[INPUT_ARG])}")
-    datasets: List [Dataset] = input_data[INPUT_ARG]
-    return FileOutput([(self.archive_path, datasets)], storeDataset)
+  class Processor(AbstractProcessor):
+    def process(self, input_container: InputContainer) -> FileOutput:
+      #create tab file
+      self.logger.info(f"Started to store {len(input_container[INPUT_ARG])}")
+      datasets: List [Dataset] = input_container[INPUT_ARG]
+      return FileOutput([(archive_path, datasets)], storeDataset)
 
   def post_init(self) -> None:
-    self.archive_path.mkdir(exist_ok=True)
+    archive_path.mkdir(exist_ok=True)
 
 
 if __name__ == "__main__":

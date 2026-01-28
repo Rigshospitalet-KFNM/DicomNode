@@ -53,12 +53,12 @@ class RTConsumer(AbstractInput):
          SERVICE_PORT is not None and\
          SERVICE_AE_TITLE is not None and\
          self.options.ae_title is not None:
-        
+
         try:
-          send_images(self.options.ae_title, 
+          send_images(self.options.ae_title,
                       Address(SERVICE_ADDRESS,
                               int(SERVICE_PORT),
-                              SERVICE_AE_TITLE))
+                              SERVICE_AE_TITLE), self)
         except CouldNotCompleteDIMSEMessage:
           error_message = "Could send images with parameters:\n"\
                          f"IP:   {SERVICE_ADDRESS}\n"\
@@ -76,4 +76,3 @@ class RTConsumer(AbstractInput):
         self.logger.error(error_message)
 
     return ready
-  
