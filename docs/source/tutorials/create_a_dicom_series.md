@@ -237,14 +237,15 @@ class MyPipeline(AbstractPipeline):
   dicom_factory = factory
   header_blueprint = blueprint
 
-  def process(self, input_container)
-    parent_series = input_container.datasets['parent']
+  class Processor(AbstractProcessor):
+    def process(self, input_container)
+      parent_series = input_container.datasets['parent']
 
 
-    image = ...
+      image = ...
 
-    datasets = self.dicom_factory.build_series(image, blueprint, parent)
+      datasets = self.dicom_factory.build_series(image, blueprint, parent)
 
-    # Do the outout
+      # Do the outout
 
 ```

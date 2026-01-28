@@ -31,12 +31,10 @@ def custom_error(input_container) -> bool:
   ...
 
 class MyPipeline(AbstractPipeline):
+  class Processor(AbstractProcessor)
+    def process(self, input_container):
+      if custom_error(input_container):
+        raise FancyException
 
-  def process(input_container):
-    if custom_error(input_container):
-      raise FancyException
-
-    # Rest of the pipeline
+      # Rest of the pipeline
 ```
-
-

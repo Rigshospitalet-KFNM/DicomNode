@@ -206,25 +206,28 @@ class MyPipeline(AbstractPipeline):
 
 ## Processing
 
-The processing is handled by the process method, so you need to overwrite it
-with your own post-processing, however it must have a specific call structure.
-
-It must accept an `InputContainer` and return a `PipelineOutput`.
+The processing is handled by the Processor class which have a process method,
+that you need to overwrite with your own post-processing, it has takes a
+`InputContainer` argument and return a `PipelineOutput`.
 
 
 ```python
+import dicomnode.server.processor import AbstractProcessor
+
 class MyPipeline(AbstractPipeline):
   ...
-  def process(self, input_container: InputContainer) -> PipelineOutput:
-    ...
-```
 
-The `PipelineOutput` is related to exporting data and will be explained in the
-next section.
+  class Processor(AbstractProcessor):
+    def process(self, input_container: InputContainer) -> PipelineOutput:
+      ...
+```
 
 The `InputContainer` is a glorified `Dict[str, Any]` where the keys are matching
  the keys of the `input` attribute of the pipeline and values is what the
  `AbstractInputs` Grinders returned.
+
+The `PipelineOutput` is related to exporting data and will be explained in the
+next section.
 
 So in the PET and CT example from above: `input_container['CT']` would return
 the CT image and `input_container['PET']` would return the pet image.
@@ -273,13 +276,14 @@ as arguments of pairs with (endpoint, series of datasets)
 from dicomnode.dicom.dimse import Address
 from dicomnode.server.output import DicomOutput
 
+
 class MyPipeline(AbstractPipeline):
   ...
-  def process(self, input_container: InputContainer) -> PipelineOutput
+  class Processor(AbstractProcessor):
+    def process(self, input_container: InputContainer) -> PipelineOutput
+      ...
 
-  ...
-
-  return DicomOutput([Address(ip='', port=104, ae_title=""), datasets], self.ae_title)
+      return DicomOutput([Address(ip='', port=104, ae_title=""), datasets], self.ae_title)
 ```
 
 If you have performed the steps above you now have a functional pipeline.

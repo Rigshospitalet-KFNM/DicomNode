@@ -23,23 +23,24 @@ report with key values, we can imagine the code to look something like this:
 
 ```python
 class MyPipeline(AbstractPipeline):
-  def process(self, input_data):
-    # data extration from input data
-    ...
+  class Processor(AbstractProcessor):
+    def process(self, input_data):
+      # data extration from input data
+      ...
 
-    # Mathematical modeling
-    modeled_images = ...
+      # Mathematical modeling
+      modeled_images = ...
 
-    # Report Generation
-    report = generate_report(modeled_images, input_data)
+      # Report Generation
+      report = generate_report(modeled_images, input_data)
 
-    # Factory
-    modeled_datasets = self.dicom_factory.build_from_header(input_data.header,
-                                                            blueprint)
-    encoded_report = self.dicom_factory.encode_pdf(report, modeled_datasets)
+      # Factory
+      modeled_datasets = self.dicom_factory.build_from_header(input_data.header,
+                                                              blueprint)
+      encoded_report = self.dicom_factory.encode_pdf(report, modeled_datasets)
 
-    return DicomOutput([(PACS_ADDRESS, modeled_dataset), (PACS_ADDRESS,
-                                                          encoded_report)])
+      return DicomOutput([(PACS_ADDRESS, modeled_dataset), (PACS_ADDRESS,
+                                                            encoded_report)])
 ```
 
 The generated report is a placeholder. (Although I highly recommend that you try

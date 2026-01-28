@@ -121,8 +121,9 @@ from pydicom import Dataset
     "HISTORIC"      : HISTORIC_INPUT # Historic Abstract Input Sub type
   }
 
-  def process(input_container):
-    historic: Dict[date, Dict[str, Dataset]] = input_container["HISTORIC"]
+  class Processor(AbstractProcessor):
+    def process(self, input_container):
+      historic: Dict[date, Dict[str, Dataset]] = input_container["HISTORIC"]
 
     # Where the date is the study date and the string is the series description.
 ```
