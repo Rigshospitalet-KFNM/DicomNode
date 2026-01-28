@@ -17,12 +17,9 @@ class Pipeline(AbstractPipeline):
 
 # Version 0.0.21 and beyond
 
-from dicomnode.server.processor import Processor
+from dicomnode.server.processor import AbstractProcessor
 
 ATTRIBUTE = ...
-
-
-    ...
 
 class Pipeline(AbstractPipeline):
   class Processor(AbstractProcessor): # Very import to name it Processor!

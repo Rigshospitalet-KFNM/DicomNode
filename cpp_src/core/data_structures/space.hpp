@@ -30,6 +30,4 @@ struct Space {
   constexpr size_t elements() const {
     return extent.elements();
   }
-
-
 };
