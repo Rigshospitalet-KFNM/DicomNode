@@ -495,6 +495,7 @@ class AbstractPipeline():
             threads.remove(thread_id)
             self.logger.debug(f"One of the Threads: {threads} will handle {patient_id}")
             continue
+    self.logger.debug(f"Removing event {release_event.association_id} from updated Patients!")
     del self._updated_patients[release_event.association_id] # Removing updated Patients
     return input_containers
 
@@ -855,7 +856,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       except Empty:
         pass
 
-  def _handle_association_released(self, event: evt.Event):
+  def _handle_association_closed(self, event: evt.Event):
     released_container = self._association_event_factory.build_association_released(event)
     self.process_queue.put(released_container)
 
@@ -868,7 +869,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     # Super is called at the end of the function
     super().__init__()
-    self._evt_handlers[evt.EVT_RELEASED] = self._handle_association_released
+    self._evt_handlers[evt.EVT_CONN_CLOSE] = self._handle_association_closed
 
   def open(self, blocking=True):
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
