@@ -14,7 +14,7 @@ import pickle
 import traceback
 import sys
 from threading import Thread
-from typing import Any, Optional, Type, Union
+from typing import Any, Dict,Callable, Optional, Type, Union
 
 # Third party packages
 from psutil import Process, STATUS_RUNNING, STATUS_DEAD, STATUS_DISK_SLEEP, STATUS_IDLE, STATUS_LOCKED, STATUS_PARKED, STATUS_SLEEPING, STATUS_STOPPED, STATUS_TRACING_STOP, STATUS_WAITING, STATUS_WAKING, STATUS_ZOMBIE
@@ -63,20 +63,7 @@ def prefixInt(number: int, minLength: int= 4):
   return f"{zeroes}{numberStr}"
 
 
-class ThreadWithReturnValue(Thread):
-  def __init__(self, group=None, target=None, name=None,
-              args=(), kwargs={}, daemon=True):
-    Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
-    self._return: Any = None
 
-  def run(self):
-    if self._target is not None: # type: ignore # In python you don't have private variables
-      self._return = self._target(*self._args, **self._kwargs) #type: ignore
-
-
-  def join(self, *args): #type: ignore
-    Thread.join(self, *args)
-    return self._return
 
 def drop_privileges(new_user_uid, logger: Optional[Logger] = None, root_uid = 0) -> None: #pragma: no cover
   """Drops privileges of program to run as a user

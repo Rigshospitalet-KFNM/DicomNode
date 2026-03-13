@@ -26,7 +26,7 @@ from queue import Queue, Empty
 import shutil
 import signal
 from sys import stdout
-from threading import Thread, Lock
+from threading import Thread, Lock, get_native_id
 from time import sleep, time
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
@@ -42,10 +42,11 @@ from pynetdicom.transport import ThreadedAssociationServer
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.dicom import DicomIdentifier
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
 from dicomnode.dicom.series import DicomSeries
-from dicomnode.lib.utils import spawn_process
+
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   CouldNotCompleteDIMSEMessage
 from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
@@ -55,7 +56,10 @@ from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
 from dicomnode.server.factories.association_events import AcceptedEvent, \
   AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
 from dicomnode.server.input import AbstractInput
+from dicomnode.server.dicomnode_config import DicomnodeConfig
 from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
+from dicomnode.server.pipeline_storage import PipelineStorage
+from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.processor import AbstractProcessor, ProcessRunnerArgs
@@ -278,18 +282,32 @@ class AbstractPipeline():
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
-    pipeline_tree_options = self.pipeline_tree_type.Options(
-      ae_title=self.ae_title,
-      data_directory=self._data_directory,
-      lazy=self.lazy_storage,
-      input_container_type=self.input_container_type,
-      patient_container=self.patient_container_type,
-    )
+    if config is None:
+      config = DicomnodeConfig(
+        STUDY_EXPIRATION_DAYS=self.study_expiration_days,
+        PATIENT_IDENTIFIER_TAG=self.patient_identifier_tag,
+        LAZY_STORAGE=self.lazy_storage,
+        AE_TITLE=self.ae_title,
+        IP=self.ip,
+        PORT=self.port,
+        REQUIRED_CALLED_AET=self.require_called_aet,
+        ARCHIVE_DIRECTORY=self._data_directory,
+        PROCESSING_DIRECTORY=self._processing_directory,
+        RUN_FILE=File(self.run_file) if self.run_file else None,
+        LOG_OUTPUT=str(self.log_output),
+        LOG_WHEN=self.log_when,
+        LOG_LEVEL=self.log_level,
+        LOG_FORMAT=self.log_format
+      )
 
-    self.data_state: PipelineTree = self.pipeline_tree_type(
-      self.patient_identifier_tag,
+    self.config = config
+
+    self.identifier = DicomIdentifier(identifying_tag=self.patient_identifier_tag)
+
+    self.data_state = PipelineStorage(
       self.input,
-      pipeline_tree_options
+      self.identifier,
+      self.config
     )
 
     self.is_open = False
@@ -341,18 +359,6 @@ class AbstractPipeline():
   def _handle_connection_opened(self, event: evt.Event):
     self.logger.debug(f"Connection {event.address[0]} opened a connection") #type: ignore
 
-  def _handle_connection_closed(self, event: evt.Event):
-    self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
-    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
-
-    released_event = self._association_event_factory.build_association_released(event)
-
-    for association_type in released_event.association_types:
-      handler = self._release_handlers.get(association_type, None)
-      if handler is not None:
-        handler(self, released_event)
-      else:
-        self.logger.critical(f"Missing Release Handler for {association_type}!") # pragma: no cover
 
   def _handle_association_rejected(self, event: evt.Event):
     self.logger.debug(f"Connection {event.assoc.remote['ae_title']} rejected a connection") #type: ignore
@@ -372,38 +378,12 @@ class AbstractPipeline():
     """
     self.logger.debug(f"Association with {event.assoc.requestor.ae_title}"
                       f" - {event.assoc.requestor.address} Accepted")
-    association_accept_container = self._association_event_factory\
-                                       .build_association_accepted(event)
-
-    for association_type in association_accept_container.association_types:
-      handler = self._acceptation_handlers.get(association_type)
-      if handler is not None:
-        handler(self, association_accept_container)
-      else:
-        self.logger.error("No association requested handler for found for "
-                          f"{association_type}!") # pragma no cover
-
-
-  def _consume_association_accept_store_association(
-      self, accepted_container: AcceptedEvent):
-    """This function initialized after a thread have connected
-    """
-    if accepted_container.association_ip is not None:
-      self._associations_responds_addresses[accepted_container.association_id] = Address(
-        accepted_container.association_ip,
-        self.default_response_port,
-        accepted_container.association_ae
-      )
-
-    self._updated_patients[accepted_container.association_id] = {}
 
 
   def _handle_c_store(self, event: evt.Event) -> int:
     c_store_container = self._association_event_factory.build_association_c_store(event)
-    status = self.consume_c_store_container(c_store_container)
-    return status
 
-  def consume_c_store_container(self, c_store_container: CStoreEvent) -> int:
+
     try:
       if not self.filter(c_store_container.dataset):
         self.logger.info("Node rejected dataset: Received Dataset did not pass filter")
@@ -412,116 +392,59 @@ class AbstractPipeline():
       log_traceback(self.logger, exception, "User defined function filter produced an exception")
       return 0xA801
 
-    if self.patient_identifier_tag in c_store_container.dataset:
-      patient_id = str(c_store_container.dataset[self.patient_identifier_tag].value)
-      thread_id = c_store_container.association_id
-      # Critical zone for managing keys
-      with self._lock_key:
-        if patient_id in self._patient_locks:
-          threads, patient_lock = self._patient_locks[patient_id]
-        else:
-          threads, patient_lock = (set([thread_id]), Lock())
-          self._patient_locks[patient_id] = (threads, patient_lock)
-
-        if patient_id not in self._updated_patients[thread_id]:
-          self._updated_patients[thread_id][patient_id] = 0
-          threads.add(thread_id)
-      # End of Critical zone
-      try:
-        # Critical Patient zone
-        with patient_lock:
-          stored = self.data_state.add_image(c_store_container.dataset)
-          self._updated_patients[thread_id][patient_id] += stored
-        # End of Critical Zone
-      except InvalidDataset:
-        self.logger.info("Node rejected dataset: Received dataset is not accepted by any inputs")
-        if self.error_on_rejected_dataset:
-          return 0xB006
-        else:
-          return 0x0000
-
-      except Exception as exception:
-        log_traceback(self.logger, exception, "Adding Image to input produced an exception")
-        return 0xA801
-    else:
+    try:
+      self.data_state.add_image(c_store_container.dataset, id(event.assoc))
+    except InvalidDataset:
       self.logger.info(f"Node rejected dataset: Received dataset doesn't have patient Identifier tag: {hex(self.patient_identifier_tag)}")
       return 0xB007
+    except Exception as exception:
+      log_traceback(self.logger, exception, "Adding Image to input produced an exception")
+      return 0xA801
 
     return 0x0000
-
-  def _extract_input_containers(self, release_event: ReleasedEvent
-                                ) -> List[Tuple[str, InputContainer]]:
-    """Iterates through all patients of the pipeline tree that this association
-    have added images to and extract all valid inputs from pipeline tree of this
-    node.
-
-    Side Effects:
-      Removes the association id (thread id) from self._updated_patients
-
-    Args:
-        release_event (ReleasedEvent): The Event triggered by an C-STORE
-        association releasing (finishing storing images in the dicom node)
-
-    Returns:
-        List[Tuple[str, InputContainer]]: A list of all patients that is
-    """
-    input_containers: List[Tuple[str, InputContainer]] = []
-    self.logger.debug(f"PatientID to be updated in: {self._updated_patients}")
-    with self._lock_key:
-      for patient_id in self._updated_patients[release_event.association_id]:
-        if patient_id in self._patient_locks:
-          threads, patient_lock = self._patient_locks[patient_id]
-        else:
-          self.logger.critical("This is a bug in the library, please report it") #pragma: no cover
-          self.logger.critical(f"patient_locks: {self._patient_locks} patient id: {patient_id}") #pragma: no cover
-          self.logger.critical("Another thread deleted thread-set and Patient log") #pragma: no cover
-          continue # pragma: no cover
-        self.logger.info(f"Thread {release_event.association_id} added: {self._updated_patients[release_event.association_id][patient_id]} images")
-        with patient_lock:
-          if len(threads) == 1:
-            if self.data_state.validate_patient_id(patient_id):
-              # Note this prevents you from adding more images to that patient
-              # While the other locks prevents multiple threads from adding
-              input_containers.append(
-                (patient_id, self._get_input_container(patient_id, release_event))
-              )
-              del self._patient_locks[patient_id]
-            else:
-              self.logger.info(f"Insufficient data for patient {patient_id}")
-              del self._patient_locks[patient_id]
-              continue
-          else:
-            thread_id = release_event.association_id
-            threads.remove(thread_id)
-            self.logger.debug(f"One of the Threads: {threads} will handle {patient_id}")
-            continue
-    self.logger.debug(f"Removing event {release_event.association_id} from updated Patients!")
-    del self._updated_patients[release_event.association_id] # Removing updated Patients
-    return input_containers
 
 
   #region handle_association_released
   def _handle_association_released(self, event: evt.Event):
-    """This function is called whenever an association is released
+    """This function is called whenever an association is released. Note that
+    this function should not be used for processing, because there's still a
+    connection to the peer.
 
-    It's the controller function for processing data
-
-    Args:
-        event (evt.Event):
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
 
     return
 
 
-  def _release_store_handler(self, released_event: ReleasedEvent):
-    input_containers = self._extract_input_containers(released_event)
-    if len(input_containers) == 0:
-      self.logger.info(f"Release Event from {released_event.association_ae} did"
-                       " not return any input containers to be processed.")
-      return
+  def _handle_connection_closed(self, event: evt.Event):
+    """This function has the responsibility of starting trigger the processing.
 
-    for patient_id, input_container in input_containers:
+    Args:
+        event (evt.Event): _description_
+    """
+    self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
+    self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
+    input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
+
+    self.logger.info(f"Thread {get_native_id()} Extracted {input_containers}, {failed_datasets}")
+
+    self._process_output(input_containers, failed_datasets)
+
+
+  def _process_output(
+      self,
+      input_containers: List[Tuple[str, PatientNode]],
+      failed_datasets: List[Dataset]
+    ):
+    """This function exists to the target for the queued pipeline"""
+
+    if len(failed_datasets):
+      self.logger.info("WRITE A CLEVER LOG MESSAGE BEFORE YOU PUSH!")
+
+
+    for patient_id,patient_node in input_containers:
+      input_container = patient_node.grind()
+
       args = ProcessRunnerArgs(
         patient_id=patient_id,
         input_container=input_container,
@@ -533,33 +456,12 @@ class AbstractPipeline():
       primitive = Parallel(parallel_primitive, self.Processor, args)
       primitive.join()
 
-      patients_to_clean_up = [fst for fst, sec in input_containers]
-      self.logger.info(f"Removing {patients_to_clean_up}'s images")
-      self.data_state.clean_up_patients(patients_to_clean_up)
+      if primitive.is_successful():
+        self.logger.info(f"process {patient_id} successful, Removing {patient_id}'s images")
+        patient_node.clean_up()
+      else:
+        self.logger.error(f"Failed to process {patient_id}!")
 
-
-  def _get_input_container(self,
-                           patient_id: str,
-                           released_container: ReleasedEvent) -> InputContainer:
-    """This function retrieves the patients input container for processing and
-    fills out any information unavailable at object creation.
-
-    Args:
-      patient_ID (str): ID of the patient who data is in the input container
-      released_container (ReleasedContainer): dataclass with relevant
-        information from when event was released.
-    """
-    input_container = self.data_state.get_patient_input_container(patient_id)
-
-    if released_container.association_ae in self.known_endpoints:
-      input_container.responding_address = self.known_endpoints[
-        released_container.association_ae
-      ]
-    elif released_container.association_id in self._associations_responds_addresses:
-      input_container.responding_address = self._associations_responds_addresses[
-        released_container.association_id]
-
-    return input_container
 
 
   ##### User functions ######
@@ -673,7 +575,6 @@ class AbstractPipeline():
     return self.ConnectionContextManager(self)
 
   def get_processing_directory_path(self, identifier) -> Optional[Path]:
-
     if self._processing_directory is None:
       return None
 
@@ -692,8 +593,6 @@ class AbstractPipeline():
 
     raise TypeError("Unknown identifier type")
 
-  def get_storage_directory(self, identifier: Any) -> Optional[Directory]:
-    return self.data_state.get_storage_directory(identifier)
 
   def _build_error_dataset(self, blueprint: Blueprint,
                                  pivot: Dataset,
@@ -811,29 +710,16 @@ class AbstractPipeline():
       self.logger.error("Unable to send error message to the client at "
                         f"{response_address}")
 
-  ##### Handler Directories #####
-  # Handlers are an extendable way of
 
-  # Extendable Handlers
-  # Note that Self type is only a part of python 3.11
-  _acceptation_handlers = { # Dict[AssociationTypes, Callable[[Self, AcceptedContainer], None]]
-    AssociationTypes.STORE_ASSOCIATION : _consume_association_accept_store_association
-  }
 
-  _release_handlers = { # Dict[AssociationTypes, Callable[[Self, ReleasedContainer], None]]
-    AssociationTypes.STORE_ASSOCIATION : _release_store_handler
-  }
 
-  exception_handlers: Dict[Type[Exception], Callable[[Exception, Optional[ReleasedEvent], InputContainer], None]] = {
-
-  }
 
 class AbstractQueuedPipeline(AbstractPipeline):
   """A pipeline that processes each object one at a time
 
   This might be very relevant when processing require a resource, such as GPU
   """
-  process_queue: Queue[ReleasedEvent]
+  process_queue: Queue[Tuple[List[Tuple[str, PatientNode]],List[Dataset]]]
 
   queue_timeout = 0.05
 
@@ -841,14 +727,11 @@ class AbstractQueuedPipeline(AbstractPipeline):
     """Worker function for the process_queue thread"""
     while self.running:
       try:
-        released_container = self.process_queue.get(timeout=self.queue_timeout)
+        input_container, failed_datasets = self.process_queue.get(timeout=self.queue_timeout)
         self.logger.info(f"Process queue got item, approximate queue length: "
                          f"{self.process_queue.qsize()}")
         try:
-          for association_type in released_container.association_types:
-            handler = self._release_handlers.get(association_type)
-            if handler is not None:
-              handler(self, released_container)
+          self._process_output(input_container, failed_datasets)
         except Exception as exception:
           log_traceback(self.logger, exception, "Process worker encountered exception")
         finally:
@@ -857,8 +740,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
         pass
 
   def _handle_association_closed(self, event: evt.Event):
-    released_container = self._association_event_factory.build_association_released(event)
-    self.process_queue.put(released_container)
+
+    self.process_queue.put(self.data_state.extract_input_container(id(event.assoc)))
 
   def node_signal_handler_SIGINT(self, signal_, frame):
     self.running = False

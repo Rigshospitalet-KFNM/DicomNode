@@ -17,7 +17,7 @@ import psutil
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.utils import human_readable_byte_count
-from dicomnode.server.pipeline_tree import PipelineTree
+from dicomnode.server.pipeline_storage import PipelineStorage
 
 class MaintenanceThread(Thread):
   """This thread ensures that old studies are removed from the input
@@ -28,7 +28,7 @@ class MaintenanceThread(Thread):
   _seconds_in_a_day = 86400
 
   def __init__(self,
-               pipeline_tree: PipelineTree,
+               pipeline_tree: PipelineStorage,
                study_expiration_days: int,
                group: None = None,
                name: Optional[str] = "Maintenance",

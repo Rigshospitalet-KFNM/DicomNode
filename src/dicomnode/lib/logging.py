@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from logging import DEBUG, Formatter, Logger, LogRecord, NullHandler, StreamHandler
+from logging import DEBUG, Formatter, Logger, LogRecord, NullHandler, StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from pathlib import Path
 from multiprocessing.queues import Queue
@@ -8,6 +8,8 @@ from sys import stdout
 from threading import get_native_id
 from traceback import format_exc
 from typing import Optional, TextIO
+
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 
 @dataclass
 class LoggerConfig:
@@ -20,7 +22,7 @@ class LoggerConfig:
   propagate: bool = False
 
 def get_logger():
-  pass
+  return getLogger(DICOMNODE_LOGGER_NAME)
 
 def set_logger(logger: Logger, config: LoggerConfig):
   logger.handlers.clear()

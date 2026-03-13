@@ -27,29 +27,7 @@ from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory,\
                                       InvalidTreeNode
 
 from dicomnode.server.input import AbstractInput
-
-class InputContainer:
-  """Simple container class for grinded input.
-  """
-  responding_address: Optional[Address]
-
-  def __init__(self,
-               data: Dict[str, Any],
-               datasets: Dict[str, List[Dataset]] = {},
-               paths: Optional[Dict[str, Directory]] = None,
-               ) -> None:
-    self.__data = data
-    self.datasets = datasets
-    self.paths = paths
-    self.responding_address = None
-
-  def __getitem__(self, key: str):
-    if self.__data is None:
-      raise KeyError(key)
-    return self.__data[key]
-
-  def __contains__(self, key):
-    return key in self.__data
+from dicomnode.server.input_container import InputContainer
 
 
 class PatientNode(ImageTreeInterface):
@@ -161,7 +139,7 @@ class PatientNode(ImageTreeInterface):
     for arg_name, dicomnode_input in self.data.items():
       if isinstance(dicomnode_input, AbstractInput):
         self.logger.debug(f"Extracting input from {dicomnode_input.__class__.__name__}")
-        data_directory[arg_name] = dicomnode_input.get_data()
+        data_directory[arg_name] = dicomnode_input.grind()
         series[arg_name] = dicomnode_input.get_datasets()
         if path_directory is not None and dicomnode_input.container is not None:
           path_directory[arg_name] = dicomnode_input.container

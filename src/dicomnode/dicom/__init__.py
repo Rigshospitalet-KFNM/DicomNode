@@ -17,6 +17,7 @@ from pydicom.valuerep import PersonName
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION, DICOMNODE_PRIVATE_TAG_HEADER
+from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidDataset, MissingDatasets
 
 PRIVATIZATION_VERSION = 1
@@ -71,10 +72,6 @@ def make_meta(dicom: Dataset) -> None:
     dicom.file_meta.MediaStorageSOPClassUID = dicom.SOPClassUID
   if 'MediaStorageSOPInstanceUID' not in dicom.file_meta:
     dicom.file_meta.MediaStorageSOPInstanceUID = dicom.SOPInstanceUID
-  if hasattr(dicom, 'is_little_endian') and dicom.is_little_endian is not None:
-    dicom.is_little_endian = None
-  if hasattr(dicom , 'is_implicit_VR') and dicom.is_implicit_VR is not None:
-    dicom.is_implicit_VR = None
 
   if 'TransferSyntaxUID' not in dicom.file_meta:
     dicom.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
@@ -283,8 +280,8 @@ def create_dicom_coordinate_system(spacial_reference, rm_shape=None, cm_shape=No
 
   points = extrapolate_image_position_patient(
     float(pixel_size_z), numpy.sign(vec_z[2]),
-        starting_point,
-        orientation, 1, extent[2]
+        starting_point, #type: ignore
+        orientation, 1, extent[2] #type: ignore
     )
 
   return points, (pixel_size_x, pixel_size_y, pixel_size_z), list(orientation), starting_point
@@ -526,6 +523,34 @@ def print_difference_between_datasets(
       print_function(f"Missing {tag_2.tag} from the first dataset")
     elif tag_2 is None and tag_1 is not None:
       print_function(f"Missing {tag_1.tag} from the second dataset")
+
+
+class DicomIdentifier:
+  identifier: int
+  fail_on_missing : bool
+
+  def __init__(self, **kwargs) -> None:
+    if "identifying_tag" not in kwargs:
+      logger = get_logger()
+      logger.error("Construction of DicomIdentifier is missing \'identifying_tag\' from kwargs. Defaulting to '0x0010_0020' - Patient ID")
+      self.identifier = 0x0010_0020
+    else:
+      self.identifier = kwargs["identifying_tag"]
+
+    if "fail_on_missing" in kwargs:
+      self.fail_on_missing = kwargs["fail_on_missing"]
+    else:
+      self.fail_on_missing = True
+
+  def __call__(self, dataset: Dataset) -> str:
+    if self.identifier in dataset:
+      return str(dataset[self.identifier].value)
+
+    if self.fail_on_missing:
+      raise KeyError(f"{self.identifier} is missing from dataset")
+
+    return "Missing Identifier"
+
 
 from . import anonymization
 from . import blueprints

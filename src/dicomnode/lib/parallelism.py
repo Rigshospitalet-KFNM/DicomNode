@@ -20,11 +20,27 @@ class ParallelPrimitive(Enum):
   THREAD = 1
   PROCESS = 2
 
+class ProcessLikeThread(Thread):
+  def __init__(self, group=None, target=None, name=None,
+              args=(), kwargs={}, daemon=True):
+    super().__init__(group, target, name, args, kwargs, daemon=daemon)
+    self._return = None
+    self.exception = None
 
+  def run(self):
+    try:
+      self._return = self._target(*self._args, **self._kwargs) #type: ignore
+    except Exception as e:
+      self.exception = e
+
+
+  def join(self, timeout: float | None=None): #type: ignore
+    super().join(timeout)
+    return self._return
 
 def spawn_thread(thread_function, *args, name=None, **kwargs):
   logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
-  thread = Thread(
+  thread = ProcessLikeThread(
     target=thread_function, args=args, name=name, kwargs=kwargs
   )
 
@@ -57,14 +73,14 @@ def spawn_process(process_function, *args, start=True,name=None, context=None, *
 
 
 class Parallel:
-  primitive: Thread | Process
+  primitive: ProcessLikeThread | Process
   def __init__(self, primitive: ParallelPrimitive, target, *args, **kwargs) -> None:
     if primitive == ParallelPrimitive.PROCESS:
       self.primitive = spawn_process(target, *args, **kwargs, context=MULTIPROCESSING)
     elif primitive == ParallelPrimitive.THREAD:
       self.primitive = spawn_thread(target, *args, **kwargs)
-    else:
-      raise ValueError("")
+    else: # pragma: no cover
+      raise TypeError("primitive argument is not of the type ParallelPrimitive")
 
   def join(self):
     logger = getLogger(DICOMNODE_LOGGER_NAME)
@@ -84,16 +100,28 @@ class Parallel:
       return self.primitive.pid
     elif isinstance(self.primitive, Thread):
       return self.primitive.native_id
-    else:
+    else: # pragma: no cover
       logger = getLogger(DICOMNODE_LOGGER_NAME)
       logger.critical(f"The Primitive is not a thread or Process")
+      return -1
+
+  def is_successful(self):
+    if self.primitive.is_alive():
+      raise RuntimeError("Parallel Primitive is still alive, join first")
+
+    match self.primitive:
+      case Process():
+        return self.primitive.exitcode == 0
+      case ProcessLikeThread():
+        return self.primitive.exception is None
 
   def primitive_name(self):
-    if isinstance(self.primitive, Process):
-      return "Process"
-    elif isinstance(self.primitive, Thread):
-      return "Thread"
-    else:
-      logger = getLogger(DICOMNODE_LOGGER_NAME)
-      logger.critical(f"The Primitive is not a thread or Process")
-      return "Unknown"
+    match self.primitive:
+      case Process():
+        return "Process"
+      case ProcessLikeThread():
+        return "Thread"
+    # pragma: no cover
+    logger = getLogger(DICOMNODE_LOGGER_NAME)
+    logger.critical(f"The Primitive is not a thread or Process")
+    return "Unknown"

@@ -16,8 +16,9 @@ from pydicom import Dataset
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid
+from dicomnode.lib.parallelism import ProcessLikeThread
 from dicomnode.lib.utils import str2bool, spawn_thread,\
-  human_readable_byte_count, ThreadWithReturnValue
+  human_readable_byte_count
 
 # Testing helpers
 from tests.helpers import bench
@@ -92,7 +93,7 @@ class pydicomTestCases(DicomnodeTestCase):
     def func():
       return 1
 
-    thread = ThreadWithReturnValue(target=func)
+    thread = ProcessLikeThread(target=func)
     thread.start()
     thread.join()
 

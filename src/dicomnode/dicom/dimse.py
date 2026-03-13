@@ -20,7 +20,7 @@ from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, P
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import CouldNotCompleteDIMSEMessage, InvalidQueryDataset
 from dicomnode.dicom import make_meta
-from dicomnode.lib.utils import ThreadWithReturnValue
+from dicomnode.lib.parallelism import ProcessLikeThread
 
 logger = getLogger(DICOMNODE_LOGGER_NAME)
 
@@ -152,6 +152,8 @@ def send_images(SCU_AE: str,
       ae.add_requested_context(image.SOPClassUID)
       added_contexts.add(image.SOPClassUID.name)
 
+  send_datasets = 0
+
   assoc = ae.associate(
     address.ip,
     address.port,
@@ -160,6 +162,7 @@ def send_images(SCU_AE: str,
   if assoc.is_established:
     try:
       for dataset in dicom_images:
+
         make_meta(dataset)
         response = assoc.send_c_store(dataset)
         if(response.Status != 0x0000):
@@ -170,6 +173,8 @@ def send_images(SCU_AE: str,
             raise CouldNotCompleteDIMSEMessage(f"Could not send {dataset}")
           else:
             error_callback_func(address, response, dataset)
+        else:
+          send_datasets += 1
     finally:
       assoc.release()
 
@@ -182,6 +187,7 @@ def send_images(SCU_AE: str,
     """
     logger.error(error_message)
     raise CouldNotCompleteDIMSEMessage("Could not connect")
+  logger.info(f"Successfully send {send_datasets} to {address}")
   return 0x0000
 
 def create_query_ae(ae_title: str) -> ApplicationEntity:
@@ -266,12 +272,12 @@ def send_images_thread(
     address : Address,
     dicom_images: Iterable[Dataset],
     error_callback_func: Optional[Callable[[Address, Dataset, Dataset], None]] = None,
-    daemon: bool = True) -> ThreadWithReturnValue:
+    daemon: bool = True) -> ProcessLikeThread:
   """Creates a thread that calls send_images:
 
   look at send_images for docs.
   """
-  thread = ThreadWithReturnValue(group= None, target=send_images, args=[SCU_AE, address, dicom_images, error_callback_func], daemon=daemon)
+  thread = ProcessLikeThread(group= None, target=send_images, args=[SCU_AE, address, dicom_images, error_callback_func], daemon=daemon)
   thread.start()
   return thread
 
@@ -297,7 +303,6 @@ def send_move(SCU_AE: str,
     dataset.QueryRetrieveLevel = query_level.value
 
   if not validate_query_dataset(dataset):
-
     raise InvalidQueryDataset(f"Incoming Dataset is not valid")
 
 
@@ -344,7 +349,7 @@ def send_move_thread(SCU_AE: str,
                      dataset : Dataset,
                      query_level: QueryLevels= QueryLevels.PATIENT,
                      daemon: bool = True
-  ) -> ThreadWithReturnValue:
+  ) -> ProcessLikeThread:
   """Creates a thread, that sends a C-Move to the target.
 
   The main reason you want to use this function over the standard send C-Move
@@ -359,6 +364,6 @@ def send_move_thread(SCU_AE: str,
   Returns:
       Thread: _description_
   """
-  thread = ThreadWithReturnValue(target=send_move, daemon=daemon, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
+  thread = ProcessLikeThread(target=send_move, daemon=daemon, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
   thread.start()
   return thread

@@ -26,12 +26,13 @@ from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import ImageTreeInterface
 from dicomnode.dicom.dimse import Address, QueryLevels,\
   AssociationContextManager, create_query_ae
-from dicomnode.dicom.dicom_factory import DicomFactory, Blueprint
+
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom, Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.utils import name
+from dicomnode.server.dicomnode_config import DicomnodeConfig, config_from_raw
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
 # Baby here we go!
@@ -95,25 +96,13 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   """Grinder for converting stored dicom images
   into a data usable by the processing function"""
 
-  @dataclass
-  class Options:
-    """These are the options to an abstract input"""
-    # These are options that are injected into all input.
-    # Note the reason, why there some options, that are not used by this class
-    # is because of Liskov's Substitution principle, and subclasses might need
-    # these options.
-    ae_title: Optional[str] = None
-    logger: Optional[Logger] = None
-    data_directory: Optional[Directory]  = None
-    lazy: bool = False
-    "Indicate if the Abstract input should keep an ethereal handle to the dataset"
 
 
   def __init__(self,
-      options: Options = Options(),
+      config: DicomnodeConfig = config_from_raw()
     ):
     super().__init__()
-    self.options = options
+    self.options = config
 
     self._study_date: Optional[str] = None # This gets updated by the PatientNode
     """Date for study, used with enforce. String is in format YYYYMMDD"""
@@ -122,12 +111,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     self.single_series_uid: Optional[UID] = None
 
-    self.container: Optional[Directory] = options.data_directory
-    if self.options.logger is not None:
-      self.logger = self.options.logger
-      "Logger for logging"
-    else:
-      self.logger = getLogger(DICOMNODE_LOGGER_NAME)
+    self.container: Optional[Directory] = config.ARCHIVE_DIRECTORY if self.options.ARCHIVE_DIRECTORY else None
+    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     # Tag for SOPInstance is (0x0008,0018)
     if 0x0008_0018 not in self.required_tags:
@@ -155,10 +140,10 @@ processing, `False` otherwise.
     if self.container is not None:
       for dicom in self:
         path = self.get_path(dicom)
-        path.unlink()
+        path.unlink(missing_ok=True)
     return self.images
 
-  def get_data(self) -> Any:
+  def grind(self) -> Any:
     """This function retrieves all the data stores in the input,
     and makes it ready for processing
 
@@ -294,7 +279,7 @@ processing, `False` otherwise.
 
     replaced = dicom.SOPInstanceUID.name in self
     # Save the dataset
-    if self.options.lazy:
+    if self.options.LAZY_STORAGE:
       if self.container is None:
         raise IncorrectlyConfigured("Lazy object require file storage")
       dicom_path = self.get_path(dicom)
@@ -375,7 +360,7 @@ class DynamicInput(AbstractInput):
   leaf_class: Type[DynamicLeaf] = DynamicLeaf
   separator_tag: int = 0x0020000E # SeriesInstanceUID
 
-  def get_data(self) -> Dict[str, Any]:
+  def grind(self) -> Dict[str, Any]:
     return_dict = {}
     for key, leaf in self.data.items():
       if not isinstance(leaf, DynamicLeaf):
@@ -413,7 +398,7 @@ class DynamicInput(AbstractInput):
         leaf_path.mkdir(parents=True, exist_ok=True)
       else:
         leaf_path = None
-      leaf = self.leaf_class([], self.options.lazy, leaf_path)
+      leaf = self.leaf_class([], self.options.LAZY_STORAGE if isinstance(self.options.LAZY_STORAGE, bool) else False, leaf_path)
       self[key] = leaf
       ret_value = leaf.add_image(dicom)
     self.images += ret_value
@@ -444,12 +429,12 @@ class HistoricAbstractInput(AbstractInput):
   address: Optional[Address] = None
   image_grinder = HistoricGrinder()
 
-  def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
+  def __init__(self, options: DicomnodeConfig):
     super().__init__(options)
 
-    if self.options.ae_title is None:
+    if self.options.AE_TITLE is None:
       raise IncorrectlyConfigured(f"The historic Input: {name(self)} have been not parsed an AE title. This is violation from containing PatientNode!")
-    self.ae_title = self.options.ae_title
+    self.ae_title = self.options.AE_TITLE
 
     if self.address is None or not isinstance(self.address, Address):
       raise IncorrectlyConfigured(f"{name(self)} needs an address to send images to!")
@@ -590,14 +575,14 @@ class AbstractInputProxy(AbstractInput):
   def validate(self) -> bool:
       return False
 
-  def __init__(self, options: AbstractInput.Options = AbstractInput.Options()):
-    self.input_options = options
+  def __init__(self, config: DicomnodeConfig = config_from_raw()):
+    self.input_options = config
 
   def add_image(self, dicom: Dataset) -> int:
     for type_option in self.type_options:
       if type_option.validate_image(dicom):
         self.__class__ = type_option
-        type_option.__init__(self, options=self.input_options)
+        type_option.__init__(self, config=self.input_options)
         return self.add_image(dicom)
     raise InvalidDataset
 

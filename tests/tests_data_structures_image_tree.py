@@ -1,17 +1,22 @@
 
+# Python Standard library
 from pathlib import Path
 import shutil
-
-from pydicom import Dataset
-from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
 from unittest import TestCase, skip
 
-from tests.helpers import generate_numpy_datasets, bench
-from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+# Third party
+from pydicom import Dataset
+from pydicom.uid import UID, MediaStorageDirectoryStorage, SecondaryCaptureImageStorage
 
+# Dicomnode modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.io import load_dicom
 from dicomnode.data_structures.image_tree import DicomTree, SeriesTree, StudyTree, PatientTree, IdentityMapping, ImageTreeInterface
+
+# Test modules
+from tests.helpers import generate_numpy_datasets, bench
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 def get_test_dataset() -> Dataset:
   dataset = Dataset()
@@ -238,7 +243,8 @@ class lib_imageTree(DicomnodeTestCase):
     dummyFile.touch()
 
     new_DT = DicomTree()
-    new_DT.discover(dicom_path)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      new_DT.discover(dicom_path)
 
     self.assertEqual(new_DT.images, len(self.datasets))
 

@@ -76,7 +76,7 @@ class DicomOutput(PipelineOutput):
       datasets_list = [dataset for dataset in datasets]
       try:
         logger.info(f"Sending {len(datasets_list)} datasets to {address.ae_title}")
-        send_images(self.ae_title, address, datasets)
+        send_images(self.ae_title, address, datasets, logger=logger)
       except CouldNotCompleteDIMSEMessage:
         logger.error(f"Could not send to images to {address.ae_title}")
         success = False
@@ -168,7 +168,7 @@ class MultiOutput(PipelineOutput):
   True
   """
 
-  output: Iterable[PipelineOutput]
+  outputs: Iterable[PipelineOutput]
 
   def __init__(self, outputs: Iterable[PipelineOutput]) -> None:
     self.outputs = outputs
