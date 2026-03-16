@@ -5,7 +5,7 @@ __author__ = "Demiguard"
 # Python standard library
 from datetime import datetime
 from functools import reduce
-from typing import Dict, Type
+from typing import Dict, Optional, Type
 
 # Third party modules
 from pydicom import Dataset
@@ -27,6 +27,7 @@ class PatientNode:
     self._nodes: Dict[str, AbstractInput] = { key : InputType(config) for key, InputType in node_structure.items()}
     self._created = datetime.now()
     self._config = config
+    self._study_date: Optional[str] = None
 
   def __iter__(self):
     for node in self._nodes.values():
@@ -46,6 +47,25 @@ class PatientNode:
 
     if not added_dataset:
       raise InvalidDataset
+
+    self.study_date = dataset.StudyDate if 'StudyDate' in dataset else None
+
+
+  @property
+  def study_date(self):
+    return self._study_date
+
+  @study_date.setter
+  def study_date(self, value: Optional[str]):
+    if value is None:
+      return
+
+    if self._study_date is not None:
+      return
+
+    self._study_date = value
+    for node in self:
+      node.study_date = value
 
 
   def validate(self) -> bool:

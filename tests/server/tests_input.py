@@ -8,7 +8,7 @@ import logging
 from logging import StreamHandler
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, List, Dict, Optional
 import shutil
 from sys import stdout
 from unittest import TestCase, mock
@@ -330,13 +330,11 @@ class HistoricInput(HistoricAbstractInput):
     # SKIP ALL the quering, It's inside of e2e tests
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
-  def check_query_dataset(self, current_study: Dataset):
+  def check_query_dataset(self, current_study: Dataset, query_dataset: Optional[Dataset] = None):
     if 'PatientID' not in current_study:
       return None
 
     return self.HistoricAction.FIND_QUERY, create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=current_study.PatientID)
-
-
 
 
 study_date = "20200101"
@@ -375,9 +373,9 @@ class HistoricTestcases(DicomnodeTestCase):
 
     self.assertEqual(0, input_.add_image(historic_input_dataset))
     self.assertEqual(0, input_.images)
-    self.assertEqual(input_.study_date, study_date)
-    #
-    #self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FETCHING)
+    # Simulate setting from PatientNode
+    input_.study_date = study_date
+
     if input_.thread is None:
       raise AssertionError("Thread should have been defined")
 

@@ -298,6 +298,7 @@ processing, `False` otherwise.
 
   @property
   def study_date(self):
+    """The study date - Note that it's the Owning patient Node that sets this!"""
     return self._study_date
 
 
@@ -530,7 +531,6 @@ class HistoricAbstractInput(AbstractInput):
       if response is not None:
         self.logger.debug("Historic input is now Fetching!")
         self.triggering_dataset = dicom
-        self._study_date = dicom.StudyDate
         action, query_dataset = response
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
         self.thread = Thread(group=None, name="Historic Input", target=self.thread_target, args=(query_dataset,))
