@@ -42,3 +42,9 @@ class PatientNodeTestCase(DicomnodeTestCase):
     self.assertEqual(node.study_date, study_date)
     for input_ in node:
       self.assertEqual(input_.study_date, study_date)
+
+
+  def test_patient_node_raises_on_no_accept(self):
+    node = PatientNode({ 'node' : Input}, config_from_raw())
+
+    self.assertRaises(InvalidDataset, node.add_dataset, Dataset())

@@ -4,7 +4,7 @@
 from datetime import date
 from random import randint
 import logging
-from typing import Sequence
+from typing import Optional, Sequence
 
 from time import sleep
 from sys import stdout
@@ -81,7 +81,7 @@ class PresentInput(AbstractInput):
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
 
-  def check_query_dataset(self, current_study: Dataset):
+  def check_query_dataset(self, current_study: Dataset, query_dataset: Optional[Dataset] = None):
     if self.triggering_dataset is None:
       return HistoricAbstractInput.HistoricAction.FIND_QUERY, create_query_dataset(QueryLevels.PATIENT, PatientID=current_study.PatientID)
 

@@ -24,8 +24,6 @@ from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.input import AbstractInput
 
 
-
-
 def create_set():
   return set()
 
