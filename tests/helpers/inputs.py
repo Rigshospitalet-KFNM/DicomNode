@@ -17,20 +17,20 @@ from dicomnode.server.grinders import ListGrinder
 from tests.helpers.storage_endpoint import ENDPOINT_PORT
 
 class TestInput(AbstractInput):
-  required_tags: List[int| str] = [0x00080018, 0x00100040]
+  required_tags = [0x00080018, 0x00100040]
 
   def validate(self):
     return True
 
 class NeverValidatingInput(AbstractInput):
-  required_tags: List[int | str] = [0x00080018]
+  required_tags = [0x00080018]
 
   def validate(self):
     return False
 
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
-  required_tags: List[int | str] = [0x00080018]
+  required_tags = [0x00080018]
 
 
 

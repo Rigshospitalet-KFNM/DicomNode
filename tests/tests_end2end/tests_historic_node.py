@@ -81,11 +81,11 @@ class PresentInput(AbstractInput):
 class TestHistoricInput(HistoricAbstractInput):
   address = Address('localhost', ENDPOINT_PORT, "DUMMY")
 
-  def check_query_dataset(self, current_study: Dataset) -> Dataset | None:
-    return create_query_dataset(QueryLevels.PATIENT, PatientID=test_patient_id)
+  def check_query_dataset(self, current_study: Dataset):
+    if self.triggering_dataset is None:
+      return HistoricAbstractInput.HistoricAction.FIND_QUERY, create_query_dataset(QueryLevels.PATIENT, PatientID=current_study.PatientID)
 
-  def handle_found_dataset(self, found_dataset: Dataset) -> Dataset | None:
-    return create_query_dataset(QueryLevels.PATIENT, PatientID=test_patient_id)
+    return HistoricAbstractInput.HistoricAction.MOVE_QUERY, create_query_dataset(QueryLevels.PATIENT, PatientID=current_study.PatientID)
 
 
 class HistoricRunner(AbstractProcessor):

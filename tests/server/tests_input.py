@@ -330,36 +330,66 @@ class HistoricInput(HistoricAbstractInput):
     # SKIP ALL the quering, It's inside of e2e tests
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
-  def check_query_dataset(self, current_study: Dataset) -> Dataset | None:
+  def check_query_dataset(self, current_study: Dataset):
     if 'PatientID' not in current_study:
       return None
 
-    return create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=current_study.PatientID)
-
-  def handle_found_dataset(self, found_dataset: Dataset) -> Dataset | None:
-    return super().handle_found_dataset(found_dataset)
+    return self.HistoricAction.FIND_QUERY, create_query_dataset(query_level=QueryLevels.PATIENT, PatientID=current_study.PatientID)
 
 
 
 
-study_date = date(2020, 1, 1)
+study_date = "20200101"
 
 historic_input_dataset = Dataset()
 historic_input_dataset.SOPInstanceUID = gen_uid()
 historic_input_dataset.StudyDate = study_date
 historic_input_dataset.PatientID = "test id"
+historic_input_dataset.InstanceNumber = 1
+historic_input_dataset.SeriesDescription = SERIES_DESCRIPTION
 
+historic_input_dataset_2 = Dataset()
+historic_input_dataset_2.SOPInstanceUID = gen_uid()
+historic_input_dataset_2.StudyDate = study_date
+historic_input_dataset_2.PatientID = "test id"
+historic_input_dataset_2.InstanceNumber = 2
+historic_input_dataset_2.SeriesDescription = SERIES_DESCRIPTION
+
+historic_input_dataset_3 = Dataset()
+historic_input_dataset_3.SOPInstanceUID = gen_uid()
+historic_input_dataset_3.StudyDate = "20190101"
+historic_input_dataset_3.PatientID = "test id"
+historic_input_dataset_3.InstanceNumber = 1
+historic_input_dataset_3.SeriesDescription = SERIES_DESCRIPTION
+
+historic_input_dataset_4 = Dataset()
+historic_input_dataset_4.SOPInstanceUID = gen_uid()
+historic_input_dataset_4.StudyDate = "20210101"
+historic_input_dataset_4.PatientID = "test id"
+historic_input_dataset_4.InstanceNumber = 1
+historic_input_dataset_4.SeriesDescription = SERIES_DESCRIPTION
 
 class HistoricTestcases(DicomnodeTestCase):
-  def test_historic_input(self):
+  def test_historic_input_add_image(self):
     input_ = HistoricInput(config_from_raw(DicomnodeConfigRaw(AE_TITLE="BLAH BLAH")))
 
     self.assertEqual(0, input_.add_image(historic_input_dataset))
-    input_.study_date = study_date
+    self.assertEqual(0, input_.images)
+    self.assertEqual(input_.study_date, study_date)
     #
     #self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FETCHING)
     if input_.thread is None:
       raise AssertionError("Thread should have been defined")
+
+    self.assertRaises(InvalidDataset, input_.add_image, historic_input_dataset_2)
+    self.assertEqual(0, input_.images)
+
+    self.assertEqual(1, input_.add_image(historic_input_dataset_3))
+    self.assertEqual(1, input_.images)
+
+    self.assertRaises(InvalidDataset, input_.add_image, historic_input_dataset_4)
+    self.assertEqual(1, input_.images)
+
 
     input_.thread.join()
     self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FILLED)

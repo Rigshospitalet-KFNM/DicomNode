@@ -201,6 +201,7 @@ processing, `False` otherwise.
     Returns:
         bool: True if the image can be added, False if not
     """
+
     # Dataset Validation
     for required_tag in cls.required_tags:
       if isinstance(required_tag, str):
@@ -209,7 +210,6 @@ processing, `False` otherwise.
           raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
 
       if required_tag not in dicom:
-        #self.logger.debug(f"required tag: {hex(required_tag)} in dicom")
         return False
 
     for required_tag, required_value in cls.required_values.items():
@@ -219,11 +219,9 @@ processing, `False` otherwise.
           raise IncorrectlyConfigured(f"{required_tag} is not evaluate to a Dicom tag")
 
       if required_tag not in dicom:
-        #self.logger.debug(f"required value tag: {hex(required_tag)} in dicom")
         return False
+
       if not cls._validate_value(required_value,dicom[required_tag].value):
-        #print(f"value: {dicom[required_tag].value}, required value: {required_value}")
-        #self.logger.debug(f"required value {required_value} not match {dicom[required_tag]} in dicom")
         return False
 
     return True
@@ -426,11 +424,16 @@ class HistoricAbstractInput(AbstractInput):
     FETCHING = 2
     FILLED = 3
 
+  class HistoricAction(Enum):
+    FIND_QUERY = 1
+    MOVE_QUERY = 2
+
   address: Optional[Address] = None
   image_grinder = HistoricGrinder()
 
   def __init__(self, options: DicomnodeConfig):
     super().__init__(options)
+    self.triggering_dataset = None
 
     if self.options.AE_TITLE is None:
       raise IncorrectlyConfigured(f"The historic Input: {name(self)} have been not parsed an AE title. This is violation from containing PatientNode!")
@@ -448,27 +451,26 @@ class HistoricAbstractInput(AbstractInput):
     self.thread: Optional[Thread] = None
 
   def _enforce_date_requirement(self, dicom: Dataset):
-    if self._study_date is None: # If study date have not been set yet
+    if self.study_date is None: # If study date have not been set yet
       return False
 
     if 'StudyDate' not in dicom:
       return False
 
-    if self._study_date < dicom.StudyDate:
+    if self.study_date < dicom.StudyDate:
       return False
 
     return True
 
-  @abstractmethod
-  def check_query_dataset(self, current_study: Dataset) -> Optional[Dataset]:
-    return None
 
   @abstractmethod
-  def handle_found_dataset(self, found_dataset: Dataset) -> Optional[Dataset]:
+  def check_query_dataset(self, current_study: Dataset, query_dataset: Optional[Dataset]=None) -> Optional[Tuple[HistoricAction,Dataset]]:
     return None
 
   def thread_target(self, query_data):
     query_level = QueryLevels(query_data.QueryRetrieveLevel)
+
+    query_datasets = [query_data]
 
     with AssociationContextManager(
       create_query_ae(self.ae_title),
@@ -480,19 +482,34 @@ class HistoricAbstractInput(AbstractInput):
         self.logger.error(f"{name(self)} could connect to {self.ae_title} : ({self._address.ip},{self._address.port})")
         return
 
-      find_response = assoc.send_c_find(query_data, query_level.find_sop_class())
 
       studies_to_be_moved: List[Dataset] = []
 
-      for (status, incoming_dataset) in find_response:
-        if status.Status not in [0xFF00, 0x0000]:
-          self.logger.error(f"While C-FIND'ing {name(self)} encountered a problem: {status}")
+      while len(query_datasets): # While there's dataset to query
+        new_finds = []
 
-        if incoming_dataset is None:
-          continue
+        for query_dataset in query_datasets:
+          find_response = assoc.send_c_find(query_dataset, query_level.find_sop_class())
 
-        if (moved_dataset := self.handle_found_dataset(incoming_dataset)) is not None:
-          studies_to_be_moved.append(moved_dataset)
+          for (status, incoming_dataset) in find_response:
+            if status.Status not in [0xFF00, 0x0000]:
+              self.logger.error(f"While C-FIND'ing {name(self)} encountered a problem: {status}")
+
+            if incoming_dataset is None:
+              continue
+
+            incoming_check = self.check_query_dataset(incoming_dataset, query_dataset)
+
+            if incoming_check is not None:
+              action, new_dataset = incoming_check
+
+              if action == self.HistoricAction.FIND_QUERY:
+                new_finds.append(new_dataset)
+              elif action == self.HistoricAction.MOVE_QUERY:
+                studies_to_be_moved.append(new_dataset)
+
+        query_datasets = new_finds
+
 
       self.logger.info(f"{name(self)} found {len(studies_to_be_moved)} series to query for!")
 
@@ -508,9 +525,13 @@ class HistoricAbstractInput(AbstractInput):
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def add_image(self, dicom: Dataset) -> int:
-    if self.state == HistoricAbstractInput.HistoricInputState.EMPTY:
-      if (query_dataset := self.check_query_dataset(dicom)) is not None:
+    if self.state == HistoricAbstractInput.HistoricInputState.EMPTY and 'StudyDate' in dicom:
+      response = self.check_query_dataset(dicom)
+      if response is not None:
         self.logger.debug("Historic input is now Fetching!")
+        self.triggering_dataset = dicom
+        self._study_date = dicom.StudyDate
+        action, query_dataset = response
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
         self.thread = Thread(group=None, name="Historic Input", target=self.thread_target, args=(query_dataset,))
         self.thread.start()
@@ -548,6 +569,14 @@ class HistoricAbstractInput(AbstractInput):
     datasets.append(historic_dataset)
     self.images += 1
 
+  def _state_based_validation(self, dicom: Dataset) -> bool:
+    if self.study_date is None:
+      return False
+
+    if 'StudyDate' not in dicom:
+      return False
+
+    return  dicom.StudyDate < self.study_date
 
   def validate(self) -> bool:
     if self.thread is not None and self.state != HistoricAbstractInput.HistoricInputState.FILLED:
