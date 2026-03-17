@@ -17,6 +17,7 @@ from pydicom.valuerep import PersonName
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMENTATION_NAME, DICOMNODE_VERSION, DICOMNODE_PRIVATE_TAG_HEADER
+from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidDataset, MissingDatasets
 
@@ -550,6 +551,45 @@ class DicomIdentifier:
       raise KeyError(f"{self.identifier} is missing from dataset")
 
     return "Missing Identifier"
+
+def display_dicom_collection(datasets: Iterable[Dataset]):
+  """Pro
+
+  Args:
+      datasets (Iterable[Dataset]): _description_
+
+  Raises:
+      ValueError: _description_
+
+  Returns:
+      _type_: _description_
+  """
+
+  from dicomnode.data_structures.image_tree import DicomTree
+
+  dt = DicomTree(datasets)
+
+  if len(dt) == 0:
+    return "Empty DICOM collection"
+
+  num_patients = dt.num_patients()
+  if 1 < num_patients:
+    return f"{dt.images} DICOM images belonging to {num_patients} patients"
+
+  num_studies = dt.num_studies()
+  if 1 < num_studies:
+    for pt in dt.patients():
+      return f"{dt.images} DICOM images belonging to {pt.PatientID} with {num_studies} studies"
+
+  num_series = dt.num_series()
+  if 1 < num_series:
+    for st in dt.studies():
+      return f"{dt.images} DICOM images belonging to {st.StudyDescription} with {num_series} series"
+
+  for st in dt.series():
+    return f"{dt.images} DICOM images belonging to {st.series_description}"
+
+  raise IncorrectlyConfigured("There's a contract violation in DICOMNODE please report")
 
 
 from . import anonymization

@@ -31,7 +31,7 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.io import save_dicom, Directory
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.grinders import NumpyGrinder
-from dicomnode.server.dicomnode_config import DicomnodeConfig, DicomnodeConfigRaw, config_from_raw
+from dicomnode.config import DicomnodeConfig, DicomnodeConfigRaw, config_from_raw
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf, AbstractInputProxy
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"

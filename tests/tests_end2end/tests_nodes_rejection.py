@@ -21,7 +21,7 @@ from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import PipelineOutput
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.processor import AbstractProcessor
 
 # Test packages

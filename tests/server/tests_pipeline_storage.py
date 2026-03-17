@@ -10,7 +10,7 @@ from pydicom.uid import SecondaryCaptureImageStorage
 # Dicomnode modules
 from dicomnode.dicom import make_meta, DicomIdentifier, gen_uid
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.dicomnode_config import config_from_raw
+from dicomnode.config import config_from_raw
 from dicomnode.server.pipeline_storage import PipelineStorage
 from dicomnode.server.patient_node import PatientNode
 

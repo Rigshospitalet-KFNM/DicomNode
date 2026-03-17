@@ -12,7 +12,7 @@ from time import sleep
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom.dimse import Address, send_images_thread
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import NoOutput, PipelineOutput
 
 # Testing Helper

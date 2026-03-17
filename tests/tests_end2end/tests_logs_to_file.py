@@ -18,7 +18,7 @@ from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import NoOutput, PipelineOutput
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.processor import AbstractProcessor
 
 # Testing Packages

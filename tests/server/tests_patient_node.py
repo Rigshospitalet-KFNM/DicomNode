@@ -6,7 +6,7 @@ from pydicom import Dataset
 # Dicomnode modules
 from dicomnode.dicom import gen_uid
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.server.dicomnode_config import config_from_raw
+from dicomnode.config import config_from_raw
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.input import AbstractInput
 

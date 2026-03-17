@@ -30,7 +30,7 @@ from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import FileOutput, NoOutput, PipelineOutput, DicomOutput
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 
 # Testing packages
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, generate_numpy_datasets,\

@@ -32,7 +32,7 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, Inva
 from dicomnode.lib.io import load_dicom, save_dicom, Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.utils import name
-from dicomnode.server.dicomnode_config import DicomnodeConfig, config_from_raw
+from dicomnode.config import DicomnodeConfig, config_from_raw
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
 # Baby here we go!
@@ -522,7 +522,7 @@ class HistoricAbstractInput(AbstractInput):
 
 
       # The datasets will then be added in add image
-    self.logger.info("Historic input finished fetching historcy")
+    self.logger.info(f"Historic input finished fetching history, and it now contains {len(self)} images")
     self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def add_image(self, dicom: Dataset) -> int:
@@ -538,15 +538,16 @@ class HistoricAbstractInput(AbstractInput):
       return 0
 
     if not self._state_based_validation(dicom):
-      self.logger.debug(f"Historic Input rejecting dataset: {dicom.StudyDate} based on state: {self.study_date}")
+      #self.logger.debug(f"Historic Input rejecting dataset: {dicom.StudyDate} based on state: {self.study_date}")
       raise InvalidDataset
 
+
     if not self.validate_image(dicom):
-      self.logger.debug("Historic Input rejecting dataset based on static")
+      #self.logger.debug("Historic Input rejecting dataset based on static")
       raise InvalidDataset
 
     # This is mostly done to keep it simple
-    self.logger.debug("Historic input storing dataset")
+    #self.logger.debug("Historic input storing dataset")
     self._store_historic_dataset(dicom)
 
     return 1
@@ -571,12 +572,15 @@ class HistoricAbstractInput(AbstractInput):
 
   def _state_based_validation(self, dicom: Dataset) -> bool:
     if self.study_date is None:
+      self.logger.info(f"input.study_date is none")
       return False
 
     if 'StudyDate' not in dicom:
+      self.logger.info(f"StudyDate not in incoming Dicom")
       return False
 
-    return  dicom.StudyDate < self.study_date
+    self.logger.info(f"{dicom.StudyDate} < {self.study_date} :  {dicom.StudyDate < self.study_date}")
+    return dicom.StudyDate < self.study_date
 
   def validate(self) -> bool:
     if self.thread is not None and self.state != HistoricAbstractInput.HistoricInputState.FILLED:

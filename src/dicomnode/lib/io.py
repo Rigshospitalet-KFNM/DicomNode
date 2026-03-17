@@ -19,10 +19,12 @@ import pydicom
 from pydicom.filewriter import dcmwrite
 from pydicom import Dataset, Sequence
 from pydicom.errors import InvalidDicomError
+
 from pydicom.values import convert_SQ, convert_string
 from pydicom.datadict import DicomDictionary, keyword_dict #type: ignore Yeah Pydicom have some fancy import stuff.
 
 # Dicomnode Library
+
 from dicomnode.lib.utils import type_corrosion
 
 def update_private_tags(new_dict_items : Dict[int, Tuple[str, str, str, str, str]]) -> None:
@@ -317,3 +319,18 @@ class Directory(IOObject):
   def __str__(self):
     return str(self.path)
 
+def fill_patient_storage_from_file_system(
+    pathlike : Directory | Path | str | None,
+    storage
+  ) -> None:
+  from dicomnode.server.pipeline_storage import PipelineStorage
+  if not isinstance(storage, PipelineStorage):
+    raise TypeError("Storage is not PipelineStorage")
+
+  if pathlike is None:
+    return
+
+  if not isinstance(pathlike, Directory):
+    pathlike = Directory(pathlike)
+
+  storage.add_images(load_dicoms(pathlike.path))

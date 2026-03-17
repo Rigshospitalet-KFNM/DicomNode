@@ -19,9 +19,9 @@ from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dimse import Address, send_images_thread, send_images
 from dicomnode.lib.parallelism import ProcessLikeThread
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.dicomnode_config import DicomnodeConfig, config_from_raw
+from dicomnode.config import DicomnodeConfig, config_from_raw
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.output import DicomOutput, PipelineOutput

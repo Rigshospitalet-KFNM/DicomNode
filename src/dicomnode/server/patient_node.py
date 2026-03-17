@@ -5,14 +5,16 @@ __author__ = "Demiguard"
 # Python standard library
 from datetime import datetime
 from functools import reduce
+import logging
 from typing import Dict, Optional, Type
 
 # Third party modules
 from pydicom import Dataset
 
 # Dicomnode Modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.server.dicomnode_config import DicomnodeConfig
+from dicomnode.config import DicomnodeConfig
 from dicomnode.server.input_container import InputContainer
 from dicomnode.server.input import AbstractInput
 
@@ -69,6 +71,8 @@ class PatientNode:
 
 
   def validate(self) -> bool:
+    logger = logging.getLogger(DICOMNODE_LOGGER_NAME)
+    logger.info(f"Validating: {self}")
     return all(node.validate() for node in self)
 
   def is_expired(self, expiry_time: datetime) -> bool:
@@ -95,7 +99,11 @@ class PatientNode:
       node.clean_up()
 
   def __str__(self) -> str:
-    return f"Patient Node with {len(self)} images"
+    base = f"Patient Node with {len(self)} images:\n"
+    for node in self:
+      base += f"  {node}\n"
+
+    return base
 
   def __repr__(self) -> str:
     return str(self)

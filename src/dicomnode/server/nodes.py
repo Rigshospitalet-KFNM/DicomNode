@@ -27,7 +27,7 @@ import shutil
 import signal
 from sys import stdout
 from threading import Thread, Lock, get_native_id
-from time import sleep, time
+from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
 from psutil import Process as PS_UTIL_Process
@@ -42,26 +42,22 @@ from pynetdicom.transport import ThreadedAssociationServer
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
-from dicomnode.dicom import DicomIdentifier
+from dicomnode.dicom import DicomIdentifier, display_dicom_collection
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
-from dicomnode.dicom.dimse import Address, send_image, DIMSE_StatusCodes
+from dicomnode.dicom.dimse import Address, dataset_from_event
 from dicomnode.dicom.series import DicomSeries
-
-from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
-  CouldNotCompleteDIMSEMessage
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
-from dicomnode.lib.io import Directory, File
+from dicomnode.lib.io import Directory, File, fill_patient_storage_from_file_system
 from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
   LoggerConfig, log_traceback
-from dicomnode.server.factories.association_events import AcceptedEvent, \
-  AssociationEventFactory, AssociationTypes, CStoreEvent, ReleasedEvent
+
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.dicomnode_config import DicomnodeConfig
-from dicomnode.server.pipeline_tree import PipelineTree, InputContainer, PatientNode
+from dicomnode.config import DicomnodeConfig
 from dicomnode.server.pipeline_storage import PipelineStorage
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
-from dicomnode.server.output import PipelineOutput, NoOutput
+
 from dicomnode.server.processor import AbstractProcessor, ProcessRunnerArgs
 
 default_sigint_handler = signal.getsignal(signal.SIGINT)
@@ -117,15 +113,6 @@ class AbstractPipeline():
   lazy_storage: bool = False
   "Indicates if the abstract inputs should use Lazy datasets or not"
 
-  pipeline_tree_type: Type[PipelineTree] = PipelineTree
-  "Class of PipelineTree that the node will create as main data storage"
-
-  patient_container_type: Type[PatientNode] = PatientNode
-  "Class of PatientNode that the the PipelineTree should create as nodes."
-
-  input_container_type: Type[InputContainer] = InputContainer
-  "Class of PatientContainer that the PatientNode should create when processing a patient"
-
   # Dicom communication configuration tags
   ae_title: str = "Your_AE_TITLE"
   "AE title of the dicomnode"
@@ -153,9 +140,6 @@ class AbstractPipeline():
   _associations_responds_addresses: Dict[int, Address]
   "Internal variable containing a mapping of association to endpoint address"
 
-  association_container_factory: Type[AssociationEventFactory] = AssociationEventFactory
-  """Class of Factory, that extracts information from the association to the underlying
-  processing function."""
 
   default_response_port: int = 104
   "Default Port used for unspecified Dicomnodes"
@@ -310,9 +294,12 @@ class AbstractPipeline():
       self.config
     )
 
-    self.is_open = False
+    fill_patient_storage_from_file_system(
+      config.ARCHIVE_DIRECTORY,
+      self.data_state
+    )
 
-    self._association_event_factory = self.association_container_factory()
+    self.is_open = False
 
     # Server validations and creation.
     self.dicom_application_entry = ApplicationEntity(ae_title = self.ae_title)
@@ -325,12 +312,6 @@ class AbstractPipeline():
     self.dicom_application_entry.require_called_aet = self.require_called_aet
     self.dicom_application_entry.require_calling_aet = self.require_calling_aet
 
-    # Handler setup
-    # class needs to be instantiated before handlers can be defined
-    self._associations_responds_addresses = {}
-    self._updated_patients: Dict[Optional[int], Dict[str, int]] = {}
-    self._patient_locks: Dict[str, Tuple[Set[int], Lock]] = {}
-    self._lock_key = Lock()
 
     if self.Processor is AbstractProcessor or not issubclass(self.Processor, AbstractProcessor):
       raise IncorrectlyConfigured("Missing Processor class!")
@@ -381,11 +362,10 @@ class AbstractPipeline():
 
 
   def _handle_c_store(self, event: evt.Event) -> int:
-    c_store_container = self._association_event_factory.build_association_c_store(event)
-
+    dataset = dataset_from_event(event)
 
     try:
-      if not self.filter(c_store_container.dataset):
+      if not self.filter(dataset):
         self.logger.info("Node rejected dataset: Received Dataset did not pass filter")
         return 0xB006 # Element discarded
     except Exception as exception:
@@ -393,7 +373,7 @@ class AbstractPipeline():
       return 0xA801
 
     try:
-      self.data_state.add_image(c_store_container.dataset, id(event.assoc))
+      self.data_state.add_image(dataset, id(event.assoc))
     except InvalidDataset:
       self.logger.info(f"Node rejected dataset: Received dataset doesn't have patient Identifier tag: {hex(self.patient_identifier_tag)}")
       return 0xB007
@@ -426,21 +406,15 @@ class AbstractPipeline():
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
     input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
 
-    self.logger.info(f"Thread {get_native_id()} Extracted {input_containers}, {failed_datasets}")
-
-    self._process_output(input_containers, failed_datasets)
-
-
-  def _process_output(
-      self,
-      input_containers: List[Tuple[str, PatientNode]],
-      failed_datasets: List[Dataset]
-    ):
-    """This function exists to the target for the queued pipeline"""
 
     if len(failed_datasets):
-      self.logger.info("WRITE A CLEVER LOG MESSAGE BEFORE YOU PUSH!")
+      dicom_collection =  display_dicom_collection(failed_datasets)
+      self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
 
+    self._process_output(input_containers)
+
+  def _process_output(self, input_containers: List[Tuple[str, PatientNode]],):
+    """This function exists to the target for the queued pipeline"""
 
     for patient_id,patient_node in input_containers:
       input_container = patient_node.grind()
@@ -646,80 +620,12 @@ class AbstractPipeline():
     exit(1)
 
 
-  def exception_handler_respond_with_dataset(self,
-                                             exception : Exception,
-                                             release_container: Optional[ReleasedEvent],
-                                             input_container: InputContainer):
-    """This function is the default exception handler for processing
-
-    By default, if there's a error blueprint, it creates a dicom image, and
-    sends it back to the triggering ip address.
-
-    For more info read the tutorial on the error handling
-
-    Args:
-        exception (Exception): The unhandled Exception triggered from process
-        release_container (ReleasedContainer): The Release Container pipeline
-        processing was called with. Contains information on association
-        input_container (InputContainer): The InputContainer that was used to
-        call process that threw.
-    """
-    if self.unhandled_error_blueprint is None or release_container is None:
-      return
-
-    if release_container.association_ip is None:
-      error_message = "Unable to send error dataset to client due to missing "\
-                      "IP address"
-      self.logger.error(error_message)
-      return
-
-    pivot_dataset = None
-    for dataset_iterator in input_container.datasets.values():
-      for dataset in dataset_iterator:
-        pivot_dataset = dataset
-        break
-      if pivot_dataset is not None:
-        break
-
-    if pivot_dataset is None:
-      self.logger.error("Unable to extract a dataset from the input container")
-      self.logger.error("Unless this is a test case, I am impressed")
-      return
-
-    response_address = Address(release_container.association_ip,
-                               self.default_response_port,
-                               release_container.association_ae)
-
-    error_dataset = self._build_error_dataset(
-      self.unhandled_error_blueprint,
-      pivot_dataset,
-      exception
-    )
-    try:
-      response = send_image(self.ae_title, response_address, error_dataset)
-      if 0x0000_0900 in response: # Status tag
-        if response.Status == DIMSE_StatusCodes.SUCCESS:
-          self.logger.info(f"Client {response_address} is informed of Failure "
-                           "triggered by Process Exception")
-        else:
-          self.logger.error(f"Client {response_address} did not accept the "
-                            f"error dataset, and responded with {response}")
-      else:
-        self.logger.error(f"Client {response_address} send an invalid response...")
-    except CouldNotCompleteDIMSEMessage:
-      self.logger.error("Unable to send error message to the client at "
-                        f"{response_address}")
-
-
-
-
-
 class AbstractQueuedPipeline(AbstractPipeline):
   """A pipeline that processes each object one at a time
 
   This might be very relevant when processing require a resource, such as GPU
   """
-  process_queue: Queue[Tuple[List[Tuple[str, PatientNode]],List[Dataset]]]
+  process_queue: Queue[List[Tuple[str, PatientNode]]]
 
   queue_timeout = 0.05
 
@@ -727,11 +633,11 @@ class AbstractQueuedPipeline(AbstractPipeline):
     """Worker function for the process_queue thread"""
     while self.running:
       try:
-        input_container, failed_datasets = self.process_queue.get(timeout=self.queue_timeout)
+        input_container = self.process_queue.get(timeout=self.queue_timeout)
         self.logger.info(f"Process queue got item, approximate queue length: "
                          f"{self.process_queue.qsize()}")
         try:
-          self._process_output(input_container, failed_datasets)
+          self._process_output(input_container)
         except Exception as exception:
           log_traceback(self.logger, exception, "Process worker encountered exception")
         finally:
@@ -740,8 +646,13 @@ class AbstractQueuedPipeline(AbstractPipeline):
         pass
 
   def _handle_association_closed(self, event: evt.Event):
+    input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
 
-    self.process_queue.put(self.data_state.extract_input_container(id(event.assoc)))
+    if len(failed_datasets):
+      dicom_collection = display_dicom_collection(failed_datasets)
+      self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
+
+    self.process_queue.put(input_containers)
 
   def node_signal_handler_SIGINT(self, signal_, frame):
     self.running = False

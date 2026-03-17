@@ -21,7 +21,7 @@ from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.dimse import Address, send_image, create_query_dataset,\
   QueryLevels
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
 from dicomnode.server.input import HistoricAbstractInput, AbstractInput
 from dicomnode.server.processor import AbstractProcessor

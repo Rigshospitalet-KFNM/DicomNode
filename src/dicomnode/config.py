@@ -5,11 +5,14 @@ __author__ = "Demiguard"
 # Python standard library
 from dataclasses import dataclass
 from logging import INFO
+from typing import TYPE_CHECKING
 
 # Third party modules
 
 # Dicomnode modules
-from dicomnode.lib.io import Directory, File
+
+if TYPE_CHECKING:
+  from dicomnode.lib.io import Directory, File
 
 
 @dataclass
@@ -39,6 +42,7 @@ class DicomnodeConfigRaw:
 
 @dataclass
 class DicomnodeConfig:
+  from dicomnode.lib.io import Directory, File
   STUDY_EXPIRATION_DAYS : int
   PATIENT_IDENTIFIER_TAG : int
   LAZY_STORAGE : bool
@@ -67,6 +71,7 @@ def default_to(value, default):
   return value if value is not None else default
 
 def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
+  from dicomnode.lib.io import Directory, File
   study_expiration_days  = default_to(config.STUDY_EXPIRATION_DAYS, 14)
   patient_identifier_tag = default_to(config.PATIENT_IDENTIFIER_TAG, 0x0010_0020)
   lazy_storage = default_to(config.LAZY_STORAGE, False)

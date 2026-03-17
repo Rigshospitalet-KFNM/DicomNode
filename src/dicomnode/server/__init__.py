@@ -8,7 +8,9 @@ from . import input
 from . import maintenance
 from . import nodes
 from . import output
-from . import pipeline_tree
+from . import input_container
+from . import patient_node
+from . import pipeline_storage
 
 __all__ = [
   'factories',
@@ -17,7 +19,9 @@ __all__ = [
   'maintenance',
   'nodes',
   'output',
-  'pipeline_tree',
+  'input_container',
+  'patient_node',
+  'pipeline_storage',
 ]
 
 def __dir__():

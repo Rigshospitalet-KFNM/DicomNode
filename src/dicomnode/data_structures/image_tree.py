@@ -421,6 +421,8 @@ class StudyTree(ImageTreeInterface):
         raise InvalidTreeNode
       yield series
 
+  def num_series(self):
+    return len(self.data)
 
 class PatientTree(ImageTreeInterface):
   """A Tree of Dicom images under one patient, based around Patient ID
@@ -468,9 +470,23 @@ class PatientTree(ImageTreeInterface):
       for series in study.series():
         yield series
 
+  def num_studies(self):
+    return len(self.data)
+
+  def num_series(self):
+    studies = 0
+    for patient_tree in self.data.values():
+      if not isinstance(patient_tree, StudyTree): #pragma: no cover
+        raise InvalidTreeNode()
+      studies += patient_tree.num_series()
+    return studies
+
 class DicomTree(ImageTreeInterface):
-  """This is a Root node of an Tree structure, with the ability to index
-  multiple studies
+  """A Tree structure that can hold DICOM images without any requirements
+  between the incoming dicom images. The Images are separated in a tree
+  structure:
+    patients -> study -> series -> image
+
   """
 
   def add_image(self, dicom : Dataset) -> int:
@@ -511,6 +527,25 @@ class DicomTree(ImageTreeInterface):
         raise InvalidTreeNode()
       for series in study.series():
         yield series
+
+  def num_patients(self):
+    return len(self.data)
+
+  def num_studies(self):
+    studies = 0
+    for patient_tree in self.data.values():
+      if not isinstance(patient_tree, PatientTree): #pragma: no cover
+        raise InvalidTreeNode()
+      studies += patient_tree.num_studies()
+    return studies
+
+  def num_series(self):
+    studies = 0
+    for patient_tree in self.data.values():
+      if not isinstance(patient_tree, PatientTree): #pragma: no cover
+        raise InvalidTreeNode()
+      studies += patient_tree.num_series()
+    return studies
 
 __all__ = [
   'DicomTree',

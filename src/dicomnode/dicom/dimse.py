@@ -14,6 +14,7 @@ from pydicom import Dataset, DataElement
 from pydicom.datadict import tag_for_keyword, dictionary_VR
 from pydicom.uid import UID
 from pynetdicom.ae import ApplicationEntity
+from pynetdicom.events import Event
 from pynetdicom.sop_class import PatientRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind # type: ignore
 
 # Dicomnode packages
@@ -367,3 +368,8 @@ def send_move_thread(SCU_AE: str,
   thread = ProcessLikeThread(target=send_move, daemon=daemon, args=(SCU_AE, address, dataset), kwargs={'query_level' : query_level})
   thread.start()
   return thread
+
+def dataset_from_event(event: Event) -> Dataset:
+  dataset = event.dataset
+  dataset.file_meta = event.file_meta
+  return dataset

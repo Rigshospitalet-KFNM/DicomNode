@@ -3,8 +3,6 @@
 # Python Standard Library
 from logging import DEBUG
 from datetime import datetime
-from unittest import TestCase
-from unittest.mock import MagicMock, patch
 
 # Third party modules
 from pydicom import Dataset
@@ -12,9 +10,8 @@ from pydicom import Dataset
 # Dicomnode modules
 from dicomnode.dicom import gen_uid, DicomIdentifier
 from dicomnode.server.maintenance import MaintenanceThread
-from dicomnode.server.pipeline_tree import PipelineTree
 from dicomnode.server.pipeline_storage import PipelineStorage
-from dicomnode.server.dicomnode_config import config_from_raw
+from dicomnode.config import config_from_raw
 from dicomnode.server.input import AbstractInput
 
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase

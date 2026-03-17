@@ -19,7 +19,7 @@ from dicomnode.lib.io import Directory
 from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory,\
                                       InvalidTreeNode
 from dicomnode.data_structures.defaulting_dict import DefaultingDict
-from dicomnode.server.dicomnode_config import DicomnodeConfig
+from dicomnode.config import DicomnodeConfig
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.input import AbstractInput
 
@@ -119,3 +119,11 @@ class PipelineStorage:
 
     for identifier in dirty_identifiers:
       del self.storage[identifier]
+
+  def __str__(self) -> str:
+    base = f"Pipeline Storage with {len(self.storage)} patients\n"
+    for patient_id, node in self.storage:
+      lines = str(node).split('\n')
+
+
+    return base

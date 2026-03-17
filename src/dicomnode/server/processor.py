@@ -9,7 +9,7 @@ from typing import Type
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.io import TemporaryWorkingDirectory
 from dicomnode.lib.logging import set_logger, LoggerConfig
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
 
 @dataclass
