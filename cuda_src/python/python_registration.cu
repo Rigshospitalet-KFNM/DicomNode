@@ -15,14 +15,15 @@ std::tuple<dicomNodeError_t, python_array<f32>> registration(
 
   python_array<f32> out;
 
-  Texture<3, f32>* destination_texture = nullptr;
-  Texture<3, f32>* source_texture = nullptr;
+  Image<3, f32>* gpu_source_image = nullptr;
+  Image<3, f32>* gpu_destination_image = nullptr;
+
   DicomNodeRunner runner([&](dicomNodeError_t error){
     std::cout << "While performing a registration the function encountered error code:" << (u32)error << "\n" ;
 
     free_device_memory(
-      &destination_texture,
-      &source_texture
+      &gpu_source_image,
+      &gpu_destination_image
     );
   });
 
@@ -32,17 +33,17 @@ std::tuple<dicomNodeError_t, python_array<f32>> registration(
     } | [&](){
       return is_instance(source_image, "dicomnode.math.image", "Image");
     } | [&](){
-      return cudaMalloc(&destination_texture, sizeof(Texture<3, f32>));
+      return cudaMalloc(&gpu_source_image, sizeof(Image<3, f32>));
     } | [&](){
-      return cudaMalloc(&source_texture, sizeof(Texture<3, f32>));
+      return cudaMalloc(&gpu_destination_image, sizeof(Image<3, f32>));
     } | [&](){
-      return load_texture_from_python_image<f32>(destination_texture, destination_image);
+      return load_image<f32>(gpu_source_image, source_image);
     } | [&](){
-      return load_texture_from_python_image<f32>(source_texture, source_image);
+      return load_image<f32>(gpu_destination_image, destination_image);
     } | [&](){
-      return free_texture(&destination_texture);
+      return free_image(gpu_source_image);
     } | [&](){
-      return free_texture(&source_texture);
+      return free_image(gpu_destination_image);
     };
 
   return {runner.error(), out};

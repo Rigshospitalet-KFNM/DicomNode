@@ -537,7 +537,6 @@ class DicomFactoryTestCase(DicomnodeTestCase):
       StaticElement(0x0008_0018, 'UI', SecondaryCaptureImageStorage)
     ])
 
-
     build_series =  self.factory.build_series_without_image_encoding(
         images,
         bp,

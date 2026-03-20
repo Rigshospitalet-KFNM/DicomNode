@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 project(dicomnode_c LANGUAGES CUDA CXX)
 
+
+include(FetchContent)
 include(ProcessorCount)
 
 ProcessorCount(NUMBER_OF_PROCESSORS)
@@ -12,7 +14,13 @@ if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
 endif()
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
-find_package(pybind11 REQUIRED)
+
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG        v3.0.2
+)
+FetchContent_MakeAvailable(pybind11)
 
 # Create object libraries for each source file
 function(add_cuda_library name source)
@@ -94,7 +102,7 @@ if(CMAKE_CUDA_COMPILER)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
-    include(FetchContent)
+
     if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
       message(STATUS "Downloading CPM.cmake")
       file(DOWNLOAD
