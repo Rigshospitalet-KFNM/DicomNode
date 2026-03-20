@@ -22,16 +22,18 @@ from pynetdicom.presentation import AllStoragePresentationContexts, build_contex
 from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelFind, StudyRootQueryRetrieveInformationModelMove, PatientRootQueryRetrieveInformationModelFind, PatientRootQueryRetrieveInformationModelMove  #type: ignore
 from psutil import Process
 
-# Dicomnode Packages
+
+
 # Test helpers
 try:
   TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
 except KeyError:
   TESTING_TEMPORARY_DIRECTORY = "/tmp/dicomnode_tests"
 
-# Dicomnode
+# Dicomnode Modules
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
 from dicomnode.dicom import gen_uid, make_meta
+from dicomnode.math.space import Space
 
 def _generate_numpy_dataset(
     StudyUID: UID,
@@ -291,5 +293,8 @@ def clear_logger(logger_name: str):
 def wait_for_children():
   [process.wait() for process in Process().children()]
 
+
+def generate_dummy_space(shape):
+  return Space(numpy.eye(3), [0,0,0], shape)
 
 from . import dicomnode_test_case

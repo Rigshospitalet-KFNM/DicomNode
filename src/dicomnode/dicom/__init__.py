@@ -591,6 +591,24 @@ def display_dicom_collection(datasets: Iterable[Dataset]):
 
   raise IncorrectlyConfigured("There's a contract violation in DICOMNODE please report")
 
+def detect_4d_image(dataset: Dataset):
+  """Detect if dataset belongs the image is a 4 dimensional"""
+  time_rr_intervals_in_dataset = 0x0054_0061 in dataset
+  time_slot_in_dataset = 0x0054_0071 in dataset
+  time_slices_in_dataset = 0x0054_0101 in dataset
+
+  return time_slices_in_dataset or time_slot_in_dataset or time_rr_intervals_in_dataset
+
+def get_4d_image_dimensionality(dataset: Dataset) -> int:
+  """Retrieves the fourth dimension of a """
+  if  0x0054_0071 in dataset and 0x0054_61:
+    return dataset[0x0054_0071].value * dataset[0x0054_0061].value
+  if  0x0054_0101 in dataset:
+    return dataset[0x0054_0101].value
+
+  raise ValueError("Dataset doesn't appear to be a 4 dimensional value")
+
+
 
 from . import anonymization
 from . import blueprints

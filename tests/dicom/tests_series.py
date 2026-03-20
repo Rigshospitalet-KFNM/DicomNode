@@ -19,15 +19,55 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured,\
   MissingPivotDataset, InvalidDataset
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.series import DicomSeries, NiftiSeries, shared_tag,\
-  Series, extract_image, FramedDicomSeries, frame_unrelated_series,\
+  Series, extract_image, frame_unrelated_series,\
   extract_space
-from dicomnode.math.image import Image, FramedImage
+from dicomnode.math.image import Image
 from dicomnode.math.space import Space
 from dicomnode.lib.utils import is_picklable
 
 # Test stuff
-from tests.helpers import generate_numpy_datasets
+from tests.helpers import generate_numpy_datasets, generate_dummy_space
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+class SeriesTestCase(DicomnodeTestCase):
+  def test_series_generate_2_dimensional_slices(self):
+    shape_3d = (4,5,5)
+    shape_4d = (3,4,5,5)
+    shape_5d = (2,3,4,5,5)
+
+    data_3d = numpy.random.uniform(0,1, shape_3d)
+    data_4d = numpy.random.uniform(0,1, shape_4d)
+    data_5d = numpy.random.uniform(0,1, shape_5d)
+
+    space_3d = generate_dummy_space(shape_3d)
+    space_4d = generate_dummy_space(shape_4d)
+    space_5d = generate_dummy_space(shape_5d)
+
+    series_3d = Series(Image(data_3d, space_3d))
+    series_4d = Series(Image(data_4d, space_4d))
+    series_5d = Series(Image(data_5d, space_5d))
+
+    self.assertEqual(series_3d.image.number_frames(), 1)
+    for index_3d, slice_ in enumerate(series_3d.slices()):
+      self.assertEqual(slice_.ndim, 2)
+      self.assertTrue((series_3d.image.raw[index_3d] == slice_).all())
+
+    self.assertEqual(series_4d.image.number_frames(), 3)
+    for i, slice_ in enumerate(series_4d.slices()):
+      index_3d = i % shape_4d[1]
+      index_4d = i // shape_4d[1]
+
+      self.assertEqual(slice_.ndim, 2)
+      self.assertTrue((series_4d.image.raw[index_4d, index_3d] == slice_).all())
+
+    self.assertEqual(series_5d.image.number_frames(), 6)
+    for i, slice_ in enumerate(series_5d.slices()):
+      index_3d = i % shape_5d[2]
+      index_4d = (i // shape_5d[2]) % shape_5d[1]
+      index_5d = i // (shape_5d[2] * shape_5d[1])
+
+      self.assertEqual(slice_.ndim, 2)
+      self.assertTrue((series_5d.image.raw[index_5d, index_4d, index_3d] == slice_).all())
 
 class DicomSeriesTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
@@ -175,12 +215,10 @@ class DicomSeriesTestCase(DicomnodeTestCase):
 
     self.assertIsInstance(
       extract_image(
-        self.create_dynamic_pet_series(),
-         frame=1),
+        self.create_dynamic_pet_series()
+      ),
       Image)
 
-  def test_extract_from_nonsense(self):
-    self.assertRaises(TypeError, extract_image, 1)
 
   def test_from_dataset_list(self):
     datasets = [ds for ds in generate_numpy_datasets(
@@ -190,61 +228,85 @@ class DicomSeriesTestCase(DicomnodeTestCase):
 
     self.assertIsInstance(extract_image(datasets),Image)
 
-  def create_dynamic_pet_series(self, frame_type=FramedDicomSeries.FRAME_TYPE.DYNAMIC):
+  def create_dynamic_pet_series(self):
+    number_of_slices_per_series = 10
     frame_1 = DicomSeries([ds for ds in generate_numpy_datasets(
-      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      number_of_slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
       starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
       slice_thickness=3
     )])
     frame_2 = DicomSeries([ds for ds in generate_numpy_datasets(
-      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      number_of_slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
       starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
       slice_thickness=3
     )])
     frame_3 = DicomSeries([ds for ds in generate_numpy_datasets(
-      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      number_of_slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
       starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
       slice_thickness=3
     )])
 
     frames = [frame_1, frame_2, frame_3]
+    num_of_frames = len(frames)
 
     frame_durations = [1000, 1000, 1000]
 
-    for i,frame in enumerate(frames):
-      frame["ImageIndex"] = [i * len(frame) + j for j in range(len(frame))]
+    for i, frame in enumerate(frames):
+      frame["NumberOfTimeSlices"] = num_of_frames
+      frame["ImageIndex"] = [i * number_of_slices_per_series + j for j in range(number_of_slices_per_series)]
       frame["ActualFrameDuration"] = frame_durations[i]
       frame["AcquisitionDate"] = date(2020, 5, 20)
       frame["AcquisitionTime"] = time(10, 14, 13 + i, 63122)
 
-    return frame_unrelated_series(*frames, frame_type=frame_type)
+    return frame_unrelated_series(*frames)
 
   def test_create_dynamic_pet_series(self):
-    pet_series = self.create_dynamic_pet_series(FramedDicomSeries.FRAME_TYPE.DYNAMIC)
+    slices_per_series = 5
+    frame_1 = DicomSeries([ds for ds in generate_numpy_datasets(
+      slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
+      slice_thickness=3
+    )])
+    frame_2 = DicomSeries([ds for ds in generate_numpy_datasets(
+      slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
+      slice_thickness=3
+    )])
+    frame_3 = DicomSeries([ds for ds in generate_numpy_datasets(
+      slices_per_series, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
+      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
+      slice_thickness=3
+    )])
 
-    self.assertIsInstance(pet_series, FramedDicomSeries)
-    self.assertIsInstance(pet_series.image, FramedImage)
-    self.assertTrue((pet_series.pixel_volume == numpy.array([1,1,3])).all())
+    frame_1_image = frame_1.image # Build the Images now otherwise they become 4 images
+    frame_2_image = frame_2.image # Build the Images now otherwise they become 4 images
+    frame_3_image = frame_3.image # Build the Images now otherwise they become 4 images
+
+    frames = [frame_1, frame_2, frame_3]
+    num_of_frames = len(frames)
+
+    frame_durations = [1000, 1000, 1000]
+
+    for i, frame in enumerate(frames):
+      frame["NumberOfTimeSlices"] = num_of_frames
+      frame["NumberOfSlices"] = slices_per_series
+      frame["ImageIndex"] = [i * slices_per_series + j for j in range(slices_per_series)]
+      frame["ActualFrameDuration"] = frame_durations[i]
+      frame["AcquisitionDate"] = date(2020, 5, 20)
+      frame["AcquisitionTime"] = time(10, 14, 13 + i, 63122)
+
+    pet_series = frame_unrelated_series(*frames)
+
+    self.assertIsInstance(pet_series, DicomSeries)
+    self.assertIsInstance(pet_series.image, Image)
     self.assertIsInstance(pet_series.frame(0), Image)
-    self.assertIsInstance(pet_series.raw, numpy.ndarray)
-    self.assertEqual(pet_series.raw.dtype, numpy.float32)
-    self.assertEqual(pet_series.raw.ndim, 4)
-    self.assertIsInstance(pet_series.frame_acquisition_time, numpy.ndarray)
-    self.assertIsInstance(pet_series.frame_durations_ms, numpy.ndarray)
+    self.assertIsInstance(pet_series.image.raw, numpy.ndarray)
+    self.assertEqual(pet_series.image.raw.dtype, numpy.float32)
+    self.assertEqual(pet_series.image.raw.ndim, 4)
 
-
-  def test_create_gated_series(self):
-    pet_series = self.create_dynamic_pet_series(frame_type=FramedDicomSeries.FRAME_TYPE.GATED)
-
-    self.assertIsInstance(pet_series, FramedDicomSeries)
-    self.assertIsInstance(pet_series.image, FramedImage)
-    self.assertTrue((pet_series.pixel_volume == numpy.array([1,1,3])).all())
-    self.assertIsInstance(pet_series.frame(0), Image)
-    self.assertIsInstance(pet_series.raw, numpy.ndarray)
-    self.assertEqual(pet_series.raw.dtype, numpy.float32)
-    self.assertEqual(pet_series.raw.ndim, 4)
-    self.assertIsInstance(pet_series.frame_acquisition_time, numpy.ndarray)
-    self.assertIsInstance(pet_series.frame_durations_ms, numpy.ndarray)
+    self.assertTrue((pet_series.image.raw[0,:,:,:] == frame_1_image.raw).all())
+    self.assertTrue((pet_series.image.raw[1,:,:,:] == frame_2_image.raw).all())
+    self.assertTrue((pet_series.image.raw[2,:,:,:] == frame_3_image.raw).all())
 
   def test_unable_to_frame_no_images(self):
     self.assertRaises(ValueError, frame_unrelated_series)
@@ -263,32 +325,9 @@ class DicomSeriesTestCase(DicomnodeTestCase):
 
     self.assertRaises(ValueError, frame_unrelated_series, frame_1, frame_2)
 
-  def test_attempt_to_create_a_framed_series_no_datasets_fails(self):
-    self.assertRaises(MissingPivotDataset, FramedDicomSeries,[])
-
-  def test_missing_tags(self):
-    frame_1 = DicomSeries([ds for ds in generate_numpy_datasets(
-      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
-      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
-      slice_thickness=3
-    )])
-    frame_2 = DicomSeries([ds for ds in generate_numpy_datasets(
-      10, Cols=3, Rows=3, PatientID="Blah", pixel_spacing=[1,1],
-      starting_image_position=[0,0,0], image_orientation=[1,0,0,0,1,0],
-      slice_thickness=3
-    )])
-
-    self.assertRaises(InvalidDataset, frame_unrelated_series, frame_1, frame_2)
-
-  def test_extracting_image_from_framed_image_fails(self):
-    framed_image = self.create_dynamic_pet_series()
-    with self.assertLogs(DICOMNODE_LOGGER_NAME) as cm:
-      self.assertRaises(TypeError,extract_image, framed_image)
-
-    self.assertEqual(len(cm.output), 1)
-
   def test_extract_image_type_error_on_bogus_arg(self):
-    self.assertRaises(TypeError, extract_image, 1)
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertRaises(TypeError, extract_image, 1)
 
   def test_extract_space(self):
     self.assertRaises(TypeError, extract_space, 1)
@@ -315,3 +354,9 @@ class DicomSeriesTestCase(DicomnodeTestCase):
         slice_thickness=3
     )])
     ))
+
+  def test_dicom_series_count_frame_and_slices(self):
+    series = self.create_dynamic_pet_series()
+
+    self.assertEqual(series.image.number_frames(), 3)
+    self.assertEqual(series.image.number_slices(), 30)

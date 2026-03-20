@@ -33,7 +33,7 @@ from dicom2nifti.convert_dicom import dicom_array_to_nifti
 # Dicom node package
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import DicomTree
-from dicomnode.dicom.series import DicomSeries, FramedDicomSeries
+from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, MissingPivotDataset
 
 logger = getLogger(DICOMNODE_LOGGER_NAME)
@@ -285,13 +285,6 @@ class RTStructGrinder(Grinder):
       raise MissingPivotDataset
 
     return RTStruct(rt_series, rt_struct) #type: ignore
-
-class LargeDynamicPetSeriesGrinder(Grinder):
-  def __init__(self) -> None:
-    super().__init__()
-
-  def __call__(self, image_generator: Iterable[Dataset]):
-    return FramedDicomSeries(image_generator)
 
 
 __all__ = [

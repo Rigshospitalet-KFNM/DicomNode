@@ -8,6 +8,7 @@ https://xkcd.com/927/
 from datetime import datetime
 from functools import reduce
 from enum import Enum
+from operator import mul, and_
 from logging import getLogger
 from typing import Any, Callable, Dict, List, Iterable, Literal, Optional,\
   Tuple, TypeAlias, Union
@@ -30,7 +31,7 @@ from dicomnode.dicom import has_tags, sort_datasets, gen_uid,\
   assess_single_series
 from dicomnode.math import transpose_nifti_coords
 from dicomnode.math.space import Space, ReferenceSpace
-from dicomnode.math.image import Image, FramedImage
+from dicomnode.math.image import Image
 from dicomnode.lib.exceptions import MissingDatasets, InvalidDataset, MissingPivotDataset, IncorrectlyConfigured
 
 logger = getLogger(DICOMNODE_LOGGER_NAME)
@@ -57,11 +58,9 @@ def shared_tag(datasets: List[Dataset], tag: BaseTag) -> bool:
     raise ValueError("Cannot determine if a tag is unique from an empty collection")
 
   # This is many here because and is not a standard python function
-  def fun_and(x, y):
-    return x and y
 
   pivot = datasets[0]
-  return reduce(fun_and,
+  return reduce(and_,
                 [dataset.get(tag, None) == pivot.get(tag, None)
                   for dataset in datasets],
                 True)
@@ -92,7 +91,7 @@ class Series:
   rather than on construction.
   """
   @property
-  def image(self):
+  def image(self) -> Image:
     if self._image is None:
       if isinstance(self._image_constructor, Callable): #pragma: no cover
         self._image = self._image_constructor()
@@ -100,9 +99,18 @@ class Series:
         raise IncorrectlyConfigured("An Image must have an image or constructor")
     return self._image
 
+  @image.setter
+  def image_setter(self, new_image: Image | Callable[[], Image]):
+    if isinstance(new_image, Image):
+      self._image = new_image
+    elif isinstance(new_image, Callable):
+      self._image = None
+      self._image_constructor = new_image
+
+
   # Constructors
-  def __init__(self, image: Union[Image, FramedImage, Callable[[],Union[Image, FramedImage]]]):
-    if isinstance(image, Image) or isinstance(image, FramedImage):
+  def __init__(self, image: Union[Image, Callable[[],Image]]):
+    if isinstance(image, Image):
       self._image = image
       self._image_constructor = None
     else:
@@ -114,6 +122,14 @@ class Series:
       transpose_nifti_coords(self.image.raw),
       self.image.space.to_affine()
     )
+
+  def slices(self):
+    """Yield each image slice in the underlying image
+
+    Yields:
+        NDArray[float]: An 2D image slice in the image
+    """
+    yield from self.image.slices()
 
 
 class DicomSeries(Series):
@@ -142,10 +158,34 @@ class DicomSeries(Series):
     else:
       self.set_individual_tag(0x0020_0013, [i + 1 for i,_ in enumerate(self.datasets)])
 
-
-    # It's forbidden to call method on self, since the object have not been
-    # Constructed yet!
     super().__init__(self._image_constructor)
+
+  @classmethod
+  def create_skeleton(cls, image: Image | ndarray):
+    """Alternative constructor.
+    Creates a series with empty datasets such that each dataset could take a 2D
+    Slice. Works for any dimensional greater than 2.
+
+    Note that if you access the image attributes, you'll encounter an error,
+    until you have filled the datasets.
+
+    Args:
+        image (Image): The Image, which you intent to create an image for
+
+    Returns:
+        DicomSeries: An empty series with only InstanceNumber Attribute
+    """
+    if not isinstance(image, Image):
+      image = Image.from_array(image)
+
+    datasets = []
+
+    for i, slice_ in enumerate(image.slices()):
+      dataset = Dataset()
+      dataset.InstanceNumber = i + 1
+
+      datasets.append(dataset)
+    return cls(datasets)
 
   def __iter__(self):
     for dataset in self.datasets:
@@ -197,6 +237,17 @@ class DicomSeries(Series):
       dataset[tag] = value
 
   def set_individual_tag(self, tag: int, values: List[Union[DataElement, Any]]):
+    """Sets a tag in the series with an individual value for each datasets.
+
+    Args:
+        tag (int): The Tag, that you wish to set
+        values (List[Union[DataElement, Any]]): A list of values that you wish to set
+
+    Raises:
+        ValueError: Raised when the length of values is not equal to the amount
+                    of datasets in the series
+    """
+
     if len(values) != len(self):
       error_message = f"The amount of values ({len(values)}) doesn't match the amount datasets ({len(self)})"
       raise ValueError(error_message)
@@ -205,11 +256,52 @@ class DicomSeries(Series):
         value = DataElement(tag, dictionary_VR(tag), value)
       dataset[tag] = value
 
+  def set_frame_tags(self, tags: List[DataElement]):
+    """Sets a tag that is individual to each frame.
+
+    Args:
+        tags (List[DataElement]): A list of DataElements, that will be set
+
+    Raises:
+      Invalid Dataset: Raised when the series is not at least four dimensional
+      ValueError: Raised when tags are not of length equal to number of frames
+    """
+    if self.image.raw.ndim >= 4:
+      raise InvalidDataset("You cannot get frame values from a 3 dimensional image")
+
+    frames = self.image.raw.shape[-4]
+    if len(tags) != frames:
+       raise ValueError(f"The number of frames {frames} do not match the length values: {len(tags)}")
+
+    images_per_frame = self.image.raw.shape[-3]
+
+    for i, dataset in enumerate(self):
+      frame = i // images_per_frame
+      tag = tags[frame]
+      dataset[tag.tag] = tag
+
+  def get_frame_values(self, tag: int):
+    if self.image.raw.ndim >= 4:
+      raise InvalidDataset("You cannot get frame values from a 3 dimensional image")
+
+    images_per_frame = self.image.raw.shape[-3]
+    values = []
+
+    for frame_number in range(self.image.raw[-4]):
+      dataset = self.datasets[frame_number * images_per_frame]
+      values.append(dataset[tag].value)
+
+    return values
+
+
   def can_copy_into_image(self, image:ndarray[Tuple[int,int,int],Any]) -> bool:
-    return image.shape[0] == len(self.datasets)
+    return image.shape[-3] == len(self.datasets)
 
   def shared_tag(self, tag) -> bool:
     return shared_tag(self.datasets, tag)
+
+  def frame(self, frame: int) -> Image:
+    return self.image.frame(frame)
 
 class NiftiSeries(Series):
   def __init__(self, nifti: Nifti1Image) -> None:
@@ -222,183 +314,26 @@ class NiftiSeries(Series):
 
     super().__init__(Image(image_data, affine))
 
-class FramedDicomSeries(Series):
-  """A Series constructed from dicom datasets, which contains frames such as
-  gates or dynamic series. Each frame is a 3 dimensional image of float32
-  points which share a coordinate system.
-
-  Each frame have identical Dimensions.
-
-  Args:
-    datasets (List[Dataset]): A non empty list of datasets where each dataset
-      have the following tags:
-      * NumberOfSlices
-      * Rows
-      * Columns
-      * RescaleIntercept
-      * RescaleSlope
-      * PixelData
-      * ActualFrameDuration
-      * AcquisitionTime
-      * AcquisitionDate
-      * ImageIndex
-      * PixelData
-  """
-
-  REQUIRED_TAGS = [
-    'NumberOfSlices',
-    'Rows',
-    'Columns',
-    'RescaleIntercept',
-    'RescaleSlope',
-    'PixelData',
-    'ActualFrameDuration',
-    'AcquisitionTime',
-    'AcquisitionDate',
-    'ImageIndex',
-    'PixelData',
-  ]
-
-  class FRAME_TYPE(Enum):
-    GATED = 1
-    DYNAMIC = 2
-
-  @property
-  def image(self) -> FramedImage:
-    image = super().image
-    if not isinstance(image, FramedImage):
-      # I do not accountability if you for some reason decide to reassign ._image
-      raise IncorrectlyConfigured # pragma: no cover
-    return image
-
-  def frame(self, frame_number:int):
-    return self.image.frame(frame_number)
-
-  @property
-  def raw(self):
-    return self.image.raw
-
-  @property
-  def frame_durations_ms(self):
-    return self._frame_durations_ms
-
-  @property
-  def frame_acquisition_time(self):
-    return self._frame_acquisition_time
-
-  @property
-  def pixel_volume(self) -> ndarray[Tuple[Literal[3]], numpy.float32]: # type: ignore # type checker is high
-    """Triplet of pixel dimension (x,y,z) in millimeters
-
-    Returns:
-        ndarray[Tuple[Literal[3]], numpy.float32]:
-          Triplet of pixel dimension (x,y,z) in millimeters
-    """
-    return self._pixel_volume # type: ignore # type checker is high
-
-  def __init__(self, datasets: Iterable[Dataset]):
-    first_dataset = None
-    raw_image = None
-    frame_times_ms = None
-    frame_acquisition_time = None
-
-    datasets_dict: Dict[int, List[Dataset]] = {}
-
-    def add_dataset(dataset: Dataset):
-      frame = dataset.ImageIndex // dataset.NumberOfSlices
-
-      if frame in datasets_dict:
-        datasets_dict[frame].append(dataset)
-      else:
-        datasets_dict[frame] = [dataset]
-
-
-    for dataset in datasets:
-      if not has_tags(dataset, self.REQUIRED_TAGS):
-        missing_tags = []
-
-        for tag in self.REQUIRED_TAGS:
-          if tag not in dataset:
-            missing_tags.append(str(tag))
-
-        raise InvalidDataset(f"Dataset doesn't appear to be large pet as dataset is missing {' '.join(missing_tags)}")
-
-      self.frames = dataset.NumberOfTimeSlices if 'NumberOfTimeSlices' in dataset else dataset.NumberOfTimeSlots
-      if first_dataset is None:
-        first_dataset = dataset
-
-      if raw_image is None:
-        raw_image = numpy.empty((self.frames, dataset.NumberOfSlices, dataset.Rows, dataset.Columns), float32)
-
-      if frame_times_ms is None:
-        frame_times_ms = numpy.ones((self.frames), dtype=numpy.int32)
-
-      if frame_acquisition_time is None:
-        frame_acquisition_time = numpy.ones((self.frames), dtype='datetime64[ms]')
-
-      frameIndex = (dataset.ImageIndex - 1) // dataset.NumberOfSlices
-      add_dataset(dataset)
-      frame_times_ms[frameIndex] = dataset.ActualFrameDuration
-      if isinstance(dataset.AcquisitionDate, str):
-        frame_acquisition_time[frameIndex] = datetime.strptime(dataset.AcquisitionDate+dataset.AcquisitionTime, "%Y%m%d%H%M%S.%f")
-      else:
-        frame_acquisition_time[frameIndex] = datetime.combine(dataset.AcquisitionDate, dataset.AcquisitionTime)
-    # Done inserting datasets
-
-    if first_dataset is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets")
-    if raw_image is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
-    if frame_times_ms is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
-    if frame_acquisition_time is None:
-      raise MissingPivotDataset("Cannot construct an image from no datasets") # pragma: no cover # statement is unreachable
-
-    # Sort datasets
-    for datasets in datasets_dict.values():
-      datasets.sort(key=sort_datasets)
-
-    space = Space.from_datasets(datasets_dict[0])
-
-    def construct_frame(raw:ndarray[Tuple[int,int,int,int], Any], frame: int):
-      frame_datasets = datasets_dict[frame]
-
-      for slice_number_in_series, dataset in enumerate(frame_datasets):
-        raw[frame, slice_number_in_series, :, :] = \
-          dataset.pixel_array.astype(float32) * dataset.RescaleSlope\
-            + dataset.RescaleIntercept
-
-    for frame in range(self.frames):
-      construct_frame(raw_image, frame)
-
-    super().__init__(FramedImage(raw_image, space))
-    self.datasets = datasets_dict
-    self._pivot = first_dataset
-    self._frame_durations_ms = frame_times_ms
-    self._frame_acquisition_time = frame_acquisition_time
-    self._pixel_volume = numpy.array(
-      [first_dataset.PixelSpacing[0],
-       first_dataset.PixelSpacing[1],
-       first_dataset.SliceThickness
-       ],
-       dtype=numpy.float32)
-
-  def __getattribute__(self, name: str) -> Any:
-    try:
-      return super().__getattribute__(name)
-    except AttributeError:
-      return self._pivot.__getattribute__(name)
-
 ImageContainerType = Union[
   Image,
   Nifti1Image,
   Nifti2Image,
   List[Dataset],
   Series,
-  FramedImage
 ]
 
-def extract_image(source: ImageContainerType, frame=None) -> Image:
+def extract_image(source: ImageContainerType) -> Image:
+  """Extracts an image from a containing class
+
+  Args:
+      source (ImageContainerType): _description_
+
+  Raises:
+      TypeError: _description_
+
+  Returns:
+      Image: _description_
+  """
   if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
     source = NiftiSeries(source)
   if isinstance(source, List):
@@ -406,13 +341,7 @@ def extract_image(source: ImageContainerType, frame=None) -> Image:
   if isinstance(source, Series):
     source = source.image
 
-  if isinstance(source, FramedImage):
-    if frame is not None:
-      return source.frame(frame)
-    error_message = "Underlying Image is a framed image and not an plain image, use the frame to select frame"
-    logger.error(error_message)
-    raise TypeError(error_message)
-  elif isinstance(source, Image):
+  if isinstance(source, Image):
     return source
 
   error_message = f"Unable to convert {type(source)} to an Image"
@@ -431,14 +360,10 @@ def extract_space(source: ImageContainerType) -> Space:
   if isinstance(source, Image):
     return source.space
 
-  if isinstance(source, FramedImage):
-    return source.space
-
   raise TypeError(f"Cannot extract space from object of type {type(source)}")
 
 
-def frame_unrelated_series(*frame_series: DicomSeries,
-                           frame_type = FramedDicomSeries.FRAME_TYPE.DYNAMIC) -> FramedDicomSeries:
+def frame_unrelated_series(*frame_series: DicomSeries) -> DicomSeries:
   """If you have multiple series, that you wish to unite in a single series,
   recreates SOPInstanceUID
 
@@ -464,7 +389,6 @@ def frame_unrelated_series(*frame_series: DicomSeries,
     elif number_of_datasets != len(series):
       raise ValueError(f"Series {i + 1} doesn't contain {number_of_datasets} which the other datasets do!")
 
-
     indexes = [i + 1 for i in range(index, index + number_of_datasets)]
     index += number_of_datasets
     series["SOPInstanceUID"] = [gen_uid() for _ in series]
@@ -472,16 +396,10 @@ def frame_unrelated_series(*frame_series: DicomSeries,
     series["InstanceNumber"] = indexes
     series["ImageIndex"] = indexes
     series["NumberOfSlices"] = number_of_datasets
-    if frame_type == FramedDicomSeries.FRAME_TYPE.DYNAMIC:
-      series["NumberOfTimeSlices"] = number_of_frames
-    elif frame_type == FramedDicomSeries.FRAME_TYPE.GATED:
-      series['NumberOfRRIntervals'] = 1
-      series['NumberOfTimeSlots'] = number_of_frames
 
     datasets.extend(series.datasets)
 
-  return FramedDicomSeries(datasets)
-
+  return DicomSeries(datasets)
 __all__ = [
   'Series',
   'DicomSeries',

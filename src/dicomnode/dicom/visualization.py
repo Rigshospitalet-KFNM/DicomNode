@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 # Dicomnode modules
-from dicomnode.math.image import Image, FramedImage
+from dicomnode.math.image import Image
 
 class Orientation(IntEnum):
     X = 0
@@ -99,10 +99,10 @@ class IndexTracker:
 def track_image_to_axes(
   figure: Figure,
   axes: Axes,
-  image: Image | FramedImage | numpy.ndarray,
+  image: Image | numpy.ndarray,
   orientation = Orientation.Z) -> IndexTracker:
 
-  if isinstance(image, Image) or isinstance(image, FramedImage):
+  if isinstance(image, Image):
     image = image.raw
 
   tracker = IndexTracker(

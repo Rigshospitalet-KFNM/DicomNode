@@ -2,6 +2,9 @@
 data"""
 
 # Python standard library
+from logging import getLogger
+from functools import reduce
+from operator import mul
 from typing import Any, List, Literal, Tuple, TypeAlias, Union
 
 # Third party Packages
@@ -11,7 +14,8 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING
+from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING,\
+  DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import DimensionalityError
 from dicomnode import math
 from dicomnode.math.types import numpy_image, raw_image_frames
@@ -40,29 +44,76 @@ def fit_image_into_unsigned_bit_range(image: ndarray,
 
     return new_image, slope, intercept
 
-def build_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
-    # This import is here to prevent circular imports
-    from dicomnode.dicom import sort_datasets
-    datasets.sort(key=sort_datasets)
+def build_image_from_datasets(datasets: List[Dataset]):
+  from dicomnode.dicom import detect_4d_image
 
-    pivot = datasets[0]
-    x_dim = pivot.Columns
-    y_dim = pivot.Rows
-    z_dim = len(datasets)
-    # tags are RescaleIntercept, RescaleSlope
-    rescale = (0x00281052 in pivot and 0x00281053 in pivot)
+  if not len(datasets):
+    raise ValueError("Cannot Construct an image from an empty list")
 
-    image_array: numpy_image = empty((z_dim, y_dim, x_dim), dtype=float32)
+  pivot = datasets[0]
 
-    for i, dataset in enumerate(datasets):
-      image = dataset.pixel_array
-      if rescale:
-        image_array[i,:,:] = image.astype(float32) * dataset.RescaleSlope\
-              + dataset.RescaleIntercept
-      else:
-        image_array[i,:,:] = image.astype(float32)
+  if detect_4d_image(pivot):
+    return _build_4d_image_from_datasets(datasets)
+  else:
+    return _build_3d_image_from_datasets(datasets)
 
-    return image_array
+def _build_4d_image_from_datasets(datasets: List[Dataset]):
+  from dicomnode.dicom import get_4d_image_dimensionality
+  pivot = datasets[0]
+
+  rescale = (0x00281052 in pivot and 0x00281053 in pivot)
+
+  x_dim = pivot.Columns
+  y_dim = pivot.Rows
+  z_dim = pivot.NumberOfSlices
+  t_dim = get_4d_image_dimensionality(pivot)
+
+  image = empty((t_dim, z_dim, y_dim, x_dim), dtype=float32)
+
+  for dataset in datasets:
+    index = (dataset.ImageIndex if 0x0054_1330 in dataset else dataset.InstanceNumber) - 1
+    index_3d = index % z_dim
+    index_4d = index // z_dim
+
+    frame = dataset.pixel_array.astype(float32)
+
+    if rescale:
+      image[index_4d,index_3d,:,:] = frame * dataset.RescaleSlope + dataset.RescaleIntercept
+    else:
+      image[index_4d,index_3d,:,:] = frame
+
+  return image
+
+def _build_3d_image_from_datasets(datasets: List[Dataset]) -> numpy_image:
+  """Builds a 3 dimensional image from datasets
+
+  Args:
+      datasets (List[Dataset]): A list of datasets
+
+  Returns:
+      numpy_image: _description_
+  """
+  # This import is here to prevent circular imports
+  from dicomnode.dicom import sort_datasets
+  datasets.sort(key=sort_datasets)
+
+  pivot = datasets[0]
+  x_dim = pivot.Columns
+  y_dim = pivot.Rows
+  z_dim = len(datasets)
+  # tags are RescaleIntercept, RescaleSlope
+  rescale = (0x00281052 in pivot and 0x00281053 in pivot)
+
+  image_array: numpy_image = empty((z_dim, y_dim, x_dim), dtype=float32)
+
+  for i, dataset in enumerate(datasets):
+    image = dataset.pixel_array.astype(float32)
+    if rescale:
+      image_array[i,:,:] = image * dataset.RescaleSlope + dataset.RescaleIntercept
+    else:
+      image_array[i,:,:] = image
+
+  return image_array
 
 class Image:
   def __init__(self,
@@ -72,6 +123,12 @@ class Image:
     self._raw = numpy.array(image_data)
     self._space = space
     self._minimum_value = minimum_value
+
+  @classmethod
+  def from_array(cls, image: numpy_image):
+    space = Space(numpy.eye(3), [0,0,0], image.shape[-3:])
+
+    return cls(image, space)
 
   def __iter__(self):
     for slice_ in self.raw:
@@ -92,6 +149,24 @@ class Image:
   @property
   def shape(self):
     return self.raw.shape
+
+  def frame(self, frame: int) -> 'Image':
+    return self.__class__(self.raw[frame], self.space)
+
+  def frames(self):
+    yield from self.raw.reshape(-1, *self.raw.shape[-3:])
+
+  def number_frames(self) -> int:
+    if self.raw.ndim < 3:
+        raise ValueError(f"Image must be at least 3D, got {self.raw.ndim}D")
+
+    return reduce(mul, self.raw.shape[:-3], 1)
+
+  def slices(self):
+    yield from self.raw.reshape(-1, *self.raw.shape[-2:])
+
+  def number_slices(self) -> int:
+    return reduce(mul, self.raw.shape[:-2], 1)
 
   def __getitem__(self, idx):
     return self.raw[idx]
@@ -184,25 +259,3 @@ class Image:
 
   def __repr__(self) -> str:
     return str(self)
-
-
-class FramedImage():
-  @property
-  def space(self):
-    return self._space
-
-  @property
-  def shape(self):
-    return self.raw.shape
-
-  def frame(self, frame: int) -> Image:
-    return Image(self.raw[frame], self.space)
-
-  def __init__(self, frames: raw_image_frames, space: Space) -> None:
-    self.raw = frames
-    self._space = space
-
-  def __iter__(self):
-    for frame in self.raw:
-      for slice_ in frame:
-        yield slice_

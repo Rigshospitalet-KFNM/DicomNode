@@ -18,15 +18,18 @@ from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
 from numpy import ndarray, zeros_like
 from pydicom import DataElement, Dataset, Sequence, datadict
-from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage
+from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage,\
+  PositronEmissionTomographyImageStorage, EnhancedPETImageStorage,\
+  EnhancedCTImageStorage
+
 from pydicom.tag import Tag, BaseTag
 from sortedcontainers import SortedDict
 
 # Dicomnode Library
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING, DICOMNODE_PRIVATE_TAG_VERSION, DICOMNODE_PRIVATE_TAG_HEADER, DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import make_meta, Reserved_Tags
-from dicomnode.dicom.series import DicomSeries, NiftiSeries
-from dicomnode.math.image import fit_image_into_unsigned_bit_range
+from dicomnode.dicom.series import Series, DicomSeries, NiftiSeries, extract_image, ImageContainerType
+from dicomnode.math.image import Image, fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.exceptions import MissingPivotDataset, ConstructionFailure
 
@@ -430,6 +433,16 @@ class Blueprint():
 
     return True
 
+class DynamicSeriesType(Enum):
+  """The different DICOM COID, that can support time series and is supported by
+  dicomnode. """
+
+  DYNAMIC_PET = PositronEmissionTomographyImageStorage
+  #DYNAMIC_CT  = EnhancedCTImageStorage
+  #DYNAMIC_ENHANCED_PET = EnhancedPETImageStorage
+
+
+
 class DicomFactory():
   """A DicomFactory produces Series of Dicom Datasets and everything needed to produce them.
 
@@ -456,6 +469,38 @@ class DicomFactory():
     self.default_bits_allocated = 16
     self.default_pixel_representation = DicomFactory.PixelRepresentation.UNSIGNED
     self.default_photometric_interpretation = DicomFactory.PhotometricInterpretation.MONOCHROME_BLACK
+
+  def apply_blueprint_list(
+      self,
+      constructed_series: DicomSeries,
+      blueprint: Blueprint,
+      original_series: List[Dataset] = [],
+      **kwargs
+    ):
+
+    for virtual_tag in blueprint:
+      corporeal_tag = virtual_tag.corporealialize(original_series)
+
+      if corporeal_tag is None:
+        continue
+
+      if isinstance(corporeal_tag, DataElement):
+        constructed_series.set_shared_tag(corporeal_tag.tag, corporeal_tag)
+      else:
+        envs = [
+          InstanceEnvironment(
+            instance_number= i + 1, # InstanceNumbers are 1 indexed
+            factory=self,
+            kwargs=kwargs,
+            instance_dataset=dataset,
+            image=slice_
+          ) for i, (dataset, slice_) in enumerate(zip(constructed_series, constructed_series.slices()))
+        ]
+
+        tag = [corporeal_tag.produce(env) for env in envs]
+
+        constructed_series.set_individual_tag(corporeal_tag.tag, tag)
+
 
   def store_image_in_dataset(self, dataset: Dataset, image: ndarray):
     if len(image.shape) != 2:
@@ -503,12 +548,14 @@ class DicomFactory():
 
 
   def build_series(self,
-                   image,
+                   image: Image | ndarray,
                    blueprint: Blueprint,
                    parent_series: Union[DicomSeries, List[Dataset]],
                    kwargs: Dict[Any, Any] = {}
                    ) -> DicomSeries:
     """Builds a dicom series from a series, from an image, blueprint, and series
+
+    It's highly recommend to use build_4d_series for 4 dimensional series.
 
     The following tags are always added:
       (0028,0002) - Samples per Pixel
@@ -547,12 +594,10 @@ class DicomFactory():
     else:
       parent_datasets = parent_series.datasets
 
-    can_copy_instances = len(parent_datasets) == len(image)
+    if not isinstance(image, Image):
+      image = Image.from_array(image)
 
-    if not can_copy_instances:
-      logger.info(f"Constructing a series of length {len(image)}, but there's only supplied {len(parent_datasets)} datasets!")
-
-    series = DicomSeries([Dataset() for _ in image])
+    series = DicomSeries.create_skeleton(image)
 
     for virtual_tag in blueprint:
       try:
@@ -563,25 +608,20 @@ class DicomFactory():
       if isinstance(result, DataElement):
         series.set_shared_tag(virtual_tag.tag, result)
       elif isinstance(result, InstanceVirtualElement):
-        if can_copy_instances:
-          envs = [
+        if isinstance(virtual_tag,InstanceCopyElement) and len(parent_datasets) != image.number_slices():
+          raise ConstructionFailure(f"Unable to construct series because the blueprint have instance copy element and the parent series have {len(parent_datasets)} instances and this would produce {image.number_slices()} datasets")
+
+        envs = []
+        for i, slice_ in enumerate(image):
+          parent_dataset = parent_datasets[i] if i < len(parent_datasets) else None
+          envs.append(
             InstanceEnvironment(
               instance_number=i + 1, # InstanceNumbers are 1 indexed
               factory=self,
               kwargs=kwargs,
-              instance_dataset=dataset,
+              instance_dataset=parent_dataset,
               image=slice_,
-            ) for (i, (dataset, slice_)) in enumerate(zip(parent_datasets, image))
-          ]
-        else:
-          envs = [
-            InstanceEnvironment(
-              instance_number=i,
-              factory=self,
-              kwargs=kwargs,
-              image=slice_,
-            ) for i, slice_ in enumerate(image)
-          ]
+            ))
 
         data_elements = [
           result.produce(env) for env in envs
@@ -643,6 +683,73 @@ class DicomFactory():
       raise NotImplementedError("None 3D Nifti images are not supported")
 
     return DicomSeries(datasets)
+
+
+  def build_4d_series(self, image: ImageContainerType, blueprint: Blueprint, original_series=[], **kwargs):
+    """Constructs a four dimensional series over an image
+
+    Supported COID are:
+       * 1.2.840.10008.5.1.4.1.1.128 - Positron Emission Tomography Image,
+         you must pass series_type="GATED" or series_type="DYNAMIC" as Keyword arguments
+
+    Args:
+      image (ImageContainerType): What ever image that should
+      blueprint (Blueprint): The blueprint of the produced series
+      original_series (List[Dataset]): The parent series that copyElement will
+        copy from. Defaults to []
+
+    Raises:
+      IncorrectlyConfigured: Raised if:
+                              * Blueprint doesn't contain a StaticElement for
+                                SOPClassUID
+                              *
+
+    """
+    if 0x0008_0016 not in blueprint:
+      raise IncorrectlyConfigured("Input blueprint must contain a Virtual Element at (0008,0016) and be static element")
+
+    sop_class_uid_VE = blueprint[0x0008_0016]
+
+    if not isinstance(sop_class_uid_VE, StaticElement):
+      raise IncorrectlyConfigured("Input blueprint must contain a Virtual Element at (0008,0016) and be static element")
+
+    try:
+      series_type = DynamicSeriesType(sop_class_uid_VE.value)
+    except ValueError:
+      raise IncorrectlyConfigured(f"The {sop_class_uid_VE.value} is not supported by dicomnode - Check the enum: DynamicSeriesType for supported types")
+
+    image = extract_image(image)
+
+    series = DicomSeries.create_skeleton(image)
+
+    self.apply_blueprint_list(series, blueprint, original_series, **kwargs)
+
+    return self.DYNAMIC_HANDLER_FUNCTIONS[series_type](self, series, image, **kwargs)
+
+  def _build_dynamic_series_pet(self, series: DicomSeries, image: Image, **kwargs):
+    if 'series_type' not in kwargs:
+      raise IncorrectlyConfigured("series_type is not a kwargs")
+
+    series_type = kwargs['series_type']
+
+    if series_type != "GATED" or series_type == "DYNAMIC":
+      raise IncorrectlyConfigured(f"series type is {series_type} not GATED or DYNAMIC")
+
+    for i, (dataset, slice_) in enumerate(zip(series, image.slices())):
+      self.store_image_in_dataset(dataset, slice_)
+
+      dataset.SeriesType = [series_type, "IMAGE"]
+      dataset.ImageIndex = i + 1
+      dataset.NumberOfSlices = image.shape[-3]
+      if series_type == "GATED":
+        ## I kinda wanna say that this might be wrong and you need to some manual fixing
+        dataset.NumberOfRRIntervals = 1
+        dataset.NumberOfTimeSlots = image.shape[-4]
+      else:
+        dataset.NumberOfTimeSlices = image.shape[-4]
+
+    return series
+
 
   def build_series_without_image_encoding(self,
                                           images: TypingSequence,
@@ -845,4 +952,8 @@ class DicomFactory():
   REPORT_HANDLER_FUNCTIONS = {
     SecondaryCaptureImageStorage : _build_pdf_in_secondary_image_capture,
     EncapsulatedPDFStorage : _build_pdf_in_encapsulated_document
+  }
+
+  DYNAMIC_HANDLER_FUNCTIONS = {
+    DynamicSeriesType.DYNAMIC_PET : _build_dynamic_series_pet
   }

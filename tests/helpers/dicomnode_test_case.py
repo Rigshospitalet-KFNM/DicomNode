@@ -1,11 +1,11 @@
 import collections
 from enum import IntEnum
 from re import compile, Pattern
-from typing import List, Optional, Union
 from pprint import pformat
 import logging
 import threading
 import multiprocessing
+from typing import Iterable, List, Optional, Union
 from unittest import TestCase
 from unittest.case import _BaseTestCaseContext
 from unittest.util import safe_repr
@@ -202,3 +202,16 @@ class DicomnodeTestCase(TestCase):
 
   def assertNonCapturingNoLogs(self, logger, level=logging.DEBUG, raise_error=True):
     return _AssertNonCapturingLogsContext(self, logger, level, no_logs=True, raise_error=raise_error)
+
+  def assertIteratorEqual(self, container_1: Iterable, container_2: Iterable, msg=None):
+    failed_items = []
+    try:
+      for i, (item_1, item_2) in enumerate(zip(container_1, container_2, strict=True)):
+        if item_1 != item_2:
+          failed_items.append((i, item_1, item_2))
+    except ValueError:
+      msg = self._formatMessage(msg, "Containers are not of the same length, and therefore cannot be equal")
+      self.fail(msg)
+
+    if failed_items:
+      msg = self._formatMessage(msg, f"The follows items are not equal: {failed_items}")
