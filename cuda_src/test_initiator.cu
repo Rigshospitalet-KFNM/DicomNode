@@ -9,3 +9,4 @@
 #include"tests/indexing_test.cu"
 #include"tests/label_tests.cu"
 #include"tests/utilities_test.cu"
+#include"tests/datastructure_test.cu"

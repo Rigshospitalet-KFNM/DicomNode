@@ -10,23 +10,24 @@
  */
 #pragma once
 
-#include<stdint.h>
 #include<vector>
 
 #include"../concepts.cuh"
 #include"extent.cuh"
+#include"point.cuh"
+#include"index.cuh"
 
 template<uint8_t DIMENSIONS, typename T>
 struct Volume {
   T* data = nullptr;
   Extent<DIMENSIONS> m_extent;
-  T default_value;
+  T default_value = 0;
 
-  size_t elements() const {
+  constexpr  __device__ __host__  size_t elements() const {
     return m_extent.elements();
   }
 
-  bool is_allocated() const {
+  constexpr  __device__ __host__  bool is_allocated() const {
     return data == nullptr;
   }
 
@@ -34,8 +35,46 @@ struct Volume {
     return m_extent.set_dimensions(dims);
   }
 
-  const Extent<DIMENSIONS>& extent() const {
+  constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const {
     return m_extent;
+  }
+
+  constexpr __device__ __host__ const T& at(const Index<DIMENSIONS>& index) const {
+    const cuda::std::optional<u64> flat_index = m_extent.flat_index(index);
+
+    if(!flat_index.has_value()){
+      return default_value;
+    }
+
+    return data[flat_index.value()];
+  }
+
+  __device__ __host__ T interpolate_at_index_point(const Point<DIMENSIONS>& p) const {
+    T value = 0;
+
+    float alphas[DIMENSIONS];
+    Index<DIMENSIONS> index_lower_point;
+
+    for (u8 d = 0; d < DIMENSIONS; d++) {
+      alphas[d] = p[d] - floorf(p[d]);
+      index_lower_point[d] = floorf(p[d]);
+    }
+
+    // A N-dimensional cube has 2^N points
+    constexpr u16 MAX_POINTS = 1 << DIMENSIONS;
+
+    // Coordinate index is the point index of points we need to visit
+    for (u8 coordinate_index = 0; coordinate_index < MAX_POINTS; coordinate_index++) {
+      float modifier = 1.0f;
+      for (u8 d = 0; d < DIMENSIONS; d++ ) {
+        modifier *= (coordinate_index >> d) & 1u ? alphas[d] : 1.0f - alphas[d];
+      }
+      Index<DIMENSIONS> index = index_lower_point + dimensional_offset<DIMENSIONS>(coordinate_index);
+
+      value += modifier * this->at(index);
+    }
+
+    return value;
   }
 };
 

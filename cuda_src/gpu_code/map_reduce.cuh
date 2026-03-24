@@ -345,7 +345,7 @@ __global__ void reduce_kernel(T_IN* src,
                        uint32_t* counter,
                        Args... args
                      ){
-  // So this kernel is boarderline
+  // So this kernel is borderline
 
   // We are reusing the space as once it's boardcast, we not longer need the space
   extern __shared__ char shared_memory[];

@@ -1,10 +1,11 @@
 #pragma once
 
 #include"extent.cuh"
-#include"image.cuh"
+#include"volume.cuh"
+#include"square_matrix.cuh"
 #include"index.cuh"
 #include"point.cuh"
-#include"space.cuh"
-#include"square_matrix.cuh"
 #include"texture.cuh"
-#include"volume.cuh"
+#include"affine.cuh"
+#include"space.cuh"
+#include"image.cuh"

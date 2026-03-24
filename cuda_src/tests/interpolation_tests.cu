@@ -7,7 +7,12 @@
 
 #include"../gpu_code/dicom_node_gpu.cuh"
 
-__global__ void interpolation_tests(const Texture<3, float>* texture, float* out, Space<3>* out_space, float3* coords){
+#include"../python/utilities.cuh"
+
+namespace INTERPOLATION {
+
+
+  __global__ void interpolation_tests(const Texture<3, float>* texture, float* out, Space<3>* out_space, float3* coords){
   const Texture<3, float>& refTexture = *texture;
   const uint32_t x = texture->space.extent[2];
   const uint32_t y = texture->space.extent[1];
@@ -359,7 +364,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
         0.0f, 0.0f, 1.0f
       }
     },
-   .inverted_basis = SquareMatrix<3>{
+    .inverted_basis = SquareMatrix<3>{
       .points={
         1.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f,
@@ -371,7 +376,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
 
   const Space<3> target_space {
     .starting_point = Point<3>{
-     1.0f, 1.0f, 1.0f
+      1.0f, 1.0f, 1.0f
     },
     .basis = SquareMatrix<3>{
       .points={
@@ -381,7 +386,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
       }
     },
    .inverted_basis = SquareMatrix<3>{
-      .points={
+     .points={
         1.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 1.0f
@@ -444,4 +449,147 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
 
   delete[] host_data;
   delete[] host_result;
+}
+
+TEST(INTERPOLATION, INTERPOLATE_IMAGE){
+  using DataType = f32;
+
+  constexpr u32 x = 10;
+  constexpr u32 y = 10;
+  constexpr u32 z = 10;
+
+  constexpr u32 ux = 9;
+  constexpr u32 uy = 9;
+  constexpr u32 uz = 9;
+
+
+  DataType* host_data = new DataType[ x * y * z ];
+
+  for(int i = 0; i < x * y * z; i++){
+    const u32 lx = i % x;
+    const u32 ly = (i / x) % y;
+    const u32 lz = i / (x * y);
+
+    host_data[i] = std::max(std::max(lx, ly), lz) + 1;
+  }
+
+  const Space<3> source_space {
+    .starting_point = Point<3>{
+      0.0f, 0.0f, 0.0f
+    },
+
+    .basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      }
+    },
+    .inverted_basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      },
+    },
+    .extent = Extent<3>{z,y,x}
+  };
+
+  const Space<3> target_space {
+    .starting_point = Point<3>{
+      1.0f, 1.0f, 1.0f
+    },
+    .basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0, 0.0f,
+        0.0f, 0.0f, 1.0f
+      }
+    },
+   .inverted_basis = SquareMatrix<3>{
+     .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      },
+    },
+    .extent = Extent<3>{uz, uy, ux}
+  };
+
+  constexpr size_t out_elements = uz * uy * ux;
+  constexpr size_t out_size = out_elements * sizeof(DataType);
+
+
+  Volume<3, DataType> debug_volume{
+    .data = host_data,
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0
+  };
+
+  Point<3> testpoint(1.0,1.0,1.0);
+  DataType debug_value = debug_volume.interpolate_at_index_point(
+    testpoint
+  );
+
+  Volume<3, DataType> host_volume{
+    .m_extent = Extent<3>{10,10,10}
+
+  };
+
+  cudaMalloc(&host_volume.data, host_volume.elements() * sizeof(DataType));
+  cudaMemcpy(host_volume.data, host_data, sizeof(DataType) * source_space.elements(), cudaMemcpyDefault);
+
+  Image<3, DataType> host_image{
+    source_space,
+    host_volume
+  };
+
+
+  DataType* host_result = new DataType[out_elements];
+
+  cudaError_t error;
+
+  DataType* device_interpolated_image = nullptr;
+  error = cudaMalloc(&device_interpolated_image, out_size);
+  ASSERT_EQ(error, cudaSuccess);
+
+  dicomNodeError_t dicomnode_error = SUCCESS;
+
+  dicomnode_error = gpu_interpolation_linear<DataType>(
+    host_image, target_space, device_interpolated_image
+  );
+
+  if(dicomnode_error){
+    error = extract_cuda_error(dicomnode_error);
+    const char* error_name = cudaGetErrorName(error);
+    printf("Encountered %s Trying to launch the kernel\n", error_name);
+  }
+
+  ASSERT_EQ(dicomnode_error, dicomNodeError_t::SUCCESS);
+
+  error = cudaMemcpy(host_result, device_interpolated_image, out_size, cudaMemcpyDefault);
+  ASSERT_EQ(error, cudaSuccess);
+
+  for(uint32_t i = 0; i < out_elements; i++ ){
+    const uint32_t lux = i % ux;
+    const uint32_t luy = (i / ux) % uy;
+    const uint32_t luz = i / (ux * uy);
+
+    const uint32_t lx = lux + 1;
+    const uint32_t ly = luy + 1;
+    const uint32_t lz = luz + 1;
+
+    EXPECT_EQ(
+      host_result[i], host_data[ lz * y * x + ly * x + lx]
+    );
+  }
+
+
+  cudaFree(host_volume.data);
+  cudaFree(device_interpolated_image);
+
+  delete[] host_data;
+  delete[] host_result;
+}
+
 }

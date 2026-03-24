@@ -51,6 +51,17 @@ struct Index {
     return coordinates[idx];
   }
 
+  __device__ __host__ Index<DIMENSIONS> operator+(const Index<DIMENSIONS>& other) const {
+    Index<DIMENSIONS> return_index{coordinates};
+
+    #pragma unroll
+    for (u8 dim = 0; dim < DIMENSIONS; ++dim){
+      return_index[dim] += other[dim];
+    }
+
+    return return_index;
+  }
+
   __device__ __host__ const i32& x() const {
     return coordinates[0];
   }
@@ -64,4 +75,27 @@ struct Index {
     static_assert(DIMENSIONS > 2);
     return coordinates[2];
   }
+
+  constexpr __device__ __host__ bool operator== (const Index<DIMENSIONS>& other) const {
+    #pragma unroll
+    for(u8 i = 0; i < DIMENSIONS; i++){
+      if(coordinates[i] != other[i]){
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
+
+template<u8 DIMENSION>
+__device__ __host__ Index<DIMENSION> dimensional_offset(u8 dimensional_count){
+  Index<DIMENSION> return_index;
+
+  #pragma unroll
+  for (u8 dim = 0; dim < DIMENSION; dim++){
+    return_index[dim] = (dimensional_count >> dim) & 1 ? 1 : 0; // Optimizer will convert bool to
+  }
+
+  return return_index;
+}

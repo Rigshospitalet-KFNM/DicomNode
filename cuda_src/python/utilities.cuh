@@ -189,7 +189,7 @@ namespace {
           cudaMemcpyDefault
         ));
       } | [&](){
-       return cudaMalloc(&(dev_out_image->volume.data), image_size);
+        return cudaMalloc(&(dev_out_image->volume.data), image_size);
       } | [&](){
         return cudaMemcpy(dev_out_image->volume.data, image_buffer.ptr, image_size, cudaMemcpyDefault);
       };

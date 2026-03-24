@@ -16,7 +16,7 @@ namespace {
     python_array<uint32_t> return_array = {};
 
     DicomNodeRunner runner{
-      [&](dicomNodeError_t error){
+      [&](const dicomNodeError_t error){
         std::cout << "Sliced based CCL encountered: " << error_to_human_readable(error) << "\n"
                    << "device_out_labels: " << device_out_labels << "\n"
                    << "Image volume Data: " << image.volume.data << "\n"

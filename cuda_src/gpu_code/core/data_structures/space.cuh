@@ -32,7 +32,12 @@ class Space {
     SquareMatrix<DIMENSIONS> inverted_basis;
     Extent<DIMENSIONS> extent;
 
-  __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
+    /** Transforms an index into the point in side
+     *
+     * @param index
+     * @return
+     */
+    __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
     return point * basis + starting_point;
   }
@@ -49,3 +54,4 @@ class Space {
     return extent.elements();
   }
 };
+

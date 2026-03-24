@@ -24,18 +24,18 @@ struct Extent {
 
   // Default constructor is need because otherwise the next constructor is used
   // which fails as no arguments fails static assert
-  Extent(){}
+  constexpr __device__ __host__ Extent(){}
 
   template<typename... Args>
-  __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
+  constexpr __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
     static_assert(sizeof...(args) == DIMENSIONS);
   };
 
-  __device__ __host__ uint32_t& operator[](const uint8_t i) {
+  constexpr __device__ __host__ uint32_t& operator[](const uint8_t i) {
     return sizes[i];
   }
 
-  __device__ __host__ constexpr const uint32_t& operator[](const uint8_t i) const {
+  constexpr __device__ __host__ const uint32_t& operator[](const uint8_t i) const {
     return sizes[i];
   }
 
@@ -61,7 +61,7 @@ struct Extent {
     return contains(Index({static_cast<int32_t>(args)...}));
   }
 
-  __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS> index) const {
+  __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS>& index) const {
     if(!contains(index)){
       return {};
     }
@@ -136,7 +136,7 @@ struct Extent {
    *
    * @return __device__ the number of elements
    */
-  __device__  __host__ size_t elements() const noexcept {
+  __device__  __host__ constexpr size_t elements() const noexcept {
     size_t size = 1;
 
     #pragma unroll

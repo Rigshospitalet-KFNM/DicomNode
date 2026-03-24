@@ -343,8 +343,6 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     self.assertTrue((arr==cpu_version.raw).all())
 
-
-
   def test_cpp_incrementByInterpolation(self):
     shape = (4,4,4)
     data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
@@ -362,3 +360,38 @@ class GPUInterpolationTest(DicomnodeTestCase):
     success, stuff = _cpp.interpolation.linear(image, out_space)
 
     self.assertTrue((stuff == out.raw).all())
+
+  @skipIf(not CUDA, "Need GPU for this test")
+  def test_gpu_interpolation_with_image_instead_of_texture(self):
+    from dicomnode.math import _cuda
+
+    shape = (4,4,4)
+    data = (2 * numpy.arange(numpy.prod(shape), dtype=numpy.float32) + 1).reshape(shape)
+    image = Image(data, Space(numpy.eye(3), (0,0,0), shape))
+
+    out_shape = (3,3,3)
+    out_space = Space(numpy.eye(3, dtype=numpy.float32), (0.5,0,0), out_shape)
+
+    s, out = _cuda.interpolation.linear_image(
+      image, out_space
+    )
+
+    self.assertFalse(s)
+    self.assertTrue((out==(data[:3,:3,:3] + 1)).all())
+
+  @skipIf(not CUDA, "Need GPU for gpu test")
+  def test_interpolation_gpu_large_image(self):
+    from dicomnode.math import _cuda
+    # This is ~0.1s on my machine, dedicated hardware ftw
+    shape = (100, 400, 400)
+
+    data = numpy.arange(numpy.prod(shape), dtype=numpy.float32).reshape(shape)
+
+    space = Space(numpy.eye(3, dtype=numpy.float32), [0,0,0], shape)
+
+    image = Image(data, space)
+
+    error, arr = _cuda.interpolation.linear_image(image, space)
+
+    self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
+    self.assertTrue((arr == data).all())

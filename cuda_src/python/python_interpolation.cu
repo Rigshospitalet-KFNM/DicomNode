@@ -81,6 +81,69 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   return {runner.error(), out_array};
 }
 
+template<typename T>
+std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image(
+  const pybind11::object& image,
+  const pybind11::object& new_space
+){
+  Space<3> destination_space;
+  dicomNodeError_t error = load_space(&destination_space, new_space);
+  if (error){
+    return {error , python_array<T>(1)};
+  }
+  const size_t image_size = get_image_size<T>(image);
+  const size_t out_image_size = get_image_size<T>(new_space);
+
+  if(!out_image_size){
+    return {dicomNodeError_t::INPUT_TYPE_ERROR, python_array<T>(1)};
+  }
+  const size_t out_image_elements = out_image_size / sizeof(T);
+
+  const size_t shape[3] = {
+    destination_space.extent[0],
+    destination_space.extent[1],
+    destination_space.extent[2]
+  };
+  const size_t strides[3] = {
+    destination_space.extent[1] * destination_space.extent[2] * sizeof(T),
+    destination_space.extent[2] * sizeof(T),
+    sizeof(T)
+  };
+
+  pybind11::array_t<T> out_array(shape, strides);
+  pybind11::buffer_info out_buffer = out_array.request(true);
+
+  Image<3, T> host_image;
+  T* device_out_image = nullptr;
+
+  auto error_function = [&](dicomNodeError_t _){
+    std::cout << "Error Trigger!\n";
+    free_image<T>(&host_image);
+    free_device_memory(&device_out_image);
+  };
+
+  DicomNodeRunner runner{error_function};
+  runner
+    | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
+    | [&](){ return load_image<T>(&host_image, image); }
+    | [&](){ return cudaMalloc(&device_out_image, out_image_size);}
+    | [&](){ return gpu_interpolation_linear(
+      host_image, std::cref(destination_space), device_out_image
+    );}
+    | [&](){
+      return cudaMemcpy(out_buffer.ptr, device_out_image, out_image_size, cudaMemcpyDefault);
+    }
+    | [&](){
+      return free_image<T>(&host_image);}
+    | [&](){
+      free_device_memory(&device_out_image);
+      return dicomNodeError_t::SUCCESS;
+    };
+
+  return {runner.error(), out_array};
+}
+
+
 std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
     const pybind11::object& image,
     const pybind11::object& new_space
@@ -110,6 +173,36 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
   throw std::runtime_error(error_message);
 }
 
+std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear_image(
+    const pybind11::object& image,
+    const pybind11::object& new_space
+  ){
+  const pybind11::array& raw_image = image.attr("raw");
+  const pybind11::dtype& image_dtype = raw_image.dtype();
+
+  //Switch statement doesn't work because I am comparing strings
+  if(image_dtype.equal(pybind11::dtype::of<f32>())){
+    return interpolate_linear_templated_image<f32>(image, new_space);
+  } else if (image_dtype.equal(pybind11::dtype::of<u8>()) ) {
+    return interpolate_linear_templated_image<u8>(image, new_space);
+  } if (image_dtype.equal(pybind11::dtype::of<u16>())) {
+    return interpolate_linear_templated_image<u16>(image, new_space);
+  } if (image_dtype.equal(pybind11::dtype::of<u32>())) {
+    return interpolate_linear_templated_image<u32>(image, new_space);
+  } else if (image_dtype.equal(pybind11::dtype::of<i8>())) {
+    return interpolate_linear_templated_image<i8>(image, new_space);
+  } if (image_dtype.equal(pybind11::dtype::of<i16>())) {
+    return interpolate_linear_templated_image<i16>(image, new_space);
+  } if (image_dtype.equal(pybind11::dtype::of<i32>())) {
+    return interpolate_linear_templated_image<i32>(image, new_space);
+  }
+
+  const std::string dtype = pybind11::str(raw_image.attr("dtype"));
+  const std::string error_message = "Unsupported dtype:" + dtype;
+  throw std::runtime_error(error_message);
+}
+
+
 void apply_interpolation_module(pybind11::module& m){
   pybind11::module sub_module = m.def_submodule(
     "interpolation",
@@ -117,4 +210,5 @@ void apply_interpolation_module(pybind11::module& m){
   );
 
   sub_module.def("linear", &interpolate_linear);
+  sub_module.def("linear_image", &interpolate_linear_image);
 }

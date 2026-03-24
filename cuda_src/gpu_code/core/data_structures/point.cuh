@@ -1,3 +1,5 @@
+#pragma once
+
 #include"../declarations.cuh"
 
 #include<cuda/std/utility>

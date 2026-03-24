@@ -38,8 +38,10 @@ std::tuple<dicomNodeError_t, python_array<f32>> registration(
       return cudaMalloc(&gpu_destination_image, sizeof(Image<3, f32>));
     } | [&](){
       return load_image<f32>(gpu_source_image, source_image);
-    } | [&](){
+    } | [&]() {
       return load_image<f32>(gpu_destination_image, destination_image);
+    } | [&](){
+      return REGISTRATION::register_to(gpu_source_image, gpu_destination_image);
     } | [&](){
       return free_image(gpu_source_image);
     } | [&](){

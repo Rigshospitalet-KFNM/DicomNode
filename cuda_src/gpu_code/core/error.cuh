@@ -6,7 +6,6 @@
 
 constexpr uint32_t cudaErrorFlag = 0x80000000;
 
-
 /**
  * @brief This is the enum of all the errors that can happen using this library
  * Note that this is not an exhaustive list of valid dicomnodeError_t values
@@ -48,16 +47,22 @@ static std::string error_to_human_readable(const dicomNodeError_t error) noexcep
 
   switch (error){
     case NON_POSITIVE_SHAPE:
-      return "None positive shape of extent";
+      return std::string("None positive shape of extent");
     case NOT_LINEAR_INDEPENDENT:
-      return "Not linear independent matrix";
+      return std::string("Not linear independent matrix");
     case INPUT_SIZE_MISMATCH:
-      return "Input sizes mismatching";
+      return std::string("Input sizes mismatching");
     case ALREADY_ALLOCATED_OBJECT:
-      return "Already allocated object";
+      return std::string("Already allocated object");
     default:
       const std::string error_message = "unknown error of code: "
           + std::to_string(static_cast<uint32_t>(error));
       return error_message;
   }
+}
+
+static void print_error(const dicomNodeError_t error) {
+  std::string error_string = error_to_human_readable(error);
+
+  std::cout << "Encountered: " << error_string << "\n";
 }

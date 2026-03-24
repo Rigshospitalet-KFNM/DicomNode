@@ -21,3 +21,6 @@ def linear(source: Image, target: Space) -> Tuple[DicomnodeError, ndarray]:
 
   """
   ...
+
+def linear_image(source: Image, target: Space) -> Tuple[DicomnodeError, ndarray]:
+  ...

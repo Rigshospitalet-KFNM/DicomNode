@@ -76,8 +76,8 @@ class DicomNodeRunner{
   public:
     DicomNodeRunner() : m_error_function([](dicomNodeError_t _){}){}
 
-    DicomNodeRunner(std::function<void(dicomNodeError_t)> error_funciton)
-    : m_error_function(error_funciton) {}
+    DicomNodeRunner(std::function<void(dicomNodeError_t)> error_function)
+    : m_error_function(std::move(error_function)) {}
 
   DicomNodeRunner& operator|(std::function<cudaError_t()> func){
     if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
@@ -136,10 +136,14 @@ static std::tuple<cudaError_t, cudaDeviceProp> get_current_device(){
 }
 
 template<class R, class... Args>
-int32_t maximize_shared_memory(R (kernel)(Args...)){
+i32 maximize_shared_memory(R (kernel)(Args...)){
   auto [error, dev_prop] = get_current_device();
   if (error == cudaSuccess && dev_prop.major >= 7){
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, dev_prop.sharedMemPerBlockOptin);
   }
   return dev_prop.sharedMemPerBlockOptin;
+}
+
+static __device__ u64 get_gid(){
+  return blockDim.x * blockIdx.x + threadIdx.x;
 }
