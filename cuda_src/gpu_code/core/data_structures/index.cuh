@@ -4,6 +4,8 @@
 
 #include"../declarations.cuh"
 
+using FlatIndex = cuda::std::optional<u64>;
+
 /**
  * @brief An index in X,Y,Z,... coordinates
  *

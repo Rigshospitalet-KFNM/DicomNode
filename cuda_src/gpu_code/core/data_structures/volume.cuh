@@ -78,4 +78,47 @@ struct Volume {
   }
 };
 
+template<typename T>
+__device__ __host__ Volume<3, T> sub_volume(
+    const Volume<3, T> orginal_volume,
+    T* sub_volume_data_ptr,
+    Extent<3> new_extent,
+    const Index<3>& offset_index
+  ){
+
+  #ifdef __CUDA_ARCH__
+
+  for(u64 flat_index = threadIdx.x; flat_index < new_extent.elements(); flat_index += blockDim.x){
+    const Index<3> local_index = new_extent.from_flat_index(flat_index);
+    const Index<3> original_index = offset_index + local_index;
+
+    sub_volume_data_ptr[flat_index] = orginal_volume.at(original_index);
+
+  }
+  __syncthreads();
+  #else
+
+  for( i32 z = 0; z < new_extent.z(); z++){
+    for( i32 y = 0; y < new_extent.y(); y++){
+      for( i32 x = 0; x < new_extent.x(); x++){
+        Index<3> local_index{x,y,z};
+        Index<3> global_index = local_index + offset_index;
+        FlatIndex local_flat_index = new_extent.flat_index(local_index);
+
+        if(local_flat_index.has_value()){
+          sub_volume_data_ptr[*local_flat_index] = orginal_volume.at(global_index);
+        }
+      }
+    }
+  }
+
+  #endif
+
+  return {
+    .data=sub_volume_data_ptr,
+    .m_extent=new_extent,
+    .default_value=orginal_volume.default_value
+  };
+}
+
 //static_assert(CVolume<Volume, 3, float>, "Volume doesn't fulfill volume concepts");

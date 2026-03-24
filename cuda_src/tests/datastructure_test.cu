@@ -2,6 +2,8 @@
 
 #include<gtest/gtest.h>
 
+#include<vector>
+
 #include<cuda/std/array>
 
 #include"../gpu_code/dicom_node_gpu.cuh"
@@ -298,5 +300,120 @@ TEST(IMAGE, CUDA_POINT_INDEXING){
   cudaFree(dev_outs);
   cudaFree(dev_points);
 }
+
+} // end of namespace
+
+namespace TEST_VOLUME {
+
+
+TEST(VOLUME, SUB_VOLUME_HOST){
+  constexpr static u32 z = 4;
+  constexpr static u32 y = 4;
+  constexpr static u32 x = 4;
+  constexpr static Extent<3> extent{z,y,x};
+
+
+  std::array<f32, extent.elements()> data = {{
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0
+  }};
+
+  Volume<3, f32> og_volume{
+    .data=data.data(),
+    .m_extent=extent,
+    .default_value=-1.0f
+  };
+
+  Extent<3> new_extent{2,2,2};
+  Index<3> offset_index{1,1,1};
+  std::array<f32, 8> result_data;
+
+  auto the_sub_volume = sub_volume(
+    og_volume,
+    result_data.data(),
+    new_extent,
+    offset_index
+  );
+
+  EXPECT_FLOAT_EQ(result_data[0],1.0f);
+  EXPECT_FLOAT_EQ(result_data[1],1.0f);
+  EXPECT_FLOAT_EQ(result_data[2],1.0f);
+  EXPECT_FLOAT_EQ(result_data[3],1.0f);
+
+  EXPECT_FLOAT_EQ(result_data[4],2.0f);
+  EXPECT_FLOAT_EQ(result_data[5],2.0f);
+  EXPECT_FLOAT_EQ(result_data[6],2.0f);
+  EXPECT_FLOAT_EQ(result_data[7],2.0f);
+}
+
+
+__global__ void sub_volume_gpu_kernel(Volume<3, f32> volume, f32* out, Extent<3> new_extent, Index<3> offset){
+  sub_volume(
+    volume, out, new_extent, offset
+  );
+}
+
+TEST(VOLUME, SUB_VOLUME_GPU){
+  constexpr static u32 z = 32;
+  constexpr static u32 y = 32;
+  constexpr static u32 x = 32;
+  constexpr static Extent<3> extent{z,y,x};
+
+
+  std::vector<f32> data(extent.elements());
+
+  f32 row_count = 0.0f;
+
+  for(u32 zz = 0; zz < z; zz++){
+    row_count += 1.0f;
+
+    for(u32 xy = 0; xy < x * y; xy++){
+      data[x * y * zz + xy] = row_count;
+    }
+  }
+
+  Volume<3, f32> og_volume{
+    .data=data.data(),
+    .m_extent=extent,
+    .default_value=-1.0f
+  };
+
+
+  Volume<3, f32> ghost_volume{
+    .data=nullptr,
+    .m_extent=extent,
+    .default_value=-1.0f
+  };
+
+  cudaMalloc(&(ghost_volume.data), sizeof(f32) * extent.elements());
+  cudaMemcpy(ghost_volume.data, data.data(), sizeof(f32) * extent.elements(), cudaMemcpyDefault);
+
+  f32* dev_out_pointer = nullptr;
+  cudaMalloc(&dev_out_pointer, sizeof(f32) * extent.elements());
+
+  Extent<3> new_extent{8,8,8};
+  Index<3> offset{8,8,8};
+
+  sub_volume_gpu_kernel<<<1, 1024>>>(ghost_volume, dev_out_pointer, new_extent, offset);
+  EXPECT_EQ(cudaSuccess, cudaGetLastError());
+}
+
 
 } // end of namespace
