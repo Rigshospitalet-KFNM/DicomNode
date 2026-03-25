@@ -7,19 +7,6 @@ using Point3 = Point<3>;
 
 
 TEST(SPACE_INDEXING, REAL_LIFE_1){
-  const Space3 dest_space{
-    .starting_point = {-362.4010009765625f,-546.052978515625f, -805.7930297851562f},
-    .basis = {1.649999976158142f, 0.0f, 0.0f,
-              0.0f, 1.649999976158142f, 0.0f,
-              0.0f, 0.0f, 1.6455700397491455f},
-    .inverted_basis = {
-      0.60606061f, 0.0f, 0.0f,
-      0.0f , 0.60606061f, 0.0f,
-      0.0f , 0.0f, 0.60769215f
-    },
-    .extent = {645,440,440}
-  };
-
   const float host_basis_xy_length = 1.5234375f;
 
   const Space3 host_space{

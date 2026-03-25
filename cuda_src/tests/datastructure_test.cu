@@ -363,6 +363,7 @@ TEST(VOLUME, SUB_VOLUME_HOST){
   EXPECT_FLOAT_EQ(result_data[7],2.0f);
 }
 
+constexpr u64 ImageSize = sizeof(Image<3, f32>);
 
 __global__ void sub_volume_gpu_kernel(Volume<3, f32> volume, f32* out, Extent<3> new_extent, Index<3> offset){
   sub_volume(
@@ -370,24 +371,34 @@ __global__ void sub_volume_gpu_kernel(Volume<3, f32> volume, f32* out, Extent<3>
   );
 }
 
-TEST(VOLUME, SUB_VOLUME_GPU){
-  constexpr static u32 z = 32;
-  constexpr static u32 y = 32;
-  constexpr static u32 x = 32;
+TEST(VOLUME, SUB_VOLUME_GPU_SMALL){
+  constexpr static u32 z = 4;
+  constexpr static u32 y = 4;
+  constexpr static u32 x = 4;
   constexpr static Extent<3> extent{z,y,x};
 
 
-  std::vector<f32> data(extent.elements());
+  std::array<f32, extent.elements()> data = {{
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
 
-  f32 row_count = 0.0f;
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
 
-  for(u32 zz = 0; zz < z; zz++){
-    row_count += 1.0f;
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
 
-    for(u32 xy = 0; xy < x * y; xy++){
-      data[x * y * zz + xy] = row_count;
-    }
-  }
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0
+  }};
 
   Volume<3, f32> og_volume{
     .data=data.data(),
@@ -402,17 +413,118 @@ TEST(VOLUME, SUB_VOLUME_GPU){
     .default_value=-1.0f
   };
 
-  cudaMalloc(&(ghost_volume.data), sizeof(f32) * extent.elements());
-  cudaMemcpy(ghost_volume.data, data.data(), sizeof(f32) * extent.elements(), cudaMemcpyDefault);
+  CUDA_CHECK(cudaMalloc(&(ghost_volume.data), sizeof(f32) * extent.elements()));
+  CUDA_CHECK(cudaMemcpy(ghost_volume.data, data.data(), sizeof(f32) * extent.elements(), cudaMemcpyDefault));
 
   f32* dev_out_pointer = nullptr;
-  cudaMalloc(&dev_out_pointer, sizeof(f32) * extent.elements());
+  Extent<3> new_extent{2,2,2};
+  Index<3> offset{1,1,1};
 
-  Extent<3> new_extent{8,8,8};
-  Index<3> offset{8,8,8};
+  const u64 out_size = sizeof(f32) * new_extent.elements();
+  CUDA_CHECK(cudaMalloc(&dev_out_pointer, out_size));
 
   sub_volume_gpu_kernel<<<1, 1024>>>(ghost_volume, dev_out_pointer, new_extent, offset);
   EXPECT_EQ(cudaSuccess, cudaGetLastError());
+
+  std::vector<f32> host_out(new_extent.elements());
+
+  CUDA_CHECK(cudaMemcpy(
+    host_out.data(),
+    dev_out_pointer,
+    out_size,
+    cudaMemcpyDefault
+  ));
+
+  EXPECT_FLOAT_EQ(host_out[0],1.0f);
+  EXPECT_FLOAT_EQ(host_out[1],1.0f);
+  EXPECT_FLOAT_EQ(host_out[2],1.0f);
+  EXPECT_FLOAT_EQ(host_out[3],1.0f);
+
+  EXPECT_FLOAT_EQ(host_out[4],2.0f);
+  EXPECT_FLOAT_EQ(host_out[5],2.0f);
+  EXPECT_FLOAT_EQ(host_out[6],2.0f);
+  EXPECT_FLOAT_EQ(host_out[7],2.0f);
+
+  cudaFree(ghost_volume.data);
+  cudaFree(dev_out_pointer);
+}
+
+TEST(VOLUME, SUB_VOLUME_GPU_SMALL_OUTSIDE){
+  constexpr static u32 z = 4;
+  constexpr static u32 y = 4;
+  constexpr static u32 x = 4;
+  constexpr static Extent<3> extent{z,y,x};
+
+
+  std::array<f32, extent.elements()> data = {{
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+    2.0, 2.0, 2.0, 2.0,
+
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0
+  }};
+
+  Volume<3, f32> og_volume{
+    .data=data.data(),
+    .m_extent=extent,
+    .default_value=-1.0f
+  };
+
+
+  Volume<3, f32> ghost_volume{
+    .data=nullptr,
+    .m_extent=extent,
+    .default_value=-1.0f
+  };
+
+  CUDA_CHECK(cudaMalloc(&(ghost_volume.data), sizeof(f32) * extent.elements()));
+  CUDA_CHECK(cudaMemcpy(ghost_volume.data, data.data(), sizeof(f32) * extent.elements(), cudaMemcpyDefault));
+
+  f32* dev_out_pointer = nullptr;
+  Extent<3> new_extent{2,2,2};
+  Index<3> offset{3,3,3};
+
+  const u64 out_size = sizeof(f32) * new_extent.elements();
+  CUDA_CHECK(cudaMalloc(&dev_out_pointer, out_size));
+
+  sub_volume_gpu_kernel<<<1, 1024>>>(ghost_volume, dev_out_pointer, new_extent, offset);
+  EXPECT_EQ(cudaSuccess, cudaGetLastError());
+
+  std::vector<f32> host_out(new_extent.elements());
+
+  CUDA_CHECK(cudaMemcpy(
+    host_out.data(),
+    dev_out_pointer,
+    out_size,
+    cudaMemcpyDefault
+  ));
+
+  EXPECT_FLOAT_EQ(host_out[0],3.0f);
+  EXPECT_FLOAT_EQ(host_out[1],-1.0f);
+  EXPECT_FLOAT_EQ(host_out[2],-1.0f);
+  EXPECT_FLOAT_EQ(host_out[3],-1.0f);
+
+  EXPECT_FLOAT_EQ(host_out[4],-1.0f);
+  EXPECT_FLOAT_EQ(host_out[5],-1.0f);
+  EXPECT_FLOAT_EQ(host_out[6],-1.0f);
+  EXPECT_FLOAT_EQ(host_out[7],-1.0f);
+
+  cudaFree(ghost_volume.data);
+  cudaFree(dev_out_pointer);
 }
 
 

@@ -80,7 +80,7 @@ struct Volume {
 
 template<typename T>
 __device__ __host__ Volume<3, T> sub_volume(
-    const Volume<3, T> orginal_volume,
+    const Volume<3, T>& original_volume,
     T* sub_volume_data_ptr,
     Extent<3> new_extent,
     const Index<3>& offset_index
@@ -92,7 +92,7 @@ __device__ __host__ Volume<3, T> sub_volume(
     const Index<3> local_index = new_extent.from_flat_index(flat_index);
     const Index<3> original_index = offset_index + local_index;
 
-    sub_volume_data_ptr[flat_index] = orginal_volume.at(original_index);
+    sub_volume_data_ptr[flat_index] = original_volume.at(original_index);
 
   }
   __syncthreads();
@@ -106,7 +106,7 @@ __device__ __host__ Volume<3, T> sub_volume(
         FlatIndex local_flat_index = new_extent.flat_index(local_index);
 
         if(local_flat_index.has_value()){
-          sub_volume_data_ptr[*local_flat_index] = orginal_volume.at(global_index);
+          sub_volume_data_ptr[*local_flat_index] = original_volume.at(global_index);
         }
       }
     }
@@ -117,7 +117,7 @@ __device__ __host__ Volume<3, T> sub_volume(
   return {
     .data=sub_volume_data_ptr,
     .m_extent=new_extent,
-    .default_value=orginal_volume.default_value
+    .default_value=original_volume.default_value
   };
 }
 

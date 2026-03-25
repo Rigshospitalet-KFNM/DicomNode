@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(dicomnode_c LANGUAGES CUDA CXX)
 
-
 include(FetchContent)
 include(ProcessorCount)
 
@@ -89,7 +88,7 @@ if(CMAKE_CUDA_COMPILER)
                       ${CUDA_OBJECT_TARGETS}
   )
 
-  target_compile_options(_cuda PRIVATE -O3 -g)
+  target_compile_options(_cuda PRIVATE -O3)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
   target_compile_options(_cuda PRIVATE -Wno-deprecated-gpu-targets)
   target_precompile_headers(
@@ -124,6 +123,11 @@ if(CMAKE_CUDA_COMPILER)
     enable_testing()
 
     add_executable(cu_tests test_initiator.cu)
+
+    target_compile_options(
+      cu_tests PUBLIC -g
+    )
+
     target_link_libraries(
       cu_tests
       GTest::gtest_main
@@ -131,8 +135,8 @@ if(CMAKE_CUDA_COMPILER)
       Python::Python
       utilities
     )
-    #include(GoogleTest)
-    #gtest_discover_tests(cu_tests)
+    include(GoogleTest)
+    gtest_discover_tests(cu_tests)
     #  # Sadly Coverage for GPU code is not supported...
     #  # https://docs.nvidia.com/cuda/cuda-features-archive/index.html#bullseye-support
 

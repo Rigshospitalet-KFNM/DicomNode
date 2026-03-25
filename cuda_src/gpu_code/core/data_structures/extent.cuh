@@ -1,13 +1,13 @@
 #pragma once
 
-#include<stdint.h>
+
 #include<vector>
 #include<array>
 
 #include<cuda/std/optional>
 
 #include"../declarations.cuh"
-#include"../concepts.cuh"
+#include"../grid.cuh"
 
 //namespace dicomnode {
 
@@ -24,7 +24,7 @@ struct Extent {
 
   // Default constructor is need because otherwise the next constructor is used
   // which fails as no arguments fails static assert
-  constexpr __device__ __host__ Extent(){}
+  constexpr Extent() = default;
 
   template<typename... Args>
   constexpr __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
@@ -45,7 +45,7 @@ struct Extent {
    * @param index
    * @return __device__
    */
-  __device__ __host__ inline bool contains(const Index<DIMENSIONS> index) const {
+  constexpr __device__ __host__ bool contains(const Index<DIMENSIONS> index) const {
     bool in = true;
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
@@ -56,12 +56,12 @@ struct Extent {
   }
 
   template<typename... Args>
-  __device__ __host__ inline bool contains(const Args... args) const {
+  constexpr __device__ __host__ bool contains(const Args... args) const {
     static_assert(sizeof...(args) == DIMENSIONS);
     return contains(Index({static_cast<int32_t>(args)...}));
   }
 
-  __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS>& index) const {
+  constexpr __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS>& index) const {
     if(!contains(index)){
       return {};
     }
@@ -79,7 +79,7 @@ struct Extent {
   }
 
   template<typename... Args>
-  __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Args... args) const {
+  constexpr __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Args... args) const {
     static_assert(sizeof...(args) == DIMENSIONS);
     Index index = Index<DIMENSIONS>(args...);
 
@@ -101,33 +101,33 @@ struct Extent {
     return Index<DIMENSIONS>(coordinates);
   }
 
-  __device__ __host__ const u32& x() const noexcept {
+  constexpr __device__ __host__ const u32& x() const noexcept {
     return sizes[DIMENSIONS - 1];
   }
 
-  __device__ __host__ const u32& y() const noexcept{
+  constexpr __device__ __host__ const u32& y() const noexcept{
     static_assert(DIMENSIONS > 1);
     return sizes[DIMENSIONS - 2];
   }
 
-  __device__ __host__ const u32& z() const noexcept {
+  constexpr __device__ __host__ const u32& z() const noexcept {
     static_assert(DIMENSIONS > 2);
     return sizes[DIMENSIONS - 3];
   }
 
-  __device__ __host__ constexpr u32* begin() noexcept{
+  constexpr __device__ __host__ u32* begin() noexcept{
     return &sizes[0];
   }
 
-  __device__ __host__ constexpr u32* end() noexcept{
+  constexpr __device__ __host__ u32* end() noexcept{
     return &sizes[DIMENSIONS - 1];
   }
 
-  __device__ __host__ constexpr const u32* begin() const noexcept{
+  constexpr __device__ __host__ const u32* begin() const noexcept{
     return &sizes[0];
   }
 
-  __device__ __host__ constexpr const u32* end() const noexcept{
+  constexpr __device__ __host__ const u32* end() const noexcept{
     return &sizes[DIMENSIONS - 1];
   }
 
@@ -136,7 +136,7 @@ struct Extent {
    *
    * @return __device__ the number of elements
    */
-  __device__  __host__ constexpr size_t elements() const noexcept {
+  constexpr __device__  __host__ size_t elements() const noexcept {
     size_t size = 1;
 
     #pragma unroll
@@ -147,7 +147,7 @@ struct Extent {
     return size;
   }
 
-  constexpr u8 dimensionality() const {
+   [[nodiscard]] constexpr static u8 dimensionality() {
     return DIMENSIONS;
   }
 
@@ -168,7 +168,7 @@ struct Extent {
   }
 
   template<u8 ARRAY_SIZE>
-  __host__ dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
+  [[nodiscard]] __host__ dicomNodeError_t set_dimensions(const std::array<ssize_t, ARRAY_SIZE>& dims){
     static_assert(ARRAY_SIZE == DIMENSIONS);
 
     for(u8 i = 0; const ssize_t& dim : dims){
@@ -178,9 +178,20 @@ struct Extent {
       sizes[i] = dim;
       i++;
     }
+    return dicomNodeError_t::SUCCESS;
   }
+
 };
 
 //static_assert(CExtent<Extent, 3>); // I think there's some template magic wrong here
 
 //}
+
+template<dim3 THREAD_BLOCK>
+dim3 get_envelope_grid(const Extent<3> extent) {
+  return dim3{
+    envelope_length<THREAD_BLOCK.x>(extent.x()),
+    envelope_length<THREAD_BLOCK.y>(extent.y()),
+    envelope_length<THREAD_BLOCK.z>(extent.z()),
+  };
+}

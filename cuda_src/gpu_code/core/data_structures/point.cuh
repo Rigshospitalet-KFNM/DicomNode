@@ -13,40 +13,39 @@ template<uint8_t DIMENSIONS>
 struct Point {
   float points[DIMENSIONS]{};
 
-  Point<DIMENSIONS>() noexcept = default;
-
+  Point() noexcept = default;
 
   template<typename T, size_t... idx_seq>
-  __device__ __host__ Point<DIMENSIONS>(
+  constexpr __device__ __host__ Point(
     const T& arr, cuda::std::index_sequence<idx_seq...>
   ) noexcept : points{static_cast<float>(arr[idx_seq])...} {}
 
-  __device__ __host__ Point<DIMENSIONS>(Index<DIMENSIONS> idx)
+  constexpr __device__ __host__ Point(Index<DIMENSIONS> idx)
     : Point(idx.coordinates, cuda::std::make_index_sequence<DIMENSIONS>{}) {}
 
   template<typename... Args>
-  __device__ __host__ Point<DIMENSIONS>(Args... args) noexcept
+  constexpr __device__ __host__ Point(Args... args) noexcept
     : points{static_cast<float>(args)...} {
     static_assert(sizeof...(args) == DIMENSIONS);
   }
 
   template<typename T>
-  __device__ __host__ f32& operator[](const T i){
+  constexpr __device__ __host__ f32& operator[](const T i){
     return points[i];
   }
 
   template<typename T>
-  __device__ __host__ volatile f32& operator[](const T i) volatile {
+  constexpr __device__ __host__ volatile f32& operator[](const T i) volatile {
     return points[i];
   }
 
   template<typename T>
-  __device__ __host__ const f32& operator[](const T i) const {
+  constexpr __device__ __host__ const f32& operator[](const T i) const {
     return points[i];
   }
 
-  __device__ __host__ Point<DIMENSIONS> operator*(const SquareMatrix<DIMENSIONS>& m){
-    Point<DIMENSIONS> v; // It's zero initialized!
+  constexpr __device__ __host__ Point operator*(const SquareMatrix<DIMENSIONS>& m){
+    Point v; // It's zero initialized!
     #pragma unroll
     for(u8 j = 0; j < DIMENSIONS; j++){
       #pragma unroll
@@ -58,8 +57,8 @@ struct Point {
     return v;
   }
 
-  __device__ __host__ Point<DIMENSIONS> operator-(const Point<DIMENSIONS>& other) const {
-    Point<DIMENSIONS> v; // It's zero initialized!
+  constexpr __device__ __host__ Point operator-(const Point& other) const {
+    Point v; // It's zero initialized!
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
       v[i] = points[i] - other[i];

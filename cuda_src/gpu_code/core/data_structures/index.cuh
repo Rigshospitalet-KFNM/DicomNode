@@ -101,3 +101,19 @@ __device__ __host__ Index<DIMENSION> dimensional_offset(u8 dimensional_count){
 
   return return_index;
 }
+
+__device__ inline Index<3> get_gidx() {
+  return Index<3>{
+    blockDim.x * blockIdx.x + threadIdx.x,
+    blockDim.y * blockIdx.y + threadIdx.y,
+    blockDim.z * blockIdx.z + threadIdx.z
+  };
+}
+
+__device__ inline Index<3> get_local_index() {
+  return Index<3>{
+    threadIdx.x,
+    threadIdx.y,
+    threadIdx.z
+  };
+}

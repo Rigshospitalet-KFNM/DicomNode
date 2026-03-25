@@ -29,8 +29,8 @@ class Image {
     Space<DIMENSIONS> space;
     Volume<DIMENSIONS, T> volume;
 
-  Image(){}
-  Image(Space<DIMENSIONS> a_space, Volume<DIMENSIONS, T> v_volume):
+  __device__ __host__ Image(){}
+  __device__ __host__ Image(Space<DIMENSIONS> a_space, Volume<DIMENSIONS, T> v_volume):
     space(std::move(a_space)),
     volume(std::move(v_volume))
   {}
@@ -51,7 +51,7 @@ class Image {
     return space.extent.sizes[2];
   }
 
-  size_t elements() const {
+  constexpr size_t elements() const {
     return volume.elements();
   }
 };

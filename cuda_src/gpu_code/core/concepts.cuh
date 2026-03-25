@@ -1,7 +1,5 @@
 #pragma once
 #include<concepts>
-#include<stdint.h>
-#include<type_traits>
 
 #include"declarations.cuh"
 

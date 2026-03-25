@@ -46,7 +46,7 @@ class Space {
     return (point - starting_point) * inverted_basis;
   }
 
-  __device__ __host__ Index<DIMENSIONS> index(const uint64_t& flat_index) const {
+  __device__ __host__ Index<DIMENSIONS> index(const u64& flat_index) const {
     return extent.from_flat_index(flat_index);
   }
 
@@ -54,4 +54,18 @@ class Space {
     return extent.elements();
   }
 };
+
+
+__device__ __host__ inline Space<3> offset_space(
+    const Space<3>& original_space,
+    const Extent<3>& new_extent,
+    const Index<3>& offset
+) {
+  return Space{
+      .starting_point=original_space.at_index(offset),
+      .basis=original_space.basis,
+      .inverted_basis=original_space.inverted_basis,
+      .extent=new_extent
+    };
+}
 

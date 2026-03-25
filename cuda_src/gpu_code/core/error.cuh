@@ -6,6 +6,14 @@
 
 constexpr uint32_t cudaErrorFlag = 0x80000000;
 
+#define CUDA_CHECK(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
+static void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
+   if (stat != cudaSuccess) {
+      fprintf(stderr, "CUDA Error: %s %s %d\n", cudaGetErrorString(stat), file, line);
+   }
+}
+
+
 /**
  * @brief This is the enum of all the errors that can happen using this library
  * Note that this is not an exhaustive list of valid dicomnodeError_t values

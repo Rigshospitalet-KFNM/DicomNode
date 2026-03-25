@@ -11,8 +11,7 @@
  */
 #pragma once
 
-
-#include<stdint.h>
+#include<cstdint>
 
 using u8  = uint8_t;
 using u16 = uint16_t;
@@ -41,3 +40,5 @@ struct SquareMatrix;
 
 template<u8 DIMENSIONS>
 class Space;
+
+constexpr dim3 THREAD_BLOCK_3D = dim3(32,8,4);
