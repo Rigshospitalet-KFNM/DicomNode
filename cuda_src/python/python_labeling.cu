@@ -1,4 +1,5 @@
 #include"../gpu_code/dicom_node_gpu.cuh"
+#include"../gpu_code/labeling.cuh"
 
 #include"utilities.cuh"
 

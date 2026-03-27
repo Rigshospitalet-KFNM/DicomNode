@@ -461,6 +461,130 @@ __global__ void reduce_kernel(T_IN* src,
   }
 }
 
+  template<uint8_t CHUNK, typename OP, typename T_OUT,  typename... Args>
+  requires MappingBinaryOperator<OP, T_OUT, Args...>
+__global__ void reduce_kernel_no_src(
+                       T_OUT* dst,
+                       const size_t N,
+                       volatile Flag* flags,
+                       volatile T_OUT* aggregates,
+                       volatile T_OUT* inclusive_prefixes,
+                       uint32_t* counter,
+                       Args... args
+                     ){
+  extern __shared__ char shared_memory[];
+  volatile T_OUT* shared_input = (T_OUT*)shared_memory;
+  volatile FlagVal<T_OUT, OP>* shared_flags = (FlagVal<T_OUT, OP>*)shared_memory;
+
+
+  // Registers
+  T_OUT chunk_registers[CHUNK];
+  const uint32_t blockId = get_shared_id(counter);
+  __threadfence();
+
+  if(threadIdx.x == 0){
+    flags[blockId] = STATUS_INVALID;
+    aggregates[blockId] = OP::identity();
+    inclusive_prefixes[blockId] = OP::identity();
+  }
+
+  __threadfence();
+  __syncthreads();
+
+  {
+    const size_t global_offset = blockId * blockDim.x * CHUNK;
+
+    map_into_shared_memory_no_mem<CHUNK, OP, T_OUT, Args...>(shared_input, N, global_offset, args...);
+  } // Remove the Global offset register
+
+  {
+    chunk_registers[0] = OP::remove_volatile(shared_input[threadIdx.x * CHUNK]);
+    #pragma unroll
+    for(uint8_t i = 1; i < CHUNK; i++){
+      chunk_registers[i] = OP::apply(chunk_registers[i - 1],
+                                     OP::remove_volatile(shared_input[threadIdx.x * CHUNK + i])
+      );
+    }
+
+    __syncthreads();
+    // Overwrite Shared memory
+    shared_input[threadIdx.x] = chunk_registers[CHUNK - 1];
+  }
+  __syncthreads();
+
+  scan_inclusive_block<T_OUT, OP>(shared_input, threadIdx.x);
+  // Update chunk registers with local data
+  {
+    T_OUT local_aggregate = threadIdx.x == 0 ? OP::identity() : OP::remove_volatile(shared_input[threadIdx.x - 1]);
+    #pragma unroll
+    for(uint8_t i = 0; i < CHUNK; i++){
+      chunk_registers[i] = OP::apply(local_aggregate, chunk_registers[i]);
+    }
+  }
+  __syncthreads();
+
+
+  // Publish the result
+  if(threadIdx.x == blockDim.x - 1){
+    aggregates[blockId] = OP::remove_volatile(shared_input[blockDim.x - 1]);
+    __threadfence();
+    if(blockId != 0){
+      flags[blockId] = STATUS_AGGREGATE;
+    } else {
+      inclusive_prefixes[blockId] = OP::remove_volatile(shared_input[blockDim.x - 1]);
+      __threadfence();
+      flags[blockId] = STATUS_PREFIX;
+    }
+  }
+  __threadfence();
+  __syncthreads();
+  // Do the decoupled for loop
+  if(blockId != 0){
+    T_OUT inclusive_prefix = OP::identity();
+    Flag flag = STATUS_INVALID;
+    // It is an int because you need that current_index - 1024 can be negative and not overflow
+    int32_t current_index = blockId;
+    while(flag != STATUS_PREFIX){
+      __syncthreads();
+      const int thread_index = current_index - (blockDim.x - threadIdx.x);
+      shared_flags[threadIdx.x].flag = thread_index < 0 ? STATUS_PREFIX : flags[thread_index];
+      if(shared_flags[threadIdx.x].flag == STATUS_PREFIX) {
+        shared_flags[threadIdx.x].val = thread_index < 0 ? OP::identity() : OP::remove_volatile(inclusive_prefixes[thread_index]);
+      } else {
+        shared_flags[threadIdx.x].val = thread_index < 0 ? OP::identity() : OP::remove_volatile(aggregates[thread_index]);
+      }
+
+      __syncthreads();
+
+      const FlagVal flag_val = reduce_inclusive_block<FlagVal<T_OUT, OP>, FlagOp<T_OUT, OP>>(shared_flags, threadIdx.x);
+
+      flag = flag_val.flag;
+      if(flag == STATUS_INVALID){
+        // Pool again
+      } else {
+        inclusive_prefix = OP::apply(flag_val.val, inclusive_prefix);
+        current_index -= blockDim.x;
+      }
+    }
+
+    #pragma unroll
+    for(uint8_t i = 0; i < CHUNK; i++){
+      chunk_registers[i] = OP::apply(inclusive_prefix, chunk_registers[i]);
+    }
+
+    if(threadIdx.x == blockDim.x - 1){
+      inclusive_prefixes[blockId] = chunk_registers[CHUNK - 1];
+      __threadfence();
+      flags[blockId] = STATUS_PREFIX;
+    }
+  }
+
+  __syncthreads();
+  if(blockId == gridDim.x - 1 && threadIdx.x == blockDim.x - 1){
+      dst[0] = chunk_registers[CHUNK - 1];
+  }
+}
+
 } // End of anonymous namespace
 
 
@@ -580,6 +704,48 @@ cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output, cons
            }
     | [&](){ return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDefault);}
     | [&](){ free_device_memory(&device_in, &device_out, &device_flags,
+                                &device_aggregates, &device_prefixes,
+                                &device_counter);
+            return cudaSuccess;};
+
+  return runner.error();
+}
+
+template<uint8_t chunk, typename OP, typename T_OUT, typename... Args>
+  requires MappingBinaryOperator<OP, T_OUT, Args...>
+cudaError_t reduce_no_mem(const size_t data_size, T_OUT* output, const Args... args){
+  T_OUT*    device_out = nullptr;
+  Flag*     device_flags = nullptr;
+  T_OUT*    device_aggregates = nullptr;
+  T_OUT*    device_prefixes = nullptr;
+  uint32_t* device_counter = nullptr;
+
+  const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
+
+  auto error_function = [&](cudaError_t error){
+    free_device_memory(&device_out, &device_flags, &device_aggregates,
+                       &device_prefixes, &device_counter);
+  };
+
+  CudaRunner runner{error_function};
+
+  runner
+    | [&](){ return cudaMalloc(&device_out, sizeof(T_OUT));}
+    | [&](){ return cudaMalloc(&device_flags, sizeof(Flag) * grid.x);}
+    | [&](){ return cudaMalloc(&device_aggregates, sizeof(T_OUT) * grid.x);}
+    | [&](){ return cudaMalloc(&device_prefixes, sizeof(T_OUT) * grid.x);}
+    | [&](){ return cudaMalloc(&device_counter, sizeof(uint32_t));}
+    | [&](){ return cudaMemset(device_counter, 0, sizeof(uint32_t));}
+    | [&](){
+      reduce_kernel_no_src<chunk, OP, T_OUT, Args...>
+              <<<grid, SCAN_BLOCK_SIZE, shared_memory_size>>>(
+                device_out, data_size, device_flags, device_aggregates, device_prefixes, device_counter, args...
+              );
+        return cudaGetLastError();
+           }
+    | [&](){ return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDefault);}
+    | [&](){ free_device_memory(&device_out, &device_flags,
                                 &device_aggregates, &device_prefixes,
                                 &device_counter);
             return cudaSuccess;};

@@ -6,6 +6,7 @@
 #include<tuple>
 
 #include"../gpu_code/dicom_node_gpu.cuh"
+#include"../gpu_code/linear_interpolation.cuh"
 
 #include"../python/utilities.cuh"
 

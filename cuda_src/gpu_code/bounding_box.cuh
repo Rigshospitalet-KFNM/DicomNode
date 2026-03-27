@@ -1,6 +1,5 @@
 #pragma once
 
-#include<exception>
 // Dicomnode imports
 #include"core/core.cuh"
 
@@ -65,7 +64,7 @@ template<typename T>
 class BoundingBoxOP_3D {
   public:
   static __device__ __host__ BoundingBox_3D apply(const BoundingBox_3D a,
-                                                  const BoundingBox_3D b){
+                                                  const BoundingBox_3D b) noexcept{
     return BoundingBox_3D(
       (uint16_t)min(a.x_min,b.x_min),
       (uint16_t)max(a.x_max,b.x_max),
@@ -76,7 +75,7 @@ class BoundingBoxOP_3D {
     );
   };
   static __device__ __host__ bool equals(const BoundingBox_3D a,
-                                        const BoundingBox_3D b){
+                                         const BoundingBox_3D b) noexcept {
     return a.x_min == b.x_min
         && a.x_max == b.x_max
         && a.y_min == b.y_min
@@ -85,10 +84,10 @@ class BoundingBoxOP_3D {
         && a.z_max == b.z_max;
   };
 
-  static __device__ __host__ BoundingBox_3D identity(){
+  static __device__ __host__ BoundingBox_3D identity() noexcept{
     return BoundingBox_3D();
   };
-  static __device__ __host__ BoundingBox_3D remove_volatile(volatile BoundingBox_3D& a){
+  static __device__ __host__ BoundingBox_3D remove_volatile(volatile BoundingBox_3D& a) noexcept {
     BoundingBox_3D temp = {
       a.x_min,
       a.x_max,
@@ -104,7 +103,7 @@ class BoundingBoxOP_3D {
   static __device__ __host__ BoundingBox_3D map_to(const T value,
                                                    const uint64_t flat_index,
                                                    const Extent<3> space
-                                                   ){
+                                                   ) noexcept {
 
     if (value){
       Index<3> index(flat_index, space);

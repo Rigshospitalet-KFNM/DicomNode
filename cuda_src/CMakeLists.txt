@@ -71,6 +71,7 @@ if(CMAKE_CUDA_COMPILER)
     mirror python/python_mirror.cu
     interpolation python/python_interpolation.cu
     labeling python/python_labeling.cu
+    registration python/python_registration.cu
   )
 
   set(CUDA_OBJECT_TARGETS)

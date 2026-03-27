@@ -27,6 +27,14 @@ struct Volume {
   Extent<DIMENSIONS> m_extent;
   T default_value = 0;
 
+  /* Byte size for the volume
+   *
+   * @return Number of bytes required to contain the volume in data member
+   */
+  constexpr __device__ __host__ size_t size() const {
+    return m_extent.elements() * sizeof(T);
+  }
+
   constexpr  __device__ __host__  size_t elements() const {
     return m_extent.elements();
   }

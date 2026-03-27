@@ -5,6 +5,4 @@
 #include"map.cuh"
 #include"bounding_box.cuh"
 #include"mirror.cuh"
-#include"linear_interpolation.cuh"
-#include"labeling.cuh"
 #include"registration.cuh"

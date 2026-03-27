@@ -5,7 +5,9 @@
 #include<string>
 #include<tuple>
 
+
 #include"../gpu_code/dicom_node_gpu.cuh"
+#include"../gpu_code/linear_interpolation.cuh"
 #include"utilities.cuh"
 
 using basis_t = pybind11::array_t<float>;

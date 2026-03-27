@@ -11,10 +11,8 @@
  */
 #pragma once
 
-#include<stdint.h>
 
 #include"../declarations.cuh"
-#include"../concepts.cuh"
 #include"space.cuh"
 #include"volume.cuh"
 
@@ -51,6 +49,26 @@ class Image {
     return space.extent.sizes[2];
   }
 
+  constexpr const Extent<DIMENSIONS>& extent() const {
+    return space.extent;
+  }
+
+  constexpr T*& data() noexcept{
+    return volume.data;
+  }
+
+  /** Returns the amount of bytes contained in the volume
+   *
+   * @return
+   */
+  constexpr size_t size() const {
+    return volume.size();
+  }
+
+  /** Returns the number of Elements stored in the image
+   *
+   * @return
+   */
   constexpr size_t elements() const {
     return volume.elements();
   }
@@ -77,3 +95,4 @@ __device__ __host__ Image<3, T> sub_image(
       )
     );
 }
+
