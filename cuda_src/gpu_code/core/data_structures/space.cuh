@@ -50,7 +50,7 @@ class Space {
     return extent.from_flat_index(flat_index);
   }
 
-  __device__ __host__ size_t elements() const {
+  [[nodiscard]] constexpr __device__ __host__ size_t elements() const {
     return extent.elements();
   }
 };

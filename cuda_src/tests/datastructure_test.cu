@@ -48,6 +48,24 @@ namespace TEST_EXTENT {
     EXPECT_TRUE(v013.has_value());
     EXPECT_EQ(  v013, 7);
   }
+
+  TEST(EXTENT, ENVELOPING) {
+    Extent<3> dummy_size{10,10,10};
+
+    dim3 envelope = get_envelope_grid<THREAD_BLOCK_3D>(dummy_size);
+
+    EXPECT_EQ(envelope.x, 1);
+    EXPECT_EQ(envelope.y, 2);
+    EXPECT_EQ(envelope.z, 3);
+
+    Extent<3> bigger_dummy_size{100,100,100};
+    dim3 bigger_envelope = get_envelope_grid<THREAD_BLOCK_3D>(bigger_dummy_size);
+
+    EXPECT_EQ(bigger_envelope.x, 4);
+    EXPECT_EQ(bigger_envelope.y, 13);
+    EXPECT_EQ(bigger_envelope.z, 25);
+  }
+
 }
 
 
@@ -301,10 +319,74 @@ TEST(IMAGE, CUDA_POINT_INDEXING){
   cudaFree(dev_points);
 }
 
-} // end of namespace
+
+TEST(IMAGE, SUB_IMAGING_HOST) {
+  constexpr static Extent<3> extent{5,5,5};
+
+  auto data = []() {
+    std::array<f32, extent.elements()> a;
+
+    for (u32 i = 0; i < extent.elements(); i++) {
+      a[i] = i / 25;
+    }
+
+    return a;
+  }();
+
+  const Space<3> space {
+    .starting_point = {0.0,0.0,0.0},
+    .basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      }
+    },
+    .inverted_basis = SquareMatrix<3>{
+      .points={
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+      },
+    },
+    .extent=extent
+  };
+
+  Image<3, f32> image{
+    space,
+    Volume<3, f32>{
+      .data=data.data(),
+      .m_extent = extent,
+      .default_value=-1.0f
+    }
+  };
+
+  constexpr Extent<3> new_extent{4,3,2};
+  Index<3> offset{1,1,1};
+  std::array<f32, new_extent.elements()> new_data;
+
+  Image<3, f32> new_image = sub_image(image, new_data.data(), new_extent, offset);
+  Point<3> expected_point{1.0f, 1.0f, 1.0f};
+  EXPECT_EQ(new_image.space.starting_point,expected_point);
+  EXPECT_EQ(new_image.space.basis, image.space.basis);
+  EXPECT_EQ(new_image.space.inverted_basis, image.space.inverted_basis);
+  EXPECT_EQ(new_image.volume.m_extent, new_extent);
+
+  for (u32 z = 0; z < new_extent.z(); z++) {
+    for (u32 y = 0; y < new_extent.y(); y++) {
+      for (u32 x = 0; x < new_extent.x(); x++) {
+        Index<3> index{x,y,z};
+        Point<3> point_in_destination = new_image.space.at_index(index);
+        Point<3> point_in_og = image.space.at_index(index + offset);
+        ASSERT_EQ(point_in_destination, point_in_og);
+      }
+    }
+  }
+}
+
+}
 
 namespace TEST_VOLUME {
-
 
 TEST(VOLUME, SUB_VOLUME_HOST){
   constexpr static u32 z = 4;
@@ -335,7 +417,7 @@ TEST(VOLUME, SUB_VOLUME_HOST){
     3.0, 3.0, 3.0, 3.0
   }};
 
-  Volume<3, f32> og_volume{
+  const Volume og_volume{
     .data=data.data(),
     .m_extent=extent,
     .default_value=-1.0f
@@ -526,6 +608,6 @@ TEST(VOLUME, SUB_VOLUME_GPU_SMALL_OUTSIDE){
   cudaFree(ghost_volume.data);
   cudaFree(dev_out_pointer);
 }
+ // End of name space TEST_VOLUME
+}
 
-
-} // end of namespace

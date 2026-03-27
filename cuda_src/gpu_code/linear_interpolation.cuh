@@ -41,44 +41,58 @@ namespace INTERPOLATION {
   }
 
   template<typename T>
+  __global__ void kernel_interpolation_linear_blocked(
+    const Image<3, T>* src_image,
+    const Space<3>* dst_space,
+    T* destination_data
+  ) {
+
+    const size_t destination_elements = dst_space->elements();
+
+    const Index<3> global_index = get_gidx();
+
+    const FlatIndex gid = dst_space->extent.flat_index(global_index);
+
+    if (gid.has_value()) {
+      const Point<3> point_in_destination_space = dst_space->at_index(global_index);
+      const Point<3> point_in_source_space = src_image->space.interpolate_point(point_in_destination_space);
+      destination_data[*gid] = src_image->volume.interpolate_at_index_point(point_in_source_space);
+    }
+  }
+
+  template<typename T>
   __global__ void kernel_interpolation_linear_shared(
     const Image<3, T>* src_image,
     const Space<3>* dst_space,
     T* destination_data
   ) {
-    constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.x + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.z +1 };
+    // Just for my sanity
+    const Image<3,T>& source_image = *src_image;
+    const Space<3>& destination_space = *dst_space;
+
+    constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.z + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.x + 1 };
     __shared__ T shared_image_ptr[(THREAD_BLOCK_3D.x + 1)*(THREAD_BLOCK_3D.y + 1)*(THREAD_BLOCK_3D.z + 1)];
     const Index<3> offset_index{
       blockDim.x * blockIdx.x,
       blockDim.y * blockIdx.y,
       blockDim.z * blockIdx.z,
     };
-    const Image<3,T>& source_image = *src_image;
-    const Space<3>& destination_space = *dst_space;
 
 
-    Image<3, T> shared_image{
-      offset_space(
-        source_image.space,
-        shared_extent,
-        offset_index
-      ),
-      sub_volume<T>(
-        source_image.volume,
-        shared_image_ptr,
-        shared_extent,
-        offset_index
-      )
-    };
+    Image<3, T> shared_image = sub_image<T>(
+      source_image,
+      shared_image_ptr,
+      shared_extent,
+      offset_index
+    );
 
     const Index<3> global_index = get_gidx();
-    FlatIndex flat_global_index = dst_space->extent.flat_index(global_index);
+    FlatIndex flat_global_index = destination_space.extent.flat_index(global_index);
     if (flat_global_index.has_value()) {
       const Point<3> point_in_destination_space = destination_space.at_index(global_index);
       const Point<3> point_in_source_space = shared_image.space.interpolate_point(point_in_destination_space);
       destination_data[*flat_global_index] = shared_image.volume.interpolate_at_index_point(point_in_source_space);
     }
-
   }
 }
 
@@ -157,11 +171,11 @@ dicomNodeError_t gpu_interpolation_linear(
 
 }
 
-template<typename T>
-dicomNodeError_t gpu_interpolation_linear_shared(
-const Image<3, T>& host_image,
-const Space<3>& host_destination_space,
-T* device_out_data
+template<typename T, auto Kernel>
+dicomNodeError_t gpu_interpolation_linear_t(
+  const Image<3, T>& host_image,
+  const Space<3>& host_destination_space,
+  T* device_out_data
 ) {
   Space<3>* device_space = nullptr;
   Image<3, T>* device_image = nullptr;
@@ -178,7 +192,7 @@ T* device_out_data
   | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
   | [&](){
     const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
-    INTERPOLATION::kernel_interpolation_linear_shared<T><<<envelope_grid, THREAD_BLOCK_3D>>>(
+    Kernel<<<envelope_grid, THREAD_BLOCK_3D>>>(
       device_image,
       device_space,
       device_out_data
@@ -190,5 +204,4 @@ T* device_out_data
     return dicomNodeError_t::SUCCESS;
   };
   return runner.error();
-
 }

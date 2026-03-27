@@ -51,6 +51,15 @@ struct SquareMatrix {
     return point;
   }
 
+  constexpr __device__ __host__ bool operator==(const SquareMatrix& other) const {
+    for(u8 j = 0; j < DIMENSIONS * DIMENSIONS; j++) {
+      if(other[j] != points[j]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static constexpr __host__ __device__ size_t elements() {
     return DIMENSIONS * DIMENSIONS;
   }

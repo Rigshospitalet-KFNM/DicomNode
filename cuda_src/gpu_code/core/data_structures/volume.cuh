@@ -1,11 +1,10 @@
 /**
  * @file volume.cuh
- * @author your name (you@domain.com)
- * @brief
+ * @Demiguard (you@domain.com)
+ * @brief Contains the Volume class
  * @version 0.1
  * @date 2025-02-27
  *
- * @copyright Copyright (c) 2025
  *
  */
 #pragma once
@@ -17,6 +16,11 @@
 #include"point.cuh"
 #include"index.cuh"
 
+/** A volume is a memory region, that is constrained by an extent.
+ *
+ * @tparam DIMENSIONS - The Dimensionality of the volume
+ * @tparam T - The Datatype of underlying data
+ */
 template<uint8_t DIMENSIONS, typename T>
 struct Volume {
   T* data = nullptr;

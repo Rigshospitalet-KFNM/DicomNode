@@ -17,8 +17,6 @@
 #include"../gpu_code/dicom_node_gpu.cuh"
 
 namespace TEST_INDEXING {
-
-
   TEST(INDEXING, CREATION_TEST_MULTIPLE_ARGS){
   const Extent<3> extent(3,4,5);
 
@@ -32,6 +30,17 @@ namespace TEST_INDEXING {
   EXPECT_EQ(index.y(), 2);
   EXPECT_EQ(index.z(), 3);
 }
+
+  TEST(INDEXING, CONTAINS_RESPECTS_ORDERING) {
+    const Extent<3> extent(2,10,100);
+    const Index<3> i{50,5,1};
+    EXPECT_TRUE(extent.contains(i));
+
+    const FlatIndex fi = extent.flat_index(i);
+
+    EXPECT_TRUE(fi.has_value());
+    EXPECT_EQ(*fi, i.x() + i.y() * extent.x() + i.z() * extent.x() * extent.y());
+  }
 
 TEST(INDEXING, CREATION_TEST_LIST){
   const Extent<3> extent({3,4,5});
@@ -164,7 +173,39 @@ TEST(INDEXING, INTERPOLATING_INTO_A_VOLUME){
   EXPECT_FLOAT_EQ(volume.interpolate_at_index_point(index_at_begin), 1.5f);
 }
 
+__global__ void fill_indexes(Index<3>* out_indices, Extent<3> extent) {
+  Index<3> global_index = get_gidx();
 
+  FlatIndex gid = extent.flat_index(global_index);
 
+  if (gid.has_value()) {
+    out_indices[*gid] = global_index;
+  }
+}
+
+TEST(INDEXING, INDEXING_CORRECTLY) {
+  Extent<3> extent{50,50,50};
+  Index<3>* dev_indices = nullptr;
+  cudaMalloc(&dev_indices, extent.elements()*sizeof(Index<3>));
+  fill_indexes<<<get_envelope_grid<THREAD_BLOCK_3D>(extent) ,THREAD_BLOCK_3D>>>(dev_indices, extent);
+
+  std::vector<Index<3>> host_out(extent.elements());
+  cudaMemcpy(host_out.data(), dev_indices, extent.elements()*sizeof(Index<3>), cudaMemcpyDefault);
+
+  for (u32 z = 0; z < extent.z(); ++z) {
+    for (u32 y = 0; y < extent.y(); ++y) {
+      for (u32 x = 0; x < extent.x(); ++x) {
+        u32 gid = z * extent.x() * extent.y() + y * extent.x() + x;
+        Index<3> test_index{x,y,z};
+        FlatIndex flat_index = extent.flat_index(test_index);
+        ASSERT_EQ(host_out[gid], test_index);
+        ASSERT_TRUE(flat_index.has_value());
+        ASSERT_EQ(gid, *flat_index);
+      }
+    }
+  }
+
+  cudaFree(dev_indices);
+}
 
 }

@@ -44,6 +44,18 @@ struct Point {
     return points[i];
   }
 
+  constexpr __device__ __host__ bool operator==(const Point& other) const {
+    #pragma unroll
+    for (u8 i = 0; i < DIMENSIONS; i++) {
+      if (this->points[i] != other[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
   constexpr __device__ __host__ Point operator*(const SquareMatrix<DIMENSIONS>& m){
     Point v; // It's zero initialized!
     #pragma unroll
@@ -69,19 +81,12 @@ struct Point {
 
   __device__ __host__ Point<DIMENSIONS> operator+(const Point<DIMENSIONS>& other) const {
     Point<DIMENSIONS> v; // It's zero initialized!
+    #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
       v[i] = points[i] + other[i];
     }
 
     return v;
-  }
-
-  __device__ __host__ bool operator==(const Point<DIMENSIONS> other) const {
-    bool ret = true;
-    for(u8 i = 0; i < DIMENSIONS; i++){
-      ret = ret && points[i] == other[i];
-    }
-    return ret;
   }
 
   static constexpr __host__ __device__ size_t elements() {

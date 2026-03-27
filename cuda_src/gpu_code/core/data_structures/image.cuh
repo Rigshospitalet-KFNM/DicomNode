@@ -55,3 +55,25 @@ class Image {
     return volume.elements();
   }
 };
+
+template<typename T>
+__device__ __host__ Image<3, T> sub_image(
+    const Image<3, T>& original,
+    T* new_data_ptr,
+    Extent<3> new_extent,
+    Index<3> offset_index
+  ) {
+    return Image<3, T>(
+      offset_space(
+        original.space,
+        new_extent,
+        offset_index
+    ),
+    sub_volume(
+        original.volume,
+        new_data_ptr,
+        new_extent,
+        offset_index
+      )
+    );
+}

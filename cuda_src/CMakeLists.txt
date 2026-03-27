@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
+
+set(CMAKE_CUDA_ARCHITECTURES native)
 project(dicomnode_c LANGUAGES CUDA CXX)
 
 include(FetchContent)

@@ -42,3 +42,4 @@ template<u8 DIMENSIONS>
 class Space;
 
 constexpr dim3 THREAD_BLOCK_3D = dim3(32,8,4);
+constexpr dim3 THREAD_BLOCK_3d_SMALLER = dim3(32, 4,4);

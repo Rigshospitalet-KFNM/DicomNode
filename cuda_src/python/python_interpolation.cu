@@ -127,7 +127,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image
     | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
     | [&](){ return load_image<T>(&host_image, image); }
     | [&](){ return cudaMalloc(&device_out_image, out_image_size);}
-    | [&](){ return gpu_interpolation_linear(
+    | [&](){ return gpu_interpolation_linear_t<T, INTERPOLATION::kernel_interpolation_linear_shared<T>>(
       host_image, std::cref(destination_space), device_out_image
     );}
     | [&](){

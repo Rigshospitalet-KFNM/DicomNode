@@ -1,6 +1,4 @@
 #pragma once
-// C standard Library
-#include<stdint.h>
 
 #include"declarations.cuh"
 
@@ -16,9 +14,9 @@
    */
 template<uint8_t CHUNK = 1>
 [[nodiscard]] inline dim3 get_grid(const size_t &entries, const u16 &threads) noexcept {
-  const size_t entiries_after_chunk = entries % CHUNK == 0 ? entries / CHUNK : entries / CHUNK + 1;
+  const size_t entries_after_chunk = entries % CHUNK == 0 ? entries / CHUNK : entries / CHUNK + 1;
 
-  return entiries_after_chunk % threads == 0 ? entiries_after_chunk / threads : entiries_after_chunk / threads + 1;
+  return entries_after_chunk % threads == 0 ? entries_after_chunk / threads : entries_after_chunk / threads + 1;
 }
 
 /**
@@ -44,11 +42,11 @@ template<uint8_t CHUNK = 1>
  * @brief Figures out how many object of @ENVELOPE_SIZE is needed to cover
  * entries
  *
- * @tparam ENVELOPE_SIZE -
- * @param entries
+ * @tparam ENVELOPE_SIZE - The size of the covering object in u32
+ * @param entries - The number of object
  * @return u32
  */
 template<u32 ENVELOPE_SIZE>
-[[nodiscard]] u32 envelope_length(const u32 entries) {
+[[nodiscard]] u32 envelope_length(const u32 entries) noexcept {
   return entries % ENVELOPE_SIZE == 0 ? entries / ENVELOPE_SIZE : entries / ENVELOPE_SIZE + 1;
 }

@@ -39,6 +39,17 @@ struct Extent {
     return sizes[i];
   }
 
+  constexpr __device__ __host__ bool operator==(const Extent<DIMENSIONS>& other) const {
+    #pragma unroll
+    for (u8 i = 0; i < DIMENSIONS; i++) {
+      if (this->sizes[i] != other.sizes[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /**
    * @brief Checks in the index inside of the extent
    *
@@ -188,7 +199,7 @@ struct Extent {
 //}
 
 template<dim3 THREAD_BLOCK>
-dim3 get_envelope_grid(const Extent<3> extent) {
+constexpr dim3 get_envelope_grid(const Extent<3> extent) noexcept {
   return dim3{
     envelope_length<THREAD_BLOCK.x>(extent.x()),
     envelope_length<THREAD_BLOCK.y>(extent.y()),
