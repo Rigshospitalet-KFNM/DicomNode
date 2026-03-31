@@ -1,11 +1,10 @@
 #pragma once
 
-
-#include<vector>
 #include<array>
 
 #include<cuda/std/optional>
 
+#include"flat_index.cuh"
 #include"../declarations.cuh"
 #include"../grid.cuh"
 
@@ -72,13 +71,13 @@ struct Extent {
     return contains(Index({static_cast<int32_t>(args)...}));
   }
 
-  constexpr __device__ __host__ cuda::std::optional<u64> flat_index(const Index<DIMENSIONS>& index) const {
+  constexpr __device__ __host__ FlatIndex flat_index(const Index<DIMENSIONS>& index) const {
     if(!contains(index)){
       return {};
     }
 
-    u64 return_val = 0;
-    u64 dimension_temp = 1;
+    u32 return_val = 0;
+    u32 dimension_temp = 1;
 
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
@@ -86,11 +85,11 @@ struct Extent {
       dimension_temp *= sizes[DIMENSIONS - (i + 1)];
     }
 
-    return return_val;
+    return FlatIndex{.index=return_val};
   }
 
   template<typename... Args>
-  constexpr __device__ __host__ cuda::std::optional<uint64_t> flat_index(const Args... args) const {
+  constexpr __device__ __host__ FlatIndex flat_index(const Args... args) const {
     static_assert(sizeof...(args) == DIMENSIONS);
     Index index = Index<DIMENSIONS>(args...);
 
@@ -98,6 +97,21 @@ struct Extent {
   }
 
   __device__ __host__ Index<DIMENSIONS> from_flat_index(u64 flat_index) const {
+    int32_t coordinates[DIMENSIONS];
+    uint64_t dimension_temp = 1;
+
+    #pragma unroll
+    for(u8 dim = 0; dim < DIMENSIONS; dim++){
+      const u32& extent = sizes[DIMENSIONS - (dim + 1)];
+      coordinates[dim] = (flat_index % (dimension_temp * extent))
+        / dimension_temp;
+      dimension_temp *= extent;
+    }
+
+    return Index<DIMENSIONS>(coordinates);
+  }
+
+  __device__ __host__ Index<DIMENSIONS> from_flat_index(FlatIndex flat_index) const {
     int32_t coordinates[DIMENSIONS];
     uint64_t dimension_temp = 1;
 

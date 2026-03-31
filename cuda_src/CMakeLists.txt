@@ -128,7 +128,7 @@ if(CMAKE_CUDA_COMPILER)
     add_executable(cu_tests test_initiator.cu)
 
     target_compile_options(
-      cu_tests PUBLIC -g
+      cu_tests PUBLIC
     )
 
     target_link_libraries(

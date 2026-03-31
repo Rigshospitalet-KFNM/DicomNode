@@ -326,13 +326,13 @@ def extract_image(source: ImageContainerType) -> Image:
   """Extracts an image from a containing class
 
   Args:
-      source (ImageContainerType): _description_
+      source (ImageContainerType): So a list of dicom datasets, A Nifti Image or a dicomnode series
 
   Raises:
-      TypeError: _description_
+      TypeError: Raises when source isn't of type ImageContainerType
 
   Returns:
-      Image: _description_
+      Image: The image contained inside of the source
   """
   if isinstance(source, Nifti1Image) or isinstance(source, Nifti2Image):
     source = NiftiSeries(source)

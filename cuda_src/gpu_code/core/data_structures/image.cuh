@@ -34,6 +34,13 @@ class Image {
   {}
 
   //T operator()(Point<DIMENSIONS> point){}
+  constexpr __device__ __host__ T*& data() noexcept {
+    return volume.data;
+  }
+
+  constexpr __device__ __host__ const T* data() const noexcept {
+    return volume.data;
+  }
 
   constexpr const u32& num_cols() const {
     return space.extent.sizes[0];
@@ -53,9 +60,7 @@ class Image {
     return space.extent;
   }
 
-  constexpr T*& data() noexcept{
-    return volume.data;
-  }
+
 
   /** Returns the amount of bytes contained in the volume
    *
@@ -69,7 +74,7 @@ class Image {
    *
    * @return
    */
-  constexpr size_t elements() const {
+  constexpr __device__ __host__ size_t elements() const {
     return volume.elements();
   }
 };
@@ -95,4 +100,3 @@ __device__ __host__ Image<3, T> sub_image(
       )
     );
 }
-

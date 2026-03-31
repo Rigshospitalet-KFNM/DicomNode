@@ -27,7 +27,6 @@ __device__ inline void map_into_shared_memory(
 }
 
 template<uint8_t CHUCK, typename OP, typename T_OUT, typename... Args>
-  requires MappingBinaryOperator<OP, T_OUT, Args...>
 __device__ inline void map_into_shared_memory_no_mem(
     volatile T_OUT* dst_shared,
     size_t number_of_elements,

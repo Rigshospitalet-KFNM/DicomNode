@@ -21,14 +21,14 @@ namespace TEST_EXTENT {
     Index<3> i012{2,1,0};
     Index<3> i013{3,1,0};
 
-    cuda::std::optional<u64> v000 = extent.flat_index(i000);
-    cuda::std::optional<u64> v001 = extent.flat_index(i001);
-    cuda::std::optional<u64> v002 = extent.flat_index(i002);
-    cuda::std::optional<u64> v003 = extent.flat_index(i003);
-    cuda::std::optional<u64> v010 = extent.flat_index(i010);
-    cuda::std::optional<u64> v011 = extent.flat_index(i011);
-    cuda::std::optional<u64> v012 = extent.flat_index(i012);
-    cuda::std::optional<u64> v013 = extent.flat_index(i013);
+    FlatIndex v000 = extent.flat_index(i000);
+    FlatIndex v001 = extent.flat_index(i001);
+    FlatIndex v002 = extent.flat_index(i002);
+    FlatIndex v003 = extent.flat_index(i003);
+    FlatIndex v010 = extent.flat_index(i010);
+    FlatIndex v011 = extent.flat_index(i011);
+    FlatIndex v012 = extent.flat_index(i012);
+    FlatIndex v013 = extent.flat_index(i013);
 
     EXPECT_TRUE(v000.has_value());
     EXPECT_EQ(v000, 0);
@@ -448,9 +448,10 @@ TEST(VOLUME, SUB_VOLUME_HOST){
 constexpr u64 ImageSize = sizeof(Image<3, f32>);
 
 __global__ void sub_volume_gpu_kernel(Volume<3, f32> volume, f32* out, Extent<3> new_extent, Index<3> offset){
-  sub_volume(
+  Volume<3, f32> vol = sub_volume(
     volume, out, new_extent, offset
   );
+  (void)vol;
 }
 
 TEST(VOLUME, SUB_VOLUME_GPU_SMALL){

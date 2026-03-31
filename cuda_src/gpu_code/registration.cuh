@@ -7,8 +7,12 @@
 namespace REGISTRATION {
     template<typename T>
     struct IMAGE_DIFFERENCE {
-        static __device__ __host__ T maps_to(u64 global_index, Image<3, T>* image_1, Image<3, T>* image_2) {
-            T t = image_1.data[global_index] - image_2.data[global_index];
+        static __device__ __host__ T map_to(u64 global_index, const Image<3, T>* image_1, const Image<3, T>* image_2) {
+            if (min(image_1->elements(), image_2->elements()) <= global_index){
+                return identity();
+            }
+
+            T t = image_1->data()[global_index] - image_2->data()[global_index];
             return t < 0 ? -t : t; // I can't find good docs on abs...
         }
 
@@ -46,13 +50,12 @@ namespace REGISTRATION {
 
         Image<3,T> intermediate_image(
             smallest_space, Volume<3, T>{
-                .data=nullptr,
-                .m_extent=smallest_space.extent,
-                .default_value=0
+                .data = nullptr,
+                .m_extent = smallest_space.extent,
+                .default_value = 0
             }
         );
 
-        T* device_difference = nullptr;
         T difference = 0;
 
         Image<3, T>* device_source_image = nullptr;
@@ -65,8 +68,7 @@ namespace REGISTRATION {
 
         DicomNodeRunner runner{[&](dicomNodeError_t error) {
             free_device_memory(
-                &device_difference,
-                &intermediate_image.data,
+                &intermediate_image.data(),
                 &device_source_image,
                 &device_destination_image,
                 &device_intermediate_image
@@ -74,46 +76,43 @@ namespace REGISTRATION {
         }};
 
         runner | [&]() {
-            return cudaMalloc(&(intermediate_image.data), smallest_image.size());
+            return cudaMalloc(&(intermediate_image.data()), smallest_image.size());
         } | [&]() {
             return cudaMalloc(&(device_source_image), sizeof(Image<3, T>));
         } | [&]() {
             return cudaMalloc(&(device_destination_image), sizeof(Image<3, T>));
         } | [&]() {
             return cudaMalloc(&(device_intermediate_image), sizeof(Image<3, T>));
-        } | [&](){
-            return cudaMalloc(&device_difference, sizeof(T));
         } | [&]() {
             return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);
         } | [&]() {
             return cudaMemcpy(device_destination_image, &host_registration_target_image, sizeof(Image<3, T>), cudaMemcpyDefault);
         } | [&]() {
-            return cudaMemcpy(device_intermediate_image, intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
+            return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
         } | [&]() {
             largest_image_ptr  = source_is_smallest ? device_destination_image : device_source_image;
 
             constexpr static dim3 THREAD_BLOCK = THREAD_BLOCK_3D;
             const dim3 envelope = get_envelope_grid<THREAD_BLOCK>(intermediate_image.extent());
 
-            return INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
+            INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
                 largest_image_ptr,
                 &(device_intermediate_image->space),
-                intermediate_image.data
+                intermediate_image.data()
             );
 
+            return cudaGetLastError();
         } | [&]() {
             smallest_image_ptr = !source_is_smallest ? device_destination_image : device_source_image;
-            return reduce_no_mem<8, IMAGE_DIFFERENCE, T>(
+            return reduce_no_mem<8, IMAGE_DIFFERENCE<T>, T>(
                 smallest_image.elements(),
-                device_difference,
+                &difference,
                 device_intermediate_image,
                 smallest_image_ptr
             );
-        } |[&]() {
-            return cudaMemcpy(&difference, device_difference, sizeof(T), cudaMemcpyDefault);
         } | [&]() {
             free_device_memory(
-                &intermediate_image.data,
+                &intermediate_image.data(),
                 &device_source_image,
                 &device_destination_image,
                 &device_intermediate_image

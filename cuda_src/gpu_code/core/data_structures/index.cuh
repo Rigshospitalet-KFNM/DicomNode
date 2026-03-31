@@ -4,8 +4,7 @@
 
 #include"../declarations.cuh"
 
-using FlatIndex = cuda::std::optional<u64>;
-
+#include"flat_index.cuh"
 /**
  * @brief An index in X,Y,Z,... coordinates
  *
@@ -34,6 +33,17 @@ struct Index {
   };
 
   __device__ __host__ Index(const u64& flat_index, const Extent<DIMENSIONS>& space){
+    u64 dimension_temp = 1;
+
+    #pragma unroll
+    for(u8 dim = 0; dim < DIMENSIONS; dim++){
+      coordinates[dim] = (flat_index % (dimension_temp * space[dim]))
+        / dimension_temp;
+      dimension_temp *= space[dim];
+    }
+  }
+
+  __device__ __host__ Index(const FlatIndex& flat_index, const Extent<DIMENSIONS>& space){
     u64 dimension_temp = 1;
 
     #pragma unroll
@@ -91,7 +101,7 @@ struct Index {
 };
 
 template<u8 DIMENSION>
-__device__ __host__ Index<DIMENSION> dimensional_offset(u8 dimensional_count){
+constexpr __device__ __host__ Index<DIMENSION> dimensional_offset(u8 dimensional_count) noexcept {
   Index<DIMENSION> return_index;
 
   #pragma unroll

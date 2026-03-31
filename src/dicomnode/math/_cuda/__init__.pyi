@@ -36,6 +36,7 @@ def get_device_properties() -> Tuple[DicomnodeCudaError, DicomnodeDeviceProperti
 
 from . import interpolation
 from . import labeling
+from . import registration
 
 all = [
   interpolation,

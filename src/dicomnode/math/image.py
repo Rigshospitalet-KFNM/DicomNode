@@ -5,7 +5,7 @@ data"""
 from logging import getLogger
 from functools import reduce
 from operator import mul
-from typing import Any, List, Literal, Tuple, TypeAlias, Union
+from typing import Any, List, Literal, Tuple,Sequence, TypeAlias, Union
 
 # Third party Packages
 import numpy
@@ -14,13 +14,14 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
+import dicomnode
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING,\
   DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import DimensionalityError
 from dicomnode import math
 from dicomnode.math.types import numpy_image, raw_image_frames
 from dicomnode.math.types import MirrorDirection
-from dicomnode.math.space import Space, ReferenceSpace
+from dicomnode.math.space import Space, ReferenceSpace, constrain_space
 
 
 
@@ -150,6 +151,10 @@ class Image:
   def shape(self):
     return self.raw.shape
 
+  @property
+  def ndim(self):
+    return self.raw.ndim
+
   def frame(self, frame: int) -> 'Image':
     return self.__class__(self.raw[frame], self.space)
 
@@ -259,3 +264,55 @@ class Image:
 
   def __repr__(self) -> str:
     return str(self)
+
+def constrain_array(data: ndarray, restraints: Sequence[Tuple[int, int]]) -> ndarray:
+  """Limits an array to a region specified by the restraints
+
+  Note:
+    This function is designed to work with the bounding_box function from
+    dicomnode.math
+
+  Args:
+      data (ndarray): The data to be restraint
+      restraints (Tuple[Tuple[int, int], ...]): A tuple with restrains, not that
+        these are Inclusive, which is not the default for python slice objects.
+
+  Raises:
+      ValueError: Raised if there is an incorrect amount of restraints to the dimensionality of the image
+
+  Returns:
+      ndarray: A restrained numpy array
+
+
+
+  Example:
+  >>> constrain_array(numpy.arange(16).reshape((4,4)) + 1, ((1,2), (1,2)))
+  array([[ 6,  7],
+      [10, 11]])
+  """
+  if len(restraints) != data.ndim:
+    raise ValueError("Length of restraints do not match the number of dimension of the image")
+
+  slices = tuple(slice(min_, max_ + 1) for min_, max_ in restraints)
+
+  return data[slices]
+
+def constrain(image: Image, restraints: Sequence[Tuple[int, int]]):
+  return Image(
+    constrain_array(image.raw, restraints),
+    constrain_space(image.space, restraints),
+    image.minimum_value
+  )
+
+
+def mask_image(image: 'dicomnode.dicom.series.ImageContainerType', mask):
+  from dicomnode.dicom.series import extract_image, ImageContainerType
+
+  if not isinstance(mask, numpy.ndarray):
+    mask = extract_image(mask).raw
+
+  masked = image.raw * mask
+
+  constrains = math.bounding_box(masked)
+
+  return constrain(Image(masked, image.space), constrains)

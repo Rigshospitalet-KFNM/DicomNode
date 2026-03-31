@@ -47,8 +47,6 @@ namespace INTERPOLATION {
     T* destination_data
   ) {
 
-    const size_t destination_elements = dst_space->elements();
-
     const Index<3> global_index = get_gidx();
 
     const FlatIndex gid = dst_space->extent.flat_index(global_index);
@@ -56,7 +54,7 @@ namespace INTERPOLATION {
     if (gid.has_value()) {
       const Point<3> point_in_destination_space = dst_space->at_index(global_index);
       const Point<3> point_in_source_space = src_image->space.interpolate_point(point_in_destination_space);
-      destination_data[*gid] = src_image->volume.interpolate_at_index_point(point_in_source_space);
+      destination_data[gid] = src_image->volume.interpolate_at_index_point(point_in_source_space);
     }
   }
 
@@ -78,7 +76,6 @@ namespace INTERPOLATION {
       blockDim.z * blockIdx.z,
     };
 
-
     Image<3, T> shared_image = sub_image<T>(
       source_image,
       shared_image_ptr,
@@ -86,12 +83,82 @@ namespace INTERPOLATION {
       offset_index
     );
 
-    const Index<3> global_index = get_gidx();
-    FlatIndex flat_global_index = destination_space.extent.flat_index(global_index);
+    FlatIndex flat_global_index = destination_space.extent.flat_index(get_gidx());
     if (flat_global_index.has_value()) {
-      const Point<3> point_in_destination_space = destination_space.at_index(global_index);
-      const Point<3> point_in_source_space = shared_image.space.interpolate_point(point_in_destination_space);
-      destination_data[*flat_global_index] = shared_image.volume.interpolate_at_index_point(point_in_source_space);
+      const Point<3> point_in_source_space = shared_image.space.interpolate_point(destination_space.at_index(get_gidx()));
+      destination_data[flat_global_index] = shared_image.volume.interpolate_at_index_point(point_in_source_space);
+    }
+  }
+
+  struct InterpolationIntermediateCalculation {
+    SquareMatrix<3> composed_basis;
+    Point<3> composed_offset;
+  };
+
+  template<typename T>
+  __global__ void kernel_interpolation_linear_cheating(
+    const Volume<3, T> source_volume,
+    const Extent<3> destination_extent,
+    const InterpolationIntermediateCalculation cheats,
+    T* destination_data
+  ) {
+
+    /*
+    constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.z + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.x + 1 };
+    __shared__ T shared_image_ptr[(THREAD_BLOCK_3D.x + 1)*(THREAD_BLOCK_3D.y + 1)*(THREAD_BLOCK_3D.z + 1)];
+    const Index<3> offset_index{
+      blockDim.x * blockIdx.x,
+      blockDim.y * blockIdx.y,
+      blockDim.z * blockIdx.z,
+    };
+
+    Volume<3, T> shared_volume = sub_volume<T>(
+      source_volume,
+      shared_image_ptr,
+      shared_extent,
+      offset_index
+    );
+    */
+
+    const Index<3> global_index = get_gidx();
+    FlatIndex flat_global_index = destination_extent.flat_index(global_index);
+    if (flat_global_index.has_value()) {
+      Point<3> index_point = Point<3>{global_index.x() , global_index.y(), global_index.z() };
+      destination_data[flat_global_index] = source_volume.interpolate_at_index_point(index_point * cheats.composed_basis + cheats.composed_offset);
+    }
+  }
+
+  template<typename T>
+  __global__ void kernel_interpolation_linear_shared_cheating(
+    const Volume<3, T> source_volume,
+    const Extent<3> destination_extent,
+    const InterpolationIntermediateCalculation cheats,
+    T* destination_data
+  ) {
+
+
+    constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.z + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.x + 1 };
+    __shared__ T shared_image_ptr[(THREAD_BLOCK_3D.x + 1)*(THREAD_BLOCK_3D.y + 1)*(THREAD_BLOCK_3D.z + 1)];
+    const Index<3> offset_index{
+      blockDim.x * blockIdx.x,
+      blockDim.y * blockIdx.y,
+      blockDim.z * blockIdx.z,
+    };
+
+    Volume<3, T> shared_volume = sub_volume<T>(
+      source_volume,
+      shared_image_ptr,
+      shared_extent,
+      offset_index
+    );
+
+
+    const Index<3> global_index = get_gidx();
+    FlatIndex flat_global_index = destination_extent.flat_index(global_index);
+    if (flat_global_index.has_value()) {
+      const Point<3> index_point = Point<3>{global_index.x() , global_index.y(), global_index.z() };
+      const Point<3> mapped_point = ((index_point * cheats.composed_basis) + cheats.composed_offset) - Point<3>(offset_index);
+      destination_data[flat_global_index] = shared_volume.interpolate_at_index_point(mapped_point);
     }
   }
 }
@@ -168,7 +235,6 @@ dicomNodeError_t gpu_interpolation_linear(
     };
 
   return runner.error();
-
 }
 
 template<typename T, auto Kernel>
@@ -191,10 +257,92 @@ dicomNodeError_t gpu_interpolation_linear_t(
   | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
   | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
   | [&](){
-    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
-    Kernel<<<envelope_grid, THREAD_BLOCK_3D>>>(
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3d_SMALLER>(host_destination_space.extent);
+    Kernel<<<envelope_grid, THREAD_BLOCK_3d_SMALLER>>>(
       device_image,
       device_space,
+      device_out_data
+    );
+
+    return cudaGetLastError();
+  } | [&](){
+    free_device_memory(&device_space, &device_image);
+    return dicomNodeError_t::SUCCESS;
+  };
+  return runner.error();
+}
+
+template<typename T>
+dicomNodeError_t gpu_interpolation_linear_cheating(
+  const Image<3, T>& host_image,
+  const Space<3>& host_destination_space,
+  T* device_out_data
+) {
+  Space<3>* device_space = nullptr;
+  Image<3, T>* device_image = nullptr;
+
+  INTERPOLATION::InterpolationIntermediateCalculation intermediate {
+    .composed_basis = host_destination_space.basis * host_image.space.inverted_basis,
+    .composed_offset = (host_destination_space.starting_point - host_image.space.starting_point) * host_image.space.inverted_basis
+  };
+
+  DicomNodeRunner runner{[&](const dicomNodeError_t error){
+    print_error(error);
+    free_device_memory(&device_space, &device_image);
+  }};
+
+  runner
+  | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
+  | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
+  | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+  | [&](){
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
+    INTERPOLATION::kernel_interpolation_linear_cheating<<<envelope_grid, THREAD_BLOCK_3D>>>(
+      host_image.volume,
+      host_destination_space.extent,
+      intermediate,
+      device_out_data
+    );
+
+    return cudaGetLastError();
+  } | [&](){
+    free_device_memory(&device_space, &device_image);
+    return dicomNodeError_t::SUCCESS;
+  };
+  return runner.error();
+}
+
+template<typename T>
+dicomNodeError_t gpu_interpolation_linear_shared_cheating(
+  const Image<3, T>& host_image,
+  const Space<3>& host_destination_space,
+  T* device_out_data
+) {
+  Space<3>* device_space = nullptr;
+  Image<3, T>* device_image = nullptr;
+
+  INTERPOLATION::InterpolationIntermediateCalculation intermediate {
+    .composed_basis = host_destination_space.basis * host_image.space.inverted_basis,
+    .composed_offset = (host_destination_space.starting_point - host_image.space.starting_point) * host_image.space.inverted_basis
+  };
+
+  DicomNodeRunner runner{[&](const dicomNodeError_t error){
+    print_error(error);
+    free_device_memory(&device_space, &device_image);
+  }};
+
+  runner
+  | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
+  | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
+  | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+  | [&](){
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
+    INTERPOLATION::kernel_interpolation_linear_shared_cheating<<<envelope_grid, THREAD_BLOCK_3D>>>(
+      host_image.volume,
+      host_destination_space.extent,
+      intermediate,
       device_out_data
     );
 

@@ -39,7 +39,7 @@ namespace TEST_INDEXING {
     const FlatIndex fi = extent.flat_index(i);
 
     EXPECT_TRUE(fi.has_value());
-    EXPECT_EQ(*fi, i.x() + i.y() * extent.x() + i.z() * extent.x() * extent.y());
+    EXPECT_EQ(fi, i.x() + i.y() * extent.x() + i.z() * extent.x() * extent.y());
   }
 
 TEST(INDEXING, CREATION_TEST_LIST){
@@ -83,7 +83,7 @@ TEST(INDEXING, CONTAINS_TAKES_REVERSED_INDEXES_INTO_ACCOUNT){
 TEST(INDEXING, TO_FLAT_INDEX){
   const Extent<3> extent(3,4,5);
 
-  cuda::std::optional<uint64_t> flat_index = extent.flat_index(1,1,2);
+  FlatIndex flat_index = extent.flat_index(1,1,2);
 
   EXPECT_TRUE(flat_index.has_value());
   if(flat_index.has_value()){
@@ -179,7 +179,7 @@ __global__ void fill_indexes(Index<3>* out_indices, Extent<3> extent) {
   FlatIndex gid = extent.flat_index(global_index);
 
   if (gid.has_value()) {
-    out_indices[*gid] = global_index;
+    out_indices[gid] = global_index;
   }
 }
 
@@ -200,7 +200,7 @@ TEST(INDEXING, INDEXING_CORRECTLY) {
         FlatIndex flat_index = extent.flat_index(test_index);
         ASSERT_EQ(host_out[gid], test_index);
         ASSERT_TRUE(flat_index.has_value());
-        ASSERT_EQ(gid, *flat_index);
+        ASSERT_EQ(gid, flat_index);
       }
     }
   }

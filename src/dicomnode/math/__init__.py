@@ -167,7 +167,7 @@ def _bounding_box_cpu(array : numpy.ndarray):
         current_max = bounding_box_list[shape_index][1]
         bounding_box_list[shape_index][0] = min(current_min, dim_index)
         bounding_box_list[shape_index][1] = max(current_max, dim_index)
-  return bounding_box_list
+  return tuple( tuple(t) for t in bounding_box_list)
 
 def _bounding_box_gpu(array):
   if not CUDA: # pragma: no cover
@@ -183,7 +183,7 @@ def _bounding_box_gpu(array):
 
 from . import image
 
-def bounding_box(array):
+def bounding_box(array) -> Tuple[Tuple[int,int],...]:
   from dicomnode.dicom.series import Series
   if isinstance(array, Series):
     array = array.image.raw
@@ -191,7 +191,7 @@ def bounding_box(array):
   if isinstance(array, image.Image):
     array = array.raw
 
-  if CUDA:
+  if CUDA and array.ndim == 3:
     return _bounding_box_gpu(array)
   else:# pragma: no cover
     return _bounding_box_cpu(array)

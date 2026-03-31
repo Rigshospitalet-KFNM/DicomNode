@@ -20,7 +20,7 @@ struct Point {
     const T& arr, cuda::std::index_sequence<idx_seq...>
   ) noexcept : points{static_cast<float>(arr[idx_seq])...} {}
 
-  constexpr __device__ __host__ Point(Index<DIMENSIONS> idx)
+  constexpr __device__ __host__ Point(Index<DIMENSIONS> idx) noexcept
     : Point(idx.coordinates, cuda::std::make_index_sequence<DIMENSIONS>{}) {}
 
   template<typename... Args>
@@ -30,7 +30,7 @@ struct Point {
   }
 
   template<typename T>
-  constexpr __device__ __host__ f32& operator[](const T i){
+  constexpr __device__ __host__ f32& operator[](const T i) noexcept {
     return points[i];
   }
 
@@ -40,11 +40,11 @@ struct Point {
   }
 
   template<typename T>
-  constexpr __device__ __host__ const f32& operator[](const T i) const {
+  constexpr __device__ __host__ const f32& operator[](const T i) const noexcept {
     return points[i];
   }
 
-  constexpr __device__ __host__ bool operator==(const Point& other) const {
+  constexpr __device__ __host__ bool operator==(const Point& other) const noexcept {
     #pragma unroll
     for (u8 i = 0; i < DIMENSIONS; i++) {
       if (this->points[i] != other[i]) {
@@ -56,7 +56,7 @@ struct Point {
   }
 
 
-  constexpr __device__ __host__ Point operator*(const SquareMatrix<DIMENSIONS>& m){
+  constexpr __device__ __host__ Point operator*(const SquareMatrix<DIMENSIONS>& m) const noexcept {
     Point v; // It's zero initialized!
     #pragma unroll
     for(u8 j = 0; j < DIMENSIONS; j++){
@@ -69,7 +69,7 @@ struct Point {
     return v;
   }
 
-  constexpr __device__ __host__ Point operator-(const Point& other) const {
+  constexpr __device__ __host__ Point operator-(const Point& other) const noexcept {
     Point v; // It's zero initialized!
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
@@ -79,7 +79,7 @@ struct Point {
     return v;
   }
 
-  __device__ __host__ Point<DIMENSIONS> operator+(const Point<DIMENSIONS>& other) const {
+  __device__ __host__ Point<DIMENSIONS> operator+(const Point<DIMENSIONS>& other) const noexcept {
     Point<DIMENSIONS> v; // It's zero initialized!
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){

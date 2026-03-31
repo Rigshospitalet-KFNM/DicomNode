@@ -21,8 +21,8 @@ std::tuple<dicomNodeError_t, python_array<f32>> registration(
   DicomNodeRunner runner([&](dicomNodeError_t error){
     std::cout << "While performing a registration the function encountered error code:" << (u32)error << "\n" ;
 
-    free_image(source_image);
-    free_image(destination_image);
+    free_image(&source_image);
+    free_image(&destination_image);
   });
 
   runner
@@ -31,15 +31,15 @@ std::tuple<dicomNodeError_t, python_array<f32>> registration(
     } | [&](){
       return is_instance(p_source_image, "dicomnode.math.image", "Image");
     } | [&](){
-      return load_image<f32>(source_image, source_image);
+      return load_image<f32>(&source_image, p_source_image);
     } | [&]() {
-      return load_image<f32>(destination_image, destination_image);
+      return load_image<f32>(&destination_image, p_destination_image);
     } | [&](){
       return REGISTRATION::register_to<f32>(source_image, destination_image);
     } | [&](){
-      return free_image(source_image);
+      return free_image(&source_image);
     } | [&](){
-      return free_image(destination_image);
+      return free_image(&destination_image);
     };
 
   return {runner.error(), out};

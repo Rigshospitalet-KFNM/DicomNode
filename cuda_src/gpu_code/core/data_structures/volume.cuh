@@ -15,6 +15,7 @@
 #include"extent.cuh"
 #include"point.cuh"
 #include"index.cuh"
+#include"flat_index.cuh"
 
 /** A volume is a memory region, that is constrained by an extent.
  *
@@ -31,7 +32,7 @@ struct Volume {
    *
    * @return Number of bytes required to contain the volume in data member
    */
-  constexpr __device__ __host__ size_t size() const {
+  [[nodiscard]] constexpr __device__ __host__ size_t size() const {
     return m_extent.elements() * sizeof(T);
   }
 
@@ -39,7 +40,7 @@ struct Volume {
     return m_extent.elements();
   }
 
-  constexpr  __device__ __host__  bool is_allocated() const {
+  [[nodiscard]] constexpr  __device__ __host__  bool is_allocated() const {
     return data == nullptr;
   }
 
@@ -51,8 +52,8 @@ struct Volume {
     return m_extent;
   }
 
-  constexpr __device__ __host__ const T& at(const Index<DIMENSIONS>& index) const {
-    const cuda::std::optional<u64> flat_index = m_extent.flat_index(index);
+  [[nodiscard]] constexpr __device__ __host__ const T& at(const Index<DIMENSIONS>& index) const {
+    const FlatIndex flat_index = m_extent.flat_index(index);
 
     if(!flat_index.has_value()){
       return default_value;
@@ -61,7 +62,7 @@ struct Volume {
     return data[flat_index.value()];
   }
 
-  __device__ __host__ T interpolate_at_index_point(const Point<DIMENSIONS>& p) const {
+  [[nodiscard]] __device__ __host__ T interpolate_at_index_point(const Point<DIMENSIONS>& p) const {
     T value = 0;
 
     float alphas[DIMENSIONS];
@@ -73,7 +74,7 @@ struct Volume {
     }
 
     // A N-dimensional cube has 2^N points
-    constexpr u16 MAX_POINTS = 1 << DIMENSIONS;
+    constexpr static u16 MAX_POINTS = 1 << DIMENSIONS;
 
     // Coordinate index is the point index of points we need to visit
     for (u8 coordinate_index = 0; coordinate_index < MAX_POINTS; coordinate_index++) {
@@ -91,7 +92,7 @@ struct Volume {
 };
 
 template<typename T>
-__device__ __host__ Volume<3, T> sub_volume(
+[[nodiscard]] __device__ __host__ Volume<3, T> sub_volume(
     const Volume<3, T>& original_volume,
     T* sub_volume_data_ptr,
     Extent<3> new_extent,
@@ -99,8 +100,10 @@ __device__ __host__ Volume<3, T> sub_volume(
   ){
 
   #ifdef __CUDA_ARCH__
+  const u64 thread_flat = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+  const u64 thread_stride = blockDim.x * blockDim.y * blockDim.z;
 
-  for(u64 flat_index = threadIdx.x; flat_index < new_extent.elements(); flat_index += blockDim.x){
+  for(u64 flat_index = thread_flat; flat_index < new_extent.elements(); flat_index += thread_stride){
     const Index<3> local_index = new_extent.from_flat_index(flat_index);
     const Index<3> original_index = offset_index + local_index;
 
@@ -118,7 +121,7 @@ __device__ __host__ Volume<3, T> sub_volume(
         FlatIndex local_flat_index = new_extent.flat_index(local_index);
 
         if(local_flat_index.has_value()){
-          sub_volume_data_ptr[*local_flat_index] = original_volume.at(global_index);
+          sub_volume_data_ptr[local_flat_index] = original_volume.at(global_index);
         }
       }
     }

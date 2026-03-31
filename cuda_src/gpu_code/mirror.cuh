@@ -44,7 +44,7 @@ class Mirror_X {
         index.z()
       );
 
-      const cuda::std::optional<uint64_t> o_flat_inverted_index = space.flat_index(inverted_index);
+      const FlatIndex o_flat_inverted_index = space.flat_index(inverted_index);
 
       if(!o_flat_inverted_index.has_value()){
         assert(false);
@@ -71,7 +71,7 @@ class Mirror_Y {
         index.z()
       );
 
-      const cuda::std::optional<uint64_t> o_flat_inverted_index = space.flat_index(inverted_index);
+      const FlatIndex o_flat_inverted_index = space.flat_index(inverted_index);
 
       if(!o_flat_inverted_index.has_value()){
         assert(false);

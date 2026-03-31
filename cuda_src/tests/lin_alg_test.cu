@@ -621,3 +621,41 @@ TEST(LIN_ALG, POINTS_ARE_ZERO_INITIALIZED){
     EXPECT_FLOAT_EQ(p[i], 0.0f);
   }
 }
+
+TEST(LIN_ALG, MATMUL) {
+  SquareMatrix<3> a {{
+    1.0f, 2.0f, 3.0f,
+    4.0f, 5.0f, 6.0f,
+    7.0f, 8.0f, 9.0f,
+  }};
+  SquareMatrix<3> b {
+    {
+      10.0f, 11.0f, 12.0f,
+      13.0f, 14.0f, 15.0f,
+      16.0f, 17.0f, 18.0f,
+    }};
+
+  SquareMatrix<3> c = a * b;
+
+  EXPECT_FLOAT_EQ(c[0], 84.0f);
+  EXPECT_FLOAT_EQ(c[1], 90.0f);
+  EXPECT_FLOAT_EQ(c[2], 96.0f);
+  EXPECT_FLOAT_EQ(c[3], 201.0f);
+  EXPECT_FLOAT_EQ(c[4], 216.0f);
+  EXPECT_FLOAT_EQ(c[5], 231.0f);
+  EXPECT_FLOAT_EQ(c[6], 318.0f);
+  EXPECT_FLOAT_EQ(c[7], 342.0f);
+  EXPECT_FLOAT_EQ(c[8], 366.0f);
+
+  SquareMatrix<3> d = b * a;
+
+  EXPECT_FLOAT_EQ(d[0], 138.0f);
+  EXPECT_FLOAT_EQ(d[1], 171.0f);
+  EXPECT_FLOAT_EQ(d[2], 204.0f);
+  EXPECT_FLOAT_EQ(d[3], 174.0f);
+  EXPECT_FLOAT_EQ(d[4], 216.0f);
+  EXPECT_FLOAT_EQ(d[5], 258.0f);
+  EXPECT_FLOAT_EQ(d[6], 210.0f);
+  EXPECT_FLOAT_EQ(d[7], 261.0f);
+  EXPECT_FLOAT_EQ(d[8], 312.0f);
+}

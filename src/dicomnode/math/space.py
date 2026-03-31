@@ -5,7 +5,7 @@
 
 # Python standard library
 from enum import Enum
-from typing import List, Literal, Tuple, TypeAlias
+from typing import List, Literal, Sequence, Tuple, TypeAlias
 
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
@@ -80,7 +80,7 @@ class Space:
 
   It contains relevant information:
   * basis - 3x3 basis, note that the vector are not unit vectors
-  * starting_point - The point in space for index (0,0,0)
+  * starting_point - The point in space for index (0,0,0) in (x coord, y coord, z coord)
   * extent - The values z,y,x such that all indexes (k,j,i) satisfying:
     0 < i < x, 0 < j < y, 0 < k < z
     has a image value and all indexes not satisfying this condition do not.
@@ -423,3 +423,18 @@ class ReferenceSpace(Enum):
       return cls.LPI
 
     return None
+
+def constrain_space(space: Space, restraints: Sequence[Tuple[int,int]]):
+  relevant_restrains = restraints[:3]
+
+  (x_min, x_max), (y_min, y_max), (z_min, z_max) = relevant_restrains
+
+  new_extent = [z_max - z_min + 1, y_max - y_min + 1,  x_max - x_min + 1]
+
+  new_starting_point = numpy.array([x_min, y_min, z_min]) @ space.basis + space.starting_point
+
+  return Space(
+    space.basis,
+    new_starting_point,
+    new_extent
+  )

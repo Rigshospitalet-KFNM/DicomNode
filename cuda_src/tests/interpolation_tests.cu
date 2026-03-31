@@ -733,10 +733,11 @@ TEST(INTERPOLATION, SHARED_MEMORY_INTERPOLATION) {
   dicomNodeError_t derror = gpu_interpolation_linear<DataType>(
     host_image, target_space, device_interpolated_image
   );
+
   EXPECT_EQ(derror, dicomNodeError_t::SUCCESS);
 
   CUDA_CHECK(cudaMemcpy(host_result, device_interpolated_image, out_size, cudaMemcpyDefault));
-  derror = gpu_interpolation_linear_t<DataType, INTERPOLATION::kernel_interpolation_linear_shared_debug<DataType>>(
+  derror = gpu_interpolation_linear_t<DataType, INTERPOLATION::kernel_interpolation_linear_shared<DataType>>(
     host_image, target_space, device_interpolated_image
   );
   EXPECT_EQ(derror, dicomNodeError_t::SUCCESS);
@@ -758,6 +759,89 @@ TEST(INTERPOLATION, SHARED_MEMORY_INTERPOLATION) {
   delete[] host_result_shared;
 }
 
+TEST(INTERPOLATION, INTERPOLATION_CHEATING) {
+  using DataType = f32;
+
+  auto host_data = DEFAULT_TEST_OBJECTS::host_image_data();
+
+  const Space<3> host_space = DEFAULT_TEST_OBJECTS::source_space;
+  Space<3> target_space = DEFAULT_TEST_OBJECTS::destination_space;
+
+  target_space.extent = Extent<3>{5,5,5};
+
+  const size_t out_elements = target_space.elements();
+  const size_t out_size = out_elements * sizeof(DataType);
+
+
+  Volume<3, DataType> host_volume{
+    .m_extent = Extent<3>{10,10,10},
+    .default_value = -1.0
+  };
+
+  CUDA_CHECK(cudaMalloc(&host_volume.data, host_volume.elements() * sizeof(DataType)));
+  CUDA_CHECK(cudaMemcpy(host_volume.data, host_data.data(), sizeof(DataType) * host_space.elements(), cudaMemcpyDefault));
+
+  const Image<3, DataType> host_image{
+    host_space,
+    host_volume
+  };
+
+  DataType* host_result = new DataType[out_elements];
+  DataType* host_result_shared = new DataType[out_elements];
+  DataType* device_interpolated_image = nullptr;
+  CUDA_CHECK(cudaMalloc(&device_interpolated_image, out_size));
+
+  dicomNodeError_t derror = gpu_interpolation_linear<DataType>(
+    host_image, target_space, device_interpolated_image
+  );
+
+  EXPECT_EQ(derror, dicomNodeError_t::SUCCESS);
+
+  CUDA_CHECK(cudaMemcpy(host_result, device_interpolated_image, out_size, cudaMemcpyDefault));
+  derror = gpu_interpolation_linear_shared_cheating<DataType>(
+    host_image, target_space, device_interpolated_image
+  );
+  EXPECT_EQ(derror, dicomNodeError_t::SUCCESS);
+  CUDA_CHECK(cudaMemcpy(host_result_shared, device_interpolated_image, out_size, cudaMemcpyDefault));
+
+  for (u32 i = 0; i < target_space.elements(); i++) {
+     EXPECT_FLOAT_EQ(host_result[i], host_result_shared[i]);
+    if (host_result[i] != host_result_shared[i]) {
+      std::cout << "Error at: " << i << "\n";
+      break;
+    }
+  }
+
+  // Freeing
+  cudaFree(host_volume.data);
+  cudaFree(device_interpolated_image);
+  delete[] host_result;
+  delete[] host_result_shared;
 }
 
 
+
+/*
+
+TEST(INTERPOLATION, DIFFERENT_SPACES) {
+  constexpr Extent<3> extent = {3,3,3};
+  Space starting_space = TEST_DATA::make_spaces(extent);
+  Space<3> ending_space{
+    .starting_point = {2.0,2.0,2.0},
+    .basis = {
+      0.0,-1.0f,0.0,
+      -1.0f, 0.0, 0.0,
+      0.0,0.0,1.0
+    },
+    .inverted_basis = {
+      0.0,-1.0f,0.0,
+      -1.0f, 0.0, 0.0,
+      0.0,0.0,1.0
+    },
+
+    .extent=extent
+  };
+}
+*/
+
+}

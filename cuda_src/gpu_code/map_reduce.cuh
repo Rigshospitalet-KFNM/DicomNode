@@ -462,7 +462,6 @@ __global__ void reduce_kernel(T_IN* src,
 }
 
   template<uint8_t CHUNK, typename OP, typename T_OUT,  typename... Args>
-  requires MappingBinaryOperator<OP, T_OUT, Args...>
 __global__ void reduce_kernel_no_src(
                        T_OUT* dst,
                        const size_t N,
@@ -712,7 +711,6 @@ cudaError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output, cons
 }
 
 template<uint8_t chunk, typename OP, typename T_OUT, typename... Args>
-  requires MappingBinaryOperator<OP, T_OUT, Args...>
 cudaError_t reduce_no_mem(const size_t data_size, T_OUT* output, const Args... args){
   T_OUT*    device_out = nullptr;
   Flag*     device_flags = nullptr;
