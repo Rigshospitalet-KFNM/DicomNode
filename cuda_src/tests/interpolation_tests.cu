@@ -10,6 +10,8 @@
 
 #include"../python/utilities.cuh"
 
+#include"test_helper.cuh"
+
 namespace TEST_INTERPOLATION {
   namespace DEFAULT_TEST_OBJECTS {
     constexpr static u32 x = 10;
@@ -821,27 +823,66 @@ TEST(INTERPOLATION, INTERPOLATION_CHEATING) {
 
 
 
-/*
-
 TEST(INTERPOLATION, DIFFERENT_SPACES) {
+  using DataType = f32;
   constexpr Extent<3> extent = {3,3,3};
-  Space starting_space = TEST_DATA::make_spaces(extent);
+
+  auto data = [&]() {
+    std::array<DataType,extent.elements()> host_data;
+
+    for (u32 i = 0; i < extent.elements(); i++) {
+      host_data[i] = i + 1;
+    }
+    return host_data;
+  }();
+
+  Space<3> starting_space = TEST_DATA::make_spaces(extent);
+
+  Image<3, DataType> host_image{
+    starting_space,
+    Volume<3, DataType>{
+      .data = nullptr,
+      .m_extent = extent,
+      .default_value = 0.0
+    }
+  };
+
+  cudaMalloc(&host_image.data(), host_image.size());
+  cudaMemcpy(host_image.data(), data.data(), host_image.size(), cudaMemcpyDefault);
+
   Space<3> ending_space{
     .starting_point = {2.0,2.0,2.0},
     .basis = {
-      0.0,-1.0f,0.0,
-      -1.0f, 0.0, 0.0,
-      0.0,0.0,1.0
+      0.2f,-1.0f,0.0f,
+      -1.0f, 0.6f, 4.0f,
+      0.4f,0.0f,1.0f
     },
     .inverted_basis = {
-      0.0,-1.0f,0.0,
-      -1.0f, 0.0, 0.0,
-      0.0,0.0,1.0
+      -0.24193548f,-0.40322581f,1.61290323f,
+      -1.0483871f, -0.08064516f, 0.32258065,
+      0.09677419f,0.16129032f,0.35483871
     },
-
     .extent=extent
   };
+
+  DeviceArray<f32> device_out(ending_space.elements());
+
+  dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(host_image, ending_space, device_out.get());
+  EXPECT_EQ(error, dicomNodeError_t::SUCCESS);
+
+  std::array<DataType,extent.elements()> host_out;
+  cudaMemcpy(host_out.data(), device_out.get(), device_out.size(), cudaMemcpyDefault);
+
+  error = gpu_interpolation_linear_cheating(host_image, ending_space, device_out.get());
+  EXPECT_EQ(error, dicomNodeError_t::SUCCESS);
+
+  std::array<DataType,extent.elements()> host_out_shared;
+  cudaMemcpy(host_out_shared.data(), device_out.get(), device_out.size(), cudaMemcpyDefault);
+
+  for (u32 i = 0; i < extent.elements(); i++) {
+    EXPECT_FLOAT_EQ(host_out[i], host_out_shared[i]);
+  }
+
 }
-*/
 
 }

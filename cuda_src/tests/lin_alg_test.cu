@@ -10,7 +10,7 @@ __global__ void swapRowKernel(
   volatile SquareMatrix<DIMENSION> *matrix,
   const uint8_t r1, const uint8_t r2
 ){
-  swapRow<DIMENSION>(matrix, r1, r2);
+  LINALG::DEVICE::swapRow<DIMENSION>(matrix, r1, r2);
 }
 
 TEST(LIN_ALG, ROW_SLAP){
@@ -54,7 +54,7 @@ __global__ void forwardEliminationKernel(
   volatile Point<DIMENSION> *vector,
   dicomNodeError_t* error
 ){
-  *error = ForwardElimination<DIMENSION>(matrix, vector);
+  *error = LINALG::DEVICE::ForwardElimination<DIMENSION>(matrix, vector);
 }
 
 
@@ -262,7 +262,7 @@ __global__ void full_reduction_kernel(
   volatile Point<DIMENSION>* point,
   dicomNodeError_t *error
 ){
-  *error = GaussJordanElimination<DIMENSION>(matrix, point);
+  *error = LINALG::DEVICE::GaussJordanElimination<DIMENSION>(matrix, point);
 }
 
 TEST(LIN_ALG, FULL_REDUCTION){
@@ -352,7 +352,7 @@ __global__ void FORWARD_INVERSION_KERNEL(
   volatile SquareMatrix<DIMENSIONS>* output,
   volatile dicomNodeError_t *error
 ){
-  *error = _invertMatrixForward<DIMENSIONS>(*input, *output);
+  *error = LINALG::DEVICE::_invertMatrixForward<DIMENSIONS>(*input, *output);
 }
 
 TEST(LIN_ALG, FORWARD_INVERSION){
@@ -443,7 +443,7 @@ __global__ void matrix_inversion(
   volatile SquareMatrix<DIMENSION>* output,
   dicomNodeError_t *error
 ){
-  *error = invertMatrix<DIMENSION>(*matrix, *output);
+  *error = LINALG::DEVICE::invertMatrix<DIMENSION>(*matrix, *output);
 }
 
 TEST(LIN_ALG, INVERSION_2x2){

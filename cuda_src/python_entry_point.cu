@@ -16,6 +16,7 @@
 
 // Dicomnode imports
 #include"python/python_bounding_box.cuh"
+#include "python/python_center_of_gravity.cuh"
 #include"python/python_cuda_management.cuh"
 #include"python/python_mirror.cuh"
 #include"python/python_interpolation.cuh"
@@ -33,4 +34,5 @@ PYBIND11_MODULE(_cuda, m){
   apply_interpolation_module(m);
   apply_labeling_module(m);
   apply_registration_module(m);
+  apply_center_of_gravity_module(m);
 }

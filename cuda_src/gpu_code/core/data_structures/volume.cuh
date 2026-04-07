@@ -62,6 +62,26 @@ struct Volume {
     return data[flat_index.value()];
   }
 
+  [[nodiscard]] constexpr __device__ __host__ const T& at(const u32& flat_index) const {
+    Index<3> idx = m_extent.from_flat_index(flat_index);
+
+    if (!m_extent.contains(idx)) {
+      return default_value;
+    }
+
+    return data[flat_index];
+  }
+
+  [[nodiscard]] constexpr __device__ __host__ const T& at(const u64& flat_index) const {
+    Index<3> idx = m_extent.from_flat_index(flat_index);
+
+    if (!m_extent.contains(idx)) {
+      return default_value;
+    }
+
+    return data[flat_index];
+  }
+
   [[nodiscard]] __device__ __host__ T interpolate_at_index_point(const Point<DIMENSIONS>& p) const {
     T value = 0;
 
@@ -137,3 +157,27 @@ template<typename T>
 }
 
 //static_assert(CVolume<Volume, 3, float>, "Volume doesn't fulfill volume concepts");
+
+template<u8 DIMENSION, typename T>
+struct VOLUME_SUM_OP {
+  static __device__ __host__ T map_to(u64 global_index, const Volume<DIMENSION, T>& vol) noexcept {
+    return vol.at(global_index);
+  }
+
+  static __device__ __host__ T apply(const T& a, const T& b) noexcept {
+    return a + b;
+  }
+
+  static __device__ __host__ bool equals(const T& a, const T& b) noexcept {
+    return a == b;
+  }
+
+  static __device__ __host__ T identity() noexcept {
+    return 0;
+  }
+
+  static __device__ __host__ T remove_volatile(volatile T& v) noexcept {
+    T vv = v;
+    return vv;
+  }
+};

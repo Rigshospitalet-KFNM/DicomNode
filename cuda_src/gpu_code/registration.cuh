@@ -12,7 +12,7 @@ namespace REGISTRATION {
                 return identity();
             }
 
-            T t = image_1->data()[global_index] - image_2->data()[global_index];
+            T t = image_1->data()[global_index] - image_2->data()[global_index]; // This is a problem for unsigned
             return t < 0 ? -t : t; // I can't find good docs on abs...
         }
 
@@ -33,11 +33,6 @@ namespace REGISTRATION {
             return vv;
         }
     };
-
-    inline __device__ f32 distance_between() {
-        return 0.0f;
-    }
-
 
     template<typename T>
     dicomNodeError_t register_to(

@@ -6,6 +6,7 @@ from typing import Callable, List, Optional, Tuple, Union
 
 # Third party packages
 import nibabel
+import numpy
 from pydicom import Dataset
 from matplotlib.gridspec import GridSpec
 
@@ -30,10 +31,11 @@ class TriplePlot(Plot):
     transform: Callable = rotate_image_90
 
   def __init__(self,
-               images: Union[nibabel.nifti1.Nifti1Image, List[Dataset]],
+               images: Union[nibabel.nifti1.Nifti1Image, List[Dataset], numpy.ndarray],
+               figure = None,
                options = Options()) -> None:
     logger = getLogger(DICOMNODE_LOGGER_NAME)
-    super().__init__(file_path=options.file_path)
+    super().__init__(figure=figure,file_path=options.file_path)
     self.figure.set_figheight(6.0)
     self.figure.set_figwidth(15.0)
 
@@ -42,7 +44,10 @@ class TriplePlot(Plot):
     self.plot_2 = self._figure.add_subplot(grid_spec[1])
     self.plot_3 = self._figure.add_subplot(grid_spec[2])
 
-    if isinstance(images, List):
+
+    if isinstance(images, numpy.ndarray):
+      image = images
+    elif isinstance(images, List):
       image = build_image_from_datasets(images)
     else:
       image = images.get_fdata()

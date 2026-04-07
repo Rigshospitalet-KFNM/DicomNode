@@ -154,8 +154,8 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
   const pybind11::dtype& image_dtype = raw_image.dtype();
 
   //Switch statement doesn't work because I am comparing strings
-  if(image_dtype.equal(pybind11::dtype::of<float>())){
-    return interpolate_linear_templated<float>(image, new_space);
+  if(image_dtype.equal(pybind11::dtype::of<f32>())){
+    return interpolate_linear_templated<f32>(image, new_space);
   } else if (image_dtype.equal(pybind11::dtype::of<uint8_t>()) ) {
     return interpolate_linear_templated<uint8_t>(image, new_space);
   } if (image_dtype.equal(pybind11::dtype::of<uint16_t>())) {

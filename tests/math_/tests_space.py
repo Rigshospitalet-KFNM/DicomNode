@@ -1,4 +1,5 @@
 # Python standard library
+from copy import deepcopy
 from random import shuffle
 
 
@@ -9,7 +10,7 @@ from nibabel.nifti1 import Nifti1Image, Nifti1Header
 # Dicomnode modules
 from dicomnode.lib.exceptions import NonReducedBasis
 from dicomnode.math.types import MirrorDirection
-from dicomnode.math.space import Space
+from dicomnode.math.space import Space, constrain_space, translate_space
 from dicomnode.math.types import ROTATION_MATRIX_90_DEG_X,\
   ROTATION_MATRIX_90_DEG_Y,ROTATION_MATRIX_90_DEG_Z
 
@@ -18,6 +19,29 @@ from tests.helpers import generate_numpy_datasets
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class SpaceTestCases(DicomnodeTestCase):
+  def setUp(self) -> None:
+    super().setUp()
+
+    basis = numpy.array([
+      [3,0,0],
+      [0,3,0],
+      [0,0,3]
+    ])
+
+    starting_point = [
+      3,3,3
+    ]
+
+    domain = [
+      100,100,100
+    ]
+
+    self.space = Space(
+      basis,
+      starting_point,
+      domain
+    )
+
   def test_construct_space_from_nifti(self):
     shape = (5,6,7)
     header = Nifti1Header()
@@ -69,7 +93,7 @@ class SpaceTestCases(DicomnodeTestCase):
     space = Space.from_nifti(image)
 
     # To do asserts
-    self.assertTrue((space.extent == numpy.array([s for s in reversed(shape)])).all())
+    self.assertTrue(space.extent == numpy.array([s for s in reversed(shape)]))
 
   def test_coordinates(self):
     shape = (2,3,4)
@@ -348,3 +372,60 @@ class SpaceTestCases(DicomnodeTestCase):
       space_from_shuffle = Space.from_datasets(datasets)
 
       self.assertEqual(space_from_ordered, space_from_shuffle)
+
+  def test_constraining_space_to_bound_box(self):
+    constrained_space = constrain_space(
+      self.space,
+      [(40,59),(20,49),(65,89)]
+    )
+
+    self.assertEqual(constrained_space.extent.x, 20)
+    self.assertEqual(constrained_space.extent.y, 30)
+    self.assertEqual(constrained_space.extent.z, 25)
+
+    self.assertTrue((constrained_space.basis == self.space.basis).all())
+
+    self.assertEqual(constrained_space.starting_point[0], 123.0)
+    self.assertEqual(constrained_space.starting_point[1], 63.0)
+    self.assertEqual(constrained_space.starting_point[2], 198.0)
+
+  def test_space_to_affine_matrix(self):
+    affine = self.space.to_affine()
+
+    expected = numpy.array([
+      [3,0,0,3],
+      [0,3,0,3],
+      [0,0,3,3],
+      [0,0,0,1],
+    ], dtype=numpy.double)
+
+    self.assertTrue((affine == expected).all())
+
+  def test_space_setting_basis_updates_inverted(self):
+    space = deepcopy(self.space)
+
+    space.basis = numpy.array([
+      [2,0,0],
+      [0,2,0],
+      [0,0,2]
+    ])
+
+    expected = numpy.array([
+      [0.5,0,0],
+      [0,0.5,0],
+      [0,0,0.5]
+    ])
+
+    self.assertTrue((space.inverted_basis == expected).all())
+
+
+  def test_space_translate_space_by_x1(self):
+    affine = numpy.array([
+      [1,0,0,1],
+      [0,1,0,0],
+      [0,0,1,0],
+      [0,0,0,1]
+    ])
+
+    translated_space = translate_space(self.space, affine)
+    self.assertEqual(translated_space.starting_point[0], self.space.starting_point[0] + 1)

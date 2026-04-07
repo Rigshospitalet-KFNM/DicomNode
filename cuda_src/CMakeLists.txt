@@ -72,6 +72,7 @@ if(CMAKE_CUDA_COMPILER)
     interpolation python/python_interpolation.cu
     labeling python/python_labeling.cu
     registration python/python_registration.cu
+    center_of_gravity python/python_center_of_gravity.cu
   )
 
   set(CUDA_OBJECT_TARGETS)
@@ -128,7 +129,7 @@ if(CMAKE_CUDA_COMPILER)
     add_executable(cu_tests test_initiator.cu)
 
     target_compile_options(
-      cu_tests PUBLIC
+      cu_tests PUBLIC -g -G -Wno-deprecated-gpu-targets
     )
 
     target_link_libraries(

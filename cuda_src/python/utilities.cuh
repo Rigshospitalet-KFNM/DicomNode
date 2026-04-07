@@ -1,9 +1,7 @@
 #pragma once
+
 #include<functional>
 #include<string>
-#include<cstring>
-#include<sstream>
-#include<tuple>
 #include<vector>
 #include<iostream>
 

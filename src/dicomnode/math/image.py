@@ -293,7 +293,7 @@ def constrain_array(data: ndarray, restraints: Sequence[Tuple[int, int]]) -> nda
   if len(restraints) != data.ndim:
     raise ValueError("Length of restraints do not match the number of dimension of the image")
 
-  slices = tuple(slice(min_, max_ + 1) for min_, max_ in restraints)
+  slices = tuple(slice(min_, max_ + 1) for min_, max_ in reversed(restraints))
 
   return data[slices]
 

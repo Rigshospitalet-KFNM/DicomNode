@@ -16,6 +16,7 @@ from pydicom import Dataset
 
 # Dicomnode packages
 from dicomnode.lib.exceptions import NonReducedBasis
+from dicomnode.math.extent import Extent
 from dicomnode.math.types import MirrorDirection, ROTATION_MATRIX_90_DEG_X,\
   ROTATION_MATRIX_90_DEG_Y, ROTATION_MATRIX_90_DEG_Z
 
@@ -96,7 +97,7 @@ class Space:
     self._basis = numpy.array(basis, dtype=float32)
     self._inverted_basis = numpy.array(inv(self._basis),dtype=float32)
     self._starting_point = numpy.array(starting_point, dtype=float32)
-    self._extent = numpy.array(domain, dtype=uint32)
+    self._extent = Extent(domain)
 
   def __eq__(self, other):
     # This is mostly useful for testing
@@ -105,7 +106,7 @@ class Space:
 
     return (self.basis == other.basis).all() and\
            (self.starting_point == other.starting_point).all() and\
-           (self.extent == other.extent).all()
+           (self.extent == other.extent)
 
   def coords(self):
     index = 0
@@ -144,7 +145,7 @@ class Space:
     affine = numpy.eye(4)
 
     affine[:3,:3] = self.basis
-    affine[3, :3] = self.starting_point
+    affine[:3, 3] = self.starting_point
 
     return affine
 
@@ -239,7 +240,7 @@ class Space:
     self._inverted_basis = inv(self.basis)
 
   def __str__(self):
-    return (f"Space over extend x: {self.extent[2]}, y: {self.extent[1]} z: {self.extent[0]}\n"
+    return (f"Space over extend x: {self.extent.x}, y: {self.extent.y} z: {self.extent.z}\n"
             f"Starting point at ({self.starting_point[0]},{self.starting_point[1]}, {self.starting_point[2]})\n"
             f"Basis:\n"
             f"{self.basis[0,0]} {self.basis[0,1]} {self.basis[0,2]}\n"
@@ -317,7 +318,7 @@ class Space:
       elif rotation_direction == -1:
         new_starting_point += (self.extent[i] * self.basis[:,i])
 
-      else:
+      else: #pragma: no cover
         raise Exception("")
 
 
@@ -425,6 +426,9 @@ class ReferenceSpace(Enum):
     return None
 
 def constrain_space(space: Space, restraints: Sequence[Tuple[int,int]]):
+  if len(restraints) < 3:
+    raise ValueError("You need 3 constraints to constrain a space")
+
   relevant_restrains = restraints[:3]
 
   (x_min, x_max), (y_min, y_max), (z_min, z_max) = relevant_restrains
@@ -438,3 +442,77 @@ def constrain_space(space: Space, restraints: Sequence[Tuple[int,int]]):
     new_starting_point,
     new_extent
   )
+
+def translate_space(space: Space, affine: ndarray):
+  if affine.ndim != 2 or affine.shape != (4,4):
+    raise ValueError("Affine is not a 4x4 matrix")
+
+  space_affine = space.to_affine()
+
+  new_affine = affine @ space_affine
+
+  return Space(
+    basis=new_affine[:3,:3],
+    starting_point=new_affine[:3, 3],
+    domain=space.extent
+  )
+
+""" # Just some pseudo code for the registration
+not_optimal = True
+error = numpy.inf
+affine_start = numpy.eye(4)
+
+while not_optimal:
+  old_error = error
+  results = []
+  affines = get_nearby_affines(affine_start)
+
+  for affine in affines:
+    new_source_space = translate_space(source.space, affine)
+
+    new_source = interpolate(source, new_source_space)
+
+    results.append(difference(new_source, target))
+
+  for result, affine in zip(results, affines):
+    if result < error:
+      affine_start = affine
+      error = result
+
+  not_optimal = old_error != error
+
+
+def get_nearby_affine(affine):
+  x_offset = numpy.array([
+    [0,0,0,1],
+    [0,0,0,0],
+    [0,0,0,0],
+    [0,0,0,0]
+  ])
+
+  y_offset = numpy.array([
+    [0,0,0,0],
+    [0,0,0,1],
+    [0,0,0,0],
+    [0,0,0,0]
+  ])
+
+  z_offset = numpy.array([
+    [0,0,0,0],
+    [0,0,0,0],
+    [0,0,0,1],
+    [0,0,0,0]
+  ])
+
+  # I'll add rotations later
+
+  return [
+    affine + x_offset,
+    affine - x_offset,
+    affine + y_offset,
+    affine - y_offset,
+    affine + z_offset,
+    affine - z_offset
+  ]
+
+"""
