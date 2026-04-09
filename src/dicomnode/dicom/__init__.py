@@ -553,16 +553,16 @@ class DicomIdentifier:
     return "Missing Identifier"
 
 def display_dicom_collection(datasets: Iterable[Dataset]):
-  """Pro
+  """Provides a method to transform a collection of dicom datasets into
+  a meaning full string that can be
 
   Args:
-      datasets (Iterable[Dataset]): _description_
+      datasets (Iterable[Dataset]): The datasets, that will summarized into a
+                                    string
 
-  Raises:
-      ValueError: _description_
 
   Returns:
-      _type_: _description_
+    str: The description of argument
   """
 
   from dicomnode.data_structures.image_tree import DicomTree
@@ -589,7 +589,7 @@ def display_dicom_collection(datasets: Iterable[Dataset]):
   for st in dt.series():
     return f"{dt.images} DICOM images belonging to {st.series_description}"
 
-  raise IncorrectlyConfigured("There's a contract violation in DICOMNODE please report")
+  raise IncorrectlyConfigured("There's a contract violation in DICOMNODE please report") # pragma: no cover
 
 def detect_4d_image(dataset: Dataset):
   """Detect if dataset belongs the image is a 4 dimensional"""

@@ -453,7 +453,7 @@ class HistoricAbstractInput(AbstractInput):
     if self.enforce_single_study_date:
       self.logger.warning(f"In {name(self)} enforce_single_study_date have been set, which is redundant for a historic input")
 
-    self.historic_dataset: Dict[date, Dict[str, List[Dataset]]] = {}
+    self.historic_dataset: Dict[str, Dict[str, List[Dataset]]] = {}
     self.state = HistoricAbstractInput.HistoricInputState.EMPTY
     self.thread: Optional[Thread] = None
 
@@ -561,7 +561,7 @@ class HistoricAbstractInput(AbstractInput):
     if 'StudyDate' not in historic_dataset or 'SeriesDescription' not in historic_dataset:
       raise InvalidDataset
 
-    study_date: date = historic_dataset.StudyDate # this might be a data-element
+    study_date: str = historic_dataset.StudyDate # this might be a data-element
     if study_date not in self.historic_dataset:
       self.historic_dataset[study_date] = {}
 
@@ -589,6 +589,20 @@ class HistoricAbstractInput(AbstractInput):
       self.thread.join(1.0)
 
     return self.state == HistoricAbstractInput.HistoricInputState.FILLED
+
+  def __str__(self):
+    study_info_strings = []
+
+    for study_date, series_dict in self.historic_dataset.items():
+      series_strings = []
+      for series_name, list_of_datasets in series_dict.items():
+        series_strings.append(f"    {series_name} - {len(list_of_datasets)} Datasets")
+      series_string = "\n".join(series_strings)
+
+      study_info_strings.append(f"  {study_date}:\n{series_string}")
+
+    study_info_string = "\n".join(study_info_strings)
+    return f"Historic Input - {self.state}\n{study_info_string}"
 
 class AbstractInputProxy(AbstractInput):
   """Internal library Class, that is constructed from an or operation between

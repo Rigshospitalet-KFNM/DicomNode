@@ -634,8 +634,8 @@ class AbstractQueuedPipeline(AbstractPipeline):
     while self.running:
       try:
         input_container = self.process_queue.get(timeout=self.queue_timeout)
-        self.logger.info(f"Process queue got item, approximate queue length: "
-                         f"{self.process_queue.qsize()}")
+        self.logger.info(f"Process queue got node {input_container}, "
+                         f"approximate queue length: {self.process_queue.qsize()}")
         try:
           self._process_output(input_container)
         except Exception as exception:
@@ -650,9 +650,13 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     if len(failed_datasets):
       dicom_collection = display_dicom_collection(failed_datasets)
-      self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
+      self.logger.info(f"The association {id(event.assoc)} with {event.assoc.requestor.ae_title}  send {dicom_collection} which was rejected")
 
-    self.process_queue.put(input_containers)
+    if input_containers:
+      self.process_queue.put(input_containers)
+    else:
+      self.logger.info(f"The association {id(event.assoc)} with {event.assoc.requestor.ae_title} - didn't produce any InputContainers to be processed")
+
 
   def node_signal_handler_SIGINT(self, signal_, frame):
     self.running = False
