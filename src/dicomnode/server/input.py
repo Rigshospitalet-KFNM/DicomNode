@@ -121,8 +121,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     if self.container is not None:
       for image_path in self.container:
-        dcm = load_dicom(image_path)
-        self.add_image(dcm)
+        self.add_image(load_dicom(image_path))
 
   @abstractmethod
   def validate(self) -> bool:

@@ -35,7 +35,7 @@ class PlotTestCase(DicomnodeTestCase):
   def test_triple_plot(self):
 
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/triple_plot.png')
-    tp = TriplePlot(nifti_image, options) # type: ignore
+    tp = TriplePlot(nifti_image, options=options) # type: ignore
 
     tp.save()
 
@@ -43,7 +43,7 @@ class PlotTestCase(DicomnodeTestCase):
   def test_triple_plot_different_selectors(self):
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/different_triple_plot.png',
                                  selector=(PercentageSelector(0.30), MaxSelector(), AverageSelector()))
-    tp = TriplePlot(nifti_image, options)# type: ignore
+    tp = TriplePlot(nifti_image, options=options)# type: ignore
 
     tp.save()
 
@@ -53,6 +53,6 @@ class PlotTestCase(DicomnodeTestCase):
 
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/ct_triple_plot.png',
                                  selector=(PercentageSelector(0.30), MaxSelector(), AverageSelector()))
-    tp = TriplePlot(datasets, options)
+    tp = TriplePlot(datasets, options=options)
 
     tp.save()

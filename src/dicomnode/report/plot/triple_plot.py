@@ -8,6 +8,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import nibabel
 import numpy
 from pydicom import Dataset
+from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 
 # Dicomnode packages
@@ -32,7 +33,7 @@ class TriplePlot(Plot):
 
   def __init__(self,
                images: Union[nibabel.nifti1.Nifti1Image, List[Dataset], numpy.ndarray],
-               figure = None,
+               figure: Optional[Figure] = None,
                options = Options()) -> None:
     logger = getLogger(DICOMNODE_LOGGER_NAME)
     super().__init__(figure=figure,file_path=options.file_path)

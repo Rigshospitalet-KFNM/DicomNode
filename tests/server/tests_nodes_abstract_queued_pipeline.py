@@ -19,7 +19,7 @@ from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.output import NoOutput, PipelineOutput
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.processor import AbstractProcessor
 
 class TestInput(AbstractInput):

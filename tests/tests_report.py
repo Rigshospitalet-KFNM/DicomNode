@@ -42,9 +42,8 @@ nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.g
 figure_image_path = Path(f"{library_paths.report_data_directory}/report_image.png")
 
 if nifti_path.exists():
-  nifti_image: Optional[nibabel.nifti1.Nifti1Image] = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
-else:
-  nifti_image = None
+  nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
+
 
 class GeneratorTestCase(DicomnodeTestCase):
   @skipIf(SKIP_REPORT_TESTS, "You do not have a valid Latex compiler")
@@ -84,7 +83,7 @@ class GeneratorTestCase(DicomnodeTestCase):
 
     test_header_doc = f"{library_paths.report_directory}/test_doc"
     triple_plot_options = TriplePlot.Options(file_path=f"{library_paths.figure_directory}/report_figure.png")
-    triple_plot = TriplePlot(nifti_image, triple_plot_options)
+    triple_plot = TriplePlot(nifti_image, options=triple_plot_options)
 
     table = Table(Table.TableStyle.FULL, Alignment=['l', 'c', 'r', 'X', 'X'], Rows=[
       ["Hello", "World", "I should put a grafic in here", 'Bla?', "Bla!"],

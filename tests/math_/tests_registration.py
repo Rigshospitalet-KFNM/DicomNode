@@ -24,7 +24,7 @@ mniBrain_path = library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI
 files_exists = ct_brain_path.exists() and ct_brain_path.exists() and mniBrain_path.exists()
 
 class RegistrationTestCase(DicomnodeTestCase):
-  @skipIf(not CUDA and files_exists, "Need GPU and files")
+  @skipIf((not CUDA) or (not files_exists), "Need GPU and files")
   def test_registration_from_python(self):
     from dicomnode.math import _cuda
 
