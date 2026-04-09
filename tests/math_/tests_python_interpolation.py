@@ -15,31 +15,6 @@ from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 class RESAMPLE_METHODS(Enum):
   LINEAR = "linear"
 
-def old_interpolate(source: Image, target: Space, method=RESAMPLE_METHODS.LINEAR):
-    from scipy.interpolate import RegularGridInterpolator
-    original_grid = [numpy.arange(s) for s in reversed(source.space.extent)]
-
-    # Create interpolator for original data
-    interpolator = RegularGridInterpolator(
-        tuple(original_grid),
-        switch_ordering(source.raw),
-        method=method.value,
-        bounds_error=False,
-        fill_value=source.minimum_value
-    )
-
-    # Create new grid coordinates
-    new_coords = numpy.array([i for i in target.coords()])
-
-    world_coords_new = target.starting_point + new_coords @ target.basis
-
-    # Transform world coordinates back to original basis indices for interpolation
-    orig_indices = (world_coords_new - source.space.starting_point) @ source.space.inverted_basis
-
-    # Interpolate
-    interpolated: numpy.ndarray = interpolator(orig_indices).reshape(target.extent) # type: ignore
-
-
 class CPUInterpolationTests(DicomnodeTestCase):
   def test_basicInterpolation(self):
     # Assemble

@@ -174,7 +174,6 @@ setup(name='dicomnode',
       "nibabel<6.0.0",
       "dicom2nifti",
       "rt_utils<2.0.0",
-      "scipy<2.0.0"
     ],
     extras_require = {
      "test" : ["coverage", "coverage-lcov"],
