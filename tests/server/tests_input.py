@@ -32,7 +32,8 @@ from dicomnode.lib.io import save_dicom, Directory
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.config import DicomnodeConfig, DicomnodeConfigRaw, config_from_raw
-from dicomnode.server.input import AbstractInput, HistoricAbstractInput, DynamicInput, DynamicLeaf, AbstractInputProxy
+from dicomnode.server.input import AbstractInput, HistoricAbstractInput,\
+  DynamicInput, DynamicLeaf, AbstractInputProxy
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -119,6 +120,7 @@ class InputTestCase(DicomnodeTestCase):
     self.assertTrue(issubclass(test, AbstractInputProxy))
 
     test_instance = test()
+    self.assertEqual(test_instance.images, 0)
 
     self.assertIsInstance(test_instance, AbstractInputProxy)
     self.assertIsInstance(test_instance, AbstractInput)
@@ -317,6 +319,24 @@ class InputTestCase(DicomnodeTestCase):
 
     self.assertFalse(ValidatorInput.validate_image(topogram))
     self.assertTrue(ValidatorInput.validate_image(ct_image))
+
+  def test_abstract_input_initialization_yells_at_you(self):
+    class BadProxy(AbstractInputProxy):
+      type_options = []
+
+    class WorseProxy(AbstractInputProxy):
+      type_options = [int]
+
+    class EnforcingInput(AbstractInput):
+      enforce_single_study_date = True
+
+    class NotEnforcingInput(AbstractInput):
+      enforce_single_study_date = False
+
+    self.assertRaises(IncorrectlyConfigured, BadProxy, config_from_raw())
+    self.assertRaises(IncorrectlyConfigured, WorseProxy, config_from_raw())
+    self.assertRaises(IncorrectlyConfigured, EnforcingInput | NotEnforcingInput, config_from_raw())
+
 
 
 class HistoricInput(HistoricAbstractInput):

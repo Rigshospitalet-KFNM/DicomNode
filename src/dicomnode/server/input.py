@@ -236,13 +236,20 @@ processing, `False` otherwise.
           return False
     return True
 
-  def _enforce_date_requirement(self, dicom):
-    if self.enforce_single_study_date:
-      if 0x0008_0020 not in dicom: # 0x0008_0020 = Study Date
+  def _enforce_date_requirement(self, dicom: Dataset) -> bool:
+    """A state based check if the dicom is of the correct study date
+
+    Args:
+        dicom (Dataset): Dataset which must comply with date requirement
+
+    Returns:
+        bool: Returns False if dataset is of a different study date than this object
+    """
+
+
+    if self.enforce_single_study_date and self.study_date is not None:
+      if 0x0008_0020 not in dicom or self.study_date != dicom.StudyDate: # 0x0008_0020 = Study Date
         return False
-      if self._study_date is not None:
-        if self._study_date != dicom.StudyDate:
-          return False
     return True
 
   def _state_based_validation(self, dicom: Dataset) -> bool:
@@ -482,7 +489,6 @@ class HistoricAbstractInput(AbstractInput):
         self.logger.error(f"{name(self)} could connect to {self.ae_title} : ({self._address.ip},{self._address.port})")
         return
 
-
       studies_to_be_moved: List[Dataset] = []
 
       while len(query_datasets): # While there's dataset to query
@@ -571,14 +577,11 @@ class HistoricAbstractInput(AbstractInput):
 
   def _state_based_validation(self, dicom: Dataset) -> bool:
     if self.study_date is None:
-      self.logger.info(f"input.study_date is none")
       return False
 
     if 'StudyDate' not in dicom:
-      self.logger.info(f"StudyDate not in incoming Dicom")
       return False
 
-    self.logger.info(f"{dicom.StudyDate} < {self.study_date} :  {dicom.StudyDate < self.study_date}")
     return dicom.StudyDate < self.study_date
 
   def validate(self) -> bool:
@@ -598,7 +601,7 @@ class AbstractInputProxy(AbstractInput):
   input
 
   """
-  type_options: List[Type[AbstractInput]]
+  type_options: List[Type[AbstractInput]] # Set by MetaClass
 
   @property
   def images(self):
@@ -609,8 +612,26 @@ class AbstractInputProxy(AbstractInput):
 
   def __init__(self, config: DicomnodeConfig = config_from_raw()):
     self.input_options = config
+    self._study_date = None
+    enforcing_single_study_date = None
+    for type_option in self.type_options:
+      if not issubclass(type_option, AbstractInput):
+        raise IncorrectlyConfigured(f"type option {type_option.__name__} is not a AbstractInputs")
+
+      if enforcing_single_study_date is None:
+        enforcing_single_study_date = type_option.enforce_single_study_date
+      elif type_option.enforce_single_study_date != enforcing_single_study_date:
+        raise IncorrectlyConfigured("You cannot create a union between non-enforcing study date and enforcing")
+
+    if enforcing_single_study_date is None:
+      raise IncorrectlyConfigured("A Proxy cannot proxy no object")
+    else:
+      self.enforce_single_study_date = enforcing_single_study_date
 
   def add_image(self, dicom: Dataset) -> int:
+    if self.enforce_single_study_date:
+      if not self._enforce_date_requirement(dicom):
+        raise InvalidDataset
     for type_option in self.type_options:
       if type_option.validate_image(dicom):
         self.__class__ = type_option
