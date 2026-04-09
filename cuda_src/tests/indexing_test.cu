@@ -10,10 +10,8 @@
  */
 
 #include<array>
-#include<iostream>
 #include<gtest/gtest.h>
-#include<cuda/std/optional>
-
+#include"../gpu_code/center_of_gravity.cuh"
 #include"../gpu_code/dicom_node_gpu.cuh"
 
 namespace TEST_INDEXING {

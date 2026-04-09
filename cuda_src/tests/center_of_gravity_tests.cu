@@ -1,7 +1,11 @@
-#include "../gpu_code/center_of_gravity.cuh"
+#include<array>
+#include<cuda/std/array>
+
 #include<gtest/gtest.h>
 
-namespace CENTER_OF_GRAVITY {
+#include "../gpu_code/center_of_gravity.cuh"
+
+namespace CENTER_OF_GRAVITY_TESTS {
   TEST(CENTER_OF_GRAVITY_TEST, INDEX_FUNCTION_2x3x4) {
     constexpr static Extent<3> extent{2,3,4};
 
@@ -40,15 +44,15 @@ namespace CENTER_OF_GRAVITY {
     };
 
     auto actual_x = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32 {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::X>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::X>::index(i, extent);
     });
 
     auto actual_y = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32 {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::Y>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::Y>::index(i, extent);
     });
 
     auto actual_z = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32  {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::Z>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::Z>::index(i, extent);
     });
 
     for (u64 i = 0; i < extent.elements(); ++i) {
@@ -120,15 +124,15 @@ namespace CENTER_OF_GRAVITY {
     };
 
     auto actual_x = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32 {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::X>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::X>::index(i, extent);
     });
 
     auto actual_y = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32 {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::Y>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::Y>::index(i, extent);
     });
 
     auto actual_z = initialize_array<extent.elements()>([&](u64 i) constexpr noexcept -> u32  {
-      return COG_REDUCE_FUNCTION<f32, DIMENSION::Z>::index(i, extent);
+      return CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<f32, DIMENSION::Z>::index(i, extent);
     });
 
     for (u64 i = 0; i < extent.elements(); ++i) {

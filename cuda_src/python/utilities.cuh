@@ -366,3 +366,81 @@ dicomNodeError_t free_image(Image<3, T>* out_image){
 
   return runner.error();
 }
+
+template<typename T, u8 DIMENSION>
+dicomNodeError_t _load_host_volume_from_array(Volume<DIMENSION, T>* out_volume, const pybind11::array_t<T>& python_array) {
+  if(out_volume == nullptr) {
+    return dicomNodeError_t::ARG_IS_NULL_POINTER;
+  }
+  Volume<DIMENSION, T>& volume = *out_volume;
+
+  if (volume.data != nullptr) {
+    return dicomNodeError_t::ALREADY_ALLOCATED_OBJECT;
+  }
+
+  // this might throw
+  const pybind11::buffer_info& array_buffer = python_array.request();
+  if (array_buffer.ptr == nullptr) {
+    return dicomNodeError_t::UNABLE_TO_ACQUIRE_BUFFER;
+  }
+
+  DicomNodeRunner runner;
+  volume.set_extent(array_buffer.shape);
+
+  runner | [&]() {
+    return cudaMalloc(&volume.data, array_buffer.size * sizeof(T));
+  } | [&]() {
+    return cudaMemcpy(volume.data, array_buffer.ptr, array_buffer.size * sizeof(T), cudaMemcpyDefault);
+  };
+
+  return runner.error();
+}
+
+template<typename T, u8 DIMENSION>
+dicomNodeError_t _load_device_volume_from_array(Volume<DIMENSION, T>* out_volume, const pybind11::array_t<T>& python_array) {
+  Volume<DIMENSION, T> volume;
+  DicomNodeRunner runner;
+  runner | [&]() {
+    return _load_host_volume_from_array(&volume, python_array);
+  } | [&](){
+    return cudaMemcpy(out_volume, &volume, sizeof(Volume<DIMENSION, T>), cudaMemcpyDefault);
+  };
+
+  return runner.error();
+}
+
+template<typename T, u8 DIMENSION>
+dicomNodeError_t load_volume_from_array(Volume<DIMENSION, T>* out_volume, const pybind11::array_t<T>& python_array) {
+  return pointer_location_dependent_code<
+      _load_host_volume_from_array<T,DIMENSION>,
+      _load_device_volume_from_array<T,DIMENSION>,
+      Volume<DIMENSION, T>
+    >(out_volume, python_array);
+}
+
+template<typename T, u8 DIMENSION>
+dicomNodeError_t free_host_volume(Volume<DIMENSION, T>* out_volume) {
+  return encode_cuda_error(cudaFree(out_volume->data));
+}
+
+template<typename T, u8 DIMENSION>
+dicomNodeError_t free_device_volume(Volume<DIMENSION, T>* out_volume) {
+  Volume<DIMENSION, T> volume;
+  cudaMemcpy(&volume, out_volume, sizeof(Volume<DIMENSION, T>), cudaMemcpyDefault);
+  return encode_cuda_error(cudaFree(volume.data));
+
+}
+template<typename T, u8 DIMENSION>
+dicomNodeError_t free_volume(Volume<DIMENSION, T>* out_volume) {
+  DicomNodeRunner runner;
+  cudaPointerAttributes attr;
+
+  runner | [&]() {
+    return cudaPointerGetAttributes(&attr, out_volume);
+  } | [&](){
+    return is_host_pointer(attr)
+      ? free_host_volume(out_volume)
+      : free_device_volume(out_volume);
+  };
+  return runner.error();
+}

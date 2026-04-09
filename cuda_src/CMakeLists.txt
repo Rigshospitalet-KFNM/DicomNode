@@ -8,7 +8,6 @@ include(ProcessorCount)
 
 ProcessorCount(NUMBER_OF_PROCESSORS)
 if(NOT NUMBER_OF_PROCESSORS EQUAL 0)
-  message(STATUS "Processors ${NUMBER_OF_PROCESSORS}")
   set(CMAKE_BUILD_PARALLEL_LEVEL ${NUMBER_OF_PROCESSORS})
   set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=${NUMBER_OF_PROCESSORS})
   set(CMAKE_JOB_POOL_COMPILE compile_pool)
@@ -19,7 +18,7 @@ find_package(Python COMPONENTS Interpreter Development REQUIRED)
 FetchContent_Declare(
   pybind11
   GIT_REPOSITORY https://github.com/pybind/pybind11.git
-  GIT_TAG        v3.0.2
+  GIT_TAG        v3.0.3
 )
 FetchContent_MakeAvailable(pybind11)
 
@@ -105,6 +104,7 @@ if(CMAKE_CUDA_COMPILER)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --time compile_times.csv")
 
     if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake")
       message(STATUS "Downloading CPM.cmake")

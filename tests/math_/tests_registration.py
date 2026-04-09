@@ -35,7 +35,11 @@ class RegistrationTestCase(DicomnodeTestCase):
 
     seg_image = extract_image(seg_nifti)
 
+    mni: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(mniBrain_path) # type: ignore
+
     hmmm = mask_image(image, seg_image)
+
+    print(_cuda.center_of_gravity(hmmm))
 
 
     figure = TriplePlot(hmmm.raw, figure=plt.figure(), options=TriplePlot.Options(

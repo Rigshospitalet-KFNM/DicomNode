@@ -1,13 +1,15 @@
-from . import tests_affine
-from . import tests_bounding_box
-from . import tests_mirror
-from . import tests_image
-from . import tests_types
-from . import tests_space
+# Python standard library
+from unittest import skipIf
 
+# Third party modules
 import numpy
-from dicomnode.math import switch_ordering
 
+# Dicomnode modules
+from dicomnode.math import switch_ordering, CUDA
+from dicomnode.math.image import Image
+from dicomnode.math.space import Space
+
+# Test modules
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class MathTestCases(DicomnodeTestCase):
@@ -32,5 +34,49 @@ class MathTestCases(DicomnodeTestCase):
       ]
     ])
 
-  def test_switch_ordering_is_it(self):
-    pass
+
+
+  @skipIf(not CUDA, "You need GPU for this test")
+  def test_center_of_gravity(self):
+    image_data =  numpy.array([
+      [[1,0,0,1],
+       [0,0,0,0],
+       [0,0,0,0],
+       [1,0,0,1]],
+
+      [[0,0,0,0],
+       [0,0,0,0],
+       [0,0,0,0],
+       [0,0,0,0]],
+
+      [[0,0,0,0],
+       [0,0,0,0],
+       [0,0,0,0],
+       [0,0,0,0]],
+
+      [[1,0,0,1],
+       [0,0,0,0],
+       [0,0,0,0],
+       [1,0,0,1]],
+    ], dtype=numpy.float32)
+
+    image = Image(
+      image_data, Space(
+        numpy.eye(3), [0,0,0], image_data.shape
+      )
+    )
+
+    from dicomnode.math import _cuda
+    success, cog = _cuda.center_of_gravity(image)
+
+    self.assertEqual(cog[0], 1.5)
+    self.assertEqual(cog[1], 1.5)
+    self.assertEqual(cog[2], 1.5)
+
+
+from . import tests_affine
+from . import tests_bounding_box
+from . import tests_mirror
+from . import tests_image
+from . import tests_types
+from . import tests_space

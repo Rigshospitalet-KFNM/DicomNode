@@ -1,5 +1,7 @@
 #pragma once
 
+#include<cuda/std/array>
+
 #include"constants.cuh"
 #include"declarations.cuh"
 #include"error.cuh"

@@ -1,12 +1,13 @@
 #pragma once
 
+#include <array>
+
+#include "core/core.cuh"
 #include "map_reduce.cuh"
 
 namespace CENTER_OF_GRAVITY {
   template<typename T, DIMENSION REDUCING_DIMENSION>
   struct COG_REDUCE_FUNCTION {
-
-
     constexpr static __device__ __host__ u32 index(u64 global_index, const Extent<3>& extent) noexcept {
       u32 ret = 0;
 
@@ -42,6 +43,39 @@ namespace CENTER_OF_GRAVITY {
       return vv;
     }
   };
+
+
+template<typename T>
+  dicomNodeError_t center_of_gravity(
+    const Volume<3, T>& volume,
+    std::array<float, 3>& cog
+  ) noexcept {
+  T sum = 0;
+
+  DicomNodeRunner runner;
+
+  runner | [&]() {
+    return reduce_no_mem<8, VOLUME_SUM_OP<3, T>, T, Volume<3,T>>(
+      volume.elements(), &sum, volume
+    );
+  } | [&](){
+    return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::X>, float, Volume<3,T>>(
+      volume.elements(), &cog[0], volume);
+  } | [&](){
+    return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Y>, float, Volume<3, T>>(
+      volume.elements(), &cog[1], volume);
+  } | [&](){
+    return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Z>, float, Volume<3, T>>(
+      volume.elements(), &cog[2], volume);
+  };
+
+  float sumf = static_cast<float>(sum);
+
+  cog[0] = cog[0] / sumf;
+  cog[1] = cog[1] / sumf;
+  cog[2] = cog[2] / sumf;
+
+  return runner.error();
 }
 
-
+}

@@ -183,6 +183,17 @@ def _bounding_box_gpu(array):
 
 from . import image
 
+def center_of_gravity(image_: image.DataContainer):
+  data = image.get_image_data(image_)
+
+  if data.ndim != 3:
+    raise TypeError("This center of gravity only work for 3 dimensional images")
+
+  if CUDA:
+    from dicomnode.math import _cuda
+    _cuda.center_of_gravity(data)
+
+
 def bounding_box(array) -> Tuple[Tuple[int,int],...]:
   from dicomnode.dicom.series import Series
   if isinstance(array, Series):

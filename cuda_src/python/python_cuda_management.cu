@@ -6,30 +6,13 @@
 
 #include"utilities.cuh"
 
-#include"../gpu_code/dicom_node_gpu.cuh"
+#include"../gpu_code/core/error.cuh"
 
 
 pybind11::object cast_current_device(){
   return pybind11::cast(get_current_device());
 }
 
-void print_image(const pybind11::object& python_image){
-  Image<3, float> host_image;
-  dicomNodeError_t error = load_image(&host_image, python_image);
-
-  if(error){
-    std::cout << "Encoutered dicomnode Error:" << error << "\n";
-  } else {
-    std::cout << "Starting Point: (" << host_image.space.starting_point[0] << ", "
-                                     << host_image.space.starting_point[1] << ", "
-                                     << host_image.space.starting_point[2] << ")\n";
-    std::cout << "Extent: (" << host_image.space.extent[0] << ", "
-                             << host_image.space.extent[1] << ", "
-                             << host_image.space.extent[2] << ")\n";
-  }
-
-  free_image(&host_image);
-}
 void apply_cuda_management_module(pybind11::module& m){
   pybind11::class_<cudaDeviceProp>(m, "DicomnodeDeviceProperties", pybind11::module_local())
     .def_readonly("major", &cudaDeviceProp::major)
@@ -104,6 +87,5 @@ void apply_cuda_management_module(pybind11::module& m){
       return error != dicomNodeError_t::SUCCESS;
     });
 
-  m.def("print_image", &print_image);
   m.def("get_device_properties", &cast_current_device);
 }

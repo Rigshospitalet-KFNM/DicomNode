@@ -8,6 +8,7 @@ from operator import mul
 from typing import Any, List, Literal, Tuple,Sequence, TypeAlias, Union
 
 # Third party Packages
+import nibabel
 import numpy
 from numpy import array, empty, float32, float64, ndarray, zeros_like
 from numpy.linalg import inv
@@ -316,3 +317,20 @@ def mask_image(image: 'dicomnode.dicom.series.ImageContainerType', mask):
   constrains = math.bounding_box(masked)
 
   return constrain(Image(masked, image.space), constrains)
+
+DataContainer = Union[
+  Image,
+  ndarray,
+  nibabel.nifti1.Nifti1Image,
+  nibabel.nifti2.Nifti2Image,
+]
+
+def get_image_data(container:  DataContainer) -> ndarray:
+  if isinstance(container, Image):
+    return container.raw
+  elif isinstance(container, nibabel.nifti1.Nifti1Image):
+    return container.get_fdata(dtype=float32)
+  elif isinstance(container, nibabel.nifti2.Nifti2Image):
+    return container.get_fdata(dtype=float32)
+  else:
+    return container
