@@ -524,11 +524,14 @@ class HistoricAbstractInput(AbstractInput):
         for status, move_response in move_responses:
           if status.Status not in [0xFF00, 0x0000]:
             self.logger.error(f"While C-Move'ing {name(self)} encountered a problem: {status}")
+      # The datasets will then be added in add image and should be contained by
+      # the HistoricINput
 
-
-      # The datasets will then be added in add image
-    self.logger.info(f"Historic input finished fetching history, and it now contains {len(self)} images")
-    self.state = HistoricAbstractInput.HistoricInputState.FILLED
+      # Note that you have set the state to filled while the association is live
+      # otherwise if the historic association is the last to leave, there'll be
+      # no thread to start the processing.
+      self.logger.info(f"Historic input finished fetching history, and it now contains {len(self)} images")
+      self.state = HistoricAbstractInput.HistoricInputState.FILLED
 
   def add_image(self, dicom: Dataset) -> int:
     if self.state == HistoricAbstractInput.HistoricInputState.EMPTY and 'StudyDate' in dicom:
