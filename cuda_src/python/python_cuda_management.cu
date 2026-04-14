@@ -87,5 +87,6 @@ void apply_cuda_management_module(pybind11::module& m){
       return error != dicomNodeError_t::SUCCESS;
     });
 
+
   m.def("get_device_properties", &cast_current_device);
 }

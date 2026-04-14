@@ -25,7 +25,8 @@ from dicomnode.lib.exceptions import IncorrectlyConfigured,\
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import CopyElement, DicomFactory, DiscardElement, FunctionalElement,\
   Blueprint, SeriesElement, StaticElement, InstanceCopyElement,\
-  InstanceEnvironment, SequenceElement, get_pivot
+  InstanceEnvironment, SequenceElement, get_pivot, CopyOrElseElement,\
+  IndexElement, KeyedIndexElement
 from dicomnode.dicom.blueprints import add_UID_tag, general_image_blueprint
 from dicomnode.dicom.series import DicomSeries
 
@@ -547,3 +548,62 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     self.assertIsInstance(build_series, DicomSeries)
 
     # Fails due to missing SOPClass
+
+  def test_virtual_element_copy_or_else(self):
+    copy_or_else = CopyOrElseElement(0x0010_0010, 'PN', "Unknown")
+    copy_or_func = CopyOrElseElement(0x0010_0020, 'LO', FunctionalElement(0x0010_0020,'LO', lambda ie : "I was called"))
+    copy_or_data = CopyOrElseElement(0x0010_0030, 'LO', DataElement(0x0010_0030, 'DS', "100.0"))
+
+    with_name = Dataset()
+    with_name.PatientName = "Not Unknown"
+
+    without_name = Dataset()
+
+    name = copy_or_else.corporealialize([with_name])
+    nameless = copy_or_else.corporealialize([without_name])
+    weird = copy_or_func.corporealialize([with_name])
+    data = copy_or_data.corporealialize([with_name])
+
+
+    if not isinstance(name, DataElement) or\
+        not isinstance(nameless, DataElement) or\
+        not isinstance(weird, FunctionalElement) or\
+        not isinstance(data, DataElement):
+      raise AssertionError("TypeChecker is stupid")
+
+    weird_value = weird.produce(InstanceEnvironment(1, self.factory))
+
+    self.assertEqual(name.value, "Not Unknown")
+    self.assertEqual(nameless.value, "Unknown")
+    self.assertEqual(weird_value.value, "I was called")
+    self.assertEqual(data.value, "100.0")
+
+  def test_virtual_element_indexing(self):
+    index_element = IndexElement(0x0008_0032,'TM', ["120001","120001","120002","120002"])
+    # The interesting part happens in production
+    self.assertIs(index_element, index_element.corporealialize([]))
+
+    de_1 = index_element.produce(InstanceEnvironment(1, DicomFactory()))
+    de_2 = index_element.produce(InstanceEnvironment(2, DicomFactory()))
+    de_3 = index_element.produce(InstanceEnvironment(3, DicomFactory()))
+    de_4 = index_element.produce(InstanceEnvironment(4, DicomFactory()))
+
+    self.assertEqual(de_1.value, "120001")
+    self.assertEqual(de_2.value, "120001")
+    self.assertEqual(de_3.value, "120002")
+    self.assertEqual(de_4.value, "120002")
+
+  def test_virtual_element_keyed_indexing(self):
+    index_element = KeyedIndexElement(0x0008_0032,'TM', "KEY")
+    # The interesting part happens in production
+    self.assertIs(index_element, index_element.corporealialize([]))
+
+    de_1 = index_element.produce(InstanceEnvironment(1, DicomFactory(), {"KEY" : ["120001","120001","120002","120002"]}))
+    de_2 = index_element.produce(InstanceEnvironment(2, DicomFactory(), {"KEY" : ["120001","120001","120002","120002"]}))
+    de_3 = index_element.produce(InstanceEnvironment(3, DicomFactory(), {"KEY" : ["120001","120001","120002","120002"]}))
+    de_4 = index_element.produce(InstanceEnvironment(4, DicomFactory(), {"KEY" : ["120001","120001","120002","120002"]}))
+
+    self.assertEqual(de_1.value, "120001")
+    self.assertEqual(de_2.value, "120001")
+    self.assertEqual(de_3.value, "120002")
+    self.assertEqual(de_4.value, "120002")

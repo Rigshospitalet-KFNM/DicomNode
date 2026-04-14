@@ -77,13 +77,6 @@ class AssociationContextManager:
       self.assoc.release()
 
 
-@dataclass(init=False)
-class ResponseAddress(Address):
-  """Dynamic address of target"""
-
-  def __init__(self):
-    pass
-
 def send_image(SCU_AE: str, address: Address, dicom_image: Dataset) -> Dataset:
   """Sends a single dataset to a SCP
 

@@ -234,7 +234,7 @@ class SequenceElement(InstanceVirtualElement):
     return DataElement(self.tag, 'SQ', Sequence(sequence_datasets))
 
 class IndexElement(InstanceVirtualElement):
-  def __init__(self, tag: TagType, VR: str, indexable: TypingSequence[DataElement], name: str | None = None) -> None:
+  def __init__(self, tag: TagType, VR: str, indexable: TypingSequence[Any], name: str | None = None) -> None:
     super().__init__(tag, VR, name)
     self.indexable = indexable
 
@@ -242,7 +242,7 @@ class IndexElement(InstanceVirtualElement):
     return self
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    return self.indexable[instance_environment.instance_number]
+    return DataElement(self.tag, self.VR, self.indexable[instance_environment.instance_number - 1])
 
 class KeyedIndexElement(InstanceVirtualElement):
   def __init__(self, tag: TagType, VR: str, key: Any, name: str | None = None) -> None:
@@ -253,7 +253,11 @@ class KeyedIndexElement(InstanceVirtualElement):
     return self
 
   def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
-    return instance_environment.kwargs[self.key][instance_environment.instance_number]
+    return DataElement(
+      self.tag,
+      self.VR,
+      instance_environment.kwargs[self.key][instance_environment.instance_number - 1]
+    )
 
 
 class FunctionalElement(InstanceVirtualElement):

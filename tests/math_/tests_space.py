@@ -389,6 +389,10 @@ class SpaceTestCases(DicomnodeTestCase):
     self.assertEqual(constrained_space.starting_point[1], 63.0)
     self.assertEqual(constrained_space.starting_point[2], 198.0)
 
+  def test_space_cannot_constrain_with_no_constraint(self):
+    self.assertRaises(ValueError, constrain_space, self.space, [])
+
+
   def test_space_to_affine_matrix(self):
     affine = self.space.to_affine()
 
@@ -418,7 +422,6 @@ class SpaceTestCases(DicomnodeTestCase):
 
     self.assertTrue((space.inverted_basis == expected).all())
 
-
   def test_space_translate_space_by_x1(self):
     affine = numpy.array([
       [1,0,0,1],
@@ -429,3 +432,22 @@ class SpaceTestCases(DicomnodeTestCase):
 
     translated_space = translate_space(self.space, affine)
     self.assertEqual(translated_space.starting_point[0], self.space.starting_point[0] + 1)
+
+  def test_space_translation_throws_on_invalid_input(self):
+    not_so_affine =numpy.eye(5)
+    self.assertRaises(ValueError, translate_space, self.space, not_so_affine)
+
+  def test_space_to_string(self):
+    space_strings = [
+      "Space over extent x: 100, y: 100, z: 100",
+      "Starting point at (3.0, 3.0, 3.0)",
+      "Basis:"
+      "3.0 0.0 0.0",
+      "0.0 3.0 0.0",
+      "0.0 0.0 3.0",
+    ]
+
+    self.assertEqual(str(self.space),"\n".join(space_strings))
+
+  def test_space_z_dominant(self):
+    self.assertEqual(self.space._dominant_axis([0,1,2]),2)

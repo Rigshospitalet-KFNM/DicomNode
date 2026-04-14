@@ -15,7 +15,7 @@ from numpy.linalg import inv
 from pydicom import Dataset
 
 # Dicomnode packages
-from dicomnode.lib.exceptions import NonReducedBasis
+from dicomnode.lib.exceptions import NonReducedBasis, ContractViolation
 from dicomnode.math.extent import Extent
 from dicomnode.math.types import MirrorDirection, ROTATION_MATRIX_90_DEG_X,\
   ROTATION_MATRIX_90_DEG_Y, ROTATION_MATRIX_90_DEG_Z
@@ -113,13 +113,37 @@ class Space:
     points = numpy.prod(self.extent)
 
     while index < points:
-      x = index % self.extent[2]
-      y = (index // self.extent[2]) % self.extent[1]
-      z = index // (self.extent[1] * self.extent[2])
+      x = index % self.extent.x
+      y = (index // self.extent.x) % self.extent.y
+      z = index // (self.extent.y * self.extent.x)
 
       yield numpy.array([x,y,z])
 
       index += 1
+
+  def at_index(self, index: ndarray):
+    """Calculates the point in space for an index.
+
+    Note that this is the center
+
+    Args:
+        index (ndarray): An index of x,y,z
+
+    Raises:
+        ValueError: _description_
+    """
+
+    if not isinstance(index, ndarray):
+      index = numpy.array(index, dtype=numpy.float32)
+
+    if index.ndim != 1:
+      index = index.flatten()
+
+    if len(index) != 3:
+      raise ValueError("Index is not in the correct form")
+
+    return index @ self.basis + self.starting_point
+
 
   @classmethod
   def from_nifti(cls, nifti: Nifti1Image):
@@ -240,8 +264,8 @@ class Space:
     self._inverted_basis = inv(self.basis)
 
   def __str__(self):
-    return (f"Space over extend x: {self.extent.x}, y: {self.extent.y} z: {self.extent.z}\n"
-            f"Starting point at ({self.starting_point[0]},{self.starting_point[1]}, {self.starting_point[2]})\n"
+    return (f"Space over extend x: {self.extent.x}, y: {self.extent.y}, z: {self.extent.z}\n"
+            f"Starting point at ({self.starting_point[0]}, {self.starting_point[1]}, {self.starting_point[2]})\n"
             f"Basis:\n"
             f"{self.basis[0,0]} {self.basis[0,1]} {self.basis[0,2]}\n"
             f"{self.basis[1,0]} {self.basis[1,1]} {self.basis[1,2]}\n"
@@ -260,7 +284,7 @@ class Space:
     return is_affine_in_correct_rotation(self.basis)
 
 
-  def __dominant_axis(self, vector):
+  def _dominant_axis(self, vector):
     abs_vec = absolute(vector)
     if abs_vec[0] < abs_vec[1]:
       if abs_vec[1] < abs_vec[2]:
@@ -274,9 +298,9 @@ class Space:
         return 0
 
   def get_rotation_matrix_to_standard_space(self) -> ndarray:
-    axis_x_dom = self.__dominant_axis(self.basis[0])
-    axis_y_dom = self.__dominant_axis(self.basis[1])
-    axis_z_dom = self.__dominant_axis(self.basis[2])
+    axis_x_dom = self._dominant_axis(self.basis[0])
+    axis_y_dom = self._dominant_axis(self.basis[1])
+    axis_z_dom = self._dominant_axis(self.basis[2])
 
     if axis_x_dom == axis_y_dom or axis_x_dom == axis_z_dom or axis_y_dom == axis_z_dom:
       raise NonReducedBasis("The Basis is invalid")
@@ -300,9 +324,9 @@ class Space:
   def _rotate_extent(self, rotation_matrix):
     new_extent = numpy.empty((3,), dtype=uint32)
 
-    new_extent[0] = self.extent[self.__dominant_axis(rotation_matrix[0])]
-    new_extent[1] = self.extent[self.__dominant_axis(rotation_matrix[1])]
-    new_extent[2] = self.extent[self.__dominant_axis(rotation_matrix[2])]
+    new_extent[0] = self.extent[self._dominant_axis(rotation_matrix[0])]
+    new_extent[1] = self.extent[self._dominant_axis(rotation_matrix[1])]
+    new_extent[2] = self.extent[self._dominant_axis(rotation_matrix[2])]
 
     return new_extent
 
@@ -310,7 +334,7 @@ class Space:
     new_starting_point = numpy.copy(self.starting_point)
 
     for i in range(3):
-      index = self.__dominant_axis(rotation_matrix[i])
+      index = self._dominant_axis(rotation_matrix[i])
       rotation_direction = rotation_matrix[i][index]
 
       if rotation_direction == 1:
@@ -400,7 +424,7 @@ class ReferenceSpace(Enum):
     return cls.from_affine(space.basis)
 
   @classmethod
-  def from_affine(cls, affine: ndarray):
+  def from_affine(cls, affine: ndarray) -> 'ReferenceSpace':
     x_coord = affine[0,0]
     y_coord = affine[1,1]
     z_coord = affine[2,2]
@@ -423,7 +447,7 @@ class ReferenceSpace(Enum):
     if not is_positive(x_coord) and not is_positive(y_coord) and not is_positive(z_coord):
       return cls.LPI
 
-    return None
+    raise ContractViolation # pragma: no cover
 
 def constrain_space(space: Space, restraints: Sequence[Tuple[int,int]]):
   if len(restraints) < 3:

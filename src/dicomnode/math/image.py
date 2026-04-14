@@ -201,8 +201,6 @@ class Image:
     # 1. First ensure that the image is in the correct rotation
     # 2. Performs mirroring until we are in RAS space
 
-    if not self.space.is_correct_rotation:
-      pass
 
     reference_space = ReferenceSpace.from_space(self.space)
 
@@ -224,10 +222,19 @@ class Image:
       case ReferenceSpace.LPI:
         self.mirror_perspective(MirrorDirection.XYZ)
       case None:
-        raise Exception("")
+        raise Exception("Space doesn't have valid basis")
 
 
-  def embed_image(self, start_coord: 'math.Coordinate', embedding: ndarray):
+  def embed_image(self, start_coord: 'math.Index', embedding: ndarray):
+    """Embeds a volume inside of this image.
+
+    Args:
+        start_coord (math.Index): _description_
+        embedding (ndarray): _description_
+
+    Raises:
+        DimensionalityError: _description_
+    """
     if embedding.ndim != 3:
       raise DimensionalityError(f"Embedding doesn't have 3 dimensions, but {embedding.ndim}")
 
@@ -235,7 +242,7 @@ class Image:
 
     x_embedding_dim, y_embedding_dim, z_embedding_dim = embedding.shape
 
-    end_coord = math.Coordinate(
+    end_coord = math.Index(
       min(start_coord.x + x_embedding_dim, x_dim),
       min(start_coord.y + y_embedding_dim, y_dim),
       min(start_coord.z + z_embedding_dim, z_dim)
@@ -327,10 +334,10 @@ DataContainer = Union[
 
 def get_image_data(container:  DataContainer) -> ndarray:
   if isinstance(container, Image):
-    return container.raw
+    return container.raw.astype(float32)
   elif isinstance(container, nibabel.nifti1.Nifti1Image):
     return container.get_fdata(dtype=float32)
   elif isinstance(container, nibabel.nifti2.Nifti2Image):
     return container.get_fdata(dtype=float32)
   else:
-    return container
+    return container.astype(float32)

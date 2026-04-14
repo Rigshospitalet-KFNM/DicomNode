@@ -68,3 +68,11 @@ class DimensionalityError(Exception):
   """Raised when an object is expected to have a dimension of a certain degree
   but doesn't
   """
+
+class ContractViolation(Exception):
+  """Raised exception when something impossible have happened. You should never
+  see this or except it"""
+
+
+class GPUError(Exception):
+  """The GPU encountered an exception"""

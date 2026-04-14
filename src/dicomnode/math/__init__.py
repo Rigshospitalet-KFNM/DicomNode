@@ -21,6 +21,8 @@ from dicomnode.math.types import MirrorDirection, CudaErrorEnum, CudaException, 
 
 # Module Imports
 from . import types
+from dicomnode.math import gpu_helpers
+
 
 # Cuda code
 try:
@@ -70,16 +72,6 @@ def transpose_nifti_coords(input_data: numpy.ndarray):
   """
   return numpy.fliplr(switch_ordering(input_data))
 
-def center_of_gravity(data: numpy.ndarray):
-    ndims = data.ndim
-    imadim = data.shape
-    center_of_gravity = numpy.zeros((ndims,), dtype=int)
-
-    # loop over each dimension to find center
-    for dim in range(0,ndims):
-        center_of_gravity[dim] = numpy.sum(range(0,imadim[dim])*numpy.sum(data, axis=dim))//numpy.sum(numpy.sum(data, axis=dim))
-
-    return center_of_gravity
 
 def mirror_inplace_gpu(arr: numpy_image, direction: MirrorDirection):
   """This mirrors the data inplace with a direction.
@@ -183,7 +175,7 @@ def _bounding_box_gpu(array):
 
 from . import image
 
-def center_of_gravity(image_: image.DataContainer):
+def center_of_gravity(image_: image.DataContainer) -> numpy.ndarray:
   data = image.get_image_data(image_)
 
   if data.ndim != 3:
@@ -191,7 +183,24 @@ def center_of_gravity(image_: image.DataContainer):
 
   if CUDA:
     from dicomnode.math import _cuda
-    _cuda.center_of_gravity(data)
+
+    answer = gpu_helpers.gpu_call(_cuda.center_of_gravity,data)
+
+    return numpy.array(answer, dtype=numpy.float32)
+  else: #pragma: no cover
+    return cpu_center_of_gravity(image_)
+
+def cpu_center_of_gravity(image_: image.DataContainer):
+  data = image.get_image_data(image_)
+
+  coords = numpy.indices(data.shape)
+
+  total = data.sum()
+  cx = (coords[0] * data).sum() / total
+  cy = (coords[1] * data).sum() / total
+  cz = (coords[2] * data).sum() / total
+
+  return numpy.array([cx, cy, cz], dtype=numpy.float32)
 
 
 def bounding_box(array) -> Tuple[Tuple[int,int],...]:
@@ -208,7 +217,12 @@ def bounding_box(array) -> Tuple[Tuple[int,int],...]:
     return _bounding_box_cpu(array)
 
 @dataclass(slots=True, frozen=True)
-class Coordinate:
+class Index:
+  """An index into an volume. Because it's
+
+  Returns:
+      _type_: _description_
+  """
   x: int
   y: int
   z: int

@@ -84,7 +84,7 @@ class _LibraryPaths:
 
       if not path.exists(): # pragma: no cover
         path.mkdir(parents=True, exist_ok=True) # Mainly here in cases of multithreading
-    except PermissionError:
+    except PermissionError: # pragma: no cover
       setattr(self, key, None)
 
   def __str__(self):

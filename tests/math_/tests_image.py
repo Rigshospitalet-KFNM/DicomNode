@@ -7,7 +7,7 @@ import numpy
 
 # Dicomnode modules
 from dicomnode.lib.exceptions import DimensionalityError
-from dicomnode.math import Coordinate
+from dicomnode.math import Index
 from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space, ReferenceSpace
 from dicomnode.math.image import fit_image_into_unsigned_bit_range, Image
@@ -430,7 +430,7 @@ class ImageTestCase(DicomnodeTestCase):
     image_data = numpy.zeros((4,4,4))
     image = Image(image_data, self.space_ras)
 
-    coord = Coordinate(1,1,1)
+    coord = Index(1,1,1)
     slice_to_embed = numpy.ones((2,2,2))
 
     image.embed_image(coord, slice_to_embed)
@@ -461,7 +461,7 @@ class ImageTestCase(DicomnodeTestCase):
     image_data = numpy.zeros((4,4,4))
     image = Image(image_data, self.space_ras)
 
-    coord = Coordinate(1,1,1)
+    coord = Index(1,1,1)
     slice_to_embed = numpy.ones((2,2))
 
     self.assertRaises(DimensionalityError, image.embed_image, coord, slice_to_embed)
@@ -470,7 +470,7 @@ class ImageTestCase(DicomnodeTestCase):
     image_data = numpy.zeros((4,4,4))
     image = Image(image_data, self.space_ras)
 
-    coord = Coordinate(1,1,1)
+    coord = Index(1,1,1)
     slice_to_embed = numpy.ones((5,5,5))
 
     image.embed_image(coord, slice_to_embed)

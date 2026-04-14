@@ -36,24 +36,6 @@ std::tuple<dicomNodeError_t, std::tuple<f32,f32,f32>> python_center_of_gravity(c
 
   if (image_dtype.is(pybind11::dtype::of<f32>())) {
     return tpl_python_center_of_gravity<f32>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<f64>())){
-      return tpl_python_center_of_gravity<f64>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<i8>())){
-      return tpl_python_center_of_gravity<i8>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<i16>())) {
-      return tpl_python_center_of_gravity<i16>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<i32>())) {
-      return tpl_python_center_of_gravity<i32>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<i64>())) {
-      return tpl_python_center_of_gravity<i64>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<u8>())) {
-      return tpl_python_center_of_gravity<u8>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<u16>())) {
-      return tpl_python_center_of_gravity<u16>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<u32>())) {
-      return tpl_python_center_of_gravity<u32>(image);
-  } else if (image_dtype.is(pybind11::dtype::of<u64>())) {
-      return tpl_python_center_of_gravity<u64>(image);
   }
 
   return std::make_tuple(dicomNodeError_t::INPUT_TYPE_ERROR, std::make_tuple(-1.0f,-1.0f, -1.0f));

@@ -1,5 +1,8 @@
 #pragma once
 
+#include<cuda/cmath>
+#include<cuda/type_traits>
+
 #include"core/core.cuh"
 #include"linear_interpolation.cuh"
 #include"map_reduce.cuh"
@@ -7,13 +10,19 @@
 namespace REGISTRATION {
     template<typename T>
     struct IMAGE_DIFFERENCE {
-        static __device__ __host__ T map_to(u64 global_index, const Image<3, T>* image_1, const Image<3, T>* image_2) {
-            if (min(image_1->elements(), image_2->elements()) <= global_index){
+        static __device__ __host__ T map_to(u64 global_index, const Volume<3, T>* volume_1, const Volume<3, T>* volume_2) {
+            // ASSERT IMAGES ARE OF THE SAME SIZE
+
+            if (image_1->elements() <= global_index){
                 return identity();
             }
-
-            T t = image_1->data()[global_index] - image_2->data()[global_index]; // This is a problem for unsigned
-            return t < 0 ? -t : t; // I can't find good docs on abs...
+            T t;
+            if constexpr (cuda::std::is_unsigned_v<T>){
+                t = __usad(image_1->data[global_index], image_2->data[global_index], 0u);
+            } else {
+                t = cuda::std::abs(image_1->data[global_index] - image_2->data[global_index]);
+            }
+            return t * t;
         }
 
         static __device__ __host__ T apply(const T& a, const T& b) noexcept {
@@ -56,9 +65,6 @@ namespace REGISTRATION {
         Image<3, T>* device_source_image = nullptr;
         Image<3, T>* device_destination_image = nullptr;
         Image<3, T>* device_intermediate_image = nullptr;
-        // This pointer is a reference, so it shouldn't be freed
-        Image<3, T>* largest_image_ptr = nullptr;
-        Image<3, T>* smallest_image_ptr = nullptr;
 
 
         DicomNodeRunner runner{[&](dicomNodeError_t error) {
