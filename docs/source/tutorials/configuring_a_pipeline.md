@@ -88,7 +88,7 @@ Sometimes you want to create a report supplementing an image series or you want 
 ## Historic Inputs
 
 Sometimes you want historic images to compare against the current image.
-Dicomnode has a build-in for just that:
+Dicomnode has a build-in input for just that:
 `dicomnode.server.input.HistoricAbstractInput`. However sadly this is not plug
 and play solution as many things can go wrong. Hence this is why it has it own
 section. So please read this section carefully.
@@ -117,8 +117,8 @@ from pydicom import Dataset
   ... # Rest of the Dicomnode node configuration:
   input = {
     "SERIES_TYPE_1" : SERIES_1_INPUT, # Abstract Input Subtype
-    "SERIES_TYPE_2" : SERIES_2_INPUT # Abstract Input Subtype
-    "HISTORIC"      : HISTORIC_INPUT # Historic Abstract Input Sub type
+    "SERIES_TYPE_2" : SERIES_2_INPUT, # Abstract Input Subtype
+    "HISTORIC"      : HISTORIC_INPUT, # Historic Abstract Input Sub type
   }
 
   class Processor(AbstractProcessor):
@@ -148,7 +148,21 @@ impose restrictions:
   to StudyInstanceUID as example)
 
 If these Assumption or restrictions are backbreaking - Send patches with the
-wine.
+whine.
+
+### Modification to non-historic inputs
+
+The "common" use case that the library attempts to handle is: Comparison between
+old and new series of the same type. This poses a problem, where your normal
+input would accept and add both the historic and current series, which is not
+desirable because by default inputs assumes that there's only a single series in
+them. You also cannot solve this by adding `enforce_single_series` because if
+the historic series is added first, then the current series will be rejected.
+
+To solve this issue you must add `enforce_single_study_date = True` to all non
+historic inputs. When any non historic input accepts an image, the study_date
+attribute is set for ALL abstract inputs.
+
 
 ### A birds eye view of `HistoricAbstractInput`
 
@@ -187,73 +201,32 @@ historic input validates to true when It has finished a single connection to the
 
 #### C-FIND, C-MOVE - Query and Retrieve
 
-When dicom datasets are send from the source, the `add_image` is called for all
-`AbstractInput`s are called. The historic inputs `add_image` is a tad different.
-Instead of trying to add it calls:
-  `check_query_dataset(self, current_study: Dataset) -> Optional[Dataset]`
+To retrieve a history, you need to use the two DICOM Message Service Element
+**(DIMSE)** commands:
+
+* C_FIND - Used to index for the historic studies.
+* C_MOVE - Used to transfer the studies from your archive to the dicomnode for
+  processing.
+
+When the pivot dicom datasets are send from the source, the `add_image` is
+called for all `AbstractInput`s are called as normal, but The historic inputs
+`add_image` is a tad different. Instead of trying to add the image to itself,
+it calls:
+`check_query_dataset(self, current_study: Dataset, query_dataset: Optional[Dataset] = None) -> Optional[HistoricAction, Dataset]`
 Where the `current_study` argument is the dataset send by the source.
 
-**You must overwrite this function yourself**. If it returns `None` it indicates
-that the source dataset couldn't be used to generate the query dataset and
-nothing else happens. If you return a dataset, it's used to as the query dataset
-for a C-FIND against the `SCP` in the `address` attribute.
+This function purpose is to determine if the "current_study" should send a dimse
+message or not. It should return one of three things:
 
-Note that you can use `dicomnode.dicom.dimse.create_query_dataset` to easily
-create a valid query dataset. I recommend using `SERIES` level querying for the
-most precise control over which studies to retrieve.
+* None - The current study should not send any DIMSE message
+* Tuple[HistoricAction.FIND_QUERY, Dataset] - Dicomnode should send a C-FIND
+  with the dataset as the querying dataset
+* Tuple[HistoricAction.MOVE_QUERY, Dataset] - Dicomnode should send a C-MOVE
+  with the dataset as the querying dataset
 
-You can see what Tags are relevant in the Conformance statement of your SCP.
-
-It's often difficult to craft a C-FIND query, that only includes exactly what
-you want, as a matter of fact it's ill advised, since there might a type of
-dataset, that you fail to account for. Instead you should craft a query dataset
-from each relevant find response.
-
-This is what:
-`handle_found_dataset(self, found_dataset: Dataset) -> Optional[Dataset]:`
-method is for which is another method you **MUST** implement in your historic
-input.
-
-Again if you return a dataset that will be used for a C-Move, while if you
-return, the node considers the series irrelevant.
-
-### What is going to go wrong:
-
-In the bird eye view we assumed that nothing went wrong and we'll explore what
-can go wrong.
-
-#### Historic data masquerading as current data
-
-If we get historic scans, they will pass the filters that is in place for the
-other inputs. So they'll be filled into our non historic inputs, which is
-problem because they'll overwrite / extend the inputs contents.
-
-To fix this problem you should add `enforce_single_study_date = True` like:
-
-```python
-
-class InputSeries1(AbstractInput)
-  ... # All normal stuff
-
-  enforce_single_study_date = True
-
-class InputSeries2(AbstractInput)
-  ... # All normal stuff
-
-  enforce_single_study_date = True
-
-class HistoricInput(HistoricAbstractInput)
-  ...
-
-```
-This will cause the inputs to reject Datasets with an older study date than the
-first accepted dataset. Note that it's the first globally accepted dataset, that
-determines the pivot study date.
-As a likely error is that creating association only supplies datasets for 1
-input, then the historic association gets datasets for both inputs, that would
-be accepted unless a `enforce_single_study_date` is enabled.
-
-Likewise Historic Input rejects studies with the same study date, as the pivot
-study date.
-
-#### Really dumb series
+`check_query_dataset` is called once from pivot series with `query_dataset=None`
+and for each C-FIND response with the `query_dataset` equal to the dataset used
+for the query. You can (and should) chain C-FINDs together such that you only
+request the series you need.
+This is because most DICOM studies contain a lot of auxiliary data, that in best
+case just takes extra time.
