@@ -271,6 +271,7 @@ class AbstractPipeline():
         STUDY_EXPIRATION_DAYS=self.study_expiration_days,
         PATIENT_IDENTIFIER_TAG=self.patient_identifier_tag,
         LAZY_STORAGE=self.lazy_storage,
+        IDENTIFIER=DicomIdentifier(identifying_tag=self.patient_identifier_tag),
         AE_TITLE=self.ae_title,
         IP=self.ip,
         PORT=self.port,
@@ -286,11 +287,8 @@ class AbstractPipeline():
 
     self.config = config
 
-    self.identifier = DicomIdentifier(identifying_tag=self.patient_identifier_tag)
-
     self.data_state = PipelineStorage(
       self.input,
-      self.identifier,
       self.config
     )
 
@@ -427,8 +425,9 @@ class AbstractPipeline():
       )
 
       parallel_primitive = ParallelPrimitive.THREAD if self.processing_directory is None else ParallelPrimitive.PROCESS
-      primitive = Parallel(parallel_primitive, self.Processor, args)
+      primitive = Parallel(parallel_primitive, self.Processor, args, capture_output=True)
       primitive.join()
+      output = primitive.get_output()
 
       if primitive.is_successful():
         self.logger.info(f"process {patient_id} successful, Removing {patient_id}'s images")
@@ -436,6 +435,11 @@ class AbstractPipeline():
       else:
         self.logger.error(f"Failed to process {patient_id}!")
 
+      if output.stdout != "":
+        self.logger.info(f"Program had output:\n{output.stdout}")
+
+      if output.stderr != "":
+        self.logger.error(f"Program had error:\n{output.stderr}")
 
 
   ##### User functions ######

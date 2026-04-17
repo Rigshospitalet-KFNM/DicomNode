@@ -72,7 +72,6 @@ class PipelineStorageTestCase(DicomnodeTestCase):
 
     target = PipelineStorage(
       {"input" : HungryInput},
-      DicomIdentifier(identifying_tag=0x0010_0020),
       config_from_raw()
     )
 

@@ -43,11 +43,10 @@ class PipelineStorage:
 
   def __init__(self,
                node_structure: Dict[str, Type[AbstractInput]],
-               identifier: DicomIdentifier,
                config: DicomnodeConfig
                ) -> None:
 
-    self.identifier = identifier
+    self.identifier = config.IDENTIFIER
     self.node_structure = node_structure
     self.config = config
 

@@ -2,14 +2,23 @@
 library"""
 
 # Python standard library
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from io import StringIO
 from logging import getLogger
-from threading import Thread
 import multiprocessing
+import sys
+from threading import Thread
+from typing import Optional
 
 # Dicomnode modules
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
+
+@dataclass
+class ProgramOutput:
+  stdout : str
+  stderr : str
 
 
 
@@ -39,7 +48,7 @@ class ProcessLikeThread(Thread):
     return self._return
 
 def spawn_thread(thread_function, *args, name=None, **kwargs):
-  logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger(DICOMNODE_LOGGER_NAME)
   thread = ProcessLikeThread(
     target=thread_function, args=args, name=name, kwargs=kwargs
   )
@@ -52,14 +61,45 @@ def spawn_thread(thread_function, *args, name=None, **kwargs):
 
   return thread
 
-def spawn_process(process_function, *args, start=True,name=None, context=None, **kwargs):
-  logger = kwargs['logger'] if 'logger' in kwargs else getLogger("dicomnode")
+
+def _spawn_main(output_queue, process_function, args, kwargs): #pragma: no cover
+  """This function is called from spawn process, it sets up the messaging be
+
+  Args:
+      output_queue (_type_): _description_
+      process_function (_type_): _description_
+      args (_type_): _description_
+      kwargs (_type_): _description_
+  """
+  stdout_capture = StringIO()
+  stderr_capture = StringIO()
+
+  if output_queue is not None:
+    sys.stdout = stdout_capture
+    sys.stderr = stderr_capture
+
+  try:
+    process_function(*args, **kwargs)
+  finally:
+    if output_queue is not None:
+      output_queue.put(ProgramOutput(
+        stdout_capture.getvalue(),
+        stderr_capture.getvalue()
+      ))
+
+def spawn_process(process_function, *args, start=True, name=None, context=None, capture_output=None, **kwargs):
+  logger = kwargs['logger'] if 'logger' in kwargs else getLogger(DICOMNODE_LOGGER_NAME)
 
   if context is None:
     context = multiprocessing.get_context('spawn')
 
+  if capture_output is None:
+    output_queue = None
+  else:
+    output_queue: Optional[multiprocessing.Queue[ProgramOutput]] = context.Queue()
+
   process = context.Process(
-    target=process_function, args=args, name=name
+    target=_spawn_main, args=(output_queue, process_function, args, kwargs ), name=name
   )
 
   if start:
@@ -69,14 +109,18 @@ def spawn_process(process_function, *args, start=True,name=None, context=None, *
 
   logger.debug(log_message)
 
-  return process
+  return process, output_queue
 
 
 class Parallel:
   primitive: ProcessLikeThread | Process
-  def __init__(self, primitive: ParallelPrimitive, target, *args, **kwargs) -> None:
+  def __init__(self, primitive: ParallelPrimitive, target, *args, capture_output=None, **kwargs) -> None:
+    self.queue = None
+    self._program_output: Optional[ProgramOutput] = None
     if primitive == ParallelPrimitive.PROCESS:
-      self.primitive = spawn_process(target, *args, **kwargs, context=MULTIPROCESSING)
+      primitive_, queue = spawn_process(target, *args, capture_output=capture_output, **kwargs, context=MULTIPROCESSING)
+      self.primitive = primitive_
+      self.queue = queue
     elif primitive == ParallelPrimitive.THREAD:
       self.primitive = spawn_thread(target, *args, **kwargs)
     else: # pragma: no cover
@@ -106,8 +150,8 @@ class Parallel:
       return -1
 
   def is_successful(self):
-    if self.primitive.is_alive():
-      raise RuntimeError("Parallel Primitive is still alive, join first")
+    if self.primitive.is_alive(): # pragma: no cover
+      self.join()
 
     match self.primitive:
       case Process():
@@ -121,7 +165,16 @@ class Parallel:
         return "Process"
       case ProcessLikeThread():
         return "Thread"
-    # pragma: no cover
-    logger = getLogger(DICOMNODE_LOGGER_NAME)
-    logger.critical(f"The Primitive is not a thread or Process")
-    return "Unknown"
+      case _:     # pragma: no cover
+        logger = getLogger(DICOMNODE_LOGGER_NAME)
+        logger.critical(f"The Primitive is not a thread or Process")
+        return "Unknown"
+
+  def get_output(self) -> ProgramOutput:
+    if self.queue is None:
+      return ProgramOutput("", "")
+    elif self._program_output is None:
+      self.join()
+      self._program_output = self.queue.get()
+      self.queue.close()
+    return self._program_output

@@ -46,7 +46,7 @@ void apply_cuda_management_module(pybind11::module& m){
          << "Compute capability: " << prop.major << "." << prop.minor << "\n"
          << "Total memory: " << get_byte_string(prop.totalGlobalMem) << "\n"
          << "Shared memory: " << get_byte_string(prop.sharedMemPerBlock) << "\n"
-         << "Shared memory (optin): " << get_byte_string(prop.sharedMemPerBlock) << "\n"
+         << "Shared memory (opt in): " << get_byte_string(prop.sharedMemPerBlock) << "\n"
          << "Registers per block: " << get_byte_string(prop.regsPerBlock) << "\n"
          << "Registers per multiprocessor: " << get_byte_string(prop.regsPerMultiprocessor);
       return ss.str();

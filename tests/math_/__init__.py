@@ -17,8 +17,6 @@ from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 ct_image_path = library_paths.report_data_directory / "CT_nifti" / "CT.nii"
 ct_brain_path = library_paths.report_data_directory / "CT_nifti" / "segmentation" / "brain.nii.gz"
 
-
-
 class MathTestCases(DicomnodeTestCase):
   def test_row_to_column(self):
     shape = (4,3,2)
@@ -40,8 +38,6 @@ class MathTestCases(DicomnodeTestCase):
        [ 5.0, 11.0, 17.0, 23.0],
       ]
     ])
-
-
 
   @skipIf(not CUDA, "You need GPU for this test")
   def test_center_of_gravity(self):
@@ -79,44 +75,6 @@ class MathTestCases(DicomnodeTestCase):
     self.assertEqual(cog[0], 1.5)
     self.assertEqual(cog[1], 1.5)
     self.assertEqual(cog[2], 1.5)
-
-  @skipIf(True, "This is just here to performance test - You need GPU")
-  def test_center_of_gravity_performance_test(self):
-    import time
-    from dicomnode.dicom.series import extract_image
-    from dicomnode.math.image import mask_image
-    from dicomnode.math import center_of_gravity, cpu_center_of_gravity
-    nifti: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(ct_image_path) # type: ignore
-    image = extract_image(nifti)
-
-    seg_nifti: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(ct_brain_path) # type: ignore
-
-    seg_image = extract_image(seg_nifti)
-    masked_image = mask_image(image, seg_image)
-
-    runtimes_gpu = []
-    runtimes_cpu = []
-
-    for i in range(10):
-      start = time.perf_counter()
-      gpu_cog = center_of_gravity(masked_image)
-      end = time.perf_counter()
-
-      runtimes_gpu.append(end - start)
-
-    for i in range(10):
-      start = time.perf_counter()
-      cpu_cog =  cpu_center_of_gravity(masked_image)
-      end = time.perf_counter()
-
-      runtimes_cpu.append(end - start)
-
-    print(numpy.mean(runtimes_cpu))
-    print(numpy.mean(runtimes_gpu))
-    self.assertTrue((numpy.array(gpu_cog) - numpy.array(cpu_cog) < 0.0001).all()) # type: ignore
-
-
-
 
 
 from . import tests_affine

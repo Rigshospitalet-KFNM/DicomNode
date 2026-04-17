@@ -18,7 +18,7 @@ from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class MaintenanceTestCases(DicomnodeTestCase):
   def test_calculate_time_from_1_before_midnight(self):
-    storage_to_clean = PipelineStorage({},DicomIdentifier(identifying_tag=0x0010_0020), config_from_raw())
+    storage_to_clean = PipelineStorage({}, config_from_raw())
     maintenance_thread = MaintenanceThread(storage_to_clean, 1)
 
     self.assertEqual(maintenance_thread._seconds_in_a_day,
@@ -27,7 +27,7 @@ class MaintenanceTestCases(DicomnodeTestCase):
     ))
 
   def test_calculate_time_from_midnight(self):
-    storage_to_clean = PipelineStorage({},DicomIdentifier(identifying_tag=0x0010_0020), config_from_raw())
+    storage_to_clean = PipelineStorage({}, config_from_raw())
     maintenance_thread = MaintenanceThread(storage_to_clean, 1)
 
     self.assertEqual(maintenance_thread._seconds_in_a_day,
@@ -36,7 +36,7 @@ class MaintenanceTestCases(DicomnodeTestCase):
     ))
 
   def test_calculate_time_from_1_after_midnight(self):
-    storage_to_clean = PipelineStorage({},DicomIdentifier(identifying_tag=0x0010_0020), config_from_raw())
+    storage_to_clean = PipelineStorage({}, config_from_raw())
     maintenance_thread = MaintenanceThread(storage_to_clean, 1)
 
     self.assertEqual(maintenance_thread._seconds_in_a_day - 60,
@@ -49,7 +49,7 @@ class MaintenanceTestCases(DicomnodeTestCase):
       def validate(self):
         return False
 
-    storage_to_clean = PipelineStorage({"input" : Input},DicomIdentifier(identifying_tag=0x0010_0020), config_from_raw())
+    storage_to_clean = PipelineStorage({"input" : Input}, config_from_raw())
     dataset = Dataset()
     dataset.PatientID = "test"
     dataset.SOPInstanceUID = gen_uid()

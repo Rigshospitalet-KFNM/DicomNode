@@ -57,46 +57,46 @@ transfer_syntax = [
 
 #region TestCase
 class RejectionTestCase(DicomnodeTestCase):
-  def setUp(self):
-    self.node = RejectionAETitle()
-    self.port = randint(1025,65535)
-    self.node.port = self.port
-
-
   def tearDown(self) -> None:
     clear_logger(DICOMNODE_LOGGER_NAME)
     clear_logger(DICOMNODE_PROCESS_LOGGER)
 
-    self.node.close()
     super().tearDown()
 
   def test_rejection(self):
-    with self.assertLogs(self.node.logger) as cm:
-      self.node.open(blocking=False)
+    node = RejectionAETitle()
+    port = randint(1025,65535)
+    node.port = port
+
+
+    with self.assertLogs(node.logger) as cm:
+      node.open(blocking=False)
     ae = ApplicationEntity(ae_title="NOT_KNOWN")
     self.assertRegexIn("Starting Server at address: * and AE: REJECT", cm.output)
     sleep(0.005)
     ae.add_requested_context(Verification, transfer_syntax)
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', self.port, ae_title="NOT TARGET")
+      assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
       self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection NOT_KNOWN rejected a connection', recorded_logs.output)
 
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', self.port, ae_title="REJECT")
+      assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
       self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection NOT_KNOWN rejected a connection', recorded_logs.output)
 
     ae.ae_title = ACCEPTED_AE_TITLE
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', self.port, ae_title="NOT TARGET")
+      assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
       self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection {ACCEPTED_AE_TITLE} rejected a connection', recorded_logs.output)
 
-    with self.assertLogs(self.node.logger, DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', self.port, ae_title="REJECT")
+    with self.assertLogs(node.logger, DEBUG) as recorded_logs:
+      assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
       self.assertTrue(assoc.is_established)
       responds = assoc.send_c_echo()
       self.assertEqual(responds.Status, 0x0000)
       assoc.release()
     self.assertIn(f'DEBUG:dicomnode:Connection {ACCEPTED_AE_TITLE} send an echo', recorded_logs.output)
+
+    node.close()

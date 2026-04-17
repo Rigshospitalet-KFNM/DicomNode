@@ -21,7 +21,6 @@ namespace INTERPOLATION {
     }
   }
 
-
   template<typename T>
   __global__ void kernel_interpolation_linear(
     const Image<3, T>* src_image,
@@ -102,24 +101,7 @@ namespace INTERPOLATION {
     const InterpolationIntermediateCalculation cheats,
     T* destination_data
   ) {
-
-    /*
-    constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.z + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.x + 1 };
-    __shared__ T shared_image_ptr[(THREAD_BLOCK_3D.x + 1)*(THREAD_BLOCK_3D.y + 1)*(THREAD_BLOCK_3D.z + 1)];
-    const Index<3> offset_index{
-      blockDim.x * blockIdx.x,
-      blockDim.y * blockIdx.y,
-      blockDim.z * blockIdx.z,
-    };
-
-    Volume<3, T> shared_volume = sub_volume<T>(
-      source_volume,
-      shared_image_ptr,
-      shared_extent,
-      offset_index
-    );
-    */
-
+    
     const Index<3> global_index = get_gidx();
     FlatIndex flat_global_index = destination_extent.flat_index(global_index);
     if (flat_global_index.has_value()) {

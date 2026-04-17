@@ -44,8 +44,7 @@ struct FlagVal {
 __device__ uint32_t get_shared_id(uint32_t* counter){
   __shared__ uint32_t address;
   if(threadIdx.x == 0){
-    uint32_t local = atomicAdd(counter, 1);
-    address = local;
+    address = atomicAdd(counter, 1);;
   }
   __syncthreads();
   return address;

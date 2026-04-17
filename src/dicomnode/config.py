@@ -43,14 +43,18 @@ class DicomnodeConfigRaw:
 @dataclass
 class DicomnodeConfig:
   from dicomnode.lib.io import Directory, File
+  from dicomnode.dicom import DicomIdentifier
   STUDY_EXPIRATION_DAYS : int
   PATIENT_IDENTIFIER_TAG : int
   LAZY_STORAGE : bool
+
+  IDENTIFIER : DicomIdentifier
 
   # AE CONFIG
   AE_TITLE : str
   IP : str
   PORT : int
+
 
   REQUIRED_CALLED_AET : bool
 
@@ -72,9 +76,12 @@ def default_to(value, default):
 
 def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
   from dicomnode.lib.io import Directory, File
+  from dicomnode.dicom import DicomIdentifier
   study_expiration_days  = default_to(config.STUDY_EXPIRATION_DAYS, 14)
   patient_identifier_tag = default_to(config.PATIENT_IDENTIFIER_TAG, 0x0010_0020)
   lazy_storage = default_to(config.LAZY_STORAGE, False)
+
+  identifier = DicomIdentifier(identifying_tag=patient_identifier_tag)
 
   ae_title = default_to(config.AE_TITLE, "DICOMNODE")
   ip = default_to(config.IP, "127.0.0.1")
@@ -97,6 +104,7 @@ def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
     study_expiration_days,
     patient_identifier_tag,
     lazy_storage,
+    identifier,
     ae_title,
     ip,
     port,

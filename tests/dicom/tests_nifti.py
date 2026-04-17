@@ -20,6 +20,8 @@ from dicomnode.dicom.nifti import convert_to_nifti
 from dicomnode.math import transpose_nifti_coords
 from dicomnode.math.image import Image
 
+
+from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers import generate_numpy_datasets
 
@@ -40,12 +42,12 @@ class DicomnodeDicomNifti(DicomnodeTestCase):
     nifti = convert_to_nifti(datasets.datasets, None, False)
     self.assertIsInstance(nifti, nifti1.Nifti1Image)
 
-  @skipIf(not CT_IMAGE_EXISTS, "Need a ct image in report_data/CT if this test need to work")
+  @skipIf(not test_data.USING_TEST_DATA, "Need a ct image in report_data/CT if this test need to work")
   def test_nifti_and_my_data_are_the_asdf(self):
     ct_datasets: List[Dataset] = [dcmread(p) for p in _PATHS] #type: ignore
     self.assertGreater(len(ct_datasets), 0)
 
-    nifti: nifti1.Nifti1Image = nibabel.load(NIFTI_PATH) #type: ignore
+    nifti = test_data.TEST_DATA.CT_IMAGE
     nifti_data = nifti.get_fdata(dtype='float32')
 
     ct_image = Image.from_datasets(ct_datasets)

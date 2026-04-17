@@ -32,15 +32,15 @@ struct Volume {
    *
    * @return Number of bytes required to contain the volume in data member
    */
-  [[nodiscard]] constexpr __device__ __host__ size_t size() const {
+  [[nodiscard]] constexpr __device__ __host__ size_t size() const noexcept {
     return m_extent.elements() * sizeof(T);
   }
 
-  constexpr  __device__ __host__  size_t elements() const {
+  constexpr  __device__ __host__  size_t elements() const noexcept {
     return m_extent.elements();
   }
 
-  [[nodiscard]] constexpr  __device__ __host__  bool is_allocated() const {
+  [[nodiscard]] constexpr  __device__ __host__  bool is_allocated() const noexcept {
     return data == nullptr;
   }
 
@@ -48,11 +48,11 @@ struct Volume {
     return m_extent.set_dimensions(dims);
   }
 
-  constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const {
+  constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const noexcept {
     return m_extent;
   }
 
-  [[nodiscard]] constexpr __device__ __host__ const T& at(const Index<DIMENSIONS>& index) const {
+  [[nodiscard]] constexpr __device__ __host__ const T& at(const Index<DIMENSIONS>& index) const noexcept {
     const FlatIndex flat_index = m_extent.flat_index(index);
 
     if(!flat_index.has_value()){

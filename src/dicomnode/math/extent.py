@@ -5,7 +5,23 @@ from collections.abc import Iterable
 import numpy
 
 class Extent:
-  """This class represents a domain or an extent in a linear space"""
+  """This class represents a domain or an extent in a linear space.
+  So if 0 <= x < X and 0 <= y < Y and ... then that points (x,y,...) is in the
+  domain or extent.
+
+  If an image have bounds then those bounds are the extent, it's just naming
+  from cuda, and I would like to avoid more names for the same thing.
+
+  Accepts args in
+  Args:
+    An iterable containing positives numbers in Z,Y,X order
+    int tuple: ...,Z,Y,X all positive
+
+
+  Raises:
+    ValueError - If arguments are not accepted
+    OverFlowError - An a dimension
+  """
 
   def __init__(self, *args) -> None:
     if len(args) == 0:

@@ -333,4 +333,5 @@ def fill_patient_storage_from_file_system(
   if not isinstance(pathlike, Directory):
     pathlike = Directory(pathlike)
 
-  storage.add_images(load_dicoms(pathlike.path))
+  for dataset in load_dicoms(pathlike.path):
+    storage.add_image(dataset)

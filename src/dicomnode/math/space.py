@@ -264,7 +264,7 @@ class Space:
     self._inverted_basis = inv(self.basis)
 
   def __str__(self):
-    return (f"Space over extend x: {self.extent.x}, y: {self.extent.y}, z: {self.extent.z}\n"
+    return (f"Space over extent x: {self.extent.x}, y: {self.extent.y}, z: {self.extent.z}\n"
             f"Starting point at ({self.starting_point[0]}, {self.starting_point[1]}, {self.starting_point[2]})\n"
             f"Basis:\n"
             f"{self.basis[0,0]} {self.basis[0,1]} {self.basis[0,2]}\n"
@@ -322,13 +322,12 @@ class Space:
         return ROTATION_MATRIX_90_DEG_Y
 
   def _rotate_extent(self, rotation_matrix):
-    new_extent = numpy.empty((3,), dtype=uint32)
 
-    new_extent[0] = self.extent[self._dominant_axis(rotation_matrix[0])]
-    new_extent[1] = self.extent[self._dominant_axis(rotation_matrix[1])]
-    new_extent[2] = self.extent[self._dominant_axis(rotation_matrix[2])]
-
-    return new_extent
+    return Extent(
+      self.extent[self._dominant_axis(rotation_matrix[0])],
+      self.extent[self._dominant_axis(rotation_matrix[1])],
+      self.extent[self._dominant_axis(rotation_matrix[2])]
+    )
 
   def _rotate_starting_point(self, rotation_matrix):
     new_starting_point = numpy.copy(self.starting_point)

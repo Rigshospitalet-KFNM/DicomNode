@@ -3,14 +3,14 @@ import sys
 import argparse
 import os
 import shutil
-import logging
+import textwrap
 import subprocess
 import re
 import psutil
 import threading
 from pathlib import Path
 from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
-from typing import  Set,  Union
+from typing import  Set, Union
 
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
@@ -20,6 +20,7 @@ os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = os.getcwd() + "/report_data"
 
 
 from tests.helpers import testing_logs
+from tests.helpers import test_data
 from tests.helpers.dicomnode_test_suite import BaseDicomnodeTestSuite
 
 class DicomnodeTestSuite(BaseDicomnodeTestSuite):
@@ -64,16 +65,42 @@ def handle_tests(running_suite: TestSuite,
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description="Testing tool for DicomNode library")
-  parser.add_argument("test_regex", default="test", nargs="?")
-  parser.add_argument("--verbose", "-v", type=int, default=1)
+  parser = argparse.ArgumentParser(
+    description="Testing tool for DicomNode library",
+    formatter_class=argparse.RawTextHelpFormatter
+  )
+  test_regex_help_message = textwrap.dedent("""\
+    A case-sensitive regex for which tests you wish to execute.
+  """)
+
+  parser.add_argument("test_regex", default="test", nargs="?", help=test_regex_help_message)
+
+  verbose_help_message = textwrap.dedent(
+    """Pythons unittest verbose variable:
+      * 0 - silent
+      * 1 - minimal
+      * 2 - verbose
+      * 3 - still verbose
+    Defaults to 1
+    """
+  )
+  parser.add_argument("--verbose", "-v", type=int, metavar="VERBOSITY", default=1, help=verbose_help_message)
   parser.add_argument("-nc", "--no_clean_up", action='store_true')
   parser.add_argument("-p", "--performance", action='store_true')
   if PYTHON_3_12_PLUS:
     parser.add_argument("-d", "--duration", action='store_true')
 
+  big_data_help = textwrap.dedent("""\
+    runs tests with big datasets.
+  """)
+  parser.add_argument("--test-data", action='store_true', help="")
+
+
   args = parser.parse_args()
   testing_logs()
+
+  test_data.USING_TEST_DATA = args.test_data
+
 
   if PYTHON_3_12_PLUS:
     if args.duration:

@@ -18,6 +18,7 @@ from pylatex import NewPage, Section, base_classes
 
 # Dicomnode Imports
 from dicomnode import library_paths
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.io import save_dicom
 from dicomnode.lib.exceptions import InvalidLatexCompiler
 from dicomnode.dicom import generate_uid, make_meta
@@ -31,6 +32,7 @@ from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 from dicomnode.report.plot.triple_plot import TriplePlot
 
+from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 if validate_compiler_installed(LaTeXCompilers.XELATEX):
@@ -38,11 +40,7 @@ if validate_compiler_installed(LaTeXCompilers.XELATEX):
 else:
   SKIP_REPORT_TESTS = False
 
-nifti_path = Path(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz')
 figure_image_path = Path(f"{library_paths.report_data_directory}/report_image.png")
-
-if nifti_path.exists():
-  nifti_image: nibabel.nifti1.Nifti1Image = nibabel.loadsave.load(f'{library_paths.report_data_directory}/someones_anatomy.nii.gz') # type: ignore
 
 
 class GeneratorTestCase(DicomnodeTestCase):
@@ -57,7 +55,7 @@ class GeneratorTestCase(DicomnodeTestCase):
 
     # Assert once there's a stable interface
 
-  @skipIf(SKIP_REPORT_TESTS or not nifti_path.exists() or not figure_image_path.exists(), f"Needs an image to plot - Valid compiler: {SKIP_REPORT_TESTS} - {nifti_path} exists: { nifti_path.exists()} - {figure_image_path} exists: {figure_image_path.exists()}")
+  @skipIf(SKIP_REPORT_TESTS or not test_data.USING_TEST_DATA or not figure_image_path.exists(), f"Needs Test data")
   def test_report(self):
     dataset = Dataset()
 
@@ -83,7 +81,7 @@ class GeneratorTestCase(DicomnodeTestCase):
 
     test_header_doc = f"{library_paths.report_directory}/test_doc"
     triple_plot_options = TriplePlot.Options(file_path=f"{library_paths.figure_directory}/report_figure.png")
-    triple_plot = TriplePlot(nifti_image, options=triple_plot_options)
+    triple_plot = TriplePlot(test_data.TEST_DATA.CT_IMAGE, options=triple_plot_options)
 
     table = Table(Table.TableStyle.FULL, Alignment=['l', 'c', 'r', 'X', 'X'], Rows=[
       ["Hello", "World", "I should put a grafic in here", 'Bla?', "Bla!"],
@@ -101,7 +99,6 @@ class GeneratorTestCase(DicomnodeTestCase):
     dicom_frame.append("Bla bla bla")
     dicom_frame.append("Bla bla bla")
 
-
     report = Report(test_header_doc)
     report.append(document_header)
     report.append(patient_header)
@@ -114,7 +111,9 @@ class GeneratorTestCase(DicomnodeTestCase):
     with dicom_frame.create(Section("Created section")) as created_section:
       created_section.append("Blah blah blah")
 
-    report.generate_pdf()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      report.generate_pdf()
+
     factory = DicomFactory()
 
     encoded_report = factory.encode_pdf(report, [dataset], default_report_blueprint)
@@ -150,7 +149,9 @@ class GeneratorTestCase(DicomnodeTestCase):
     report.append(NewPage())
     report.append(Section("Section 4"))
 
-    report.generate_pdf()
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      report.generate_pdf()
+
     factory = DicomFactory()
 
     encoded_report = factory.encode_pdf(report, datasets, SECONDARY_IMAGE_REPORT_BLUEPRINT)

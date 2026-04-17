@@ -434,20 +434,21 @@ class SpaceTestCases(DicomnodeTestCase):
     self.assertEqual(translated_space.starting_point[0], self.space.starting_point[0] + 1)
 
   def test_space_translation_throws_on_invalid_input(self):
-    not_so_affine =numpy.eye(5)
+    not_so_affine = numpy.eye(5)
     self.assertRaises(ValueError, translate_space, self.space, not_so_affine)
 
   def test_space_to_string(self):
     space_strings = [
       "Space over extent x: 100, y: 100, z: 100",
       "Starting point at (3.0, 3.0, 3.0)",
-      "Basis:"
+      "Basis:",
       "3.0 0.0 0.0",
       "0.0 3.0 0.0",
       "0.0 0.0 3.0",
     ]
+    expected_string = "\n".join(space_strings)
 
-    self.assertEqual(str(self.space),"\n".join(space_strings))
+    self.assertEqual(str(self.space),expected_string)
 
   def test_space_z_dominant(self):
     self.assertEqual(self.space._dominant_axis([0,1,2]),2)
