@@ -82,7 +82,7 @@ class PatientNodeTestCase(DicomnodeTestCase):
     study_date = "20200101"
     not_study_date = "20210101"
 
-    node = PatientNode({ 'node' : Input}, config)
+    node = PatientNode(self._testMethodName, { 'node' : Input}, config)
     node.add_dataset(generate_dataset(study_date))
 
     self.assertRaises(InvalidDataset, node.add_dataset, generate_dataset(not_study_date))
@@ -93,12 +93,12 @@ class PatientNodeTestCase(DicomnodeTestCase):
 
 
   def test_patient_node_raises_on_no_accept(self):
-    node = PatientNode({ 'node' : Input}, config_from_raw())
+    node = PatientNode(self._testMethodName,{ 'node' : Input}, config_from_raw())
 
     self.assertRaises(InvalidDataset, node.add_dataset, Dataset())
 
   def test_input_study_sets_both_inputs_study_date(self):
-    node = PatientNode({
+    node = PatientNode(self._testMethodName,{
       'ct' : CTInput,
       'pet' : PETInput
     }, config_from_raw())
@@ -121,7 +121,7 @@ class PatientNodeTestCase(DicomnodeTestCase):
     self.assertTrue(node.validate())
 
   def test_patient_node_study_date_works_with_infinite_job_security_no_magic_first(self):
-    node = PatientNode({
+    node = PatientNode(self._testMethodName, {
       'infinite_job' : CTInput | MRInput,
       'pet' : PETInput
     }, config_from_raw())

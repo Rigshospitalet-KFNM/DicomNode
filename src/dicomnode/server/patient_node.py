@@ -23,6 +23,7 @@ from dicomnode.server.input import AbstractInput
 class PatientNode:
   def __init__(
       self,
+      node_id: str,
       node_structure: Dict[str, Type[AbstractInput]],
       config: DicomnodeConfig
     ) -> None:

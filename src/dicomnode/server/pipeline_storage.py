@@ -50,8 +50,8 @@ class PipelineStorage:
     self.node_structure = node_structure
     self.config = config
 
-    def create_patient_node():
-      return PatientNode(node_structure, config)
+    def create_patient_node(key):
+      return PatientNode(key, node_structure, config)
 
     self.storage: DefaultingDict[str, PatientNode] = DefaultingDict(create_patient_node)
     self.thread_registration: DefaultingDict[str, set[int]] = DefaultingDict(create_set)
