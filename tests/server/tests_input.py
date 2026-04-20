@@ -25,6 +25,7 @@ from pydicom.uid import UID, SecondaryCaptureImageStorage
 from tests.helpers import generate_numpy_datasets, TESTING_TEMPORARY_DIRECTORY
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from dicomnode.lib.validators import RegexValidator, CaselessRegexValidator, NegatedValidator
+from dicomnode.data_structures.optional import OptionalPath
 from dicomnode.dicom.dimse import Address, create_query_dataset, QueryLevels
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.dicom.series import DicomSeries
@@ -33,7 +34,7 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.server.grinders import NumpyGrinder
 from dicomnode.config import DicomnodeConfig, DicomnodeConfigRaw, config_from_raw
 from dicomnode.server.input import AbstractInput, HistoricAbstractInput,\
-  DynamicInput, DynamicLeaf, AbstractInputProxy
+  DynamicInput, AbstractInputProxy
 
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 correct_date_format = "%Y/%m/%d %H:%M:%S"
@@ -60,19 +61,6 @@ class TestInput(AbstractInput):
   def validate(self) -> bool:
     return True
 
-class TestDynamicInput(DynamicInput):
-  required_tags = [0x0020000D, 0x00100020, 0x00080018]
-  image_grinder = NumpyGrinder()
-
-  def validate(self) -> bool:
-    return len(self.data) >= 2
-
-class TestLazyDynamicMissingPathInput(DynamicInput):
-  required_tags = [0x0020000D, 0x00100020, 0x00080018]
-  image_grinder = NumpyGrinder()
-
-  def validate(self) -> bool:
-    return len(self.data) >= 2
 
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
@@ -81,10 +69,11 @@ class InputTestCase(DicomnodeTestCase):
   def setUp(self) -> None:
     os.chdir(TESTING_TEMPORARY_DIRECTORY)
     self.input_directory = Directory(Path(self._testMethodName))
+    self.node_path = OptionalPath(self.input_directory.path)
     self.options = config_from_raw(DicomnodeConfigRaw(
       ARCHIVE_DIRECTORY=self._testMethodName
     ))
-    self.test_input = TestInput(self.options)
+    self.test_input = TestInput(self.options, node_path=self.node_path)
     self.logger = logger
 
   def tearDown(self) -> None:
@@ -128,7 +117,9 @@ class InputTestCase(DicomnodeTestCase):
 
     test_dataset = Dataset()
     test_dataset.SOPInstanceUID = gen_uid()
+    test_dataset.SOPClassUID = SecondaryCaptureImageStorage
     test_dataset.Modality = 'CT'
+    make_meta(test_dataset)
 
     a_mock.assert_not_called()
     added_images = test_instance.add_image(test_dataset)
@@ -143,7 +134,9 @@ class InputTestCase(DicomnodeTestCase):
 
     test_dataset_2 = Dataset()
     test_dataset_2.SOPInstanceUID = gen_uid()
+    test_dataset_2.SOPClassUID = SecondaryCaptureImageStorage
     test_dataset_2.Modality = 'CT'
+    make_meta(test_dataset_2)
 
     self.assertEqual(test_instance.add_image(test_dataset_2), 1)
     a_mock.assert_called_once()
@@ -218,11 +211,9 @@ class InputTestCase(DicomnodeTestCase):
 
     HiHiHiHi = HeHeHeHe()
 
-    self.assertRaises(
-      InvalidDataset,
-      HiHiHiHi.add_images,
-      [dataset_PET, dataset_CT]
-    )
+    with self.assertRaises(InvalidDataset):
+      HiHiHiHi.add_image(dataset_PET)
+      HiHiHiHi.add_image(dataset_CT)
 
   def test_abstract_input_replacing_images_preserves_class_invariant(self):
     class NeverValidating(AbstractInput):
@@ -338,6 +329,61 @@ class InputTestCase(DicomnodeTestCase):
     self.assertRaises(IncorrectlyConfigured, EnforcingInput | NotEnforcingInput, config_from_raw())
 
 
+class DynamicTests(DicomnodeTestCase):
+  def test_dynamic_inputs_datasets_are_stored_in_different_folders(self):
+    def make_dataset(num):
+      dataset = Dataset()
+      dataset.SOPInstanceUID = gen_uid()
+      dataset.SOPClassUID = SecondaryCaptureImageStorage
+      dataset.SeriesNumber = num
+      dataset.InstanceNumber = 1
+      dataset.SeriesDescription = "Overlapping"
+      make_meta(dataset)
+
+      return dataset
+
+    class TestDynamicInput(DynamicInput):
+      separator_tag = 0x0020_0011
+
+      required_tags = [0x0020_0011, 0x0008_0018]
+      image_grinder = NumpyGrinder()
+
+      def validate(self) -> bool:
+        return len(self) >= 2
+
+    config = config_from_raw(DicomnodeConfigRaw(ARCHIVE_DIRECTORY=self._testMethodName))
+
+    input_ = TestDynamicInput(config, OptionalPath(self._testMethodName))
+
+    series = 5
+
+    datasets = [ make_dataset(num + 1) for num in range(series)]
+
+    for ds in datasets:
+      input_.add_image(ds)
+
+    path = Path(self._testMethodName)
+
+    expected_paths = [
+      path / "1",
+      path / "2",
+      path / "3",
+      path / "4",
+      path / "5"
+    ]
+
+    self.assertTrue(all(p.exists() for p in expected_paths))
+    self.assertEqual(len(input_), series)
+
+    for ds in datasets:
+      self.assertIn(ds, input_)
+
+
+
+
+
+
+
 
 class HistoricInput(HistoricAbstractInput):
   required_tags = ['SOPInstanceUID']
@@ -407,7 +453,6 @@ class HistoricTestcases(DicomnodeTestCase):
 
     self.assertRaises(InvalidDataset, input_.add_image, historic_input_dataset_4)
     self.assertEqual(1, input_.images)
-
 
     input_.thread.join()
     self.assertEqual(input_.state, HistoricAbstractInput.HistoricInputState.FILLED)

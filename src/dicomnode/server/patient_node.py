@@ -6,7 +6,9 @@ __author__ = "Demiguard"
 from datetime import datetime
 from functools import reduce
 import logging
+from operator import add
 from typing import Dict, Optional, Type
+from shutil import rmtree as remove_directory
 
 # Third party modules
 from pydicom import Dataset
@@ -19,7 +21,6 @@ from dicomnode.server.input_container import InputContainer
 from dicomnode.server.input import AbstractInput
 
 
-
 class PatientNode:
   def __init__(
       self,
@@ -27,7 +28,9 @@ class PatientNode:
       node_structure: Dict[str, Type[AbstractInput]],
       config: DicomnodeConfig
     ) -> None:
-    self._nodes: Dict[str, AbstractInput] = { key : InputType(config) for key, InputType in node_structure.items()}
+    self.node_path = config.ARCHIVE_DIRECTORY / node_id
+
+    self._nodes: Dict[str, AbstractInput] = { key : InputType(config, self.node_path) for key, InputType in node_structure.items()}
     self._created = datetime.now()
     self._config = config
     self._node_id = node_id
@@ -38,7 +41,7 @@ class PatientNode:
       yield node
 
   def __len__(self):
-    return reduce(lambda x,y : x + y, [len(node) for node in self], 0)
+    return reduce(add, [len(node) for node in self], 0)
 
   def add_dataset(self, dataset: Dataset):
     added_dataset = False
@@ -95,8 +98,7 @@ class PatientNode:
     )
 
   def clean_up(self):
-    for node in self:
-      node.clean_up()
+    self.node_path(remove_directory)
 
   def __str__(self) -> str:
     base = f"Patient Node with {len(self)} images:\n"

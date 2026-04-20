@@ -11,8 +11,10 @@ from abc import abstractmethod, ABC, ABCMeta
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
+from functools import reduce
 from logging import Logger, getLogger
 from pathlib import Path
+from operator import add
 from threading import Thread
 from typing import Any, Dict,List, Optional, Iterable, Tuple, Type, Union
 
@@ -23,12 +25,15 @@ from pydicom.uid import UID
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
-from dicomnode.data_structures.image_tree import ImageTreeInterface
+from dicomnode.data_structures.defaulting_dict import DefaultingDict
+
 from dicomnode.data_structures.optional import OptionalPath
+from dicomnode.data_structures.storage import get_storage_from_config, Storage
 from dicomnode.dicom.dimse import Address, QueryLevels,\
   AssociationContextManager, create_query_ae
 from dicomnode.dicom.lazy_dataset import LazyDataset
-from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
+from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
+  InvalidTreeNode, ContractViolation
 from dicomnode.lib.io import load_dicom, save_dicom, Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.utils import name
@@ -67,7 +72,7 @@ class AbstractInputMetaClass(ABCMeta):
     return ProxyClass
 
 
-class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
+class AbstractInput(metaclass=AbstractInputMetaClass):
   """Container for dicom sets fulfilling the validate image function.
 
     Args:
@@ -97,13 +102,15 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
   into a data usable by the processing function"""
 
 
-
+  # Dunder methods
   def __init__(self,
       config: DicomnodeConfig = config_from_raw(),
       node_path = OptionalPath()
     ):
     super().__init__()
     self.options = config
+    self.node_path = node_path
+    self.images = 0
 
     self._study_date: Optional[str] = None # This gets updated by the PatientNode
     """Date for study, used with enforce. String is in format YYYYMMDD"""
@@ -111,7 +118,6 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
     # objectively wrong that it's not a date object, but it's what dicom uses
 
     self.single_series_uid: Optional[UID] = None
-
     self.container: Optional[Directory] = Directory(node_path.path) if node_path else None
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
@@ -120,10 +126,18 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
       self.logger.info(f"You should add SOPInstanceUID to required tags for {name(self)}")
       self.required_tags.append(0x0008_0018)
 
-    if self.container is not None:
-      for image_path in self.container:
-        self.add_image(load_dicom(image_path))
+    self._storage = self._get_storage_type(config)(node_path / self.__class__.__name__)
 
+  def __contains__(self, dataset: Dataset):
+    return dataset in self._storage
+
+  def __iter__(self):
+    yield from self._storage
+
+  def __len__(self):
+    return len(self._storage)
+
+  # abstract methods
   @abstractmethod
   def validate(self) -> bool:
     """Method for checking if all data needed for
@@ -134,14 +148,6 @@ processing, `False` otherwise.
         bool: If there's sufficient data to start processing
     """
     raise NotImplementedError #pragma: no cover
-
-  def clean_up(self) -> int:
-    """Removes any files, stored by the Input"""
-    if self.container is not None:
-      for dicom in self:
-        path = self.get_path(dicom)
-        path.unlink(missing_ok=True)
-    return self.images
 
   def grind(self) -> Any:
     """This function retrieves all the data stores in the input,
@@ -155,34 +161,6 @@ processing, `False` otherwise.
   def get_datasets(self) -> List[Dataset]:
     return [dataset for dataset in self]
 
-  def get_path(self, dicom: Dataset) -> Path:
-    """Gets the path, where a dataset would be saved.
-
-    Args:
-        dicom (Dataset): The dataset in question
-
-    Returns:
-        Path: The path for that dataset.
-
-    Raises:
-      IncorrectlyConfigured : Calls to this function require a directory
-    """
-    if self.container is None:
-      raise IncorrectlyConfigured
-
-    image_name: str = ""
-    if 0x00080060 in dicom: # Modality
-      image_name += f"{dicom.Modality}_"
-    image_name += "image"
-
-    if 0x00200013 in dicom: # Instance Number
-      image_name += f"_{dicom.InstanceNumber}"
-    else:
-      image_name += f"_{dicom.SOPInstanceUID.name}"
-
-    image_name += ".dcm"
-
-    return self.container / image_name
 
   @classmethod
   def _validate_value(cls, value, target):
@@ -253,6 +231,9 @@ processing, `False` otherwise.
         return False
     return True
 
+  def _get_storage_type(self, config: DicomnodeConfig):
+    return get_storage_from_config(config)
+
   def _state_based_validation(self, dicom: Dataset) -> bool:
     """Check if a dicom can be accepted based on the state of this object
 
@@ -282,21 +263,10 @@ processing, `False` otherwise.
     if not self._state_based_validation(dicom):
       raise InvalidDataset
 
-    replaced = dicom.SOPInstanceUID.name in self
+    replaced = dicom in self
     # Save the dataset
-    if self.options.LAZY_STORAGE:
-      if self.container is None:
-        raise IncorrectlyConfigured("Lazy object require file storage")
-      dicom_path = self.get_path(dicom)
-      if not dicom_path.exists():
-        save_dicom(dicom_path, dicom)
-      self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
-    else:
-      self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
-      if self.container is not None:
-        dicom_path = self.get_path(dicom)
-        if not dicom_path.exists():
-          save_dicom(dicom_path, dicom)
+    self._storage.store_image(dicom)
+
     if not replaced:
       self.images += 1
     return 1
@@ -313,67 +283,59 @@ processing, `False` otherwise.
   def study_date(self, value):
     self._study_date = value
 
+  @property
+  def storage(self):
+    """Gets the underlying storage container that actually holds all the images"""
+    return self._storage
+
   def __str__(self):
     return f"{self.__class__.__name__} - {self.images} images - Valid: {self.validate()}"
-
-class DynamicLeaf(ImageTreeInterface):
-  """Subclass to DynamicInput, each instance is a separate series"""
-  def __init__(self,
-               dcm: Union[Iterable[Dataset], Dataset],
-               lazy = False,
-               path: Optional[Path] = None) -> None:
-    super().__init__(dcm)
-    self.lazy = lazy
-    self.path = path
-
-  def get_path(self, dicom: Dataset) -> Path:
-    """Retrieves the path of a dataset, if it would be stored in this this node
-    on the file system
-
-    Args:
-        dicom (Dataset): dataset to be stored
-
-    Raises:
-        IncorrectlyConfigured: If the DynamicLeaf is configured only to work in memory
-
-    Returns:
-        Path: Path where this dataset would be stored
-    """
-    if self.path is None:
-      raise IncorrectlyConfigured("getting the path needs a base path")
-    return self.path / (dicom.SOPInstanceUID.name + ".dcm")
-
-  def add_image(self, dicom: Dataset) -> int:
-    if self.lazy:
-      if self.path is None:
-        raise IncorrectlyConfigured("Lazy datasets require a path")
-      dicom_path = self.get_path(dicom)
-      self[dicom.SOPInstanceUID.name] = LazyDataset(dicom_path)
-    else:
-      self[dicom.SOPInstanceUID.name] = dicom # Tag for SOPInstance is (0x0008,0018)
-      if self.path is not None:
-        dicom_path = self.get_path(dicom)
-        if not dicom_path.exists():
-          save_dicom(dicom_path, dicom)
-    self.images += 1
-    return 1
 
 class DynamicInput(AbstractInput):
   """This input signifies when you are dealing with a variable number of input series.
 
   Applies image grinder to each Input
   """
-  leaf_class: Type[DynamicLeaf] = DynamicLeaf
   separator_tag: int = 0x0020000E # SeriesInstanceUID
+
+  def get_key(self, dataset) -> str:
+    key = dataset[self.separator_tag].value
+    if isinstance(key, UID):
+      key = key.name
+    if not isinstance(key, str):
+      key = str(key)
+
+    return key
+
+  def __init__(self, config: DicomnodeConfig = config_from_raw(), node_path=OptionalPath()):
+    super().__init__(config, node_path)
+
+    def create_leaf(key: str):
+      return self._get_storage_type(config)(node_path / key)
+    self.leafs: DefaultingDict[str, Storage] = DefaultingDict(create_leaf)
+
+  def __contains__(self, dataset: Dataset):
+    key = self.get_key(dataset)
+
+    return dataset in self.leafs[key]
+
+  def __len__(self):
+    return reduce(add, [len(storage) for key, storage in self.leafs], 0)
+
+  def __iter__(self):
+    for key, storage in self.leafs:
+      yield from storage
 
   def grind(self) -> Dict[str, Any]:
     return_dict = {}
-    for key, leaf in self.data.items():
-      if not isinstance(leaf, DynamicLeaf):
-        raise InvalidTreeNode # pragma: no cover
+    for key, leaf in self.leafs:
       return_dict[key] = self.image_grinder(leaf)
 
     return return_dict
+
+  @property
+  def storage(self):
+    raise ContractViolation("You cannot take the storage of a dynamic output")
 
   def add_image(self, dicom: Dataset) -> int:
     if not self.validate_image(dicom):
@@ -382,33 +344,12 @@ class DynamicInput(AbstractInput):
     if self.separator_tag not in dicom:
       raise InvalidDataset
 
-    key = dicom[self.separator_tag].value
-    if isinstance(key, UID):
-      key = key.name
-      # This is to ensure the assumption that underlying data dict is:
-      #  Dict[str, Union[Dataset, ImageTreeInterface]]
-    if not isinstance(key, str):
-      key = str(key) # Otherwise the imageTree throws a type error
+    key = self.get_key(dicom)
 
-    if key in self:
-      image_tree = self[key]
-      if isinstance(image_tree, ImageTreeInterface):
-        ret_value = image_tree.add_image(dicom)
-      else:
-        raise InvalidTreeNode #pragma: no cover
-    else:
-      # Don't use the add image functionality of the constructor due to fact
-      # that, it's return value is needed
-      if self.container is not None:
-        leaf_path = self.container / key
-        leaf_path.mkdir(parents=True, exist_ok=True)
-      else:
-        leaf_path = None
-      leaf = self.leaf_class([], self.options.LAZY_STORAGE if isinstance(self.options.LAZY_STORAGE, bool) else False, leaf_path)
-      self[key] = leaf
-      ret_value = leaf.add_image(dicom)
-    self.images += ret_value
-    return ret_value
+    self.leafs[key].store_image(dicom)
+
+    self.images += 1
+    return 1
 
 
 class HistoricAbstractInput(AbstractInput):
@@ -439,8 +380,8 @@ class HistoricAbstractInput(AbstractInput):
   address: Optional[Address] = None
   image_grinder = HistoricGrinder()
 
-  def __init__(self, options: DicomnodeConfig):
-    super().__init__(options)
+  def __init__(self, options: DicomnodeConfig, node_path= OptionalPath()):
+    super().__init__(options, node_path)
     self.triggering_dataset = None
 
     if self.options.AE_TITLE is None:
@@ -628,8 +569,9 @@ class AbstractInputProxy(AbstractInput):
   def validate(self) -> bool:
       return False
 
-  def __init__(self, config: DicomnodeConfig = config_from_raw()):
+  def __init__(self, config: DicomnodeConfig = config_from_raw(), node_path = OptionalPath()):
     self.input_options = config
+    self.node_path = node_path
     self._study_date = None
     enforcing_single_study_date = None
     for type_option in self.type_options:
@@ -653,13 +595,12 @@ class AbstractInputProxy(AbstractInput):
     for type_option in self.type_options:
       if type_option.validate_image(dicom):
         self.__class__ = type_option
-        type_option.__init__(self, config=self.input_options)
+        type_option.__init__(self, config=self.input_options, node_path=self.node_path)
         return self.add_image(dicom)
     raise InvalidDataset
 
 __all__ = [
   'AbstractInput',
   'DynamicInput',
-  'DynamicLeaf',
   'HistoricAbstractInput'
 ]

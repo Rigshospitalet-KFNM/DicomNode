@@ -59,7 +59,7 @@ def handle_tests(running_suite: TestSuite,
 
     if test_regex.search(tests._testMethodName.lower()):
       key = tests.__class__.__name__ + tests._testMethodName.lower() # this is gonna pwn me later :(
-      if key not in  added_set:
+      if key not in added_set:
         running_suite.addTest(tests)
         added_set.add(key)
 
@@ -118,6 +118,7 @@ if __name__ == "__main__":
   added_tests = set()
 
   all_suite: TestSuite = loader.discover("tests")
+
   if args.performance:
     loader.testMethodPrefix = "performance"
     performance_tests = loader.discover("tests")
@@ -132,7 +133,6 @@ if __name__ == "__main__":
   tmpDirPath.mkdir(mode=0o777, exist_ok=True)
 
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
-
 
   result = runner.run(running_suite)
   os.chdir(cwd)

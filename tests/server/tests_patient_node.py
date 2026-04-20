@@ -1,4 +1,5 @@
 # Python Standard Library
+from pathlib import Path
 
 # Third party modules
 from pydicom import Dataset
@@ -6,9 +7,9 @@ from pydicom.uid import PositronEmissionTomographyImageStorage, CTImageStorage,\
   SecondaryCaptureImageStorage, MRImageStorage
 
 # Dicomnode modules
-from dicomnode.dicom import gen_uid
+from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset
-from dicomnode.config import config_from_raw
+from dicomnode.config import config_from_raw, DicomnodeConfigRaw
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.input import AbstractInput, AbstractInputProxy
 
@@ -20,6 +21,9 @@ def generate_dataset(study_date, class_ = SecondaryCaptureImageStorage):
   ds.SOPInstanceUID = gen_uid()
   ds.SOPClassUID = class_
   ds.StudyDate = study_date
+  ds.SeriesDescription = "Generated_dataset"
+  ds.InstanceNumber = 1
+  make_meta(ds)
   return ds
 
 class Input(AbstractInput):
@@ -146,3 +150,22 @@ class PatientNodeTestCase(DicomnodeTestCase):
       still_has_proxy |= isinstance(input_, AbstractInputProxy)
 
     self.assertTrue(still_has_proxy)
+
+  def test_patient_node_clean_up(self):
+    patient_node_id = "patient_id"
+    config = config_from_raw(DicomnodeConfigRaw(ARCHIVE_DIRECTORY=self._testMethodName))
+    node = PatientNode(patient_node_id, { 'node' : Input }, config)
+
+    node.add_dataset(generate_dataset("20201130"))
+
+    path = Path(self._testMethodName) / ""
+
+    self.assertTrue((path / patient_node_id).exists())
+    self.assertTrue((path / patient_node_id / "Input").exists())
+    self.assertTrue((path / patient_node_id / "Input" / "Generated_dataset_1.dcm").exists())
+
+    node.clean_up()
+
+    self.assertFalse((path / patient_node_id).exists())
+    self.assertFalse((path / patient_node_id / "Input").exists())
+    self.assertFalse((path / patient_node_id / "Input" / "Generated_dataset_1.dcm").exists())

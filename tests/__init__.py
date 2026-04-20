@@ -4,3 +4,4 @@ from tests import math_
 from tests import dicom
 from tests import lib
 from tests import server
+from tests import datastructures

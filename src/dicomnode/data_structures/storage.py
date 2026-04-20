@@ -21,7 +21,7 @@ class Storage(ABC):
   * __contains__
   """
 
-  def __init__(self, storage_location) -> None:
+  def __init__(self, storage_location: OptionalPath) -> None:
     super().__init__()
 
   @abstractmethod
@@ -125,9 +125,8 @@ class FileStorage(LazyFileStorage): # I could see an argument for just inheritin
     return len(self._storage)
 
 
-
 def get_storage_from_config(config: DicomnodeConfig) -> Type[Storage]:
-  if config.ARCHIVE_DIRECTORY is not None:
+  if config.ARCHIVE_DIRECTORY:
     if config.LAZY_STORAGE:
       return LazyFileStorage
     else:

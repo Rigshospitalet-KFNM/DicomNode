@@ -72,4 +72,4 @@ class DefaultingDict[K,V]:
       return self._callable_one_arg(key)
     elif self._callable_no_args is not None:
       return self._callable_no_args()
-    raise ContractViolation("Somehow both callable is None?")
+    raise ContractViolation("Somehow both callable is None?") # pragma: no cover
