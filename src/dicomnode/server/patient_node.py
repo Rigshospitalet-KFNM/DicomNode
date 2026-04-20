@@ -30,6 +30,7 @@ class PatientNode:
     self._nodes: Dict[str, AbstractInput] = { key : InputType(config) for key, InputType in node_structure.items()}
     self._created = datetime.now()
     self._config = config
+    self._node_id = node_id
     self._study_date: Optional[str] = None
 
   def __iter__(self):
@@ -90,9 +91,7 @@ class PatientNode:
       datasets={
         key : input_.get_datasets() for key, input_ in self.items()
       },
-      paths={
-        key : input_.container for key, input_ in self.items() if input_.container is not None
-      }
+      paths= self._config.ARCHIVE_DIRECTORY / self._node_id
     )
 
   def clean_up(self):

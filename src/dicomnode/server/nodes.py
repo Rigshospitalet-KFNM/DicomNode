@@ -42,6 +42,7 @@ from pynetdicom.transport import ThreadedAssociationServer
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.data_structures.optional import OptionalPath
 from dicomnode.dicom import DicomIdentifier, display_dicom_collection
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
 from dicomnode.dicom.dimse import Address, dataset_from_event
@@ -260,8 +261,8 @@ class AbstractPipeline():
 
     self.__cwd = getcwd()
     # Load any previous state
-    self._data_directory = Directory(self.data_directory) if self.data_directory is not None else None
-    self._processing_directory = Directory(self.processing_directory) if self.processing_directory is not None else None
+    self._data_directory = OptionalPath(self.data_directory)
+    self._processing_directory = OptionalPath(self.processing_directory)
 
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
@@ -553,21 +554,22 @@ class AbstractPipeline():
     return self.ConnectionContextManager(self)
 
   def get_processing_directory_path(self, identifier) -> Optional[Path]:
-    if self._processing_directory is None:
+    if not self._processing_directory:
       return None
+
 
     if isinstance(identifier, DicomSeries):
       val = identifier[self.patient_identifier_tag]
       if val is not None and not isinstance(val, List):
-        return self._processing_directory / str(val.value)
+        return self._processing_directory.path / str(val.value)
       else:
         return None
 
     if isinstance(identifier, Dataset):
-      return self._processing_directory / str(identifier[self.patient_identifier_tag].value)
+      return self._processing_directory.path / str(identifier[self.patient_identifier_tag].value)
 
     if isinstance(identifier, str):
-      return self._processing_directory / identifier
+      return self._processing_directory.path / identifier
 
     raise TypeError("Unknown identifier type")
 

@@ -24,9 +24,9 @@ from pydicom.uid import UID
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import ImageTreeInterface
+from dicomnode.data_structures.optional import OptionalPath
 from dicomnode.dicom.dimse import Address, QueryLevels,\
   AssociationContextManager, create_query_ae
-
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured, InvalidTreeNode
 from dicomnode.lib.io import load_dicom, save_dicom, Directory
@@ -99,7 +99,8 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
 
   def __init__(self,
-      config: DicomnodeConfig = config_from_raw()
+      config: DicomnodeConfig = config_from_raw(),
+      node_path = OptionalPath()
     ):
     super().__init__()
     self.options = config
@@ -111,7 +112,7 @@ class AbstractInput(ImageTreeInterface, metaclass=AbstractInputMetaClass):
 
     self.single_series_uid: Optional[UID] = None
 
-    self.container: Optional[Directory] = config.ARCHIVE_DIRECTORY if self.options.ARCHIVE_DIRECTORY else None
+    self.container: Optional[Directory] = Directory(node_path.path) if node_path else None
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     # Tag for SOPInstance is (0x0008,0018)

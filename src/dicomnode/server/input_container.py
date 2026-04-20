@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydicom import Dataset
 
 # Dicomnode modules
+from dicomnode.data_structures.optional import OptionalPath
 from dicomnode.dicom.dimse import Address
 from dicomnode.lib.io import Directory
 
@@ -16,7 +17,7 @@ class InputContainer:
   def __init__(self,
                data: Dict[str, Any],
                datasets: Dict[str, List[Dataset]] = {},
-               paths: Optional[Dict[str, Directory]] = None,
+               paths: OptionalPath = OptionalPath(),
                ) -> None:
     self.__data = data
     self.datasets = datasets

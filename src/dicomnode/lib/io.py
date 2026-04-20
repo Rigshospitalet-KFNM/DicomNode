@@ -12,7 +12,7 @@ from pathlib import Path
 import random
 import time
 import shutil
-from typing import Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 # Thrid party Packages
 import pydicom
@@ -320,15 +320,24 @@ class Directory(IOObject):
     return str(self.path)
 
 def fill_patient_storage_from_file_system(
-    pathlike : Directory | Path | str | None,
+    pathlike : Directory | Path | str | None | Any,
     storage
   ) -> None:
+
+
   from dicomnode.server.pipeline_storage import PipelineStorage
   if not isinstance(storage, PipelineStorage):
     raise TypeError("Storage is not PipelineStorage")
 
   if pathlike is None:
     return
+
+  from dicomnode.data_structures.optional import OptionalPath
+  if isinstance(pathlike, OptionalPath):
+    if not pathlike:
+      return
+    else:
+      pathlike = pathlike.path
 
   if not isinstance(pathlike, Directory):
     pathlike = Directory(pathlike)

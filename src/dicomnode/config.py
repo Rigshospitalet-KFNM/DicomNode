@@ -44,6 +44,7 @@ class DicomnodeConfigRaw:
 class DicomnodeConfig:
   from dicomnode.lib.io import Directory, File
   from dicomnode.dicom import DicomIdentifier
+  from dicomnode.data_structures.optional import OptionalPath
   STUDY_EXPIRATION_DAYS : int
   PATIENT_IDENTIFIER_TAG : int
   LAZY_STORAGE : bool
@@ -59,8 +60,8 @@ class DicomnodeConfig:
   REQUIRED_CALLED_AET : bool
 
   # PATHS
-  ARCHIVE_DIRECTORY : Directory | None
-  PROCESSING_DIRECTORY : Directory | None
+  ARCHIVE_DIRECTORY : OptionalPath
+  PROCESSING_DIRECTORY : OptionalPath
   RUN_FILE : File | None
 
   # LOGGING
@@ -77,6 +78,7 @@ def default_to(value, default):
 def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
   from dicomnode.lib.io import Directory, File
   from dicomnode.dicom import DicomIdentifier
+  from dicomnode.data_structures.optional import OptionalPath
   study_expiration_days  = default_to(config.STUDY_EXPIRATION_DAYS, 14)
   patient_identifier_tag = default_to(config.PATIENT_IDENTIFIER_TAG, 0x0010_0020)
   lazy_storage = default_to(config.LAZY_STORAGE, False)
@@ -89,8 +91,8 @@ def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
 
   required_called_aet = default_to(config.REQUIRED_CALLED_AET, False)
 
-  archive_directory = Directory(config.ARCHIVE_DIRECTORY) if config.ARCHIVE_DIRECTORY is not None else None
-  processing_directory = Directory(config.PROCESSING_DIRECTORY) if config.PROCESSING_DIRECTORY is not None else None
+  archive_directory = OptionalPath(config.ARCHIVE_DIRECTORY)
+  processing_directory = OptionalPath(config.PROCESSING_DIRECTORY)
   run_file = File(config.RUN_FILE) if config.RUN_FILE is not None else None
 
   log_output = None
