@@ -32,17 +32,17 @@ DICOMNODE_PRIVATE_TAG_HEADER = f"Dicomnode - Private tags version: {DICOMNODE_PR
 
 # UID graciously provided by Medical Connections
 # At https://www.medicalconnections.co.uk/FreeUID.html
+#: UID of this software library
 DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
-"""UID of this software library """
-
 
 # Remember this these need to less than 16 characters!
 # Be cause they are stored in a SH
-DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
-"""Name of software, to be placed in Manufacturer Models name (0008,1090)"""
 
+#: Name of software, to be placed in Manufacturer Models name (0008,1090)
+DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
+
+#: Version of the library
 DICOMNODE_VERSION = "0.0.25"
-"""Version of the library"""
 
 
 UNSIGNED_ARRAY_ENCODING: Dict[int, type] = {

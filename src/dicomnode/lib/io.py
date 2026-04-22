@@ -240,6 +240,10 @@ class ResourceFile:
   This file doesn't handle any acquisition or release of the resource
   """
 
+  def sleep(self, attempt_number):
+    sleep_time = 120 + (attempt_number ** 2) * 60 + random.uniform(0, 60)
+    time.sleep(sleep_time)
+
   def __init__(self,
                logger : Logger,
                file_path: str | Path,
@@ -251,8 +255,8 @@ class ResourceFile:
 
 
   def __enter__(self):
-    while True:
-      retries = 0
+    retries = 0
+    while retries < 10:
       try:
         self.resource_file = open(self.resource, 'r')
         fcntl.flock(self.resource_file, fcntl.LOCK_EX)
@@ -263,11 +267,11 @@ class ResourceFile:
       except IOError as io_error:
         if io_error.errno == errno.EAGAIN:
           self.logger.info(f"Process: {self.pid} attempted and failed to acquire resource: {self.resource}")
-          sleep_time = 120 + retries * 60 + random.uniform(0, 60)
-          time.sleep(sleep_time)
+          self.sleep(retries)
           retries += 1
         else:
           raise
+    raise IOError("Unable to acquire resource")
 
   def __exit__(self, exc_type, exc_value, exc_traceback):
     if self.resource_file and self.locked:

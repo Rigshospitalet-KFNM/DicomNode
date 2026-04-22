@@ -1,4 +1,4 @@
-dicomnode.data\_structures package
+Dicomnode.data\_structures package
 ==================================
 
 Submodules

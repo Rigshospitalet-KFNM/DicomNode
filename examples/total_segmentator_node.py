@@ -12,7 +12,7 @@ from dicomnode.server.grinders import NiftiGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.output import DicomOutput, PipelineOutput
-from dicomnode.server.pipeline_tree import InputContainer
+
 
 class CTInput(AbstractInput):
   required_values = {

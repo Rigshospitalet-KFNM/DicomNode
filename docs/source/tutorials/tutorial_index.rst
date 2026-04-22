@@ -14,10 +14,8 @@ general help on writing maintainable programs.
     dicom_for_dummies
     class_overview
     configuring_a_pipeline
-    configuration_overview
     create_a_pipeline
     create_a_dicom_series
     building_a_report
     deploying_a_pipeline
     error_handling
-    spawning_vs_forking

@@ -291,12 +291,9 @@ def constrain_array(data: ndarray, restraints: Sequence[Tuple[int, int]]) -> nda
   Returns:
       ndarray: A restrained numpy array
 
-
-
   Example:
   >>> constrain_array(numpy.arange(16).reshape((4,4)) + 1, ((1,2), (1,2)))
-  array([[ 6,  7],
-      [10, 11]])
+  array([[ 6,  7],[10, 11]])
   """
   if len(restraints) != data.ndim:
     raise ValueError("Length of restraints do not match the number of dimension of the image")

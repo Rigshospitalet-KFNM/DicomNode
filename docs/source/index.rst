@@ -31,6 +31,9 @@ and Nuclear Medicine.
 
 Source code can be found at: https://github.com/Rigshospitalet-KFNM/DicomNode
 
+A word of warning is that the library moves a lot faster than documentation so
+outdated function and ideas might be present.
+
 .. toctree::
    :maxdepth: 1
    :caption: Contents:
@@ -38,10 +41,3 @@ Source code can be found at: https://github.com/Rigshospitalet-KFNM/DicomNode
    tutorials/tutorial_index
    documentation/documentation
    dicomnode
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

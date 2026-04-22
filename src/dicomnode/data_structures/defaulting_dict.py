@@ -1,3 +1,17 @@
+"""This is a dictionary with default construction. You can boil this down to the
+following code reduction:
+
+# OLD CODE
+if key not in dict_:
+  dict_[key] = default_constructor()
+
+return dict_[key]
+
+# NEW CODE
+return defaulting_dict[key]
+
+"""
+
 from typing import cast, Callable, Dict, Optional, overload
 import inspect
 

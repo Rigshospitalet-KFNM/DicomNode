@@ -14,7 +14,6 @@ from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.logging import set_logger
-from dicomnode.server.factories.association_events import ReleasedEvent, AssociationTypes
 from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractQueuedPipeline

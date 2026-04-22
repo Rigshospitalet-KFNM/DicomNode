@@ -304,4 +304,5 @@ class DicomTests(DicomnodeTestCase):
 
 from . import tests_nifti
 from . import tests_series
-from . import tests_series
+from . import tests_dicom_factory
+from . import tests_rt_struct

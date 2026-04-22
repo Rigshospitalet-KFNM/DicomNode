@@ -1,4 +1,10 @@
-""""""
+"""
+Dicom images are by default build into a tree structure with the layers:
+
+Patient / Study / Series / Image
+
+The DicomTree data structure is a tree that follows this convention.
+"""
 
 __author__ = "Christoffer Vilstrup Jensen"
 
@@ -484,9 +490,7 @@ class PatientTree(ImageTreeInterface):
 class DicomTree(ImageTreeInterface):
   """A Tree structure that can hold DICOM images without any requirements
   between the incoming dicom images. The Images are separated in a tree
-  structure:
-    patients -> study -> series -> image
-
+  structure: patients -> study -> series -> image
   """
 
   def add_image(self, dicom : Dataset) -> int:

@@ -120,14 +120,25 @@ class MyPETInput(AbstractInput):
 
 A pipeline attempt to store a picture in ALL of its inputs so an image can be
 stored in multiple inputs. If the Pipeline fails to store an image in at least 1
-input, it will return status code: `0xB006`.
+input, it will return status code: `0xB007`.
+
+Studies often contains many reconstructions of the same image, and if you don't
+filter these out, your inputs will be cluttered and you might perform post
+processing on the wrong series. On the other hand being too strict can also be
+problematic: For instance assume something went wrong in image acquisition for a
+series. In such situations the scanner personnel should repeat the scan and tag
+the correct with a mark. This mark might break strict equality so use regexes.
+
+You might also receive auxiliary information about the scan, such as the
+topograph of scan or a dose report, which you need to filter out.
 
 ### Validation
 
-After each storage connection is released, each input should check if it
+After each storage connection is released, each input checks if it
 contains sufficient data to start processing. This is done by a `validate`
-function call, where an input should inspect itself and determine this and
-return `True` if it contains sufficient data and `False` if not.
+function call, where an input should inspect itself and determine if it contains
+sufficient data for successful processing it should return `True` if it do and
+`False` if not.
 
 This is should be done by inspecting the `data` and `images` attributes.
 
@@ -138,10 +149,18 @@ however as an example:
 class MyInput(AbstractInput):
   def validate(self) -> bool:
     max_instance_number = -1 # Use
-    for dataset in self.data.values():
+    for dataset in self:
       max_instance_number = max(dataset.InstanceNumber, max_instance_number)
     return self.images == max_instanceNumber
 ```
+
+But this obviously have the problem that if you have the 300 first slices of a
+500 slice studies, this would validate but it shouldn't, but there might not be
+any tags to indicate how many slices are in a series.
+
+At the same time it's dangerous to wait for a specific number of slices because
+the number of slices might vary between patients because some people are tall
+and other are not.
 
 ### Data extraction
 
@@ -156,8 +175,8 @@ A Grinder is a glorified function, that transforms a dicom images stored in an
 input into some desired format. They can be found in:
 `dicomnode.server.grinders`.
 
-For instance the `NumpyGrinder` outputs a numpy array of dicom images. Note that
-you might need to combine grinders as grinders often throw away information. So
+For instance the `NumpyGrinder` outputs a numpy array of the dicom images. Note
+that you can combine grinders to overcome that they throw away information. So
 if your pipeline line calculate PET SUV, then you need some dicom tags with that
 is discarded by the `NumpyGrinder`. Use the `ManyGrinder` and the `TagGrinder`.
 
@@ -230,7 +249,8 @@ The `PipelineOutput` is related to exporting data and will be explained in the
 next section.
 
 So in the PET and CT example from above: `input_container['CT']` would return
-the CT image and `input_container['PET']` would return the pet image.
+the grounded CT image and `input_container['PET']` would return the grounded pet
+ image.
 
 An `InputContainer` also may contain:
 
@@ -238,7 +258,7 @@ An `InputContainer` also may contain:
 represent the last association to send picture to this patient.
 * `datasets`: `Dict[str, Iterable[Datasets]]` - A dict of the dataset that were
 stored in the input at the time
-* `paths`: `Optional[Dict[str, Path]]` - If the pipeline stores data, i.e
+* `paths`: `OptionalPath` - If the pipeline stores data, i.e
 `data_directory` is set, then this dict is set with the path to where the
 dataset are stored.
 
@@ -250,10 +270,8 @@ processing.
 
 ### Building new Dicom Series
 
-For most applications you need to return a dicom series, using the previous
-datasets.
-
-This library provides some tool to help with this explained in:
+For most clinical applications you need to return a dicom series, and Dicomnode
+can help build new series described in:
 [Create a dicom Series](./create_a_dicom_series.md)
 
 ## Exporting Data
@@ -276,7 +294,6 @@ as arguments of pairs with (endpoint, series of datasets)
 from dicomnode.dicom.dimse import Address
 from dicomnode.server.output import DicomOutput
 
-
 class MyPipeline(AbstractPipeline):
   ...
   class Processor(AbstractProcessor):
@@ -290,11 +307,19 @@ If you have performed the steps above you now have a functional pipeline.
 
 ## Testing The pipeline
 
-To run the node, run the following command:
+To run the node, add this to your python file and run the following command:
+
+```python
+if __name__ == '__main__':
+  pipeline = MyPipeline()
+  pipeline.open()
+```
 
 `source venv/bin/activate && python3 node.py`
 
-Now the server should start and open sitting idle.
+Now the server should start and open sitting idle. To close the pipeline hit
+ctrl + c.
+
 Now to test the server you need to send some dicom datasets using the DIMSE
 protocol, in this case the tutorial will assume they are at: `path/to/dicom`.
 
@@ -311,7 +336,7 @@ $path/to/dicoms
 
 ## Final notes
 
-The node is build with flexibility in mind, and there's plenty options for
+The dicomnode is build with flexibility in mind, and there's plenty options for
 configuration.
 
 Check [Configuring a Pipeline](./configuring_a_pipeline.md) for all the options

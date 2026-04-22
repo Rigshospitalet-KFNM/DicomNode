@@ -1,3 +1,10 @@
+"""This module just maybe monad around a path, or in english it's a path that
+may be None, but you could operate on it as if were a Path.
+
+The main reason why you want this is because then you don't have to branch on
+the path.
+"""
+
 
 from pathlib import Path
 from typing import Any, Callable, Optional

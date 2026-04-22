@@ -366,7 +366,7 @@ class AbstractPipeline():
     try:
       if not self.filter(dataset):
         self.logger.info("Node rejected dataset: Received Dataset did not pass filter")
-        return 0xB006 # Element discarded
+        return  0xB006 if self.error_on_rejected_dataset else 0x0000 # Element discarded
     except Exception as exception:
       log_traceback(self.logger, exception, "User defined function filter produced an exception")
       return 0xA801
@@ -375,10 +375,10 @@ class AbstractPipeline():
       self.data_state.add_image(dataset, id(event.assoc))
     except InvalidDataset:
       self.logger.info(f"Node rejected dataset: Received dataset doesn't have patient Identifier tag: {hex(self.patient_identifier_tag)}")
-      return 0xB007
+      return 0xB007 if self.error_on_rejected_dataset else 0x0000
     except Exception as exception:
       log_traceback(self.logger, exception, "Adding Image to input produced an exception")
-      return 0xA801
+      return 0xA801 if self.error_on_rejected_dataset else 0x0000
 
     return 0x0000
 
@@ -404,7 +404,6 @@ class AbstractPipeline():
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
     input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
-
 
     if len(failed_datasets):
       dicom_collection =  display_dicom_collection(failed_datasets)
@@ -689,6 +688,10 @@ class AbstractQueuedPipeline(AbstractPipeline):
     signal.signal(signal.SIGINT, default_sigint_handler)
 
     return super().close()
+
+class DaemonNode(AbstractPipeline):
+  pass
+
 
 __all__ = (
   "AbstractPipeline",

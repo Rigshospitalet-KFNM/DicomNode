@@ -20,15 +20,15 @@ The pipeline will now save a copy of each dataset, and delete them when
 it's done with the dataset. The file structure produced looks like this:
 
 ```text
-  data_directory / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                               / {\$input_arg_name_2} / Image_{\$image.modality}_{\$instance_number}.dcm
-                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+  data_directory / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
+                                               / {\$input_arg_name_2} / Image_{\$image.SeriesDescription}_{\$instance_number}.dcm
+                                                                           ... / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
                                            ... / ...
-                 / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                               / {\$input_arg_name_2} / Image_{\$image.modality}_{\$image.instance_number}.dcm
-                                                                           ... / Image_{\$image.modality}_{\$image.instance_number}.dcm
+                 / {\$patient_identifier_tag} / {\$input_arg_name_1} / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
+                                               / {\$input_arg_name_2} / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
+                                                                           ... / Image_{\$image.SeriesDescription}_{\$image.instance_number}.dcm
                                            ... / ...
              ... / ...
 ```

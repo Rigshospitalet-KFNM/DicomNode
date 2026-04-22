@@ -15,7 +15,7 @@ from dicomnode.lib.io import save_dicom
 from dicomnode.dicom import make_meta
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.output import FileOutput
 from dicomnode.server.processor import AbstractProcessor

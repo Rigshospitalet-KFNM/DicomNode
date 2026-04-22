@@ -11,7 +11,7 @@ from dicomnode.dicom.dicom_factory import Blueprint, StaticElement, DicomFactory
 from dicomnode.dicom.blueprints import SOP_common_blueprint, general_series_blueprint, image_plane_blueprint
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input import DynamicInput
-from dicomnode.server.pipeline_tree import InputContainer
+from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import PipelineOutput, FileOutput, NoOutput
 from dicomnode.server.processor import AbstractProcessor
 

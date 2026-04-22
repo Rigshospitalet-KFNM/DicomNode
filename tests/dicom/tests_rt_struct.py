@@ -29,8 +29,8 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.dicom.rt_structs import get_mask, get_contour_sequence_by_name
 
 # Test helper functions
-from helpers import generate_numpy_datasets
-from helpers.dicomnode_test_case import DicomnodeTestCase
+from tests.helpers import generate_numpy_datasets
+from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 class RTStructTestCases(DicomnodeTestCase):
   def setUp(self):

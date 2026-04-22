@@ -43,6 +43,9 @@ def sum_1_to_n(n: int) -> int:
 def sum_n_to_m(n:int, m:int):
   return sum_1_to_n(m) - sum_1_to_n(n)
 
+def unit_vector(vector):
+  return vector / numpy.linalg.norm(vector)
+
 def switch_ordering(input_data: numpy.ndarray) -> numpy.ndarray:
   """Creates an index over the data in another ordering
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 from inspect import getfullargspec
+from itertools import chain
 from logging import getLogger
 from pathlib import Path
 from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
@@ -16,6 +17,7 @@ from typing import Any, Callable, Dict, Generic, List, Iterator, Iterable,\
 # Third Party Library
 from nibabel.nifti1 import Nifti1Image
 from nibabel.nifti2 import Nifti2Image
+import numpy
 from numpy import ndarray, zeros_like
 from pydicom import DataElement, Dataset, Sequence, datadict
 from pydicom.uid import EncapsulatedPDFStorage, SecondaryCaptureImageStorage,\
@@ -29,6 +31,8 @@ from sortedcontainers import SortedDict
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING, SIGNED_ARRAY_ENCODING, DICOMNODE_PRIVATE_TAG_VERSION, DICOMNODE_PRIVATE_TAG_HEADER, DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import make_meta, Reserved_Tags
 from dicomnode.dicom.series import Series, DicomSeries, NiftiSeries, extract_image, ImageContainerType
+from dicomnode.math import unit_vector
+from dicomnode.math.space import Space
 from dicomnode.math.image import Image, fit_image_into_unsigned_bit_range
 from dicomnode.lib.exceptions import IncorrectlyConfigured, InvalidDataset, MissingOptionalDependency
 from dicomnode.lib.exceptions import MissingPivotDataset, ConstructionFailure
@@ -320,6 +324,36 @@ class CopyOrElseElement(InstanceVirtualElement):
     else:
       return DataElement(self.tag, self.VR, self._orElse)
 
+# Super specialized elements
+class ImagePositionElement(InstanceVirtualElement):
+  def __init__(self, space: Space) -> None:
+    super().__init__(0x0020_0032, 'DS')
+    self.space = space
+
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement | InstanceVirtualElement | None:
+    return self
+
+  def produce(self, instance_environment: InstanceEnvironment) -> DataElement:
+    instance_environment.instance_number
+
+    z_index = (instance_environment.instance_number - 1) % self.space.extent.z
+    point = self.space.at_index(numpy.array([0, 0, z_index]))
+
+    return DataElement(
+      0x0020_0032, 'DS', list(point)
+    )
+
+class ImageOrientationElement(VirtualElement):
+  def __init__(self, space) -> None:
+    super().__init__(0x0020_0037, 'DS')
+    self.space = space
+    unit_vector_x = unit_vector(self.space.basis[0])
+    unit_vector_y = unit_vector(self.space.basis[1])
+    self.element = DataElement(self.tag, self.VR, [ x for x in chain(unit_vector_x, unit_vector_y) ])
+
+  def corporealialize(self, datasets: Iterable[Dataset]) -> DataElement | InstanceVirtualElement | None:
+    return self.element
+
 class Blueprint():
   """Blueprint for a dicom series. A blueprint contains no information on a specific series.
   """
@@ -481,6 +515,13 @@ class DicomFactory():
       original_series: List[Dataset] = [],
       **kwargs
     ):
+    """Applies a Blueprint to an image - it doesn't
+
+    Args:
+        constructed_series (DicomSeries): _description_
+        blueprint (Blueprint): _description_
+        original_series (List[Dataset], optional): _description_. Defaults to [].
+    """
 
     for virtual_tag in blueprint:
       corporeal_tag = virtual_tag.corporealialize(original_series)
@@ -496,10 +537,13 @@ class DicomFactory():
             instance_number= i + 1, # InstanceNumbers are 1 indexed
             factory=self,
             kwargs=kwargs,
-            instance_dataset=dataset,
-            image=slice_
-          ) for i, (dataset, slice_) in enumerate(zip(constructed_series, constructed_series.slices()))
+            instance_dataset=None,
+          ) for i, dataset in enumerate(constructed_series)
         ]
+
+        if len(original_series) == len(envs):
+          for ds, ie in zip(original_series, envs):
+            ie.instance_dataset = ds
 
         tag = [corporeal_tag.produce(env) for env in envs]
 
@@ -535,6 +579,12 @@ class DicomFactory():
 
     dataset.SamplesPerPixel = 1
     dataset.PhotometricInterpretation = self.default_photometric_interpretation.value
+    # ------
+    # Consider this image of dimension shape (2,4):
+    # 1 2 3 4
+    # 5 6 7 8
+    # Then Rows = 2 aka y-dimension, Columns = 4 aka X-dimension
+
     dataset.Columns = encoded_image.shape[1]
     dataset.Rows = encoded_image.shape[0]
     dataset.BitsAllocated = self.default_bits_allocated
@@ -640,55 +690,6 @@ class DicomFactory():
 
     return series
 
-  def build_nifti_series(self,
-                         nifti: Union[Nifti1Image, Nifti2Image, NiftiSeries],
-                         blueprint: Blueprint,
-                         kwargs : Dict[Any,Any]
-                         ) -> DicomSeries:
-    """Builds a Dicom series from a nifti series and a blueprint
-    Note that the following tags doesn't need to be included
-
-
-    Args:
-        nifti (Union[Nifti1Image, Nifti2Image, NiftiSeries]): _description_
-        blueprint (Blueprint): _description_
-        kwargs (Dict[Any,Any]): _description_
-
-    Returns:
-        DicomSeries: _description_
-
-    Throws:
-      ConstructionFailure : If a CopyVirtualElement is inside of the
-                            blueprint. As there's no parent series to copy
-                            from
-    """
-    if not isinstance(nifti, NiftiSeries):
-      nifti = NiftiSeries(nifti)
-
-    corporealialized_blueprint = [virtual_tag.corporealialize([]) for virtual_tag in blueprint]
-
-    datasets = []
-    if nifti.image.raw.ndim == 3:
-      for i, slice_ in enumerate(nifti.image):
-        ds = Dataset()
-
-        for corporealialized_tag in corporealialized_blueprint:
-          if isinstance(corporealialized_tag, DataElement):
-            ds[corporealialized_tag.tag] = corporealialized_tag
-          elif isinstance(corporealialized_tag, InstanceVirtualElement):
-            instance_environment = InstanceEnvironment(i + 1, self, image=slice_, kwargs=kwargs)
-
-            ds[corporealialized_tag.tag] = corporealialized_tag.produce(
-              instance_environment
-            )
-
-        datasets.append(ds)
-    else:
-      raise NotImplementedError("None 3D Nifti images are not supported")
-
-    return DicomSeries(datasets)
-
-
   def build_4d_series(self, image: ImageContainerType, blueprint: Blueprint, original_series=[], **kwargs):
     """Constructs a four dimensional series over an image
 
@@ -732,11 +733,11 @@ class DicomFactory():
 
   def _build_dynamic_series_pet(self, series: DicomSeries, image: Image, **kwargs):
     if 'series_type' not in kwargs:
-      raise IncorrectlyConfigured("series_type is not a kwargs")
+      raise IncorrectlyConfigured("series_type is not in kwargs - please add series_type=\"GATED\" or \"DYNAMIC\" ")
 
     series_type = kwargs['series_type']
 
-    if series_type != "GATED" or series_type == "DYNAMIC":
+    if series_type not in ("GATED", "DYNAMIC"):
       raise IncorrectlyConfigured(f"series type is {series_type} not GATED or DYNAMIC")
 
     for i, (dataset, slice_) in enumerate(zip(series, image.slices())):

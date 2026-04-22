@@ -1,11 +1,29 @@
 dicomnode package
 =================
 
-Subpackages
+The Dicomnode package is divided in the following manner:
+
+Module contents
+---------------
+
+.. automodule:: dicomnode
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Dicomnode.constants module
+--------------------------
+
+.. automodule:: dicomnode.constants
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Submodules
 -----------
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 1
 
    dicomnode.bin
    dicomnode.data_structures
@@ -15,22 +33,3 @@ Subpackages
    dicomnode.report
    dicomnode.server
    dicomnode.tools
-
-Submodules
-----------
-
-dicomnode.constants module
---------------------------
-
-.. automodule:: dicomnode.constants
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dicomnode
-   :members:
-   :undoc-members:
-   :show-inheritance:

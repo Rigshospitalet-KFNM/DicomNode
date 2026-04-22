@@ -1,3 +1,6 @@
+"""A Storage is a very simplistic class with the single responsibility of
+storing DICOM Images."""
+
 # Python standard library
 from abc import ABC, abstractmethod
 from pathlib import Path

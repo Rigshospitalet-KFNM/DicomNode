@@ -18,8 +18,12 @@ import os
 import sys
 sys.path.insert(0, '../../src/dicomnode')
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage',
-              'sphinx.ext.napoleon', 'myst_parser']
+extensions = [
+  'sphinx.ext.autodoc',
+  'sphinx.ext.coverage',
+  'sphinx.ext.napoleon',
+  'myst_parser'
+]
 napoleon_include_private_with_doc = True
 
 templates_path = ['_templates']

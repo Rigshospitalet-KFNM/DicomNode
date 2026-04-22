@@ -379,12 +379,6 @@ class DynamicTests(DicomnodeTestCase):
       self.assertIn(ds, input_)
 
 
-
-
-
-
-
-
 class HistoricInput(HistoricAbstractInput):
   required_tags = ['SOPInstanceUID']
   required_values: Dict[int|str, Any] = {
