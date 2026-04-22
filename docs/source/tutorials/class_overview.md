@@ -42,7 +42,7 @@ An instanced virtual elements is a virtual element that is different for each im
 
 ### Lazy Datasets
 
-* LazyDataset - Dataset on the file system, Can be used as a normal dataset, while miniscule memory footprint until used i.e. it's lazy. 
+* LazyDataset - Dataset on the file system, Can be used as a normal dataset, while miniscule memory footprint until used i.e. it's lazy.
 
 ### Image Tree
 
@@ -56,14 +56,6 @@ An instanced virtual elements is a virtual element that is different for each im
 ## Server
 
 This module contains classes for building an medical image processing pipeline.
-
-### Assocation Container
-
-* AssociationContainer - Base dataclass for extracting information from an DIMSE association
-* AcceptedContainer - Container created from an Association Accepted Dimse Event
-* CStoreContainer - Container created from an C Store Event
-* ReleasedContainer - Container created from an Association Released Dimse Event
-* AssociationContainerFactory - Factory class for creating AssociationContainers
 
 ### Grinders
 

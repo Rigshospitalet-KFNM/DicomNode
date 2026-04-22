@@ -1,16 +1,11 @@
-from dicomnode import library_paths
-
+import dicomnode
 import nibabel
-import unittest
 
 USING_TEST_DATA = False
 
-
-
-CT_IMAGE_PATH = library_paths.report_data_directory / "CT_nifti" / "CT.nii"
-CT_IMAGE_SEGMENTATION_PATH = library_paths.report_data_directory / "CT_nifti" / "segmentation" / "brain.nii.gz"
-MNI_TEMPLATE_PATH = library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI152Lin_res-02_PD.nii.gz"
-
+CT_IMAGE_PATH = dicomnode.library_paths.report_data_directory / "CT_nifti" / "CT.nii"
+CT_IMAGE_SEGMENTATION_PATH = dicomnode.library_paths.report_data_directory / "CT_nifti" / "segmentation" / "brain.nii.gz"
+MNI_TEMPLATE_PATH = dicomnode.library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI152Lin_res-02_PD.nii.gz"
 
 class _TestData:
   @property

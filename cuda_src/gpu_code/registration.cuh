@@ -3,6 +3,7 @@
 #include<cuda/cmath>
 #include<cuda/type_traits>
 
+#include "center_of_gravity.cuh"
 #include"core/core.cuh"
 #include"linear_interpolation.cuh"
 #include"map_reduce.cuh"
@@ -53,7 +54,7 @@ dicomNodeError_t register_to(
       host_target_image.space,
       Volume<3, T>{
         .data = nullptr,
-        .m_extent = host_target_image.extent,
+        .m_extent = host_target_image.extent(),
         .default_value = 0
       }
     );
@@ -64,6 +65,13 @@ dicomNodeError_t register_to(
     Image<3, T>* device_target_image = nullptr;
     Image<3, T>* device_intermediate_image = nullptr;
 
+    constexpr static dim3 THREAD_BLOCK = THREAD_BLOCK_3D;
+    const dim3 envelope = get_envelope_grid<THREAD_BLOCK>(intermediate_image.extent());
+
+    Point<3> source_center_of_gravity;
+    Point<3> destination_center_of_gravity;
+
+
 
     DicomNodeRunner runner{[&](dicomNodeError_t error) {
       free_device_memory(
@@ -73,7 +81,7 @@ dicomNodeError_t register_to(
         &device_intermediate_image
       );
     }};
-
+    // Initialzation
     runner | [&]() {
       return cudaMalloc(&(intermediate_image.data()), intermediate_image.size());
     } | [&]() {
@@ -87,11 +95,17 @@ dicomNodeError_t register_to(
     } | [&]() {
       return cudaMemcpy(device_target_image, &host_target_image, sizeof(Image<3, T>), cudaMemcpyDefault);
     } | [&]() {
-      return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
+      return CENTER_OF_GRAVITY::center_of_gravity(host_source_image.volume, source_center_of_gravity);
     } | [&]() {
-      constexpr static dim3 THREAD_BLOCK = THREAD_BLOCK_3D;
-      const dim3 envelope = get_envelope_grid<THREAD_BLOCK>(intermediate_image.extent());
+      return CENTER_OF_GRAVITY::center_of_gravity(host_source_image.volume, destination_center_of_gravity);
+    } | [&]() {
+       intermediate_image.space.starting_point += source_center_of_gravity - destination_center_of_gravity;
 
+      return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
+    };
+
+
+    runner | [&]() {
       INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
         device_source_image,
         &(device_intermediate_image->space),
@@ -101,7 +115,7 @@ dicomNodeError_t register_to(
       return cudaGetLastError();
     } | [&]() {
       return reduce_no_mem<8, VolumeDifference<T>, T>(
-        device_intermediate_image.elements(),
+        intermediate_image.elements(),
         &difference,
         &(device_intermediate_image->volume),
         &(device_target_image->volume)

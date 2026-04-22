@@ -60,6 +60,9 @@ class Image {
     return space.extent;
   }
 
+  [[nodiscard]] constexpr __host__ __device__ const Point<DIMENSIONS> at(const Point<DIMENSIONS>& p) const noexcept  {
+    return p * space.basis + space.starting_point;
+  }
 
 
   /** Returns the amount of bytes contained in the volume

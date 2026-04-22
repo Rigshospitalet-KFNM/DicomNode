@@ -48,7 +48,7 @@ namespace CENTER_OF_GRAVITY {
 template<typename T>
   dicomNodeError_t center_of_gravity(
     const Volume<3, T>& volume,
-    std::array<float, 3>& cog
+    Point<3>& cog
   ) noexcept {
   T sum = 0;
 

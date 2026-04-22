@@ -179,6 +179,19 @@ def _bounding_box_gpu(array):
 from . import image
 
 def center_of_gravity(image_: image.DataContainer) -> numpy.ndarray:
+  """Calculate the index of the center of gravity of an image
+
+  Args:
+      image_ (image.DataContainer): Something that wraps a 3 dimensional Numpy
+      array
+
+  Raises:
+      TypeError: If a passed array is not a 3 dimensional
+
+  Returns:
+      numpy.ndarray: The index of the center of gravity. Note that you cannot
+                     dereference this index only interpolate it
+  """
   data = image.get_image_data(image_)
 
   if data.ndim != 3:

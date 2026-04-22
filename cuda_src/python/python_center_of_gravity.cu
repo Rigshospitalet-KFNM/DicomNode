@@ -14,7 +14,7 @@ template<typename T>
 std::tuple<dicomNodeError_t, std::tuple<f32,f32,f32>> tpl_python_center_of_gravity(const pybind11::array_t<T>& python_array) {
   Volume<3, T> volume;
 
-  std::array<f32, 3> cog{-1.0f, -1.0f, -1.0f};
+  Point<3> cog{-1.0f, -1.0f, -1.0f};
 
   DicomNodeRunner runner{[&](dicomNodeError_t error) {
     free_volume(&volume);

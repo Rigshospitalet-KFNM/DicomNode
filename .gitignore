@@ -20,3 +20,4 @@ tests_report_pe2i_report.py
 .cache/
 .venv/
 .idea/
+playground.ipynb
