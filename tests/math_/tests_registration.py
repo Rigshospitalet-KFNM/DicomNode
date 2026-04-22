@@ -26,9 +26,9 @@ mniBrain_path = library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI
 files_exists = ct_brain_path.exists() and ct_brain_path.exists() and mniBrain_path.exists()
 
 class RegistrationTestCase(DicomnodeTestCase):
-  @skip("Registration is not done yet")
   @skipIf((not CUDA) or (not test_data.USING_TEST_DATA), "Need GPU and files")
   def test_registration_from_python(self):
+    from dicomnode.math import _cuda
 
     nifti = test_data.TEST_DATA.CT_IMAGE
     image = extract_image(nifti)
@@ -42,17 +42,4 @@ class RegistrationTestCase(DicomnodeTestCase):
 
     masked_image = mask_image(image, seg_image)
 
-    mask_cog_index = center_of_gravity(masked_image)
-    template_cog_index = center_of_gravity(mni_image)
-
-    point_cog_m = masked_image.space.at_index(mask_cog_index)
-    point_cog_t = mni_image.space.at_index(template_cog_index)
-
-    offsets = point_cog_m - mask_cog_index @ mni_image.space.basis
-
-    print(f"Mask: {mask_cog_index}")
-    print(f"template: {template_cog_index}")
-    print(f"offsets: {offsets}")
-
-
-    plt.show()
+    _cuda.registration.register(masked_image, mni_image)
