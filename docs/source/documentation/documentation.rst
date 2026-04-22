@@ -13,5 +13,5 @@ guides that better explain what is going on.
 
     threads
     design_dicomnode
-    responsibilities_of_a_abstractpipeline
     gpu_programming
+    spawning_vs_forking
