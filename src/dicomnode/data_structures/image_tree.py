@@ -423,7 +423,7 @@ class StudyTree(ImageTreeInterface):
 
   def series(self) -> Iterable[SeriesTree]:
     for series in self.data.values():
-      if not isinstance(series, SeriesTree):
+      if not isinstance(series, SeriesTree): #pragma: no cover
         raise InvalidTreeNode
       yield series
 
@@ -465,13 +465,13 @@ class PatientTree(ImageTreeInterface):
 
   def studies(self) -> Iterable[StudyTree]:
     for study in self.data.values():
-      if not isinstance(study, StudyTree):
+      if not isinstance(study, StudyTree): #pragma: no cover
         raise InvalidTreeNode
       yield study
 
   def series(self) -> Iterable[SeriesTree]:
     for study in self.data.values():
-      if not isinstance(study, StudyTree):
+      if not isinstance(study, StudyTree): #pragma: no cover
         raise InvalidTreeNode()
       for series in study.series():
         yield series

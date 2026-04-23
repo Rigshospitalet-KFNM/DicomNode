@@ -607,3 +607,48 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     self.assertEqual(de_2.value, "120001")
     self.assertEqual(de_3.value, "120002")
     self.assertEqual(de_4.value, "120002")
+
+  def test_dicom_factory_instance_copy_raises_if_cant_copy(self):
+    bp =  Blueprint([
+      InstanceCopyElement(0x0020_0013, "IS")
+    ])
+
+    series = DicomSeries([
+      Dataset(),
+      Dataset(),
+      Dataset(),
+      Dataset()
+    ])
+
+    self.assertRaises(ConstructionFailure, self.factory.apply_blueprint_list, series, bp)
+
+  def test_dicom_factory_instance_copy_can_copy(self):
+    bp =  Blueprint([
+      DiscardElement(0x0010_0010),
+      InstanceCopyElement(0x0020_0013, "IS")
+    ])
+
+    series = DicomSeries([
+      Dataset(),
+      Dataset(),
+      Dataset(),
+      Dataset()
+    ])
+
+    og = [
+      Dataset(),
+      Dataset(),
+      Dataset(),
+      Dataset()
+    ]
+
+    def map_ds(ds):
+      ds.InstanceNumber = randint(0, 100)
+      return ds
+
+    og_series = list(map(map_ds, og))
+
+    self.factory.apply_blueprint_list(series, bp, og_series)
+
+    for og_ds, bds in zip(og_series, series.datasets):
+      self.assertEqual(og_ds.InstanceNumber, bds.InstanceNumber)

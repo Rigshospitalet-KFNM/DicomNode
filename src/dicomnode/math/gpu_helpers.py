@@ -16,7 +16,7 @@ def gpu_call(func, *args, **kwargs) -> Any:
   from dicomnode.math import _cuda
   return_value = func(*args, **kwargs)
 
-  if isinstance(return_value, _cuda.DicomnodeError) and return_value:
+  if isinstance(return_value, _cuda.DicomnodeError) and return_value: # pragma: no cover
     raise GPUError(f"Encountered {return_value}")
 
   if isinstance(return_value, tuple):
@@ -28,4 +28,4 @@ def gpu_call(func, *args, **kwargs) -> Any:
     if error:
       raise GPUError(f"Encountered {error}")
 
-    return return_value[1:]
+    return return_value[1] if len(return_value) == 2 else return_value[1:]

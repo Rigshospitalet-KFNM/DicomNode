@@ -8,6 +8,7 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode modules
+from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.dicom import make_meta, DicomIdentifier, gen_uid
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import config_from_raw
@@ -17,6 +18,24 @@ from dicomnode.server.patient_node import PatientNode
 # Dicomnode Test helper modules
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
+
+def generate_series(patient_index, num_datasets):
+  series_uid = gen_uid()
+
+  datasets = []
+  for i in range(num_datasets):
+    ds = Dataset()
+    ds.PatientID = str(patient_index)
+    ds.PatientName = f"Patient {patient_index}"
+    ds.SOPInstanceUID = gen_uid()
+    ds.InstanceNumber = i + 1
+    ds.SOPClassUID = SecondaryCaptureImageStorage
+    ds.SeriesInstanceUID = series_uid
+    #make_meta(ds)
+
+    datasets.append(ds)
+
+  return datasets
 
 class PipelineStorageTestCase(DicomnodeTestCase):
   def test_pipeline_storage_stress_test(self):
@@ -32,25 +51,6 @@ class PipelineStorageTestCase(DicomnodeTestCase):
     num_stressors = 20 # Also num threads but w/e
     datasets_per_series = 50
     series_per_patient = 3
-
-
-    def generate_series(patient_index, num_datasets):
-      series_uid = gen_uid()
-
-      datasets = []
-      for i in range(num_datasets):
-        ds = Dataset()
-        ds.PatientID = str(patient_index)
-        ds.PatientName = f"Patient {patient_index}"
-        ds.SOPInstanceUID = gen_uid()
-        ds.InstanceNumber = i + 1
-        ds.SOPClassUID = SecondaryCaptureImageStorage
-        ds.SeriesInstanceUID = series_uid
-        #make_meta(ds)
-
-        datasets.append(ds)
-
-      return datasets
 
 
     class HungryInput(AbstractInput):
@@ -117,7 +117,6 @@ class PipelineStorageTestCase(DicomnodeTestCase):
     for thread in threads:
       thread.join()
 
-
     self.assertEqual(0, len(target.storage))
     self.assertEqual(0, len(target.thread_registration))
     self.assertEqual(0, len(target.thread_additions))
@@ -129,3 +128,33 @@ class PipelineStorageTestCase(DicomnodeTestCase):
     for patient_nodes in successful_extractions.values():
       for patient_id, node in patient_nodes:
         self.assertEqual(len(node), series_per_patient * datasets_per_series)
+
+  def test_failing_to_add_accumulates_datasets(self):
+    class DenyingInput(AbstractInput):
+      def validate(self):
+        return False
+
+      def add_image(self, dicom: Dataset) -> int:
+        raise InvalidDataset
+
+    target = PipelineStorage({
+      'Anger' : DenyingInput
+    }, config=config_from_raw())
+
+    target.add_images(generate_series(1, 5))
+
+  def test_can_string_convert(self):
+    class AcceptingInput(AbstractInput):
+      def validate(self):
+        return False
+
+      def add_image(self, dicom: Dataset) -> int:
+        self.storage.store_image(dicom)
+        return 1
+
+    target = PipelineStorage({
+      'Anger' : AcceptingInput
+    }, config=config_from_raw())
+
+    target.add_images(generate_series(1, 5))
+    self.assertIsInstance(str(target), str)

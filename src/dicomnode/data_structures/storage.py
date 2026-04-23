@@ -24,7 +24,8 @@ class Storage(ABC):
   * __contains__
   """
 
-  def __init__(self, storage_location: OptionalPath) -> None:
+  # this function is here to declare that the interface takes an optional path
+  def __init__(self, storage_location: OptionalPath) -> None: #pragma: no cover
     super().__init__()
 
   @abstractmethod

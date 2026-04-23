@@ -137,6 +137,21 @@ class lib_imageTree(DicomnodeTestCase):
     self.assertEqual(seTree.images, 1)
     self.assertEqual(seTree.data[self.dataset_1.SOPInstanceUID], self.dataset_1)
 
+    self.assertEqual(dt.num_patients(), 1)
+    self.assertEqual(dt.num_studies(), 1)
+    self.assertEqual(dt.num_series(), 1)
+
+    for patient_tree in dt.patients():
+      self.assertIs(pt, patient_tree)
+
+    for studies in dt.studies():
+      self.assertIs(studies, stt)
+
+    for series in dt.series():
+      self.assertIs(series, seTree)
+
+
+
   def test_create_DicomTree_ManyPictures(self):
     dt = DicomTree(self.datasets)
     # Assertions
@@ -480,7 +495,6 @@ class lib_imageTree(DicomnodeTestCase):
     # You might argue that should raise an error here
     # You might also argue that the functionality should be very very different.
     self.assertNotIn(123, series_tree)
-
 
   @bench
   def performance_max_recursion(self):

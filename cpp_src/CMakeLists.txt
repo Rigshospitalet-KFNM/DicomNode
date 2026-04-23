@@ -73,4 +73,6 @@ target_precompile_headers(
     <pybind11/numpy.h>
   )
 
-add_subdirectory(tests)
+if (NOT DEFINED NO_TESTING)
+  add_subdirectory(tests)
+endif()

@@ -83,3 +83,4 @@ from . import tests_mirror
 from . import tests_image
 from . import tests_types
 from . import tests_space
+from . import tests_gpu_helpers

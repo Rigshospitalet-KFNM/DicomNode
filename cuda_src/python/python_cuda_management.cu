@@ -67,6 +67,7 @@ void apply_cuda_management_module(pybind11::module& m){
     });
 
   pybind11::class_<dicomNodeError_t>(m, "DicomnodeError")
+    .def(pybind11::init([](u32 value) {return static_cast<dicomNodeError_t>(value);}))
     .def("__repr__", [](const dicomNodeError_t& error){
       if(!error){
         return std::string("Success");

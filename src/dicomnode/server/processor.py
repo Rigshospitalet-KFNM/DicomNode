@@ -49,7 +49,7 @@ class AbstractProcessor():
     except Exception as exception:
       self.logger.critical(f"Encountered an exception {exception} in process function")
 
-  def process(self, input_container: InputContainer) -> PipelineOutput:
+  def process(self, input_container: InputContainer) -> PipelineOutput: #pragma: no cover
     return NoOutput()
 
   def _dispatch(self, output: PipelineOutput) -> bool:

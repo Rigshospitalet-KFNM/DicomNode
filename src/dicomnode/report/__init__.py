@@ -132,7 +132,6 @@ class Report(_Document):
 from . import latex_components
 
 __plot = None
-#from . import plot
 
 def __getattr__(name):
   if name == 'plot':
@@ -145,7 +144,7 @@ def __getattr__(name):
 __all__ = [
   'Report',
   'latex_components',
-  'plot'
+  'plot' # Lazy loaded by get attribute
 ]
 
 def __dir__():

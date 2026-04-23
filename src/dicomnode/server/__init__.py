@@ -23,6 +23,3 @@ __all__ = [
   'pipeline_storage',
   'processor'
 ]
-
-def __dir__():
-  return __all__

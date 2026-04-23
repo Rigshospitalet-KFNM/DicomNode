@@ -1,8 +1,6 @@
 dicomnode package
 =================
 
-The Dicomnode package is divided in the following manner:
-
 Module contents
 ---------------
 
@@ -23,7 +21,7 @@ Submodules
 -----------
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth:
 
    dicomnode.bin
    dicomnode.data_structures
