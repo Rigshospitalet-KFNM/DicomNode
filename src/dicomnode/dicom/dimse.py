@@ -208,6 +208,11 @@ def validate_query_dataset(dataset: Dataset):
     logger.error("Attempted to send a move at Series level without a SeriesInstanceUID tag")
     return False
 
+  if dataset.QueryRetrieveLevel not in (QueryLevels.PATIENT.value, QueryLevels.STUDY.value, QueryLevels.SERIES.value):
+    logger.error("QueryRetrieveLevel is not valid")
+    return False
+
+
   return True
 
 def create_query_dataset(query_level=QueryLevels.STUDY, **kwargs):
@@ -251,10 +256,11 @@ def create_query_dataset(query_level=QueryLevels.STUDY, **kwargs):
     tag = tag_for_keyword(tag_name)
 
     if tag is None:
-      raise ValueError(f"Keyword: {tag_name} is not a ")
+      raise ValueError(f"Cannot find the related to: {tag_name}.")
 
     vr = dictionary_VR(tag)
     dataset[tag] = DataElement(tag, vr, value)
+
 
   if not validate_query_dataset(dataset):
     raise InvalidQueryDataset

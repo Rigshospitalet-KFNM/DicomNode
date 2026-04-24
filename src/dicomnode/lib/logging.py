@@ -5,11 +5,13 @@ from pathlib import Path
 from multiprocessing.queues import Queue
 from queue import Empty
 from sys import stdout
-from threading import get_native_id
+from threading import get_native_id, Thread
 from traceback import format_exc
 from typing import Optional, TextIO
 
-from dicomnode.constants import DICOMNODE_LOGGER_NAME
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.config import DicomnodeConfig
+from dicomnode.lib.exceptions import ContractViolation
 
 @dataclass
 class LoggerConfig:
@@ -53,9 +55,10 @@ def set_logger(logger: Logger, config: LoggerConfig):
   logger.addFilter(_thread_id_filter)
 
 def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
+  print("CREATED QUEUE!")
   while True:
     try:
-      record = queue.get(timeout=2.0)
+      record = queue.get(timeout=0.1)
     except Empty:
       continue
 
@@ -80,3 +83,49 @@ def log_traceback(logger: Logger, exception: Exception, header_message: Optional
 def _thread_id_filter(record: LogRecord):
   record.thread_id = get_native_id()
   return record
+
+class LogManager:
+  def __init__(self, config: DicomnodeConfig, existing_queue: Optional[Queue[LogRecord | None]] ) -> None:
+    """The Log manager is the class that is responsible for managing the
+    handlers of the various loggers in dicomnode.
+
+
+    Args:
+        config (DicomnodeConfig): _description_
+        existing_queue (Optional[Queue[LogRecord  |  None]]): _description_
+    """
+    self.config = config
+    self._log_queue = existing_queue
+    self._owning_queue = existing_queue is None
+    self._logging_thread: Optional[Thread] = None
+
+
+  def get_logger(self) -> Logger:
+    ...
+
+  def get_process_logger(self) -> Logger:
+    ...
+
+  def start_queue(self):
+    if self._logging_thread is not None:
+      raise ContractViolation("Cannot start queue logging when you're already queue logging!")
+
+    if self._log_queue is None:
+      self._log_queue = Queue[LogRecord | None]()
+
+    self._logging_thread = Thread(
+      target=queue_logger_thread_target,
+      args=(self._log_queue, getLogger(DICOMNODE_PROCESS_LOGGER)),
+      name="Log Queue Reader Thread",
+    )
+
+  def stop_queue(self):
+    if self._log_queue is None or self._logging_thread is None:
+      return
+
+    self._log_queue.put_nowait(None)
+    self._logging_thread.join()
+    self._log_queue.join_thread()
+
+    self._log_queue = None
+    self._logging_thread = None

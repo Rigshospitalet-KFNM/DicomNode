@@ -18,7 +18,8 @@ from pynetdicom import debug_logger
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidQueryDataset, CouldNotCompleteDIMSEMessage
 from dicomnode.dicom import make_meta
-from dicomnode.dicom.dimse import send_move, Address, QueryLevels
+from dicomnode.dicom.dimse import send_move, Address, QueryLevels,\
+  create_query_dataset, validate_query_dataset
 
 # Dicomnode tests helpers
 from tests.helpers import get_test_ae
@@ -73,3 +74,25 @@ class DIMSETestCases(DicomnodeTestCase):
 
     with self.assertLogs(logger, DEBUG) as log_records:
       self.assertRaises(CouldNotCompleteDIMSEMessage,send_move,"Dummy", address, dataset)
+
+  def test_dimse_query_datasets_raises_on_invalid_keyword(self):
+    with self.assertRaises(ValueError):
+      create_query_dataset(patient_id = "Doesn't Matter")
+
+  def test_dimse_query_really_dumb_args(self):
+    with self.assertRaises(InvalidQueryDataset):
+      create_query_dataset(QueryRetrieveLevel="DOESNTMATTER")
+
+  def test_validate_empty_query_is_false(self):
+    self.assertFalse(validate_query_dataset(Dataset()))
+
+  def test_dimse_validate_query_dataset_without_required_tags(self):
+    ds = Dataset()
+    ds.QueryRetrieveLevel = "PATIENT"
+    self.assertFalse(validate_query_dataset(ds))
+
+    ds.QueryRetrieveLevel = "STUDY"
+    self.assertFalse(validate_query_dataset(ds))
+
+    ds.QueryRetrieveLevel = "SERIES"
+    self.assertFalse(validate_query_dataset(ds))

@@ -1,7 +1,7 @@
 # Python Standard library
 from pathlib import Path
 from typing import List
-from unittest import skipIf
+from unittest import skipUnless
 
 # Third party packages
 import numpy
@@ -20,7 +20,7 @@ from dicomnode.dicom.nifti import convert_to_nifti
 from dicomnode.math import transpose_nifti_coords
 from dicomnode.math.image import Image
 
-
+from tests.helpers import config
 from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers import generate_numpy_datasets
@@ -42,7 +42,7 @@ class DicomnodeDicomNifti(DicomnodeTestCase):
     nifti = convert_to_nifti(datasets.datasets, None, False)
     self.assertIsInstance(nifti, nifti1.Nifti1Image)
 
-  @skipIf(not test_data.USING_TEST_DATA, "Need a ct image in report_data/CT if this test need to work")
+  @skipUnless(config.USING_TEST_DATA, "Need a ct image in report_data/CT if this test need to work")
   def test_nifti_and_my_data_are_the_asdf(self):
     ct_datasets: List[Dataset] = [dcmread(p) for p in _PATHS] #type: ignore
     self.assertGreater(len(ct_datasets), 0)

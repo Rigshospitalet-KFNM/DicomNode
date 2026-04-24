@@ -16,6 +16,7 @@ from dicomnode.report.plot.triple_plot import TriplePlot
 from dicomnode.report.plot.selector import AverageSelector
 
 # Test
+from tests.helpers import config
 from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -26,7 +27,7 @@ mniBrain_path = library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI
 files_exists = ct_brain_path.exists() and ct_brain_path.exists() and mniBrain_path.exists()
 
 class RegistrationTestCase(DicomnodeTestCase):
-  @skipIf((not CUDA) or (not test_data.USING_TEST_DATA), "Need GPU and files")
+  @skipIf((not CUDA) or (not config.USING_TEST_DATA), "Need GPU and files")
   def test_registration_from_python(self):
     from dicomnode.math import _cuda
 

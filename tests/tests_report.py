@@ -32,6 +32,7 @@ from dicomnode.report.latex_components.dicom_frame import DicomFrame
 from dicomnode.report.latex_components import PatientInformation, ReportHeader, Table
 from dicomnode.report.plot.triple_plot import TriplePlot
 
+from tests.helpers import config
 from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -55,7 +56,7 @@ class GeneratorTestCase(DicomnodeTestCase):
 
     # Assert once there's a stable interface
 
-  @skipIf(SKIP_REPORT_TESTS or not test_data.USING_TEST_DATA or not figure_image_path.exists(), f"Needs Test data")
+  @skipIf(SKIP_REPORT_TESTS or not config.USING_TEST_DATA or not figure_image_path.exists(), f"Needs Test data")
   def test_report(self):
     dataset = Dataset()
 

@@ -21,3 +21,4 @@ tests_report_pe2i_report.py
 .venv/
 .idea/
 playground.ipynb
+result.json

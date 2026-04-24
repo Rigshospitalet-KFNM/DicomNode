@@ -12,15 +12,18 @@ from pathlib import Path
 from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
 from typing import  Set, Union
 
+starting_directory = os.getcwd()
+
 TESTING_TEMPORARY_DIRECTORY = "/tmp/pipeline_tests"
 os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTORY
-os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = os.getcwd() + "/report_data"
+os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = starting_directory + "/report_data"
 # DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing DICOMNODE
 
 
 
+
 from tests.helpers import testing_logs
-from tests.helpers import test_data
+from tests.helpers import config
 from tests.helpers.dicomnode_test_suite import BaseDicomnodeTestSuite
 
 class DicomnodeTestSuite(BaseDicomnodeTestSuite):
@@ -87,6 +90,9 @@ if __name__ == "__main__":
   parser.add_argument("--verbose", "-v", type=int, metavar="VERBOSITY", default=1, help=verbose_help_message)
   parser.add_argument("-nc", "--no_clean_up", action='store_true')
   parser.add_argument("-p", "--performance", action='store_true')
+  parser.add_argument("--print-logs","-plogs", action='store_true')
+  parser.add_argument("--profile", action='store_true')
+
   if PYTHON_3_12_PLUS:
     parser.add_argument("-d", "--duration", action='store_true')
 
@@ -99,7 +105,8 @@ if __name__ == "__main__":
   args = parser.parse_args()
   testing_logs()
 
-  test_data.USING_TEST_DATA = args.test_data
+  config.USING_TEST_DATA = args.test_data
+  config.PRINT_LOGS = args.print_logs
 
 
   if PYTHON_3_12_PLUS:
@@ -134,7 +141,15 @@ if __name__ == "__main__":
 
   os.chdir(TESTING_TEMPORARY_DIRECTORY)
 
-  result = runner.run(running_suite)
+  if args.profile:
+    print("profiling")
+    from viztracer import VizTracer
+    with VizTracer(output_file=starting_directory + "/result.json", tracer_entries=2000000):
+      result = runner.run(running_suite)
+  else:
+    result = runner.run(running_suite)
+
+
   os.chdir(cwd)
 
   this_process = psutil.Process()

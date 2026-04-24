@@ -1,8 +1,6 @@
 import dicomnode
 import nibabel
 
-USING_TEST_DATA = False
-
 CT_IMAGE_PATH = dicomnode.library_paths.report_data_directory / "CT_nifti" / "CT.nii"
 CT_IMAGE_SEGMENTATION_PATH = dicomnode.library_paths.report_data_directory / "CT_nifti" / "segmentation" / "brain.nii.gz"
 MNI_TEMPLATE_PATH = dicomnode.library_paths.report_data_directory / "tpl-MNI152Lin" / "tpl-MNI152Lin_res-02_PD.nii.gz"
@@ -42,7 +40,5 @@ class _TestData:
     self._ct_image = None
     self._ct_image_segmentation = None
     self._mni_template = None
-
-
 
 TEST_DATA = _TestData()

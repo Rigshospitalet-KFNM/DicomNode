@@ -209,6 +209,18 @@ class AbstractPipeline():
 
 
   def _setup_logger(self):
+    """Should be considered part of the init method
+    """
+    if self.config.PROCESSING_DIRECTORY:
+      if not hasattr(self, '_log_queue'):
+        self._owning_queue = True
+        self._log_queue: Optional[MPQueue[LogRecord | None]] = multiprocessing_context.Queue()
+      else:
+        self._owning_queue = False
+    else:
+      self._owning_queue = False
+      self._log_queue = None
+
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     # If the logger is empty fill it with the current config
@@ -238,26 +250,18 @@ class AbstractPipeline():
   def _stop_queue_logging(self):
     set_logger(self.logger, self.exporting_logging_config())
     self.__process_logger.handlers.clear()
-    if self._owning_queue:
+    if self._owning_queue and self._log_queue:
       self._log_queue.put_nowait(None)
       self._logger_thread.join()
       self._log_queue.join_thread()
 
 
-  def __init__(self, config=None) -> None:
+  def __init__(self, config: Optional[DicomnodeConfig] =None) -> None:
     # This function starts and opens the server
     #
     # 1. Logging
     # 2. File system
     # 3. Create Server
-
-    # logging
-    if not hasattr(self, '_log_queue'):
-      self._owning_queue = True
-      self._log_queue: MPQueue[LogRecord | None] = multiprocessing_context.Queue()
-    else:
-      self._owning_queue = False
-    self._setup_logger()
 
     self.__cwd = getcwd()
     # Load any previous state
@@ -287,6 +291,10 @@ class AbstractPipeline():
       )
 
     self.config = config
+
+  # logging
+
+    self._setup_logger()
 
     self.data_state = PipelineStorage(
       self.input,
@@ -424,7 +432,7 @@ class AbstractPipeline():
         process_path=self.get_processing_directory_path(patient_id)
       )
 
-      parallel_primitive = ParallelPrimitive.THREAD if self.processing_directory is None else ParallelPrimitive.PROCESS
+      parallel_primitive = ParallelPrimitive.THREAD if not self.config.PROCESSING_DIRECTORY else ParallelPrimitive.PROCESS
       primitive = Parallel(parallel_primitive, self.Processor, args, capture_output=True)
       primitive.join()
       output = primitive.get_output()
@@ -612,7 +620,7 @@ class AbstractPipeline():
 
     self.logger.critical(f"Killed all subprocesses!")
 
-    if signal_ in [signal.SIGTERM, signal.SIGINT] and self._owning_queue:
+    if signal_ in [signal.SIGTERM, signal.SIGINT] and self._owning_queue and self._log_queue is not None:
       self._log_queue.put(None, timeout=1.0)
 
       self._logger_thread.join()
