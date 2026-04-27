@@ -8,6 +8,7 @@ from pydicom import Dataset
 from pydicom.uid import SecondaryCaptureImageStorage
 
 # Dicomnode modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.dicom import make_meta, DicomIdentifier, gen_uid
 from dicomnode.server.input import AbstractInput
@@ -105,25 +106,24 @@ class PipelineStorageTestCase(DicomnodeTestCase):
       successful_extractions[thread_index] = stuff
       failed_datasets[thread_index] = failed
 
-
     threads = [
       Thread(target=thread_target_function, args=(thread_index,),name=f"Pipeline Storage {thread_index + 1} Test Thread")
       for thread_index in range(num_stressors )
     ]
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      for thread in reversed(threads):
+        thread.start()
 
-    for thread in reversed(threads):
-      thread.start()
+      for thread in threads:
+        thread.join()
 
-    for thread in threads:
-      thread.join()
+      self.assertEqual(0, len(target.storage))
+      self.assertEqual(0, len(target.thread_registration))
+      self.assertEqual(0, len(target.thread_additions))
+      self.assertEqual(0, len(target.failed_additions))
 
-    self.assertEqual(0, len(target.storage))
-    self.assertEqual(0, len(target.thread_registration))
-    self.assertEqual(0, len(target.thread_additions))
-    self.assertEqual(0, len(target.failed_additions))
-
-    for failed_to_add in failed_datasets.values():
-      self.assertEqual(len(failed_to_add), 0)
+      for failed_to_add in failed_datasets.values():
+        self.assertEqual(len(failed_to_add), 0)
 
     for patient_nodes in successful_extractions.values():
       for patient_id, node in patient_nodes:

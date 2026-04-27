@@ -61,6 +61,8 @@ class MaintenanceThread(Thread):
     if self.waiting_event is not None:
       self.waiting_event.set()
 
+    self.join()
+
 
   def calculate_seconds_to_next_maintenance(self, input_now:Optional[datetime] = None) -> float:
     """Calculates the time in seconds to the next scheduled clean up"""

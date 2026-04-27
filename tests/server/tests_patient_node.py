@@ -7,6 +7,7 @@ from pydicom.uid import PositronEmissionTomographyImageStorage, CTImageStorage,\
   SecondaryCaptureImageStorage, MRImageStorage
 
 # Dicomnode modules
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.config import config_from_raw, DicomnodeConfigRaw
@@ -122,7 +123,8 @@ class PatientNodeTestCase(DicomnodeTestCase):
     self.assertRaises(InvalidDataset, node.add_dataset, generate_dataset(future_study_date, CTImageStorage))
 
     node.add_dataset(generate_dataset(study_date, CTImageStorage))
-    self.assertTrue(node.validate())
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertTrue(node.validate())
 
   def test_patient_node_study_date_works_with_infinite_job_security_no_magic_first(self):
     node = PatientNode(self._testMethodName, {

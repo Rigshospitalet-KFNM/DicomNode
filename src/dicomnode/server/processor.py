@@ -21,9 +21,15 @@ class ProcessRunnerArgs:
 
 
 class AbstractProcessor():
-  """Runner class for the processing.
+  """This class is responsible for processing an input container through the
+  pipeline. Note that it might run in another process, but isn't the entry
+  point. This is in the parallelism module, but the __init__ method is called
+  after that setup.
+
   """
   def __init__(self, args : ProcessRunnerArgs) -> None:
+    root_logger = getLogger()
+    root_logger.handlers.clear() # Do not use the root logger
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
     set_logger(self.logger, args.log_config)
 

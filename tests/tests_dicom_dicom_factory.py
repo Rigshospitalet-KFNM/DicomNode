@@ -470,9 +470,9 @@ class DicomFactoryTestCase(DicomnodeTestCase):
     sequence_element = SequenceElement(
       0x0011_5011, [Blueprint([])]
     )
-
-    self.assertRaises(ConstructionFailure, sequence_element.produce,
-                      InstanceEnvironment(1, DicomFactory()))
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertRaises(ConstructionFailure, sequence_element.produce,
+                        InstanceEnvironment(1, DicomFactory()))
 
   @skipIf(not PDF2IMAGE_INSTALLED, "Optional dependency required")
   def test_encoding_with_no_dataset_fails(self):

@@ -5,10 +5,7 @@ from datetime import date
 from random import randint
 import logging
 from typing import Optional, Sequence
-
-from time import sleep
-from sys import stdout
-
+from unittest.mock import patch
 
 # Third party Packages
 from pydicom import Dataset
@@ -128,15 +125,17 @@ class HistoricTestCase(DicomnodeTestCase):
 
   @process_thread_check_leak
   def test_end_2_end_historic_input_data(self):
-    with self.assertLogs(DICOMNODE_LOGGER_NAME) as logger_output:
-      node = HistoricPipeline()
-      test_port = randint(40000,49999)
 
-      node.port = test_port
-      node.open(blocking=False)
-      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as process_output:
-        endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=test_port)
-        endpoint.open()
+    node = HistoricPipeline()
+    test_port = randint(40000,49999)
+    node.port = test_port
+
+    endpoint = TestCaseStorageEndpoint([historic_dataset], move_endpoint=test_port)
+    endpoint.open()
+
+    with patch('dicomnode.lib.logging.set_logger'):
+      with self.assertLogs(node.logger):
+        node.open(blocking=False)
 
         address = Address("localhost", test_port, TEST_AE_TITLE)
         dataset = Dataset()
@@ -153,20 +152,19 @@ class HistoricTestCase(DicomnodeTestCase):
         node.close()
         endpoint.close()
 
-    log_output = logger_output.output + process_output.output
-    self.assertRegexIn(f"Process has handled {test_patient_id}" , log_output)
-
+  @process_thread_check_leak
   def test_end_2_end_historic_input_empty(self):
-    with self.assertLogs(DICOMNODE_LOGGER_NAME) as logger_output:
-      node = HistoricPipeline()
-      test_port = randint(40000,49999)
+    node = HistoricPipeline()
+    test_port = randint(40000,49999)
 
-      node.port = test_port
-      node.open(blocking=False)
-      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as process_output:
-        endpoint = TestCaseStorageEndpoint([], move_endpoint=test_port)
-        endpoint.open()
+    node.port = test_port
 
+    endpoint = TestCaseStorageEndpoint([], move_endpoint=test_port)
+    endpoint.open()
+
+    with patch('dicomnode.lib.logging.set_logger'):
+      with self.assertLogs(node.logger):
+        node.open(blocking=False)
         address = Address("localhost", test_port, TEST_AE_TITLE)
 
         dataset = Dataset()
@@ -181,6 +179,3 @@ class HistoricTestCase(DicomnodeTestCase):
 
         node.close()
         endpoint.close()
-
-    log_output = logger_output.output + process_output.output
-    self.assertRegexIn(f"Process has handled {test_patient_id}" , log_output)

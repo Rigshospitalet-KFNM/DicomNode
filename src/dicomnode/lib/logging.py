@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from logging import DEBUG, Formatter, Logger, LogRecord, NullHandler, StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from pathlib import Path
+import multiprocessing
+multiprocessing_context = multiprocessing.get_context('spawn')
+import os
 from multiprocessing.queues import Queue
 from queue import Empty
 from sys import stdout
@@ -55,7 +58,6 @@ def set_logger(logger: Logger, config: LoggerConfig):
   logger.addFilter(_thread_id_filter)
 
 def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
-  print("CREATED QUEUE!")
   while True:
     try:
       record = queue.get(timeout=0.1)
@@ -64,6 +66,9 @@ def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
 
     if record is None:
       break
+
+
+
     record.name = logger.name
     logger.handle(record)
 
@@ -99,19 +104,23 @@ class LogManager:
     self._owning_queue = existing_queue is None
     self._logging_thread: Optional[Thread] = None
 
+    set_logger(self.get_logger(), self.logging_config())
 
   def get_logger(self) -> Logger:
-    ...
+    return getLogger(DICOMNODE_LOGGER_NAME)
 
   def get_process_logger(self) -> Logger:
-    ...
+    return getLogger(DICOMNODE_PROCESS_LOGGER) if self._should_queue_log() else self.get_logger()
 
   def start_queue(self):
+    if not self._should_queue_log():
+      return
+
     if self._logging_thread is not None:
       raise ContractViolation("Cannot start queue logging when you're already queue logging!")
 
     if self._log_queue is None:
-      self._log_queue = Queue[LogRecord | None]()
+      self._log_queue = multiprocessing_context.Queue()
 
     self._logging_thread = Thread(
       target=queue_logger_thread_target,
@@ -119,9 +128,13 @@ class LogManager:
       name="Log Queue Reader Thread",
     )
 
+    self._logging_thread.start()
+
   def stop_queue(self):
-    if self._log_queue is None or self._logging_thread is None:
+    if self._log_queue is None or self._logging_thread is None or not self._should_queue_log():
       return
+
+    self.get_logger().info("Closing Log queue!")
 
     self._log_queue.put_nowait(None)
     self._logging_thread.join()
@@ -129,3 +142,35 @@ class LogManager:
 
     self._log_queue = None
     self._logging_thread = None
+
+  def logging_config(self):
+    if isinstance(self.config.LOG_OUTPUT, str):
+      if self.config.LOG_OUTPUT == "stdout":
+        output = stdout
+      else:
+        output = Path(self.config.LOG_OUTPUT)
+    else:
+      output = None
+
+
+    return LoggerConfig(
+      log_level=self.config.LOG_LEVEL,
+      date_format=self.config.LOG_DATE_FORMAT,
+      format=self.config.LOG_FORMAT,
+      log_output=output,
+      when=self.config.LOG_WHEN,
+      number_of_backups=self.config.LOG_NUMBER_OF_BACK_UPS,
+    )
+
+  def queue_logging_config(self):
+    return LoggerConfig(
+      log_level=self.config.LOG_LEVEL,
+      date_format=self.config.LOG_DATE_FORMAT,
+      format=self.config.LOG_FORMAT,
+      log_output=self._log_queue,
+      when=self.config.LOG_WHEN,
+      number_of_backups=self.config.LOG_NUMBER_OF_BACK_UPS
+    )
+
+  def _should_queue_log(self) -> bool:
+    return bool(self.config.PROCESSING_DIRECTORY)

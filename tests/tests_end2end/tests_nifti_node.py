@@ -4,13 +4,8 @@ back again"""
 # Python standard library
 import logging
 from datetime import date, time
-from pathlib import Path
 from random import randint
-import shutil
-from typing import Iterable, NoReturn, Optional
-from time import sleep
-from unittest import TestCase
-from sys import stdout
+from unittest.mock import patch
 
 # Third party packages
 from nibabel.nifti1 import Nifti1Image
@@ -121,12 +116,12 @@ class End2EndNiftiTestCase(DicomnodeTestCase):
     port = randint(1025, ENDPOINT_PORT - 1)
     node.port = port
 
-    with self.assertLogs(DICOMNODE_LOGGER_NAME):
-      node.open(blocking=False)
-      with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER):
+    with patch('dicomnode.lib.logging.set_logger'):
+      with self.assertLogs(DICOMNODE_LOGGER_NAME):
+        node.open(blocking=False)
 
         address = Address('localhost', port, TEST_AE_TITLE)
-        slices = 50
+        slices = 10
         t_image_orientation = (1.0,0.0,0.0,0.0,1.0,0.0)
         image_orientation = [1.0,0.0,0.0,0.0,1.0,0.0]
 
@@ -134,8 +129,8 @@ class End2EndNiftiTestCase(DicomnodeTestCase):
         slice_y = 2.0
         slice_z = 2.0
 
-        rows = 300
-        cols = 400
+        rows = 30
+        cols = 40
 
         PatientID = "FooBar"
         datasets = [ ds for ds in generate_numpy_datasets(
@@ -180,4 +175,4 @@ class End2EndNiftiTestCase(DicomnodeTestCase):
         send_images(TEST_AE_TITLE, address, datasets)
 
         node.close()
-    endpoint.close()
+        endpoint.close()

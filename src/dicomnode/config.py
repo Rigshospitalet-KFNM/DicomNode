@@ -1,11 +1,13 @@
-""""""
+from __future__ import annotations
 
 __author__ = "Demiguard"
 
 # Python standard library
 from dataclasses import dataclass
 from logging import INFO
-from typing import TYPE_CHECKING
+from pathlib import Path
+
+from typing import TextIO, TYPE_CHECKING
 
 # Third party modules
 
@@ -13,6 +15,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
   from dicomnode.lib.io import Directory, File
+  from dicomnode.dicom import DicomIdentifier
+  from dicomnode.data_structures.optional import OptionalPath
 
 
 @dataclass
@@ -34,17 +38,16 @@ class DicomnodeConfigRaw:
   RUN_FILE : str | None = None
 
   # LOGGING
-  LOG_OUTPUT : str | None = None
+  LOG_OUTPUT : TextIO | Path | str | None = None
   LOG_WHEN : str | None = None
   LOG_LEVEL : int | None = None
   LOG_FORMAT : str | None = None
+  LOG_DATE_FORMAT : str | None = None
+  LOG_NUMBER_OF_BACK_UPS: int | None = None
 
 
 @dataclass
 class DicomnodeConfig:
-  from dicomnode.lib.io import Directory, File
-  from dicomnode.dicom import DicomIdentifier
-  from dicomnode.data_structures.optional import OptionalPath
   STUDY_EXPIRATION_DAYS : int
   PATIENT_IDENTIFIER_TAG : int
   LAZY_STORAGE : bool
@@ -66,9 +69,11 @@ class DicomnodeConfig:
 
   # LOGGING
   LOG_OUTPUT : str | None
-  LOG_WHEN : str | None
-  LOG_LEVEL : int | None
-  LOG_FORMAT : str | None
+  LOG_WHEN : str
+  LOG_LEVEL : int
+  LOG_FORMAT : str
+  LOG_DATE_FORMAT : str
+  LOG_NUMBER_OF_BACK_UPS : int
 
 
 
@@ -76,9 +81,9 @@ def default_to(value, default):
   return value if value is not None else default
 
 def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
-  from dicomnode.lib.io import Directory, File
   from dicomnode.dicom import DicomIdentifier
   from dicomnode.data_structures.optional import OptionalPath
+
   study_expiration_days  = default_to(config.STUDY_EXPIRATION_DAYS, 14)
   patient_identifier_tag = default_to(config.PATIENT_IDENTIFIER_TAG, 0x0010_0020)
   lazy_storage = default_to(config.LAZY_STORAGE, False)
@@ -97,10 +102,11 @@ def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
 
   log_output = None
 
-
   log_when = default_to(config.LOG_WHEN, "w0")
   log_level = default_to(config.LOG_LEVEL, INFO)
   log_format = default_to(config.LOG_FORMAT, "[%(asctime)s] |%(thread_id)d| %(name)s - %(levelname)s - %(message)s")
+  log_date_format = default_to(config.LOG_DATE_FORMAT, "%Y/%m/%d %H:%M:%S")
+  log_number_of_back_ups = default_to(config.LOG_NUMBER_OF_BACK_UPS, 8)
 
   return DicomnodeConfig(
     study_expiration_days,
@@ -117,5 +123,7 @@ def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
     log_output,
     log_when,
     log_level,
-    log_format
+    log_format,
+    log_date_format,
+    log_number_of_back_ups
   )

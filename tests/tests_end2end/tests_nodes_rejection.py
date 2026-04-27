@@ -25,7 +25,7 @@ from dicomnode.server.input_container import InputContainer
 from dicomnode.server.processor import AbstractProcessor
 
 # Test packages
-from tests.helpers import clear_logger
+from tests.helpers import clear_logger, process_thread_check_leak
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers.inputs import NeverValidatingInput
 
@@ -63,11 +63,11 @@ class RejectionTestCase(DicomnodeTestCase):
 
     super().tearDown()
 
+  @process_thread_check_leak
   def test_rejection(self):
     node = RejectionAETitle()
     port = randint(1025,65535)
     node.port = port
-
 
     with self.assertLogs(node.logger) as cm:
       node.open(blocking=False)
@@ -99,4 +99,5 @@ class RejectionTestCase(DicomnodeTestCase):
       assoc.release()
     self.assertIn(f'DEBUG:dicomnode:Connection {ACCEPTED_AE_TITLE} send an echo', recorded_logs.output)
 
-    node.close()
+    with self.assertLogs(node.logger):
+      node.close()

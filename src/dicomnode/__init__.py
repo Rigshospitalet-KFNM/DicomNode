@@ -7,9 +7,9 @@ from importlib import import_module
 from os import environ
 from pathlib import Path
 
-from dicomnode.lib import utils as __utils #
-
 from . import constants
+from dicomnode.lib import exceptions
+from dicomnode import config
 
 __version__ = constants.DICOMNODE_VERSION # This is gonna be annoying
 __author__ = "Christoffer Vilstrup Jensen"

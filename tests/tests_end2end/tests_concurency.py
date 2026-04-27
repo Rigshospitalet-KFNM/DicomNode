@@ -6,9 +6,9 @@ and it handles it correctly
 import logging
 from random import randint
 import threading
-from time import sleep
 from typing import List, Optional
-from unittest import TestCase
+
+from unittest.mock import patch
 
 # Third party Packages
 from pydicom import Dataset
@@ -87,60 +87,60 @@ class ConcurrencyTestCase(DicomnodeTestCase):
     # Thread N
 
 
-    with self.assertLogs(DICOMNODE_LOGGER_NAME):
-      self.node = ConcurrencyNode()
-      self.test_port = randint(1025, 49999)
-      self.node.port = self.test_port
-      self.node.open(blocking=False)
+    self.node = ConcurrencyNode()
+    self.test_port = randint(1025, 49999)
+    self.node.port = self.test_port
 
-      self.endpoint = TestStorageEndpoint()
-      self.endpoint.open()
-      with self.assertNonCapturingLogs(DICOMNODE_PROCESS_LOGGER):
-        num_threads = 6
-        num_images = 5
+    self.endpoint = TestStorageEndpoint()
+    self.endpoint.open()
+    num_threads = 6
+    num_images = 5
 
-        address = Address('localhost', self.test_port, TEST_AE_TITLE)
-        patient_cpr = "0201919996"
+    with self.assertLogs(self.node.logger):
+      with patch('dicomnode.lib.logging.set_logger'):
+        self.node.open(blocking=False)
+      address = Address('localhost', self.test_port, TEST_AE_TITLE)
+      patient_cpr = "0201919996"
 
-        sender_threads: List[threading.Thread] = []
+      sender_threads: List[threading.Thread] = []
 
-        study_uid = gen_uid()
-        series_uid = gen_uid()
-        for i in range(num_threads):
-            images = DicomTree(generate_numpy_datasets(num_images,
-                                                        PatientID=patient_cpr,
-                                                        SeriesUID=series_uid,
-                                                        StudyUID=study_uid,
-                                                        Rows=10,
-                                                        Cols=10,
-                                                        ))
-            images.map(personify(
-              tags=[
-                (0x00100010, "PN", "Odd Name Test"),
-                (0x00100040, "CS", "M")
-              ]
-            ))
+      study_uid = gen_uid()
+      series_uid = gen_uid()
+      for i in range(num_threads):
+          images = DicomTree(generate_numpy_datasets(num_images,
+                                                      PatientID=patient_cpr,
+                                                      SeriesUID=series_uid,
+                                                      StudyUID=study_uid,
+                                                      Rows=10,
+                                                      Cols=10,
+                                                      ))
+          images.map(personify(
+            tags=[
+              (0x00100010, "PN", "Odd Name Test"),
+              (0x00100040, "CS", "M")
+            ]
+          ))
 
-            thread = ProcessLikeThread(
-              name=f"sending-thread-{i + 1}",
-              target=send_images, args=[SENDER_AE_TITLE, address, images])
-            thread.start()
-            sender_threads.append(thread)
+          thread = ProcessLikeThread(
+            name=f"sending-thread-{i + 1}",
+            target=send_images, args=[SENDER_AE_TITLE, address, images])
+          thread.start()
+          sender_threads.append(thread)
 
-        [thread.join() for thread in sender_threads]
-        [thread.join() for thread in self.node.dicom_application_entry.active_associations]
-        [thread.join() for thread in self.endpoint.ae.active_associations]
+      [thread.join() for thread in sender_threads]
+      [thread.join() for thread in self.node.dicom_application_entry.active_associations]
+      [thread.join() for thread in self.endpoint.ae.active_associations]
 
+      self.node.close()
+      self.endpoint.close()
 
-        self.node.close()
-        self.endpoint.close()
-
-        self.assertEqual(len(self.endpoint.storage[patient_cpr]), num_threads * num_images)
-        self.assertEqual(self.endpoint.accepted_associations, 1)
+      self.assertEqual(len(self.endpoint.storage[patient_cpr]), num_threads * num_images)
+      self.assertEqual(self.endpoint.accepted_associations, 1)
 
     clear_logger(DICOMNODE_LOGGER_NAME)
     clear_logger(DICOMNODE_PROCESS_LOGGER)
 
+  @process_thread_check_leak
   def test_inputs_are_thread_safe_append_to(self):
     num_threads = 60
     num_datasets_per_thread = 5

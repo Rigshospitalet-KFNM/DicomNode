@@ -4,7 +4,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python Standard Library
 import logging
-from logging import getLogger, DEBUG
+from logging import getLogger, DEBUG, ERROR
 from pprint import pprint, pformat
 from random import randint
 from unittest import skip, TestCase
@@ -80,19 +80,24 @@ class DIMSETestCases(DicomnodeTestCase):
       create_query_dataset(patient_id = "Doesn't Matter")
 
   def test_dimse_query_really_dumb_args(self):
-    with self.assertRaises(InvalidQueryDataset):
-      create_query_dataset(QueryRetrieveLevel="DOESNTMATTER")
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      with self.assertRaises(InvalidQueryDataset):
+        create_query_dataset(QueryRetrieveLevel="DOESNTMATTER")
 
   def test_validate_empty_query_is_false(self):
     self.assertFalse(validate_query_dataset(Dataset()))
 
   def test_dimse_validate_query_dataset_without_required_tags(self):
+
     ds = Dataset()
     ds.QueryRetrieveLevel = "PATIENT"
-    self.assertFalse(validate_query_dataset(ds))
+    with self.assertLogs(DICOMNODE_LOGGER_NAME, ERROR):
+      self.assertFalse(validate_query_dataset(ds))
 
     ds.QueryRetrieveLevel = "STUDY"
-    self.assertFalse(validate_query_dataset(ds))
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertFalse(validate_query_dataset(ds))
 
     ds.QueryRetrieveLevel = "SERIES"
-    self.assertFalse(validate_query_dataset(ds))
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      self.assertFalse(validate_query_dataset(ds))

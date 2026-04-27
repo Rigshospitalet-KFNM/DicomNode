@@ -122,7 +122,7 @@ class AbstractInput(metaclass=AbstractInputMetaClass):
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     # Tag for SOPInstance is (0x0008,0018)
-    if 0x0008_0018 not in self.required_tags:
+    if 0x0008_0018 not in self.required_tags and "SOPInstanceUID" not in self.required_tags:
       self.logger.info(f"You should add SOPInstanceUID to required tags for {name(self)}")
       self.required_tags.append(0x0008_0018)
 

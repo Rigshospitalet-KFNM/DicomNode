@@ -210,3 +210,8 @@ def is_picklable(obj):
     print("".join(traceback_string))
 
     return False
+
+def optionalAttribute(obj: Any, name: str, default_value):
+  if hasattr(obj, name):
+    return getattr(obj, name)
+  return default_value

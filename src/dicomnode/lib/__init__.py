@@ -1,9 +1,11 @@
 # Python standard library
+from dicomnode import config
+
 from . import exceptions
+from . import utils
 from . import io
 from . import logging
 from . import regex
-from . import utils
 from . import validators
 from . import parallelism
 

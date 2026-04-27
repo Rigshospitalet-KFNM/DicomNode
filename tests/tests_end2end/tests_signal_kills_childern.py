@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 from typing import Any, Optional
 from threading import Thread, get_native_id
+from unittest.mock import patch
 
 # Third party Packages
 from pydicom import Dataset
@@ -40,8 +41,8 @@ class DumbProcessRunner(AbstractProcessor):
     return super().process(input_container)
 
 class DumbInput(AbstractInput):
-          def validate(self) -> bool:
-            return True
+  def validate(self) -> bool:
+    return True
 
 class DummyPipeline(AbstractPipeline):
   ae_title = "TEST"
@@ -53,7 +54,6 @@ class DummyPipeline(AbstractPipeline):
 
   Processor = DumbProcessRunner
 
-
   def __init__(self, config=None, queue: Any=None) -> None:
     self.processing_directory = Path(getcwd()) / "processing"
     self._log_queue = queue
@@ -63,9 +63,14 @@ class DummyPipeline(AbstractPipeline):
 
 
 def process_function(queue: Queue, test_port):
+  # We'll catch the logs
+  root_logger = getLogger()
+  root_logger.handlers.clear()
+
   instance = DummyPipeline(queue=queue)
   instance.port = test_port
-  instance.open(blocking=True)
+  with patch('dicomnode.lib.logging.set_logger'):
+    instance.open(blocking=True)
 
 
 class SignalKillsChildrenWritten(DicomnodeTestCase):

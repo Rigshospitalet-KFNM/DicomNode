@@ -13,20 +13,17 @@
 __author__ = "Christoffer Vilstrup Jensen"
 
 # Standard lib
-from datetime import datetime, timedelta
 from enum import Enum
 import logging
-from logging import getLogger, LogRecord
 import multiprocessing
 from multiprocessing import Queue as MPQueue
-import os
 from os import chdir, getcwd, getpid
 from pathlib import Path
 from queue import Queue, Empty
 import shutil
 import signal
 from sys import stdout
-from threading import Thread, Lock, get_native_id
+from threading import Thread
 from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
@@ -51,14 +48,13 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
 from dicomnode.lib.io import Directory, File, fill_patient_storage_from_file_system
 from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
-  LoggerConfig, log_traceback
-
+  LoggerConfig, log_traceback, LogManager
+from dicomnode.lib.utils import optionalAttribute
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.pipeline_storage import PipelineStorage
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
-
 from dicomnode.server.processor import AbstractProcessor, ProcessRunnerArgs
 
 default_sigint_handler = signal.getsignal(signal.SIGINT)
@@ -181,81 +177,6 @@ class AbstractPipeline():
 
   Processor: Type[AbstractProcessor] = AbstractProcessor
 
-  # End of Attributes definitions.
-  def exporting_logging_config(self):
-    if isinstance(self.log_output,str):
-      output = Path(self.log_output)
-    else:
-      output = self.log_output
-
-    return LoggerConfig(
-      log_level=self.log_level,
-      date_format=self.log_date_format,
-      format=self.log_format,
-      log_output=output,
-      when=self.log_when,
-      number_of_backups=self.number_of_backups,
-    )
-
-  def queue_logging_config(self):
-    return LoggerConfig(
-      log_level=self.log_level,
-      date_format=self.log_date_format,
-      format=self.log_format,
-      log_output=self._log_queue,
-      when=self.log_when,
-      number_of_backups=self.number_of_backups
-    )
-
-
-  def _setup_logger(self):
-    """Should be considered part of the init method
-    """
-    if self.config.PROCESSING_DIRECTORY:
-      if not hasattr(self, '_log_queue'):
-        self._owning_queue = True
-        self._log_queue: Optional[MPQueue[LogRecord | None]] = multiprocessing_context.Queue()
-      else:
-        self._owning_queue = False
-    else:
-      self._owning_queue = False
-      self._log_queue = None
-
-    self.logger = getLogger(DICOMNODE_LOGGER_NAME)
-
-    # If the logger is empty fill it with the current config
-    if not len(self.logger.handlers):
-      self._owns_dicomnode_logger = True
-      set_logger(self.logger, self.exporting_logging_config())
-    else:
-      self._owns_dicomnode_logger = False
-
-    self.__process_logger = getLogger(DICOMNODE_PROCESS_LOGGER)
-
-    # Set pynetdicom logger
-    getLogger("pynetdicom").setLevel(self.pynetdicom_logger_level)
-
-  def _start_queue_logging(self):
-    set_logger(self.logger, self.queue_logging_config())
-    if self._owning_queue:
-      set_logger(self.__process_logger, self.exporting_logging_config())
-
-      self._logger_thread = Thread(
-        target=queue_logger_thread_target,
-        args=(self._log_queue,self.__process_logger),
-        daemon=True
-      )
-      self._logger_thread.start()
-
-  def _stop_queue_logging(self):
-    set_logger(self.logger, self.exporting_logging_config())
-    self.__process_logger.handlers.clear()
-    if self._owning_queue and self._log_queue:
-      self._log_queue.put_nowait(None)
-      self._logger_thread.join()
-      self._log_queue.join_thread()
-
-
   def __init__(self, config: Optional[DicomnodeConfig] =None) -> None:
     # This function starts and opens the server
     #
@@ -284,17 +205,23 @@ class AbstractPipeline():
         ARCHIVE_DIRECTORY=self._data_directory,
         PROCESSING_DIRECTORY=self._processing_directory,
         RUN_FILE=File(self.run_file) if self.run_file else None,
-        LOG_OUTPUT=str(self.log_output),
+        LOG_OUTPUT=self.log_output,
         LOG_WHEN=self.log_when,
         LOG_LEVEL=self.log_level,
-        LOG_FORMAT=self.log_format
+        LOG_FORMAT=self.log_format,
+        LOG_DATE_FORMAT=self.log_date_format,
+        LOG_NUMBER_OF_BACK_UPS=self.number_of_backups
       )
 
     self.config = config
 
-  # logging
+    # logging
+    self.logManager = LogManager(
+      self.config,
+      optionalAttribute(self, '_log_queue', None)
+    )
 
-    self._setup_logger()
+    self.logger = self.logManager.get_logger()
 
     self.data_state = PipelineStorage(
       self.input,
@@ -419,16 +346,16 @@ class AbstractPipeline():
 
     self._process_output(input_containers)
 
-  def _process_output(self, input_containers: List[Tuple[str, PatientNode]],):
+  def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]],):
     """This function exists to the target for the queued pipeline"""
 
-    for patient_id,patient_node in input_containers:
+    for patient_id,patient_node in touched_patient_nodes:
       input_container = patient_node.grind()
 
       args = ProcessRunnerArgs(
         patient_id=patient_id,
         input_container=input_container,
-        log_config=self.queue_logging_config(),
+        log_config=self.logManager.queue_logging_config(),
         process_path=self.get_processing_directory_path(patient_id)
       )
 
@@ -502,7 +429,7 @@ class AbstractPipeline():
       shutil.rmtree(self.processing_directory)
 
     self._maintenance_thread.stop()
-    self._stop_queue_logging()
+    self.logManager.stop_queue()
 
 
   def open(self, blocking=True) -> Optional[NoReturn]:
@@ -524,7 +451,7 @@ class AbstractPipeline():
     self.logger.debug(f"The loaded initial pipeline tree is: {self.data_state}")
 
     signal.signal(signal.SIGINT, self.node_signal_handler_SIGINT)
-    self._start_queue_logging()
+    self.logManager.start_queue()
 
     if self.processing_directory is not None:
       if not self.processing_directory.exists():
@@ -620,10 +547,9 @@ class AbstractPipeline():
 
     self.logger.critical(f"Killed all subprocesses!")
 
-    if signal_ in [signal.SIGTERM, signal.SIGINT] and self._owning_queue and self._log_queue is not None:
-      self._log_queue.put(None, timeout=1.0)
+    if signal_ in [signal.SIGTERM, signal.SIGINT]:
+      self.logManager.stop_queue()
 
-      self._logger_thread.join()
     exit(1)
 
 
