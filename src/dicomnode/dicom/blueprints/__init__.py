@@ -1,54 +1,15 @@
 # Python Standard library
-from io import BytesIO
 from random import randint
 from datetime import date, time, datetime
 from typing import Any
 
-# Third party packages
-import matplotlib
-matplotlib.use('agg')
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-from matplotlib.figure import Figure
-from matplotlib.gridspec import GridSpec
-from pydicom.uid import (
-  EncapsulatedPDFStorage
-)
+# Third party modules
+from pydicom.uid import EncapsulatedPDFStorage
 
 # Dicomnode packages
 from dicomnode.dicom import gen_uid
 from dicomnode.dicom.dicom_factory import Blueprint, CopyElement, StaticElement,\
   FunctionalElement, InstanceCopyElement, SeriesElement, InstanceEnvironment
-
-# This trick is mostly just to prevent pollution of namespace
-class _ErrorConstants():
-  SAMPLES_PER_PIXEL = 3
-  PHOTOMETRIC_INTERPRETATION = "RGB"
-  PLANAR_CONFIGURATION = 0
-  ROWS = 500
-  COLUMNS = 500
-  BIT_ALLOCATED = 8
-  BIT_STORED = 8
-  HIGH_BIT = 7
-  PIXEL_REPRESENTATION = 0
-
-ERROR_CONSTANTS = _ErrorConstants()
-
-def generate_error_picture(_: Any):
-  my_dpi = 300
-  figure = Figure(figsize=(ERROR_CONSTANTS.COLUMNS / my_dpi, ERROR_CONSTANTS.ROWS / my_dpi), dpi=my_dpi)
-  canvas = FigureCanvasAgg(figure)
-  axis=canvas.figure.add_subplot(1,1,1)
-  axis.set_axis_off()
-  axis.text(50,50, "ERROR IN THE PIPELINE")
-  figure.set_facecolor("red")
-  canvas.draw()
-  bytes_io = BytesIO()
-  figure.savefig(bytes_io, format='rgba') # SO MATPLOTLIB DOESN*T SUPPORT RGB...
-  bytes_io.seek(0)
-  bytes_rgba = bytes_io.read()
-  bytes_rgb = bytes([b for i, b in enumerate(bytes_rgba) if i % 4 != 3])
-  return bytes_rgb
-
 
 ###### Header function ######
 def _add_InstanceNumber(caller_args: InstanceEnvironment):
@@ -193,10 +154,8 @@ default_report_blueprint = Blueprint([
 ])
 
 
-from .error_blueprint_english import ERROR_BLUEPRINT
 
 __all__ = [
   'SOP_common_blueprint',
   'default_report_blueprint',
-  'ERROR_BLUEPRINT'
 ]

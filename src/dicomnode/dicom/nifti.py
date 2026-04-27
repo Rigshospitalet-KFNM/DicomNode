@@ -8,12 +8,12 @@ from typing import List, Optional
 
 # Third party packages
 from pydicom import Dataset
-from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
 # Dicomnode
 from dicomnode.dicom import sort_datasets
 
 def convert_to_nifti(dicom_array: List[Dataset], output_file: Optional[Path], reorient: bool):
+  from dicom2nifti.convert_dicom import dicom_array_to_nifti
   dicom_array.sort(key=sort_datasets)
 
   images = dicom_array_to_nifti(dicom_array, output_file, reorient)['NII']

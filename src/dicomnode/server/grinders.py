@@ -28,7 +28,7 @@ from nibabel.nifti1 import Nifti1Image
 from pydicom import Dataset
 from pydicom.uid import RTStructureSetStorage
 from rt_utils import RTStruct
-from dicom2nifti.convert_dicom import dicom_array_to_nifti
+
 
 # Dicom node package
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
@@ -254,6 +254,8 @@ class NiftiGrinder(Grinder):
     Returns:
       Nifti1Image: Nifti image, note that it have NOT been saved to disk
     """
+    # Note the import is here because this packages takes like 200 ms to load
+    from dicom2nifti.convert_dicom import dicom_array_to_nifti
 
     lists_datasets = [ds for ds in datasets]
     return_dir = dicom_array_to_nifti(

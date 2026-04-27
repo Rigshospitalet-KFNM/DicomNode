@@ -91,7 +91,7 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     logging_queue = get_context('spawn').Queue()
-    start_up_delay = 2.0
+    start_up_delay = 1.0
 
     test_port = randint(1024, 45000)
 

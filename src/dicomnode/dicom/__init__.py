@@ -3,6 +3,7 @@
 
 # Python Standard Library
 from functools import reduce
+import importlib.util
 from enum import Enum
 from types import EllipsisType
 from typing import Any,Callable, List, Literal, Iterable, Optional, Tuple, Union
@@ -20,6 +21,7 @@ from dicomnode.constants import DICOMNODE_IMPLEMENTATION_UID, DICOMNODE_IMPLEMEN
 from dicomnode.lib.exceptions import IncorrectlyConfigured
 from dicomnode.lib.logging import get_logger
 from dicomnode.lib.exceptions import InvalidDataset, MissingDatasets
+from dicomnode.lib.utils import lazy_import
 
 PRIVATIZATION_VERSION = 1
 
@@ -608,15 +610,13 @@ def get_4d_image_dimensionality(dataset: Dataset) -> int:
 
   raise ValueError("Dataset doesn't appear to be a 4 dimensional value")
 
-
-
-from . import anonymization
-from . import blueprints
-from . import dicom_factory
-from . import dimse
-from . import lazy_dataset
-from . import nifti
-from . import sop_mapping
+anonymization = lazy_import("dicomnode.dicom.anonymization")
+blueprints = lazy_import("dicomnode.dicom.blueprints")
+dicom_factory = lazy_import("dicomnode.dicom.dicom_factory")
+dimse = lazy_import("dicomnode.dicom.dimse")
+lazy_dataset = lazy_import("dicomnode.dicom.lazy_dataset")
+nifti = lazy_import("dicomnode.dicom.nifti")
+sop_mapping = lazy_import("dicomnode.dicom.sop_mapping")
 
 __all__ = [
   'gen_uid',

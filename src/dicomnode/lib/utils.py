@@ -9,6 +9,7 @@ from enum import Enum
 from logging import Logger, getLogger
 import inspect
 import io
+import importlib.util
 import multiprocessing
 import pickle
 import traceback
@@ -215,3 +216,12 @@ def optionalAttribute(obj: Any, name: str, default_value):
   if hasattr(obj, name):
     return getattr(obj, name)
   return default_value
+
+def lazy_import(name):
+    spec = importlib.util.find_spec(name)
+    loader = importlib.util.LazyLoader(spec.loader) # type: ignore
+    spec.loader = loader # type: ignore
+    module = importlib.util.module_from_spec(spec)# type: ignore
+    sys.modules[name] = module
+    loader.exec_module(module)
+    return module
