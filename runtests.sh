@@ -35,7 +35,7 @@ export DICOMNODE_ENV_REPORT_DATA_PATH="$current_directory/report_data/"
 coverage run runtests.py --test-data $@
 coverage report --omit=tests/*,venv/*
 
-if [ -d coverage ]; then1
+if [ -d coverage ]; then
   mkdir -p coverage
 fi
 

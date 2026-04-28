@@ -45,6 +45,13 @@ namespace REGISTRATION {
     }
   };
 
+
+template<typename T>
+class Optimizer {
+  T difference;
+};
+
+
 template<typename T>
 dicomNodeError_t register_to(
   Image<3, T>& host_source_image,
@@ -70,8 +77,6 @@ dicomNodeError_t register_to(
 
     Point<3> source_center_of_gravity;
     Point<3> destination_center_of_gravity;
-
-
 
     DicomNodeRunner runner{[&](dicomNodeError_t error) {
       free_device_memory(
@@ -134,7 +139,4 @@ dicomNodeError_t register_to(
 
       return dicomNodeError_t::SUCCESS;
     }
-
-
-
 }

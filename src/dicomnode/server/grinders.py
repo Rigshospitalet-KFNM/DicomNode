@@ -20,7 +20,7 @@ __author__ = "Christoffer Vilstrup Jensen"
 from abc import ABC, abstractmethod
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Type
 
 # Third party packages
 import numpy
@@ -281,6 +281,7 @@ class RTStructGrinder(Grinder):
           logger.error(f"{self.__class__.__name__} only support single RTStructs")
           logger.error(f"the dataset is ignored:")
           logger.error(f"{dataset}")
+          raise
       else:
         rt_series.append(dataset)
     if rt_struct is None:

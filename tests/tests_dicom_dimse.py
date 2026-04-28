@@ -8,6 +8,7 @@ from logging import getLogger, DEBUG, ERROR
 from pprint import pprint, pformat
 from random import randint
 from unittest import skip, TestCase
+from unittest.mock import patch
 
 #Third party packages
 from pydicom import Dataset
@@ -19,7 +20,8 @@ from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidQueryDataset, CouldNotCompleteDIMSEMessage
 from dicomnode.dicom import make_meta
 from dicomnode.dicom.dimse import send_move, Address, QueryLevels,\
-  create_query_dataset, validate_query_dataset
+  create_query_dataset, validate_query_dataset, send_move_thread,\
+  send_images_thread
 
 # Dicomnode tests helpers
 from tests.helpers import get_test_ae
@@ -101,3 +103,14 @@ class DIMSETestCases(DicomnodeTestCase):
     ds.QueryRetrieveLevel = "SERIES"
     with self.assertLogs(DICOMNODE_LOGGER_NAME):
       self.assertFalse(validate_query_dataset(ds))
+
+  def test_dimse_thread_functions_do_what_they_say(self):
+    with patch('dicomnode.dicom.dimse.send_move') as mock:
+      thread = send_move_thread("DOESNT MATTER", Address('0.0.0.0', 0, ""), Dataset())
+      thread.join()
+      mock.assert_called()
+
+    with patch('dicomnode.dicom.dimse.send_images') as mock:
+      thread = send_images_thread("DOESNT MATTER", Address('0.0.0.0', 0, ""), [])
+      thread.join()
+      mock.assert_called()

@@ -602,7 +602,7 @@ def detect_4d_image(dataset: Dataset):
   return time_slices_in_dataset or time_slot_in_dataset or time_rr_intervals_in_dataset
 
 def get_4d_image_dimensionality(dataset: Dataset) -> int:
-  """Retrieves the fourth dimension of a """
+  """Retrieves the fourth dimension of a PET series"""
   if  0x0054_0071 in dataset and 0x0054_61:
     return dataset[0x0054_0071].value * dataset[0x0054_0061].value
   if  0x0054_0101 in dataset:
