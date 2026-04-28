@@ -52,7 +52,7 @@ from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
 from dicomnode.lib.utils import optionalAttribute
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import DicomnodeConfig
-from dicomnode.server.pipeline_storage import PipelineStorage
+from dicomnode.server.pipeline_storage import PipelineStorage, ReactivePipelineStorage, PassivePipelineStorage
 from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.maintenance import MaintenanceThread
 from dicomnode.server.processor import AbstractProcessor, ProcessRunnerArgs
@@ -176,6 +176,7 @@ class AbstractPipeline():
   """
 
   Processor: Type[AbstractProcessor] = AbstractProcessor
+  StorageType: Type[PipelineStorage] = ReactivePipelineStorage
 
   def __init__(self, config: Optional[DicomnodeConfig] =None) -> None:
     # This function starts and opens the server
@@ -205,7 +206,7 @@ class AbstractPipeline():
         ARCHIVE_DIRECTORY=self._data_directory,
         PROCESSING_DIRECTORY=self._processing_directory,
         RUN_FILE=File(self.run_file) if self.run_file else None,
-        LOG_OUTPUT=self.log_output,
+        LOG_OUTPUT=self.log_output, #type: ignore
         LOG_WHEN=self.log_when,
         LOG_LEVEL=self.log_level,
         LOG_FORMAT=self.log_format,
@@ -223,7 +224,7 @@ class AbstractPipeline():
 
     self.logger = self.logManager.get_logger()
 
-    self.data_state = PipelineStorage(
+    self.data_state = self.StorageType(
       self.input,
       self.config
     )
@@ -388,7 +389,7 @@ class AbstractPipeline():
 
     Returns:
         bool: if the dataset is valid, if True it'll attempt to add it,
-              if not it'll send a 0xB006 response.
+              if not it'llt[ident send a 0xB006 response.
     """
     return True
 
@@ -623,8 +624,39 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
     return super().close()
 
-class DaemonNode(AbstractPipeline):
-  pass
+class DaemonPipeline(AbstractPipeline):
+  """A pipeline that have a thread running pooling the storage, it assumes that
+  your inputs validate are working correctly"""
+
+  sleep_period = 5.0
+
+  StorageType: Type[PassivePipelineStorage] = PassivePipelineStorage # type: ignore
+
+  def _handle_connection_closed(self, event: evt.Event):
+    return super()._handle_connection_closed(event)
+
+  def worker_process(self):
+    while self.running:
+      things_to_process, failed_datasets = self.data_state.extract_input_container()
+
+      self._process_output(things_to_process)
+
+      if failed_datasets:
+        self.logger.error(f"Daemon got rejected datasets: {display_dicom_collection(failed_datasets)}")
+
+      sleep(5.0)
+
+  def open(self, blocking=True) -> None:
+    self.running = True
+    self.daemon = Thread(target=self.worker_process, daemon=True)
+    self.daemon.start()
+    return super().open(blocking)
+
+  def close(self) -> None:
+    self.running = False
+    return super().close()
+
+
 
 
 __all__ = (
