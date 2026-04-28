@@ -75,6 +75,7 @@ class Space:
   def starting_point(self):
     return self._starting_point
 
+
   def __init__(self, basis, starting_point, domain):
     """A Space is a 3 dimensional linear space with a starting point and a domain,
   which represent the coordinate system used describes an image.
@@ -172,6 +173,15 @@ class Space:
     affine[:3, 3] = self.starting_point
 
     return affine
+
+  @classmethod
+  def from_affine(cls, affine: numpy.ndarray, extent):
+    """Generate a space from an affine"""
+
+    basis = affine[:3, :3]
+    starting_point = affine[:3, 3]
+
+    return cls(basis, starting_point, extent)
 
   @classmethod
   def from_datasets(cls, datasets: List[Dataset]):

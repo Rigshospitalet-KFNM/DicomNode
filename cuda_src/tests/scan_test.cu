@@ -71,8 +71,8 @@ TEST(REDUCE, IMAGE_REDUCTION) {
   cudaMemcpy(device_image_1, &image_1, sizeof(Image<3,f32>), cudaMemcpyDefault);
   cudaMemcpy(device_image_2, &image_2, sizeof(Image<3,f32>), cudaMemcpyDefault);
 
-  reduce_no_mem<1, REGISTRATION::IMAGE_DIFFERENCE<f32>, f32>(
-    image_1.elements(), &difference, device_image_1, device_image_2
+  reduce_no_mem<1, REGISTRATION::VolumeDifference<f32>, f32>(
+    image_1.elements(), &difference, &(device_image_1->volume), &(device_image_2->volume)
   );
 
   EXPECT_FLOAT_EQ(27.0f, difference);
@@ -86,7 +86,7 @@ TEST(REDUCE, IMAGE_REDUCTION) {
 template<typename T>
 __global__ void image_registration_maps_to_kernel(T* output, Image<3, T>* image_1, Image<3, T>* image_2) {
   if (threadIdx.x < image_1->elements()) {
-    output[threadIdx.x] = REGISTRATION::IMAGE_DIFFERENCE<f32>::map_to(threadIdx.x, image_1, image_2);
+    output[threadIdx.x] = REGISTRATION::VolumeDifference<f32>::map_to(threadIdx.x, &(image_1->volume), &(image_2->volume));
   }
 }
 

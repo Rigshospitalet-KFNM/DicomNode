@@ -1,7 +1,8 @@
 #pragma once
 
 #include<cuda/cmath>
-#include<cuda/type_traits>
+#include<cuda/std/array>
+#include<cuda/std/limits>
 
 #include "center_of_gravity.cuh"
 #include"core/core.cuh"
@@ -45,11 +46,141 @@ namespace REGISTRATION {
     }
   };
 
+  template<typename T>
+struct OptimizerParam {
+  f32 scale = 1.0f;
+  Point<3> translations = {0.0f,0.0f,0.0f};
+  cuda::std::array<f32, 3> rotations = {0.0f,0.0f,0.0f};
+  T cost = cuda::std::numeric_limits<T>::max();
+
+    OptimizerParam& compare(OptimizerParam& other) noexcept {
+      return cost < other.cost ? *this : other;
+    };
+};
 
 template<typename T>
-class Optimizer {
-  T difference;
+struct Optimizer {
+  OptimizerParam<T> params;
+  OptimizerParam<T> max_step_size {
+    .scale = 0.025,
+    .translations = Point<3>{4.0f,4.0f,4.0f},
+    .rotations = {0.05f,0.05f,0.05f},
+  };
+
+  Optimizer(auto cost_function) {
+    params.cost = cost_function(params);
+  }
+
+
+  T update_scale(auto cost_function) {
+    OptimizerParam positive_param = params;
+    OptimizerParam negative_param = params;
+
+    // Check scale param
+    positive_param.scale += max_step_size.scale;
+    negative_param.scale -= max_step_size.scale;
+
+    positive_param.cost = cost_function(positive_param);
+    negative_param.cost = cost_function(negative_param);
+
+    params = params.compare(positive_param);
+    params = params.compare(negative_param);
+
+    return params.cost;
+  }
+
+  T update_translation(auto cost_function) {
+    OptimizerParam positive_param = params;
+    OptimizerParam negative_param = params;
+
+    for (u8 dim = 0; dim < 3; dim++) {
+      positive_param.translations[dim] += max_step_size.translations[dim];
+      negative_param.translations[dim] -= max_step_size.translations[dim];
+
+      positive_param.cost = cost_function(positive_param);
+      negative_param.cost = cost_function(negative_param);
+
+      params = params.compare(positive_param);
+      params = params.compare(negative_param);
+
+      if (dim < 2) {
+        positive_param = params;
+        negative_param = params;
+      }
+    }
+
+    return params.cost;
+  }
+
+  T update_rotations(auto cost_function) {
+    OptimizerParam positive_param = params;
+    OptimizerParam negative_param = params;
+
+    for (u8 dim = 0; dim < 3; dim++) {
+      positive_param.rotations[dim] += max_step_size.rotations[dim];
+      negative_param.rotations[dim] -= max_step_size.rotations[dim];
+
+      positive_param.cost = cost_function(positive_param);
+      negative_param.cost = cost_function(negative_param);
+
+      params = params.compare(positive_param);
+      params = params.compare(negative_param);
+
+      if (dim < 2) {
+        positive_param = params;
+        negative_param = params;
+      }
+    }
+
+    return params.cost;
+  }
+
 };
+
+template<typename T>
+dicomNodeError_t modify_space(
+  Space<3> host_space, // VERY INTENTIONAL NOT A &
+  OptimizerParam<T>& modification,
+  Space<3>* device_pointer
+) {
+
+  SquareMatrix<3> scale {
+    modification.scale, 0.0f,0.0f,
+    0.0f, modification.scale, 0.0f,
+    0.0f, 0.0f, modification.scale
+  };
+
+  f32 cos_x = cos(modification.rotations[0]);
+  f32 cos_y = cos(modification.rotations[1]);
+  f32 cos_z = cos(modification.rotations[2]);
+  f32 sin_x = sin(modification.rotations[0]);
+  f32 sin_y = sin(modification.rotations[1]);
+  f32 sin_z = sin(modification.rotations[2]);
+
+  SquareMatrix<3> rotation_x = {
+    1.0,0.0,0.0,
+    0.0, cos_x, sin_x,
+    0.0, -sin_x, cos_x
+  };
+
+  SquareMatrix<3> rotation_y = {
+    cos_y, 0.0f, sin_y,
+    0.0, 1.0, 0.0,
+    -sin_y, 0.0, cos_y
+  };
+
+  SquareMatrix<3> rotation_z = {
+    cos_z, sin_y, 0.0f,
+    -sin_z, cos_z, 0.0f,
+    0.0f,0.0f,1.0f
+  };
+
+  host_space.basis *= scale * rotation_x * rotation_y * rotation_z;
+  host_space.inverted_basis = host_space.basis.inverse();
+  host_space.starting_point += modification.translations;
+
+  return encode_cuda_error(cudaMemcpy(device_pointer, &host_space, sizeof(Space<3>), cudaMemcpyDefault));
+}
 
 
 template<typename T>
@@ -66,7 +197,7 @@ dicomNodeError_t register_to(
       }
     );
 
-    T difference = 0;
+
 
     Image<3, T>* device_source_image = nullptr;
     Image<3, T>* device_target_image = nullptr;
@@ -78,13 +209,17 @@ dicomNodeError_t register_to(
     Point<3> source_center_of_gravity;
     Point<3> destination_center_of_gravity;
 
-    DicomNodeRunner runner{[&](dicomNodeError_t error) {
+    auto free_used_memory = [&]() {
       free_device_memory(
         &intermediate_image.data(),
         &device_source_image,
         &device_target_image,
         &device_intermediate_image
       );
+    };
+
+    DicomNodeRunner runner{[&](dicomNodeError_t error) {
+      free_used_memory();
     }};
     // Initialzation
     runner | [&]() {
@@ -109,34 +244,45 @@ dicomNodeError_t register_to(
       return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
     };
 
+    auto cost_function = [&](OptimizerParam<T>& param) {
+      T difference = cuda::std::numeric_limits<T>::max();
 
-    runner | [&]() {
-      INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
-        device_source_image,
-        &(device_intermediate_image->space),
-        intermediate_image.data()
-      );
+      runner | [&]() {
+        return modify_space<T>(intermediate_image.space, param, &(device_intermediate_image->space));
+      } | [&]() {
+        INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
+          device_source_image,
+          &(device_intermediate_image->space),
+          intermediate_image.data()
+        );
 
-      return cudaGetLastError();
-    } | [&]() {
-      return reduce_no_mem<8, VolumeDifference<T>, T>(
-        intermediate_image.elements(),
-        &difference,
-        &(device_intermediate_image->volume),
-        &(device_target_image->volume)
-      );
-    } | [&]() {
-      free_device_memory(
-        &intermediate_image.data(),
-        &device_source_image,
-        &device_target_image,
-        &device_intermediate_image
-      );
-      return dicomNodeError_t::SUCCESS;
+        return cudaGetLastError();
+      } | [&]() {
+        return reduce_no_mem<8, VolumeDifference<T>, T>(
+          intermediate_image.elements(),
+          &difference,
+          &(device_intermediate_image->volume),
+          &(device_target_image->volume)
+        );
+      };
+      return difference;
     };
 
-      std::cout << "Difference: " << difference << "\n";
+    Optimizer<T> optimizer(cost_function);
 
-      return dicomNodeError_t::SUCCESS;
-    }
+    std::cout << "Start error: " << optimizer.params.cost << "\n";
+
+    optimizer.update_translation(cost_function);
+    optimizer.update_rotations(cost_function);
+    optimizer.update_scale(cost_function);
+
+    std::cout << "End error: " << optimizer.params.cost << "\n";
+
+    runner | [&]() {
+      free_used_memory();
+      return SUCCESS;
+    };
+
+    return runner.error();
+  }
 }

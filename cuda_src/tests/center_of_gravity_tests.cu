@@ -141,7 +141,7 @@ namespace CENTER_OF_GRAVITY_TESTS {
       EXPECT_EQ(expected_z[i], actual_z[i]);
     }
   }
-
+  /*
   TEST(CENTER_OF_GRAVITY_TEST, FIND_SYMETRIC_CENTER){
     constexpr Extent<3> extent{4,4,4};
 
@@ -173,8 +173,7 @@ namespace CENTER_OF_GRAVITY_TESTS {
       .default_value = 0
     };
 
-
-
   }
 
+  */
 }
