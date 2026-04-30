@@ -243,7 +243,6 @@ class AbstractPipeline():
     # and you want ECHO-SCU
     contexts = VerificationPresentationContexts + self.supported_contexts
     self.dicom_application_entry.supported_contexts = contexts
-
     self.dicom_application_entry.require_called_aet = self.require_called_aet
     self.dicom_application_entry.require_calling_aet = self.require_calling_aet
 
@@ -345,13 +344,21 @@ class AbstractPipeline():
       dicom_collection =  display_dicom_collection(failed_datasets)
       self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
 
-    self._process_output(input_containers)
+    self._process_output(input_containers, event: Optional[evt.Event])
 
-  def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]],):
+  def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]], event: evt.Event):
     """This function exists to the target for the queued pipeline"""
 
     for patient_id,patient_node in touched_patient_nodes:
       input_container = patient_node.grind()
+
+      if event is not None:
+        input_container.responding_address = Address(
+          event.assoc.requestor.address,
+          event.assoc.requestor.port,
+          event.assoc.requestor.ae_title
+        )
+
 
       args = ProcessRunnerArgs(
         patient_id=patient_id,
@@ -565,7 +572,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
 
   This might be very relevant when processing require a resource, such as GPU
   """
-  process_queue: Queue[List[Tuple[str, PatientNode]]]
+  process_queue: Queue[Tuple[List[Tuple[str, PatientNode]], Optional[evt.Event]]]
 
   queue_timeout = 0.05
 
@@ -573,11 +580,11 @@ class AbstractQueuedPipeline(AbstractPipeline):
     """Worker function for the process_queue thread"""
     while self.running:
       try:
-        input_container = self.process_queue.get(timeout=self.queue_timeout)
+        input_container, event = self.process_queue.get(timeout=self.queue_timeout)
         self.logger.info(f"Process queue got node {input_container}, "
                          f"approximate queue length: {self.process_queue.qsize()}")
         try:
-          self._process_output(input_container)
+          self._process_output(input_container, event)
         except Exception as exception:
           log_traceback(self.logger, exception, "Process worker encountered exception")
         finally:
@@ -593,7 +600,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
       self.logger.info(f"The association {id(event.assoc)} with {event.assoc.requestor.ae_title}  send {dicom_collection} which was rejected")
 
     if input_containers:
-      self.process_queue.put(input_containers)
+      self.process_queue.put((input_containers, event))
     else:
       self.logger.info(f"The association {id(event.assoc)} with {event.assoc.requestor.ae_title} - didn't produce any InputContainers to be processed")
 
@@ -639,7 +646,7 @@ class DaemonPipeline(AbstractPipeline):
     while self.running:
       things_to_process, failed_datasets = self.data_state.extract_input_container()
 
-      self._process_output(things_to_process)
+      self._process_output(things_to_process, None)
 
       if failed_datasets:
         self.logger.error(f"Daemon got rejected datasets: {display_dicom_collection(failed_datasets)}")

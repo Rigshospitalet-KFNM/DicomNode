@@ -1,10 +1,11 @@
 # Python standard library
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Third party modules
 from pydicom import Dataset
 
 # Dicomnode modules
+from dicomnode.dicom.dimse import Address
 from dicomnode.data_structures.optional import OptionalPath
 
 class InputContainer:
@@ -24,6 +25,7 @@ class InputContainer:
     self.__data = data
     self.datasets = datasets
     self.paths = paths
+    self.responding_address: Optional[Address] = None
 
   def __getitem__(self, key: str):
     return self.__data[key]
