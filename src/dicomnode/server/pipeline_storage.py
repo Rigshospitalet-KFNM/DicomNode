@@ -10,14 +10,7 @@ from typing import Dict, Iterable, List, Optional, Tuple, Type
 from pydicom import Dataset
 
 # Dicomnode Library Packages
-from dicomnode.constants import DICOMNODE_LOGGER_NAME
-from dicomnode.dicom import DicomIdentifier
-from dicomnode.dicom.series import DicomSeries
-from dicomnode.data_structures.image_tree import ImageTreeInterface
-from dicomnode.dicom.dimse import Address
-from dicomnode.lib.io import Directory
-from dicomnode.lib.exceptions import InvalidDataset, InvalidRootDataDirectory,\
-                                      InvalidTreeNode
+from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.data_structures.defaulting_dict import DefaultingDict
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.patient_node import PatientNode
@@ -29,7 +22,6 @@ def create_set():
 
 def create_list():
   return list()
-
 
 class PipelineStorage(ABC):
   @abstractmethod
@@ -160,14 +152,18 @@ class ReactivePipelineStorage(PipelineStorage):
     return base
 
 class PassivePipelineStorage(PipelineStorage):
-  """A PipelineStorage, that """
+  """A PipelineStorage, that is ignorant of the incoming threads. It's not
+  thread safe, in that and relies 100 % on correct implementation of the
+  underlying abstract Inputs.
+  - Just so you are aware some SCU's will send things over multiple associations
+  so you cannot rely on that.
+  """
   def __init__(self, node_structure: Dict[str, Type[AbstractInput]], config: DicomnodeConfig) -> None:
     self.node_structure = node_structure
     self.config = config
 
     def create_patient_node(key):
       return PatientNode(key, node_structure, config)
-
 
     self.tree: DefaultingDict[str, PatientNode] = DefaultingDict(create_patient_node)
     self.failed_datasets = []

@@ -657,8 +657,6 @@ class DaemonPipeline(AbstractPipeline):
     return super().close()
 
 
-
-
 __all__ = (
   "AbstractPipeline",
   "AbstractQueuedPipeline",

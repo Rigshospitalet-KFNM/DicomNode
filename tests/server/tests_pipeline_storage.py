@@ -13,7 +13,7 @@ from dicomnode.lib.exceptions import InvalidDataset
 from dicomnode.dicom import make_meta, DicomIdentifier, gen_uid
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import config_from_raw
-from dicomnode.server.pipeline_storage import PipelineStorage
+from dicomnode.server.pipeline_storage import ReactivePipelineStorage
 from dicomnode.server.patient_node import PatientNode
 
 # Dicomnode Test helper modules
@@ -71,7 +71,7 @@ class PipelineStorageTestCase(DicomnodeTestCase):
         return valid
 
 
-    target = PipelineStorage(
+    target = ReactivePipelineStorage(
       {"input" : HungryInput},
       config_from_raw()
     )
@@ -137,7 +137,7 @@ class PipelineStorageTestCase(DicomnodeTestCase):
       def add_image(self, dicom: Dataset) -> int:
         raise InvalidDataset
 
-    target = PipelineStorage({
+    target = ReactivePipelineStorage({
       'Anger' : DenyingInput
     }, config=config_from_raw())
 
@@ -152,7 +152,7 @@ class PipelineStorageTestCase(DicomnodeTestCase):
         self.storage.store_image(dicom)
         return 1
 
-    target = PipelineStorage({
+    target = ReactivePipelineStorage({
       'Anger' : AcceptingInput
     }, config=config_from_raw())
 
