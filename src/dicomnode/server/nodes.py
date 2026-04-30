@@ -344,7 +344,7 @@ class AbstractPipeline():
       dicom_collection =  display_dicom_collection(failed_datasets)
       self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
 
-    self._process_output(input_containers, event: Optional[evt.Event])
+    self._process_output(input_containers, event)
 
   def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]], event: evt.Event):
     """This function exists to the target for the queued pipeline"""
