@@ -75,7 +75,9 @@ class LazyFileStorage(Storage):
 
   def store_image(self, dataset: Dataset):
     path = self.path_for_dataset(dataset)
-    save_dicom(path, dataset)
+
+    if not path.exists():
+      save_dicom(path, dataset)
 
   def __iter__(self) -> Generator[Dataset, None, None]:
     if self._storage_location is None:
@@ -83,7 +85,6 @@ class LazyFileStorage(Storage):
     yield from load_dicoms(self._storage_location)
 
   def path_for_dataset(self, dataset: Dataset) -> Path:
-
     if self._storage_location is None:
       raise ContractViolation("You set path without ")
 

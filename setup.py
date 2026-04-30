@@ -154,7 +154,7 @@ if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
 setup(name='dicomnode',
-    version='0.0.27',
+    version='0.0.28',
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
@@ -166,7 +166,7 @@ setup(name='dicomnode',
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
-      'pydicom<4.0.0',
+      'pydicom>3.0.0,<4.0.0',
       'pynetdicom<4.0.0',
       'psutil<8.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
