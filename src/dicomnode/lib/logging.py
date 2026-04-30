@@ -37,6 +37,7 @@ def set_logger(logger: Logger, config: LoggerConfig):
   if isinstance(config.log_output, TextIO):
     handler = StreamHandler(config.log_output)
   elif isinstance(config.log_output, Path):
+
     handler = TimedRotatingFileHandler(
       config.log_output,
       when=config.when,
@@ -67,6 +68,8 @@ def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
     if record is None:
       break
 
+
+    print(f"SENDING A MESSAGE TO {logger.name} - {logger.handlers}")
 
 
     record.name = logger.name
@@ -122,6 +125,9 @@ class LogManager:
     if self._log_queue is None:
       self._log_queue = multiprocessing_context.Queue()
 
+    process_logger = self.get_process_logger()
+    set_logger(process_logger, self.logging_config())
+
     self._logging_thread = Thread(
       target=queue_logger_thread_target,
       args=(self._log_queue, getLogger(DICOMNODE_PROCESS_LOGGER)),
@@ -151,7 +157,6 @@ class LogManager:
         output = Path(self.config.LOG_OUTPUT)
     else:
       output = None
-
 
     return LoggerConfig(
       log_level=self.config.LOG_LEVEL,

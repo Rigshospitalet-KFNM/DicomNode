@@ -16,6 +16,12 @@ from dicomnode.server.grinders import ListGrinder
 # Test helpers
 from tests.helpers.storage_endpoint import ENDPOINT_PORT
 
+class ValidatingInput(AbstractInput):
+  required_tags = [0x0008_0018]
+
+  def validate(self) -> bool:
+    return True
+
 class TestInput(AbstractInput):
   required_tags = [0x00080018, 0x00100040]
 

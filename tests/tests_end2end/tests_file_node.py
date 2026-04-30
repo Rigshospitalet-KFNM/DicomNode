@@ -9,16 +9,18 @@ from time import sleep
 # Third Party Packages
 
 # Dicomnode Packages
+from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.data_structures.image_tree import DicomTree
-from dicomnode.dicom.dimse import Address, send_images_thread
+from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import NoOutput, PipelineOutput
+from dicomnode.server.processor import AbstractProcessor
 
 # Testing Helper
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, bench,\
   generate_numpy_datasets, personify
-from tests.helpers.inputs import NeverValidatingInput
+from tests.helpers.inputs import ValidatingInput
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 DICOM_STORAGE_PATH = Path(f"{TESTING_TEMPORARY_DIRECTORY}/file_storage")
@@ -36,40 +38,35 @@ SENDER_AE_TITLE = "SENDER_AE"
 
 class StallingFileStorageNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : NeverValidatingInput }
+  input = {INPUT_KW : ValidatingInput }
   require_calling_aet = [SENDER_AE_TITLE]
-  log_output = None
+  log_output = "log.log"
   log_level: int = logging.DEBUG
   disable_pynetdicom_logger: bool = True
   root_data_directory = DICOM_STORAGE_PATH
   processing_directory = PROCESSING_DIRECTORY
 
-  def process(self, input_data: InputContainer) -> PipelineOutput:
-    log_message =  f"process is called at cwd: {os.getcwd()}"
-    self.logger.info(log_message)
-    return NoOutput()
+  class Processor(AbstractProcessor):
+    def process(self, input_container: InputContainer) -> PipelineOutput:
+      log_message =  f"process is called at cwd: {os.getcwd()}"
+      self.logger.info(log_message)
+      return NoOutput()
 
 
 class StallingFileStorageTestCase(DicomnodeTestCase):
-  def setUp(self):
+
+  def test_check_log_file_is_created(self):
     DICOM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     self.node = StallingFileStorageNode()
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
-  def tearDown(self) -> None:
-    while self.node.dicom_application_entry.active_associations != []:
-      sleep(0.005) #pragma: no cover
-
-    #pprint([t for t in threading.enumerate()])
-    self.node.close()
-    super().tearDown()
-
-  @bench
-  def performance_send_fs(self):
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
-    images_1 = DicomTree(generate_numpy_datasets(50, PatientID = "1502799995"))
+    images_1 = DicomTree(generate_numpy_datasets(10, PatientID = "1502799995", Cols=10, Rows=10))
+
+    logger = logging.getLogger(DICOMNODE_LOGGER_NAME)
+    print(logger.handlers)
 
     images_1.map(personify(
       tags=[
@@ -78,8 +75,14 @@ class StallingFileStorageTestCase(DicomnodeTestCase):
       ]
     ))
 
-    thread_1 = send_images_thread(SENDER_AE_TITLE, address, images_1, None, False)
+    send_images(SENDER_AE_TITLE, address, images_1, None)
 
-    ret_1 = thread_1.join()
-    self.assertEqual(ret_1, 0)
-    self.assertEqual(self.node.data_state.images,50) # type: ignore
+    self.node.close()
+
+    log_file_path = Path("/tmp/pipeline_tests/log.log")
+    self.assertTrue(log_file_path.exists())
+
+    log_text = log_file_path.read_text()
+    print("\nLOG TEXT STARTS HERE:\n")
+    print(log_text)
+    print("\nLOG TEXT ENDS HERE:\n")
