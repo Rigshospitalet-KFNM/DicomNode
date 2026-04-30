@@ -566,6 +566,10 @@ class AbstractInputProxy(AbstractInput):
   def images(self):
     return 0
 
+  def __len__(self):
+    return 0
+
+
   def validate(self) -> bool:
       return False
 
