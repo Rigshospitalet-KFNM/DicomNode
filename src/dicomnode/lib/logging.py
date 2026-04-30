@@ -68,10 +68,6 @@ def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
     if record is None:
       break
 
-
-    print(f"SENDING A MESSAGE TO {logger.name} - {logger.handlers}")
-
-
     record.name = logger.name
     logger.handle(record)
 

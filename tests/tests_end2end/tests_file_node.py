@@ -9,7 +9,7 @@ from time import sleep
 # Third Party Packages
 
 # Dicomnode Packages
-from dicomnode.constants import DICOMNODE_LOGGER_NAME
+from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
 from dicomnode.data_structures.image_tree import DicomTree
 from dicomnode.dicom.dimse import Address, send_images
 from dicomnode.server.nodes import AbstractPipeline
@@ -19,7 +19,7 @@ from dicomnode.server.processor import AbstractProcessor
 
 # Testing Helper
 from tests.helpers import TESTING_TEMPORARY_DIRECTORY, bench,\
-  generate_numpy_datasets, personify
+  generate_numpy_datasets, personify, clear_logger
 from tests.helpers.inputs import ValidatingInput
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
@@ -54,19 +54,22 @@ class StallingFileStorageNode(AbstractPipeline):
 
 
 class StallingFileStorageTestCase(DicomnodeTestCase):
-
   def test_check_log_file_is_created(self):
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+
     DICOM_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
     self.node = StallingFileStorageNode()
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
 
+
+
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(10, PatientID = "1502799995", Cols=10, Rows=10))
 
     logger = logging.getLogger(DICOMNODE_LOGGER_NAME)
-    print(logger.handlers)
 
     images_1.map(personify(
       tags=[
@@ -83,6 +86,7 @@ class StallingFileStorageTestCase(DicomnodeTestCase):
     self.assertTrue(log_file_path.exists())
 
     log_text = log_file_path.read_text()
-    print("\nLOG TEXT STARTS HERE:\n")
-    print(log_text)
-    print("\nLOG TEXT ENDS HERE:\n")
+    self.assertIn('process is called at cwd: /tmp/pipeline_tests/working_directory/1502799995', log_text)
+
+    clear_logger(DICOMNODE_LOGGER_NAME)
+    clear_logger(DICOMNODE_PROCESS_LOGGER)
