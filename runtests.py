@@ -19,9 +19,6 @@ os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY'] = TESTING_TEMPORARY_DIRECTOR
 os.environ['DICOMNODE_ENV_REPORT_DATA_PATH'] = starting_directory + "/report_data"
 # DICOMNODE_TESTING_TEMPORARY_DIRECTORY must be set before importing DICOMNODE
 
-
-
-
 from tests.helpers import testing_logs
 from tests.helpers import config
 from tests.helpers.dicomnode_test_suite import BaseDicomnodeTestSuite
@@ -100,7 +97,6 @@ if __name__ == "__main__":
     runs tests with big datasets.
   """)
   parser.add_argument("--test-data", action='store_true', help="")
-
 
   args = parser.parse_args()
   testing_logs()

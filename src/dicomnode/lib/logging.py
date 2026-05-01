@@ -5,6 +5,7 @@ from pathlib import Path
 import multiprocessing
 multiprocessing_context = multiprocessing.get_context('spawn')
 import os
+from io import TextIOBase
 from multiprocessing.queues import Queue
 from queue import Empty
 from sys import stdout
@@ -34,7 +35,7 @@ def set_logger(logger: Logger, config: LoggerConfig):
 
   logger.setLevel(config.log_level)
 
-  if isinstance(config.log_output, TextIO):
+  if isinstance(config.log_output, TextIOBase):
     handler = StreamHandler(config.log_output)
   elif isinstance(config.log_output, Path):
 
@@ -151,6 +152,8 @@ class LogManager:
         output = stdout
       else:
         output = Path(self.config.LOG_OUTPUT)
+    elif isinstance(self.config.LOG_OUTPUT, TextIOBase):
+      output = self.config.LOG_OUTPUT
     else:
       output = None
 

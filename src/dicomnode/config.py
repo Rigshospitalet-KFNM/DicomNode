@@ -68,7 +68,7 @@ class DicomnodeConfig:
   RUN_FILE : File | None
 
   # LOGGING
-  LOG_OUTPUT : str | None
+  LOG_OUTPUT : TextIO | str | None
   LOG_WHEN : str
   LOG_LEVEL : int
   LOG_FORMAT : str

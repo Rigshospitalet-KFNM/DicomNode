@@ -25,7 +25,7 @@ class InputContainer:
     self.__data = data
     self.datasets = datasets
     self.paths = paths
-    self.responding_address: Optional[Address] = None
+    self.responding_address: Optional[Address] = None # You can't drop this functionality - it's used by PE2I pipeline
 
   def __getitem__(self, key: str):
     return self.__data[key]

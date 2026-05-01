@@ -31,14 +31,14 @@ ENDPOINT_AE = "ENDPOINT_AT"
 
 TEST_CPR = "1502799995"
 INPUT_KW = "test_input"
-HISTORIC_KW = "historic_input"
+
 TEST_AE_TITLE = "TEST_AE"
 SENDER_AE_TITLE = "SENDER_AE"
 
 
 class StallingFileStorageNode(AbstractPipeline):
   ae_title = TEST_AE_TITLE
-  input = {INPUT_KW : ValidatingInput }
+  input = { INPUT_KW : ValidatingInput }
   require_calling_aet = [SENDER_AE_TITLE]
   log_output = "log.log"
   log_level: int = logging.DEBUG
@@ -50,6 +50,15 @@ class StallingFileStorageNode(AbstractPipeline):
     def process(self, input_container: InputContainer) -> PipelineOutput:
       log_message =  f"process is called at cwd: {os.getcwd()}"
       self.logger.info(log_message)
+
+
+      sender_message = f"Input Container is None: {input_container.responding_address is None}"
+      self.logger.info(sender_message)
+      if input_container.responding_address is not None:
+        response_message = f" {input_container.responding_address.ip} : {input_container.responding_address.port} - {input_container.responding_address.ae_title}"
+        self.logger.info(response_message)
+
+
       return NoOutput()
 
 
@@ -87,6 +96,8 @@ class StallingFileStorageTestCase(DicomnodeTestCase):
 
     log_text = log_file_path.read_text()
     self.assertIn('process is called at cwd: /tmp/pipeline_tests/working_directory/1502799995', log_text)
+
+    self.assertIn('Input Container is None: False', log_text)
 
     clear_logger(DICOMNODE_LOGGER_NAME)
     clear_logger(DICOMNODE_PROCESS_LOGGER)

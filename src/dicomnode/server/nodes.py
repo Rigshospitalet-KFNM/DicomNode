@@ -304,7 +304,7 @@ class AbstractPipeline():
         return  0xB006 if self.error_on_rejected_dataset else 0x0000 # Element discarded
     except Exception as exception:
       log_traceback(self.logger, exception, "User defined function filter produced an exception")
-      return 0xA801
+      return 0xA801 if self.error_on_rejected_dataset else 0x0000
 
     try:
       self.data_state.add_image(dataset, id(event.assoc))
