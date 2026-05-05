@@ -1,9 +1,12 @@
 # Python standard library
 from dataclasses import dataclass
 from logging import getLogger
-from os import chdir
+
 from pathlib import Path
+import traceback
+import threading
 from typing import Type
+
 
 # Dicomnode imports
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
@@ -30,6 +33,7 @@ class AbstractProcessor():
   def __init__(self, args : ProcessRunnerArgs) -> None:
     root_logger = getLogger()
     root_logger.handlers.clear() # Do not use the root logger
+
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
     set_logger(self.logger, args.log_config)
 
@@ -38,6 +42,7 @@ class AbstractProcessor():
     else:
       with TemporaryWorkingDirectory(args.process_path):
         self._main(args.patient_id, args.input_container)
+
 
   def process_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
     # Same as above

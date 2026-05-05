@@ -215,3 +215,10 @@ class DicomnodeTestCase(TestCase):
 
     if failed_items:
       msg = self._formatMessage(msg, f"The follows items are not equal: {failed_items}")
+
+  def assertIsSameType(self, obj_1, obj_2, msg=None):
+    try:
+      self.assertIsInstance(obj_1, type(obj_2))
+    except AssertionError:
+      msg = self._formatMessage(msg, f"{obj_1} is not the same type as {obj_2}")
+      self.fail(msg)

@@ -7,6 +7,7 @@ import logging
 from random import randint
 import threading
 from typing import List, Optional
+import pprint
 
 from unittest.mock import patch
 
@@ -96,7 +97,7 @@ class ConcurrencyTestCase(DicomnodeTestCase):
     num_threads = 6
     num_images = 5
 
-    with self.assertLogs(self.node.logger):
+    with self.assertLogs(self.node.logger) as captured_logs:
       with patch('dicomnode.lib.logging.set_logger'):
         self.node.open(blocking=False)
       address = Address('localhost', self.test_port, TEST_AE_TITLE)

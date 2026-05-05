@@ -346,7 +346,7 @@ class AbstractPipeline():
 
     self._process_output(input_containers, event)
 
-  def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]], event: evt.Event):
+  def _process_output(self, touched_patient_nodes: List[Tuple[str, PatientNode]], event: Optional[evt.Event]):
     """This function exists to the target for the queued pipeline"""
 
     for patient_id,patient_node in touched_patient_nodes:
