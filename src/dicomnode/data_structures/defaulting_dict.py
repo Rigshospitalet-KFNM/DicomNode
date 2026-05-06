@@ -68,6 +68,9 @@ class DefaultingDict[K,V]:
   def __len__(self):
     return len(self._dict)
 
+  def __contains__(self, item):
+    return item in self._dict
+
   def extract(self, key: K) -> V:
     """Retrieves and removes an element
 

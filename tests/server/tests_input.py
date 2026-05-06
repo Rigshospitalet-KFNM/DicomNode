@@ -62,6 +62,15 @@ class TestInput(AbstractInput):
     return True
 
 
+class InputEnforcingConstraint(AbstractInput):
+  required_tags = [0x0008_0018]
+
+
+  enforce_single_series = True
+  enforce_single_study_date = True
+
+  def validate(self) -> bool:
+    return True
 
 # Note the functional tests of historic inputs can be found in tests_server_nodes.py
 
@@ -79,6 +88,20 @@ class InputTestCase(DicomnodeTestCase):
   def tearDown(self) -> None:
     super().tearDown()
     shutil.rmtree(self.input_directory.path)
+
+  def test_inputs_with_study_date_does_not_set_single_series(self):
+    input_ = InputEnforcingConstraint(config_from_raw())
+
+    input_.study_date = "20230811"
+
+    dataset = Dataset()
+    dataset.SeriesInstanceUID = gen_uid()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyDate = "20210516"
+
+    self.assertRaises(InvalidDataset, input_.add_image, dataset)
+    self.assertIsNone(input_.single_series_uid)
+
 
   def test_abstract_input_infinite_job_security(self):
     a_mock = mock.Mock()

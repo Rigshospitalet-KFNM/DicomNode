@@ -40,6 +40,47 @@ from dicomnode.lib.utils import name
 from dicomnode.config import DicomnodeConfig, config_from_raw
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
+
+"""
+# I added some validators, that sorta fixes - things
+
+class ValidationState(ABC):
+  def __init__(self) -> None:
+    pass
+
+  def validate(self, dicom: Dataset) -> bool:
+    raise NotImplemented
+
+  def update(self, stateful_value: Any) -> None:
+    raise NotImplemented
+
+class EnforceSingleSeries(ValidationState):
+  def __init__(self) -> None:
+    self.series_uid = None
+
+  def validate(self, dicom: Dataset) -> bool:
+    return 'SeriesInstanceUID' in dicom and (self.series_uid is None or dicom.SeriesInstanceUID == self.series_uid)
+
+  def update(self, stateful_value: Any):
+    if self.series_uid is None and isinstance(stateful_value, Dataset):
+      self.series_uid = stateful_value.SeriesInstanceUID
+
+class EnforceSingleStudyDate(ValidationState):
+  def __init__(self) -> None:
+    self.study_date = None
+
+  def validate(self, dicom: Dataset) -> bool:
+    return 'StudyDate' in dicom and (self.study_date is None or dicom.StudyDate == self.study_date)
+
+  def update(self, stateful_value: Any):
+    if self.study_date is None:
+      if isinstance(stateful_value, Dataset):
+        self.study_date = stateful_value.StudyDate
+      else: # This would be an assignment from another
+        self.study_date = stateful_value
+"""
+
+
 # Baby here we go!
 class AbstractInputMetaClass(ABCMeta):
   """# Behold my infinite job security.
@@ -101,6 +142,7 @@ class AbstractInput(metaclass=AbstractInputMetaClass):
   """Grinder for converting stored dicom images
   into a data usable by the processing function"""
 
+  #state_validators: List[Type[ValidationState]]
 
   # Dunder methods
   def __init__(self,
@@ -161,7 +203,6 @@ processing, `False` otherwise.
   def get_datasets(self) -> List[Dataset]:
     return [dataset for dataset in self]
 
-
   @classmethod
   def _validate_value(cls, value, target):
     return get_validator_for_value(value)(target)
@@ -205,14 +246,15 @@ processing, `False` otherwise.
     return True
 
   def _enforce_single_series(self, dicom):
-    if self.enforce_single_series:
-      if 0x0020_000E not in dicom: # 0x0020_000E = Series Instance UID
-        return False
-      if self.single_series_uid is None:
-        self.single_series_uid = dicom[0x0020_000E].value
-      else:
-        if self.single_series_uid != dicom[0x0020_000E].value:
-          return False
+    if not self.enforce_single_series:
+      return True
+
+    if 0x0020_000E not in dicom:
+      return False
+
+    if self.single_series_uid is not None and self.single_series_uid != dicom.SeriesInstanceUID: # 0x0020_000E = Series Instance UID
+      return False
+
     return True
 
   def _enforce_date_requirement(self, dicom: Dataset) -> bool:
@@ -224,7 +266,6 @@ processing, `False` otherwise.
     Returns:
         bool: Returns False if dataset is of a different study date than this object
     """
-
 
     if self.enforce_single_study_date and self.study_date is not None:
       if 0x0008_0020 not in dicom or self.study_date != dicom.StudyDate: # 0x0008_0020 = Study Date
@@ -245,6 +286,12 @@ processing, `False` otherwise.
     """
     return self._enforce_single_series(dicom) and self._enforce_date_requirement(dicom)
 
+  def _update_validation_state(self, dicom: Dataset):
+    if self.enforce_single_series and self.single_series_uid is None:
+      self.single_series_uid = dicom.SeriesInstanceUID
+
+    # StudyDate is set by owning
+
   def add_image(self, dicom: Dataset) -> int:
     """Attempts to add an image to the input.
 
@@ -262,6 +309,8 @@ processing, `False` otherwise.
 
     if not self._state_based_validation(dicom):
       raise InvalidDataset
+
+    self._update_validation_state(dicom)
 
     replaced = dicom in self
     # Save the dataset
@@ -479,7 +528,7 @@ class HistoricAbstractInput(AbstractInput):
     if self.state == HistoricAbstractInput.HistoricInputState.EMPTY and 'StudyDate' in dicom:
       response = self.check_query_dataset(dicom)
       if response is not None:
-        self.logger.debug("Historic input is now Fetching!")
+        self.logger.debug(f"Historic input is now Fetching from {self.address}!")
         self.triggering_dataset = dicom
         action, query_dataset = response
         self.state = HistoricAbstractInput.HistoricInputState.FETCHING
