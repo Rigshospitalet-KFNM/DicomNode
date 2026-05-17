@@ -1,9 +1,6 @@
-#pragma once
-
 #include<iostream>
 
 #include<gtest/gtest.h>
-#include<tuple>
 
 #include"../gpu_code/dicom_node_gpu.cuh"
 #include"../gpu_code/linear_interpolation.cuh"
@@ -11,6 +8,7 @@
 #include"../python/utilities.cuh"
 
 #include"test_helper.cuh"
+#include"test_data.cuh"
 
 namespace TEST_INTERPOLATION {
   namespace DEFAULT_TEST_OBJECTS {
