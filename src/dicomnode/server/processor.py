@@ -59,6 +59,7 @@ class AbstractProcessor():
         self.logger.error(f"Process was unable to dispatch {patient_id}")
     except Exception as exception:
       self.logger.critical(f"Encountered an exception {exception} in process function")
+      self.logger.critical(traceback.format_exc())
 
   def process(self, input_container: InputContainer) -> PipelineOutput: #pragma: no cover
     return NoOutput()
