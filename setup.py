@@ -125,8 +125,6 @@ class CMakeBuild(build_ext):
           shutil.rmtree(build_temp)
           build_temp.mkdir(parents=True)
 
-
-
     try:
       subprocess.run(
         ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
@@ -154,7 +152,7 @@ if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
 setup(name='dicomnode',
-    version='0.0.32',
+    version='0.0.33',
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',

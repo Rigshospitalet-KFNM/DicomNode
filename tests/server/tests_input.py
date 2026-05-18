@@ -102,6 +102,22 @@ class InputTestCase(DicomnodeTestCase):
     self.assertRaises(InvalidDataset, input_.add_image, dataset)
     self.assertIsNone(input_.single_series_uid)
 
+  def tests_inputs_rejected_dataset_does_not_set_state(self):
+    input_ = InputEnforcingConstraint(config_from_raw())
+
+    dataset = Dataset()
+    dataset.SeriesInstanceUID = gen_uid()
+    dataset.SOPInstanceUID = gen_uid()
+    dataset.StudyDate = "20210516"
+
+    # You should not do this in normal code
+    input_.required_tags.append(0x0008103E) # SeriesDescription
+
+    self.assertRaises(InvalidDataset, input_.add_image, dataset)
+
+    self.assertIsNone(input_.study_date)
+    self.assertIsNone(input_.single_series_uid)
+
 
   def test_abstract_input_infinite_job_security(self):
     a_mock = mock.Mock()
