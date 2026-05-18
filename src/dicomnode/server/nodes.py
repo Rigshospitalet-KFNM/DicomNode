@@ -193,6 +193,9 @@ class AbstractPipeline():
     if self._data_directory is not None and self._data_directory == self._processing_directory:
       raise IncorrectlyConfigured("data directory and processing directory cannot be equal")
 
+    if self.Processor is AbstractProcessor or not issubclass(self.Processor, AbstractProcessor):
+      raise IncorrectlyConfigured("Missing Processor class!")
+
     if config is None:
       config = DicomnodeConfig(
         STUDY_EXPIRATION_DAYS=self.study_expiration_days,
@@ -247,9 +250,6 @@ class AbstractPipeline():
     self.dicom_application_entry.require_calling_aet = self.require_calling_aet
 
 
-    if self.Processor is AbstractProcessor or not issubclass(self.Processor, AbstractProcessor):
-      raise IncorrectlyConfigured("Missing Processor class!")
-
     # It's import that this is initialized here, because otherwise the self
     # argument is not passed properly.
     # If you need to replace these handler it's important to call super's init
@@ -265,6 +265,10 @@ class AbstractPipeline():
     }
 
     self.post_init()
+
+    valid_containers, failed_datasets = self.data_state.extract_input_container()
+    self._process_output(valid_containers, None)
+
     # End def __init__
 
   def _handle_c_echo(self, event: evt.Event):
