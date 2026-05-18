@@ -42,8 +42,9 @@ DICOMNODE_IMPLEMENTATION_UID = UID('1.2.826.0.1.3680043.10.1083')
 DICOMNODE_IMPLEMENTATION_NAME = "DICOMNODE"
 
 #: Version of the library
-DICOMNODE_VERSION = "0.0.33"
+DICOMNODE_VERSION = "0.0.34"
 
+# I think maybe I should remove this stuff...
 
 UNSIGNED_ARRAY_ENCODING: Dict[int, type] = {
   8 :  uint8,

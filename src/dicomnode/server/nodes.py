@@ -236,6 +236,8 @@ class AbstractPipeline():
       config.ARCHIVE_DIRECTORY,
       self.data_state
     )
+    self.data_state.reset_allocation()
+
 
     self.is_open = False
 

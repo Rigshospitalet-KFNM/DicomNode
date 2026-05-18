@@ -11,6 +11,7 @@ from pydicom import Dataset
 
 # Dicomnode Library Packages
 from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.logging import get_logger
 from dicomnode.data_structures.defaulting_dict import DefaultingDict
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.patient_node import PatientNode
@@ -29,6 +30,11 @@ class PipelineStorage(ABC):
                node_structure: Dict[str, Type[AbstractInput]],
                config: DicomnodeConfig
                ) -> None:
+    raise NotImplemented
+
+  @abstractmethod
+  def reset_allocation(self) -> None:
+    """If the pipeline have any auxiliary state, then this function resets that"""
     raise NotImplemented
 
   @abstractmethod
@@ -83,6 +89,11 @@ class ReactivePipelineStorage(PipelineStorage):
 
     self.master_lock = Lock()
 
+  def reset_allocation(self):
+    with self.master_lock:
+      self.thread_additions: DefaultingDict[int, set[str]] = DefaultingDict(create_set)
+      self.thread_registration: DefaultingDict[str, set[int]] = DefaultingDict(create_set)
+      self.failed_additions: DefaultingDict[int, List[Dataset]] = DefaultingDict(create_list)
 
   def add_image(self, dicom_dataset: Dataset, thread_id=None):
     dicom_identifier = self.identifier(dicom_dataset)
@@ -106,6 +117,7 @@ class ReactivePipelineStorage(PipelineStorage):
 
 
   def extract_input_container(self, thread_id: Optional[int] = None):
+    logger = get_logger()
     if thread_id is None:
       thread_id = get_native_id()
 
@@ -117,6 +129,7 @@ class ReactivePipelineStorage(PipelineStorage):
         thread_set.discard(thread_id)
 
         if 0 < len(thread_set):
+          logger.info(f"Thread {thread_id} is not extracting {dicom_identifier} because there's {len(thread_set)} other threads active.")
           continue
 
         if self.storage[dicom_identifier].validate():
@@ -177,6 +190,10 @@ class PassivePipelineStorage(PipelineStorage):
       node.add_dataset(dicom_dataset)
     except InvalidDataset:
       self.failed_datasets.append(dicom_dataset)
+
+  def reset_allocation(self) -> None:
+    """"""
+    return None
 
   def extract_input_container(self, thread_id: int | None = None) -> Tuple[List[Tuple[str, PatientNode]], List[Dataset]]:
     failed_datasets = self.failed_datasets

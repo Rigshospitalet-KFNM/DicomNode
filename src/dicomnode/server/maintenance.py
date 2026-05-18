@@ -96,6 +96,7 @@ class MaintenanceThread(Thread):
     # This is considered so unlikely, that it's a bug I accept in the code
     expiry_datetime = now - timedelta(days=self.study_expiration_days)
     self.pipeline_tree.remove_expired_studies(expiry_datetime)
+    self.pipeline_tree.reset_allocation()
     self.logger.info("Performed Maintenance, current pipeline tree is:")
     self.logger.info(str(self.pipeline_tree))
 
