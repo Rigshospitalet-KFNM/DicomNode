@@ -1,5 +1,6 @@
 # Python standard library
-from threading import Thread
+from pprint import pprint
+from threading import Thread, Event
 from time import sleep
 from typing import Dict, List, Tuple
 
@@ -18,6 +19,23 @@ from dicomnode.server.patient_node import PatientNode
 
 # Dicomnode Test helper modules
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
+
+
+class AcceptingInput(AbstractInput):
+  def validate(self):
+    return False
+
+  def add_image(self, dicom: Dataset) -> int:
+    self.storage.store_image(dicom)
+    return 1
+
+class ValidatingInput(AbstractInput):
+  def validate(self):
+    return True
+
+  def add_image(self, dicom: Dataset) -> int:
+    self.storage.store_image(dicom)
+    return 1
 
 
 def generate_series(patient_index, num_datasets):
@@ -44,7 +62,10 @@ class PipelineStorageTestCase(DicomnodeTestCase):
     associations, then those thread spam an pipeline storage input with 3 series
 
     These thread interleave patients so:
-    Thread 1 sends Patient 1,2,3 and Thread 2 send 2,3,4 and Thread N sends
+    Thread 1 sends Patient 1,2,3 a
+from pydicom import Dataset
+from pydicom.uid import SecondaryCaptureImageStorage
+nd Thread 2 send 2,3,4 and Thread N sends
     N,1,2
     """
 
@@ -119,7 +140,7 @@ class PipelineStorageTestCase(DicomnodeTestCase):
 
       self.assertEqual(0, len(target.storage))
       self.assertEqual(0, len(target.thread_registration))
-      self.assertEqual(0, len(target.thread_additions))
+      self.assertEqual(0, len(target.heartbeats_additions))
       self.assertEqual(0, len(target.failed_additions))
 
       for failed_to_add in failed_datasets.values():
@@ -144,17 +165,59 @@ class PipelineStorageTestCase(DicomnodeTestCase):
     target.add_images(generate_series(1, 5))
 
   def test_can_string_convert(self):
-    class AcceptingInput(AbstractInput):
-      def validate(self):
-        return False
-
-      def add_image(self, dicom: Dataset) -> int:
-        self.storage.store_image(dicom)
-        return 1
-
     target = ReactivePipelineStorage({
       'Anger' : AcceptingInput
     }, config=config_from_raw())
 
     target.add_images(generate_series(1, 5))
     self.assertIsInstance(str(target), str)
+
+  def test_heartbeats_from_the_same_thread_produce_a_single_heartbeat(self):
+    target = ReactivePipelineStorage({
+      'Anger' : AcceptingInput
+    }, config=config_from_raw())
+
+    target.add_images(generate_series(1, 5))
+
+    self.assertEqual(len(target.heartbeats_additions), 1)
+    for heartbeat, _ in target.heartbeats_additions:
+      self.assertTrue(heartbeat.is_active())
+
+
+  def test_heartbeats_from_multiple_threads(self):
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      target = ReactivePipelineStorage({
+        'Anger' : ValidatingInput
+      }, config=config_from_raw())
+
+      target.add_images(generate_series(1, 5))
+
+      event = Event()
+
+      thread_event = Event()
+
+      def thread_target():
+        target.add_images(generate_series(1, 5))
+
+        thread_event.set()
+        event.wait()
+
+      t = Thread(target=thread_target)
+
+      t.start()
+      thread_event.wait()
+
+      should_be_empty, should_be_empty_2 = target.extract_input_container()
+
+      self.assertEqual(len(should_be_empty), 0)
+      self.assertEqual(len(should_be_empty_2), 0)
+
+      event.set()
+      t.join()
+
+      target.add_images(generate_series(1, 5))
+
+      should_not_be_empty, should_still_be_empty = target.extract_input_container()
+
+    self.assertGreater(len(should_not_be_empty), 0)
+    self.assertEqual(len(should_still_be_empty), 0)

@@ -138,6 +138,8 @@ class ConcurrencyTestCase(DicomnodeTestCase):
       self.assertEqual(len(self.endpoint.storage[patient_cpr]), num_threads * num_images)
       self.assertEqual(self.endpoint.accepted_associations, 1)
 
+    #pprint.pprint(captured_logs.output)
+
     clear_logger(DICOMNODE_LOGGER_NAME)
     clear_logger(DICOMNODE_PROCESS_LOGGER)
 

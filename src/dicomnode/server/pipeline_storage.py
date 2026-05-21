@@ -3,10 +3,11 @@ __author__ = "Demiguard"
 # Python Standard Library
 from abc import ABC, abstractmethod
 from datetime import datetime
-from threading import Lock, get_native_id
+from threading import Lock, get_native_id, enumerate as thread_enumeration, get_ident
 from typing import Dict, Iterable, List, Optional, Tuple, Type
 
 # Third Party Python Packages
+from pynetdicom.association import Association
 from pydicom import Dataset
 
 # Dicomnode Library Packages
@@ -38,7 +39,7 @@ class PipelineStorage(ABC):
     raise NotImplemented
 
   @abstractmethod
-  def add_image(self, dicom_dataset: Dataset, thread_id: Optional[int] = None):
+  def add_image(self, dicom_dataset: Dataset, thread_id = None):
     raise NotImplemented
 
   def add_images(self, datasets: Iterable[Dataset]):
@@ -46,12 +47,84 @@ class PipelineStorage(ABC):
       self.add_image(dataset)
 
   @abstractmethod
-  def extract_input_container(self, thread_id: Optional[int] = None) -> Tuple[List[Tuple[str, PatientNode]], List[Dataset]]:
+  def extract_input_container(self, thread_id = None) -> Tuple[List[Tuple[str, PatientNode]], List[Dataset]]:
     raise NotImplemented
 
   @abstractmethod
   def remove_expired_studies(self, expiry_time: datetime):
     raise NotImplemented
+
+class _HeartBeat(ABC):
+  """This is the interface class, that the reactive something that have added to
+  the reactive pipeline.
+  """
+  @abstractmethod
+  def __init__(self, identifier) -> None:
+    raise NotImplemented
+
+  @abstractmethod
+  def is_active(self) -> bool:
+    raise NotImplemented
+
+  @abstractmethod
+  def __eq__(self, value: object) -> bool:
+    raise NotImplemented
+
+  @abstractmethod
+  def __hash__(self) -> int:
+    raise NotImplemented
+
+  def __str__(self) -> str:
+    return f"Heartbeat - alive: {self.is_active()}"
+
+  def __repr__(self) -> str:
+    return str(self)
+
+class _ThreadHeartBeat(_HeartBeat):
+  def __init__(self, identifier: int) -> None:
+    self.identifier = identifier
+
+  def is_active(self) -> bool:
+    threads = [thread.ident for thread in thread_enumeration() if thread.ident is not None]
+
+    return self.identifier in threads
+
+  def __eq__(self, value: object) -> bool:
+    if isinstance(value, _ThreadHeartBeat):
+      return value.identifier == self.identifier
+
+    return False
+
+  def __hash__(self) -> int:
+    return hash(self.identifier)
+
+
+class _AssocHeartBeat(_HeartBeat):
+  def __init__(self, identifier: Association) -> None:
+    self.assoc = identifier
+
+  def is_active(self) -> bool:
+    return self.assoc.is_alive()
+
+  def __eq__(self, value: object) -> bool:
+    if isinstance(value, _AssocHeartBeat):
+      return self.assoc.ident == value.assoc.ident
+
+    return False
+
+  def __hash__(self) -> int:
+    return hash(self.assoc.ident)
+
+def _make_heartbeat(identifier) -> _HeartBeat:
+  if identifier is None:
+    return _ThreadHeartBeat(get_ident())
+  if isinstance(identifier, int):
+    return _ThreadHeartBeat(identifier)
+  if isinstance(identifier, Association):
+    return _AssocHeartBeat(identifier)
+
+  raise TypeError(f"Could not construct a heart beat from {identifier}")
+
 
 class ReactivePipelineStorage(PipelineStorage):
   """Provides an interface to store and extract abstract inputs thread safely
@@ -78,66 +151,67 @@ class ReactivePipelineStorage(PipelineStorage):
 
     self.storage: DefaultingDict[str, PatientNode] = DefaultingDict(create_patient_node)
     """The Storage where datasets are stored until they are ready to be processed"""
-    self.thread_registration: DefaultingDict[str, set[int]] = DefaultingDict(create_set)
+    self.thread_registration: DefaultingDict[str, set[_HeartBeat]] = DefaultingDict(create_set)
     """A patient id mapping that stores which threads have added to each patient"""
 
-    self.thread_additions: DefaultingDict[int, set[str]] = DefaultingDict(create_set)
+    self.heartbeats_additions: DefaultingDict[_HeartBeat, set[str]] = DefaultingDict(create_set)
     """A mapping that holds which """
 
-    self.failed_additions: DefaultingDict[int, List[Dataset]] = DefaultingDict(create_list)
+    self.failed_additions: DefaultingDict[_HeartBeat, List[Dataset]] = DefaultingDict(create_list)
     """"""
 
     self.master_lock = Lock()
 
   def reset_allocation(self):
     with self.master_lock:
-      self.thread_additions: DefaultingDict[int, set[str]] = DefaultingDict(create_set)
-      self.thread_registration: DefaultingDict[str, set[int]] = DefaultingDict(create_set)
-      self.failed_additions: DefaultingDict[int, List[Dataset]] = DefaultingDict(create_list)
+      self.heartbeats_additions = DefaultingDict(create_set)
+      self.thread_registration = DefaultingDict(create_set)
+      self.failed_additions = DefaultingDict(create_list)
 
   def add_image(self, dicom_dataset: Dataset, thread_id=None):
     dicom_identifier = self.identifier(dicom_dataset)
 
-    if thread_id is None:
-      thread_id = get_native_id()
+    heartbeat = _make_heartbeat(thread_id)
 
     with self.master_lock:
-      self.thread_registration[dicom_identifier].add(thread_id)
+      self.thread_registration[dicom_identifier].add(heartbeat)
 
       try:
         self.storage[dicom_identifier].add_dataset(dicom_dataset)
-        self.thread_additions[thread_id].add(dicom_identifier)
+        self.heartbeats_additions[heartbeat].add(dicom_identifier)
       except InvalidDataset:
-        self.failed_additions[thread_id].append(dicom_dataset)
+        self.failed_additions[heartbeat].append(dicom_dataset)
 
     """I kinda want to make a small little programmatic comment here. Ideally
        you would have made a `with` statement because it's kind of a mess if a
        thread dies or doesn't unregister itself, then It
   """
 
-
-  def extract_input_container(self, thread_id: Optional[int] = None):
+  def extract_input_container(self, thread_id = None):
     logger = get_logger()
-    if thread_id is None:
-      thread_id = get_native_id()
-
+    heartbeat = _make_heartbeat(thread_id)
     extracted_input_containers: List[Tuple[str,PatientNode]] = []
 
     with self.master_lock:
-      for dicom_identifier in self.thread_additions[thread_id]:
+      for dicom_identifier in self.heartbeats_additions[heartbeat]:
         thread_set = self.thread_registration[dicom_identifier]
-        thread_set.discard(thread_id)
+        thread_set.discard(heartbeat)
 
-        if 0 < len(thread_set):
-          logger.info(f"Thread {thread_id} is not extracting {dicom_identifier} because there's {len(thread_set)} other threads active.")
+        should_extract = True
+
+        for heartbeat_ in thread_set:
+          should_extract &= not heartbeat_.is_active()
+
+        if not should_extract:
+          logger.info(f"Thread {heartbeat} is not extracting {dicom_identifier} because there's {len(thread_set)} other threads active.")
           continue
 
         if self.storage[dicom_identifier].validate():
           extracted_input_containers.append((dicom_identifier, self.storage.extract(dicom_identifier)))
           del self.thread_registration[dicom_identifier]
 
-    del self.thread_additions[thread_id]
-    failed_datasets = self.failed_additions.extract(thread_id)
+    del self.heartbeats_additions[heartbeat]
+    failed_datasets = self.failed_additions.extract(heartbeat)
 
     return extracted_input_containers, failed_datasets
 

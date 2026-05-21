@@ -23,7 +23,7 @@ from queue import Queue, Empty
 import shutil
 import signal
 from sys import stdout
-from threading import Thread
+from threading import Thread, get_native_id, get_ident
 from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
@@ -313,7 +313,7 @@ class AbstractPipeline():
       return 0xA801 if self.error_on_rejected_dataset else 0x0000
 
     try:
-      self.data_state.add_image(dataset, id(event.assoc))
+      self.data_state.add_image(dataset, event.assoc)
     except InvalidDataset:
       self.logger.info(f"Node rejected dataset: Received dataset doesn't have patient Identifier tag: {hex(self.patient_identifier_tag)}")
       return 0xB007 if self.error_on_rejected_dataset else 0x0000
@@ -343,11 +343,15 @@ class AbstractPipeline():
         event (evt.Event): _description_
     """
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
+
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
-    input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
+    input_containers, failed_datasets = self.data_state.extract_input_container(event.assoc)
+
+    if not len(input_containers):
+      self.logger.info(f"Association with {event.assoc.requestor.ae_title} produced no input containers to be processed!")
 
     if len(failed_datasets):
-      dicom_collection =  display_dicom_collection(failed_datasets)
+      dicom_collection = display_dicom_collection(failed_datasets)
       self.logger.info(f"The association with {event.assoc.requestor.ae_title} send {dicom_collection} which was rejected")
 
     self._process_output(input_containers, event)

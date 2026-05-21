@@ -5,8 +5,10 @@ from pathlib import Path
 from random import randint
 from unittest import TestCase
 from time import sleep
+import pprint
 
 # Third Party Packages
+from pynetdicom.events import Event
 
 # Dicomnode Packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
@@ -46,11 +48,18 @@ class StallingFileStorageNode(AbstractPipeline):
   root_data_directory = DICOM_STORAGE_PATH
   processing_directory = PROCESSING_DIRECTORY
 
+  def _handle_c_store(self, event: Event) -> int:
+    self.logger.info("Got dataset")
+    return super()._handle_c_store(event)
+
+  def _handle_connection_closed(self, event: Event):
+    self.logger.info("Connection Closed handler starting!")
+    return super()._handle_connection_closed(event)
+
   class Processor(AbstractProcessor):
     def process(self, input_container: InputContainer) -> PipelineOutput:
       log_message =  f"process is called at cwd: {os.getcwd()}"
       self.logger.info(log_message)
-
 
       sender_message = f"Input Container is None: {input_container.responding_address is None}"
       self.logger.info(sender_message)
@@ -72,8 +81,6 @@ class StallingFileStorageTestCase(DicomnodeTestCase):
     self.test_port = randint(1025,65535)
     self.node.port = self.test_port
     self.node.open(blocking=False)
-
-
 
     address = Address('localhost', self.test_port, TEST_AE_TITLE)
     images_1 = DicomTree(generate_numpy_datasets(10, PatientID = "1502799995", Cols=10, Rows=10))

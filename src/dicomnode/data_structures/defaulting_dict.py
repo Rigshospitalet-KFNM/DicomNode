@@ -90,3 +90,6 @@ class DefaultingDict[K,V]:
     elif self._callable_no_args is not None:
       return self._callable_no_args()
     raise ContractViolation("Somehow both callable is None?") # pragma: no cover
+
+  def __str__(self) -> str:
+    return str(self._dict)

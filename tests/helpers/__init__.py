@@ -24,6 +24,7 @@ from psutil import Process
 
 
 
+
 # Test helpers
 try:
   TESTING_TEMPORARY_DIRECTORY = os.environ['DICOMNODE_TESTING_TEMPORARY_DIRECTORY']
@@ -34,6 +35,9 @@ except KeyError:
 from dicomnode.constants import UNSIGNED_ARRAY_ENCODING
 from dicomnode.dicom import gen_uid, make_meta
 from dicomnode.math.space import Space
+from dicomnode.server.processor import AbstractProcessor
+from dicomnode.server.output import PipelineOutput, NoOutput
+from dicomnode.server.input_container import InputContainer
 
 def _generate_numpy_dataset(
     StudyUID: UID,
@@ -296,5 +300,9 @@ def wait_for_children():
 
 def generate_dummy_space(shape):
   return Space(numpy.eye(3), [0,0,0], shape)
+
+class DummyProcessor(AbstractProcessor):
+  def process(self, input_container: InputContainer) -> PipelineOutput:
+    return NoOutput()
 
 from . import dicomnode_test_case
