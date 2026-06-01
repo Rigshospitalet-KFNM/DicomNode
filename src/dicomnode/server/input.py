@@ -338,7 +338,11 @@ processing, `False` otherwise.
     return self._storage
 
   def __str__(self):
-    return f"{self.__class__.__name__} - {self.images} images - Valid: {self.validate()}"
+    series_assigned = " - Unassigned" if self.single_series_uid is None else " - Assigned"
+
+    series_locked = "" if self.enforce_single_series else series_assigned
+
+    return f"{self.__class__.__name__} - {self.images} images - Valid: {self.validate()}{series_locked}"
 
 class DynamicInput(AbstractInput):
   """This input signifies when you are dealing with a variable number of input series.

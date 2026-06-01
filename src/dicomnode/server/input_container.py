@@ -32,3 +32,6 @@ class InputContainer:
 
   def __contains__(self, key):
     return key in self.__data
+
+  def __str__(self) -> str:
+    return str(self.__data)

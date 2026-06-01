@@ -5,7 +5,6 @@ __author__ = "Demiguard"
 # Python standard library
 from datetime import datetime
 from functools import reduce
-import logging
 from operator import add
 from typing import Dict, Optional, Type
 from shutil import rmtree as remove_directory
@@ -14,8 +13,8 @@ from shutil import rmtree as remove_directory
 from pydicom import Dataset
 
 # Dicomnode Modules
-from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.exceptions import InvalidDataset
+from dicomnode.lib.logging import get_logger
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.input_container import InputContainer
 from dicomnode.server.input import AbstractInput
@@ -55,6 +54,7 @@ class PatientNode:
     if not added_dataset:
       raise InvalidDataset
 
+    # Note that this is a property, that checks for double assignment
     self.study_date = dataset.StudyDate if 'StudyDate' in dataset else None
 
 
@@ -76,7 +76,7 @@ class PatientNode:
 
 
   def validate(self) -> bool:
-    logger = logging.getLogger(DICOMNODE_LOGGER_NAME)
+    logger = get_logger()
     logger.info(f"Validating: {self}")
     return all(node.validate() for node in self)
 
