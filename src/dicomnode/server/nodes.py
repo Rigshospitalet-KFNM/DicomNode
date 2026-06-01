@@ -314,7 +314,11 @@ class AbstractPipeline():
 
     for ctx in event.assoc.rejected_contexts:
       if ctx.abstract_syntax is not None:
-        self.logger.error(f"  Rejected context: {ctx.abstract_syntax.keyword}")
+        if ctx.abstract_syntax.name:
+          self.logger.error(f"  Rejected context: {ctx.abstract_syntax.name}")
+        else:
+          self.logger.error(f"  Rejected context: {ctx.abstract_syntax}")
+
       else:
         self.logger.error(f"Pynetdicom Context does not have an abstract syntax???")
 
@@ -323,7 +327,10 @@ class AbstractPipeline():
 
     for ctx in event.assoc.accepted_contexts:
       if ctx.abstract_syntax is not None:
-        self.logger.info(f"  Accepted Context: {ctx.abstract_syntax.keyword}")
+        if ctx.abstract_syntax.name:
+          self.logger.info(f"  Accepted Context: {ctx.abstract_syntax.name}")
+        else:
+          self.logger.info(f"  Accepted Context: {ctx.abstract_syntax}")
       else:
         self.logger.error(f" Pynetdicom doesn't have have an abstract syntax???")
 
