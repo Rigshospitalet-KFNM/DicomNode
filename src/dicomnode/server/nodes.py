@@ -297,9 +297,26 @@ class AbstractPipeline():
     If you require different functionality, consider first if it's possible to
     extend the handler functions consume
     """
-    self.logger.debug(f"Association with {event.assoc.requestor.ae_title}"
-                      f" - {event.assoc.requestor.address} Accepted")
 
+    ae_title = event.assoc.remote.get("ae_title", "UNKNOWN AE TITLE")
+    remote_ip_address = event.assoc.remote.get("address", "UNKNOWN IP")
+
+    self.logger.info(f"Association with {remote_ip_address} - {ae_title} accepted.")
+
+    for ctx in event.assoc.rejected_contexts:
+      if ctx.abstract_syntax is not None:
+        self.logger.error(f"  Rejected context: {ctx.abstract_syntax.keyword}")
+      else:
+        self.logger.error(f"Pynetdicom Context does not have an abstract syntax???")
+
+    if len(event.assoc.rejected_contexts):
+      self.logger.error('-----------')
+
+    for ctx in event.assoc.accepted_contexts:
+      if ctx.abstract_syntax is not None:
+        self.logger.info(f"  Accepted Context: {ctx.abstract_syntax.keyword}")
+      else:
+        self.logger.error(f" Pynetdicom doesn't have have an abstract syntax???")
 
   def _handle_c_store(self, event: evt.Event) -> int:
     dataset = dataset_from_event(event)
@@ -369,11 +386,12 @@ class AbstractPipeline():
           event.assoc.requestor.ae_title
         )
 
+      logging_config = self.logManager.queue_logging_config() if self.logManager.should_queue_log() else self.logManager.logging_config()
 
       args = ProcessRunnerArgs(
         patient_id=patient_id,
         input_container=input_container,
-        log_config=self.logManager.queue_logging_config(),
+        log_config=logging_config,
         process_path=self.get_processing_directory_path(patient_id)
       )
 

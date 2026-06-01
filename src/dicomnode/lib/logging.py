@@ -110,10 +110,10 @@ class LogManager:
     return getLogger(DICOMNODE_LOGGER_NAME)
 
   def get_process_logger(self) -> Logger:
-    return getLogger(DICOMNODE_PROCESS_LOGGER) if self._should_queue_log() else self.get_logger()
+    return getLogger(DICOMNODE_PROCESS_LOGGER) if self.should_queue_log() else self.get_logger()
 
   def start_queue(self):
-    if not self._should_queue_log():
+    if not self.should_queue_log():
       return
 
     if self._logging_thread is not None:
@@ -134,7 +134,7 @@ class LogManager:
     self._logging_thread.start()
 
   def stop_queue(self):
-    if self._log_queue is None or self._logging_thread is None or not self._should_queue_log():
+    if self._log_queue is None or self._logging_thread is None or not self.should_queue_log():
       return
 
     self.get_logger().info("Closing Log queue!")
@@ -176,5 +176,5 @@ class LogManager:
       number_of_backups=self.config.LOG_NUMBER_OF_BACK_UPS
     )
 
-  def _should_queue_log(self) -> bool:
+  def should_queue_log(self) -> bool:
     return bool(self.config.PROCESSING_DIRECTORY)
