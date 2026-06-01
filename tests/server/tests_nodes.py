@@ -1,14 +1,16 @@
 """Test cases for dicomnode.server.nodes without any networking in them."""
 
 # Python standard library
-from logging import getLogger
-from logging import NullHandler
+from io import StringIO
+import logging
+from logging import NullHandler, getLogger
 from unittest.mock import patch, MagicMock
 
 # Third party modules
 from pydicom import Dataset
 
 # Dicomnode modules
+from dicomnode.lib.logging import LoggerConfig
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.dicom import gen_uid
 from dicomnode.server.nodes import AbstractPipeline
@@ -87,3 +89,24 @@ class NonNetworkNodeTests(DicomnodeTestCase):
         extract_mock.return_value = ([],[dataset])
 
         node._handle_connection_closed(event_mock)
+
+  def test_node_setups_pynetdicom_logger(self):
+    log_output_ = StringIO()
+
+    class PynetDicomNode(Node):
+      pynetdicom_logger_config = LoggerConfig(
+        log_output=log_output_,
+        log_level=logging.ERROR
+      )
+
+    node = PynetDicomNode()
+
+    pynetdicom_logger = getLogger("pynetdicom")
+
+    handler = pynetdicom_logger.handlers[0]
+
+    if not isinstance(handler, logging.StreamHandler):
+      raise AssertionError(f"Handler is not a Stream handler but a {type(handler)}")
+
+    self.assertEqual(handler.level, logging.ERROR)
+    self.assertEqual(handler.stream, log_output_)

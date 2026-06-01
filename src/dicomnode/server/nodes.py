@@ -39,6 +39,8 @@ from pynetdicom.transport import ThreadedAssociationServer
 
 # Dicomnode packages
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.data_structures.counter import Counter
+from dicomnode.data_structures.defaulting_dict import DefaultingDict
 from dicomnode.data_structures.optional import OptionalPath
 from dicomnode.dicom import DicomIdentifier, display_dicom_collection
 from dicomnode.dicom.dicom_factory import Blueprint, DicomFactory
@@ -47,9 +49,9 @@ from dicomnode.dicom.series import DicomSeries
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured
 from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
 from dicomnode.lib.io import Directory, File, fill_patient_storage_from_file_system
-from dicomnode.lib.logging import queue_logger_thread_target, set_logger,\
+from dicomnode.lib.logging import set_logger,\
   LoggerConfig, log_traceback, LogManager
-from dicomnode.lib.utils import optionalAttribute
+from dicomnode.lib.utils import optionalAttribute, ret_zero
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.pipeline_storage import PipelineStorage, ReactivePipelineStorage, PassivePipelineStorage
@@ -166,9 +168,10 @@ class AbstractPipeline():
   log_format: str = "[%(asctime)s] |%(thread_id)d| %(name)s - %(levelname)s - %(message)s"
   "Format of log messages using the '%' style."
 
-  pynetdicom_logger_level: int = logging.CRITICAL + 1
-  """Sets the level pynetdicom logger, note that traceback from
-  associations are logged to pynetdicom, which can be helpful for bugfixing"""
+  pynetdicom_logger_config: Optional[LoggerConfig] = LoggerConfig(
+    log_level=logging.ERROR,
+  )
+  """Logging Configuration for """
 
   error_on_rejected_dataset = True
   """If true the server will send a error message code back to the server if no
@@ -231,6 +234,12 @@ class AbstractPipeline():
       self.input,
       self.config
     )
+
+    if self.pynetdicom_logger_config is not None:
+      pynetdicom_logger = logging.getLogger("pynetdicom")
+      set_logger(pynetdicom_logger, self.pynetdicom_logger_config)
+
+    self.added_datasets = DefaultingDict[int,Counter](Counter) # One is id(event.assoc) the other is the number of datasets
 
     fill_patient_storage_from_file_system(
       config.ARCHIVE_DIRECTORY,
@@ -338,6 +347,8 @@ class AbstractPipeline():
       log_traceback(self.logger, exception, "Adding Image to input produced an exception")
       return 0xA801 if self.error_on_rejected_dataset else 0x0000
 
+    self.added_datasets[id(event.assoc)].increment()
+
     return 0x0000
 
 
@@ -362,6 +373,8 @@ class AbstractPipeline():
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
 
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
+    counter = self.added_datasets.extract(id(event.assoc))
+    self.logger.info(f"{event.assoc.requestor.ae_title} added {counter.get()} Datasets")
     input_containers, failed_datasets = self.data_state.extract_input_container(event.assoc)
 
     if not len(input_containers):

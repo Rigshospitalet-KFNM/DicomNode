@@ -21,6 +21,13 @@ if TYPE_CHECKING:
 
 @dataclass
 class DicomnodeConfigRaw:
+  """This is the raw config class - in other words. It's the raw string / int
+  values, that is convertible to a more meaningful type. Note all members should
+  be available to assigned None, which is the indication that the user have not
+  typed in the value. If an empty value is possible, use 0 or \"\" instead.
+
+  Note the
+  """
   STUDY_EXPIRATION_DAYS : int | None = None
   PATIENT_IDENTIFIER_TAG : int | None = None
   LAZY_STORAGE : bool | None = None
@@ -81,6 +88,15 @@ def default_to(value, default):
   return value if value is not None else default
 
 def config_from_raw(config=DicomnodeConfigRaw()) -> DicomnodeConfig:
+  """A helper function that assigns default values and does the conversion from
+  raw config to a "fully typed" config.
+
+  Args:
+      config (The Base config to convert, optional): _description_. Defaults to DicomnodeConfigRaw().
+
+  Returns:
+      DicomnodeConfig: A Fully typed config ready for use
+  """
   from dicomnode.dicom import DicomIdentifier
   from dicomnode.data_structures.optional import OptionalPath
 

@@ -225,3 +225,6 @@ def lazy_import(name):
     sys.modules[name] = module
     loader.exec_module(module)
     return module
+
+def ret_zero():
+  return 0

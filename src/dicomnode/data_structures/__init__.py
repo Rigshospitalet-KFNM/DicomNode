@@ -1,5 +1,6 @@
 """This module contains small data structures that are relative self contained."""
 
+from . import counter
 from . import defaulting_dict
 from . import image_tree
 from . import optional
