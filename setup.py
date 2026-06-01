@@ -14,6 +14,9 @@ import pybind11
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
+
+VERSION = '0.0.36'
+
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
   "win32": "Win32",
@@ -152,7 +155,7 @@ if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
 setup(name='dicomnode',
-    version='0.0.35',
+    version=VERSION,
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
