@@ -152,7 +152,7 @@ if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
 setup(name='dicomnode',
-    version='0.0.34',
+    version='0.0.35',
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
