@@ -22,7 +22,7 @@ from pathlib import Path
 from queue import Queue, Empty
 import shutil
 import signal
-from sys import stdout
+from sys import stdout, stderr
 from threading import Thread, get_native_id, get_ident
 from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
@@ -170,6 +170,7 @@ class AbstractPipeline():
 
   pynetdicom_logger_config: Optional[LoggerConfig] = LoggerConfig(
     log_level=logging.ERROR,
+    log_output=stderr
   )
   """Logging Configuration for """
 
@@ -237,7 +238,10 @@ class AbstractPipeline():
 
     if self.pynetdicom_logger_config is not None:
       pynetdicom_logger = logging.getLogger("pynetdicom")
+      self.logger.info(f"Initializing Pydicom logger with config: {self.pynetdicom_logger_config}")
       set_logger(pynetdicom_logger, self.pynetdicom_logger_config)
+    else:
+      self.logger.debug("Silencing pynetdicom logger configuration")
 
     self.added_datasets = DefaultingDict[int,Counter](Counter) # One is id(event.assoc) the other is the number of datasets
 
@@ -278,6 +282,8 @@ class AbstractPipeline():
     self.post_init()
 
     valid_containers, failed_datasets = self.data_state.extract_input_container()
+    if valid_containers:
+      self.logger.info(f"Found Containers: {valid_containers}")
     self._process_output(valid_containers, None)
 
     # End def __init__
@@ -367,6 +373,8 @@ class AbstractPipeline():
 
     """
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Released.")
+    counter = self.added_datasets.extract(id(event.assoc))
+    self.logger.info(f"{event.assoc.requestor.ae_title} added {counter.get()} Datasets")
 
     return
 
@@ -380,8 +388,7 @@ class AbstractPipeline():
     self.logger.debug(f"Connection {event.address[0]} closed a connection") #type: ignore
 
     self.logger.info(f"Association with {event.assoc.requestor.ae_title} Closed a connection.")
-    counter = self.added_datasets.extract(id(event.assoc))
-    self.logger.info(f"{event.assoc.requestor.ae_title} added {counter.get()} Datasets")
+
     input_containers, failed_datasets = self.data_state.extract_input_container(event.assoc)
 
     if not len(input_containers):
