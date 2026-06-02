@@ -54,6 +54,11 @@ class PipelineStorage(ABC):
   def remove_expired_studies(self, expiry_time: datetime):
     raise NotImplemented
 
+  @abstractmethod
+  def forced_extraction(self) -> List[Tuple[str, PatientNode]]:
+    raise NotImplemented
+
+
 class _HeartBeat(ABC):
   """This is the interface class, that the reactive something that have added to
   the reactive pipeline.
@@ -192,8 +197,11 @@ class ReactivePipelineStorage(PipelineStorage):
     heartbeat = _make_heartbeat(thread_id)
     extracted_input_containers: List[Tuple[str,PatientNode]] = []
 
+    dicom_identifiers = self.heartbeats_additions[heartbeat]
+    logger.info(f"Considering: {dicom_identifiers} for extractions")
+
     with self.master_lock:
-      for dicom_identifier in self.heartbeats_additions[heartbeat]:
+      for dicom_identifier in dicom_identifiers:
         thread_set = self.thread_registration[dicom_identifier]
         thread_set.discard(heartbeat)
 
@@ -215,6 +223,17 @@ class ReactivePipelineStorage(PipelineStorage):
 
     return extracted_input_containers, failed_datasets
 
+  def forced_extraction(self) -> List[Tuple[str, PatientNode]]:
+    with self.master_lock:
+      identifiers = [identifier for identifier, node in self.storage if node.validate()]
+
+      extracted_containers = [(identifier,self.storage.extract(identifier)) for identifier in identifiers]
+      for identifier in identifiers:
+        del self.thread_registration[identifier]
+
+    return extracted_containers
+
+
   def remove_expired_studies(self, expiry_time : datetime):
     """Removes any PatientNode in the tree that have expired.
 
@@ -233,7 +252,7 @@ class ReactivePipelineStorage(PipelineStorage):
   def __str__(self) -> str:
     base = f"Pipeline Storage with {len(self.storage)} patients\n"
     for patient_id, node in self.storage:
-      lines = str(node).split('\n')
+      lines = str(node).strip().split('\n')
 
       for line in lines:
         base += f"  {line}\n"
@@ -285,6 +304,12 @@ class PassivePipelineStorage(PipelineStorage):
       del self.tree[patient_id]
 
     return node_to_process, failed_datasets
+
+  def forced_extraction(self) -> List[Tuple[str, PatientNode]]:
+    ret_value, failed = self.extract_input_container()
+
+    # We don't really have to do anything
+    return ret_value
 
   def remove_expired_studies(self, expiry_time: datetime):
     dirty_identifiers = []

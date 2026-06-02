@@ -284,7 +284,7 @@ class AbstractPipeline():
     self.post_init()
 
     try:
-      valid_containers, failed_datasets = self.data_state.extract_input_container()
+      valid_containers = self.data_state.forced_extraction()
       if valid_containers:
         self.logger.info(f"Found Containers: {valid_containers}")
       self._process_output(valid_containers, None)
