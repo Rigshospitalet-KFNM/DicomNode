@@ -28,6 +28,8 @@ from time import sleep
 from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, TextIO,\
   Type, Union, Tuple
 from psutil import Process as PS_UTIL_Process
+import traceback
+
 
 # Third part packages
 from pydicom import Dataset
@@ -281,10 +283,14 @@ class AbstractPipeline():
 
     self.post_init()
 
-    valid_containers, failed_datasets = self.data_state.extract_input_container()
-    if valid_containers:
-      self.logger.info(f"Found Containers: {valid_containers}")
-    self._process_output(valid_containers, None)
+    try:
+      valid_containers, failed_datasets = self.data_state.extract_input_container()
+      if valid_containers:
+        self.logger.info(f"Found Containers: {valid_containers}")
+      self._process_output(valid_containers, None)
+    except Exception:
+      self.logger.critical(f"Attempted to extract, but failed run because:")
+      self.logger.critical(traceback.format_exc())
 
     # End def __init__
 

@@ -235,8 +235,10 @@ class ReactivePipelineStorage(PipelineStorage):
     for patient_id, node in self.storage:
       lines = str(node).split('\n')
 
+      for line in lines:
+        base += f"  {line}\n"
 
-    return base
+    return base.rstrip()
 
 class PassivePipelineStorage(PipelineStorage):
   """A PipelineStorage, that is ignorant of the incoming threads. It's not

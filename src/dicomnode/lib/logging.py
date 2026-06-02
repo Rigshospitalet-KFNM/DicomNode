@@ -37,8 +37,7 @@ def set_logger(logger: Logger, config: LoggerConfig):
 
   if isinstance(config.log_output, TextIOBase):
     handler = StreamHandler(config.log_output)
-  elif isinstance(config.log_output, Path):
-
+  elif isinstance(config.log_output, Path) or isinstance(config.log_output, str):
     handler = TimedRotatingFileHandler(
       config.log_output,
       when=config.when,
