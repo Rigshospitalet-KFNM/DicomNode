@@ -3,6 +3,7 @@
 # Python standard library
 from logging import getLogger
 import os
+from typing import List, Tuple
 from unittest.mock import patch
 
 # Dicomnode modules
@@ -14,7 +15,9 @@ from dicomnode.server.input import AbstractInput
 from dicomnode.server.input_container import InputContainer
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import PipelineOutput, NoOutput
+from dicomnode.server.patient_node import PatientNode
 from dicomnode.server.processor import AbstractProcessor
+from dicomnode.server.pipeline_storage import ReactivePipelineStorage
 
 # Test
 from tests.helpers import config
@@ -35,7 +38,6 @@ class Processor(AbstractProcessor):
   def process(self, input_container: InputContainer) -> PipelineOutput:
     self.logger.info(f"Hello from {os.getpid()}")
     self.logger.info(f"my handlers are {self.logger.handlers}")
-
 
     print("Should be a log message")
 
@@ -85,3 +87,23 @@ class LogFromAnotherProcess(DicomnodeTestCase):
 
       pp(captured_logs.output)
       pp(captured_process_logs.output)
+
+  def test_end2end_log_initial_start_up_logs(self):
+    patient_id = "1502799995"
+    class InitialThing(ReactivePipelineStorage):
+
+      def forced_extraction(self) -> List[Tuple[str, PatientNode]]:
+        return [(patient_id, PatientNode(patient_id, Pipeline.input, self.config))]
+
+    class PipelineWithInitialData(Pipeline):
+      StorageType = InitialThing
+
+    with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as captured_process_logs:
+        with patch('dicomnode.lib.logging.set_logger'):
+          PipelineWithInitialData(config_from_raw(DicomnodeConfigRaw( # Side effect
+            PROCESSING_DIRECTORY=self._testMethodName
+          )))
+
+    self.assertRegexIn("Hello from", captured_process_logs.output)
+    self.assertRegexIn("Process has handled 1502799995", captured_process_logs.output)

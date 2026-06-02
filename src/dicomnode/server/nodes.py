@@ -287,7 +287,9 @@ class AbstractPipeline():
       valid_containers = self.data_state.forced_extraction()
       if valid_containers:
         self.logger.info(f"Found Containers: {valid_containers}")
-      self._process_output(valid_containers, None)
+        self.logManager.start_queue()
+        self._process_output(valid_containers, None)
+        self.logManager.stop_queue()
     except Exception:
       self.logger.critical(f"Attempted to extract, but failed run because:")
       self.logger.critical(traceback.format_exc())
