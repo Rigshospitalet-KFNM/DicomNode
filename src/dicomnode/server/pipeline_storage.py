@@ -104,6 +104,8 @@ class _ThreadHeartBeat(_HeartBeat):
     return hash(self.identifier)
 
 
+
+
 class _AssocHeartBeat(_HeartBeat):
   def __init__(self, identifier: Association) -> None:
     self.assoc = identifier
@@ -198,7 +200,7 @@ class ReactivePipelineStorage(PipelineStorage):
     extracted_input_containers: List[Tuple[str,PatientNode]] = []
 
     dicom_identifiers = self.heartbeats_additions[heartbeat]
-    logger.info(f"Considering: {dicom_identifiers} for extractions")
+    logger.info(f"Considering: {dicom_identifiers} for extractions : {self.heartbeats_additions}")
 
     with self.master_lock:
       for dicom_identifier in dicom_identifiers:

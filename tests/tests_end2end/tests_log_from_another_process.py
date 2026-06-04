@@ -80,8 +80,6 @@ class LogFromAnotherProcess(DicomnodeTestCase):
     self.assertRegexIn("Hello from", captured_process_logs.output)
     self.assertRegexIn("Process has handled 1502799995", captured_process_logs.output)
 
-
-
     if config.PRINT_LOGS:
       from pprint import pp
 
@@ -91,7 +89,6 @@ class LogFromAnotherProcess(DicomnodeTestCase):
   def test_end2end_log_initial_start_up_logs(self):
     patient_id = "1502799995"
     class InitialThing(ReactivePipelineStorage):
-
       def forced_extraction(self) -> List[Tuple[str, PatientNode]]:
         return [(patient_id, PatientNode(patient_id, Pipeline.input, self.config))]
 
@@ -101,7 +98,8 @@ class LogFromAnotherProcess(DicomnodeTestCase):
     with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
       with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as captured_process_logs:
         with patch('dicomnode.lib.logging.set_logger'):
-          PipelineWithInitialData(config_from_raw(DicomnodeConfigRaw( # Side effect
+          # Side effect of object creation is that initial
+          PipelineWithInitialData(config_from_raw(DicomnodeConfigRaw(
             PROCESSING_DIRECTORY=self._testMethodName
           )))
 
