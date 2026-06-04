@@ -167,7 +167,7 @@ setup(name='dicomnode',
     packages=find_packages(where="src", exclude=["bin", "tests"]),
     install_requires=[
       'sortedcontainers>=2.4.0',
-      'pydicom',
+      'pydicom>3.0.0,<4.0.0',
       'pynetdicom<4.0.0',
       'psutil<8.0.0',
       'typing_extensions>=4.7.1,<5.0.0',
