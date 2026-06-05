@@ -5,7 +5,8 @@
 import logging
 from io import StringIO
 from random import randint
-from pprint import pp
+from unittest.mock import patch
+
 
 # Third Party modules
 from pydicom import Dataset
@@ -32,7 +33,8 @@ class Input(AbstractInput):
     return True
 
 class PynetdicomNodeLogging(DicomnodeTestCase):
-  def test_abstract_queued_pipeline_end2end(self):
+  @patch("dicomnode.lib.logging.set_logger")
+  def test_abstract_queued_pipeline_end2end(self, mock):
     output = StringIO()
     ae_title_ = "IMINDANGER"
     port_ = randint(1050,45000)
@@ -48,22 +50,26 @@ class PynetdicomNodeLogging(DicomnodeTestCase):
         propagate=False
       )
 
-
       ae_title = ae_title_
       port = port_
 
       class Processor(AbstractProcessor):
         def process(self, input_container: InputContainer) -> PipelineOutput:
           self.logger.info("I'm triggered!")
+          self.logger.info(f"This is my handlers: {self.logger.handlers}")
           return super().process(input_container)
 
-    node = Node()
 
     with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
+      node = Node()
       with node.open_cm():
         address = Address('localhost', port_, ae_title_)
         send_images("SOAMI", address, list(generate_numpy_datasets(2, Cols=5, Rows=5)))
 
-    pp(captured_logs)
+        while not node.process_queue.empty():
+          pass
+
+    self.assertRegexIn("I'm triggered!", captured_logs.output)
+
 
     clear_logger(DICOMNODE_LOGGER_NAME)

@@ -82,8 +82,34 @@ The logger is injected into most sub-libraries.
 
 ## Customizing outputs
 
-Sometimes you want to create a report supplementing an image series or you want to send data over some other form communication protocol. In that case you need to start customizing the output
+Sometimes you want to create a report supplementing an image series or you want
+to send data over some other form communication protocol. In that case you need
+to start customizing the output
 
+
+## Dynamics Inputs
+
+Sometimes you want multiple series in the same input. For instance if you
+wanted to take an average of multiple series. For this purpose you have:
+`dicomnode.server.input.DynamicInput`, which differs from a normal input, that
+it has a `separator_tag`. Each accepted dataset will be placed in a bucket
+(leaf) based on the string conversion on the `separator_tag`.
+
+All leafs are stored in the `leafs` attribute, which you should use when you
+validate, so for example this code checks that all leafs are valid and there's
+at least 3 leafs:
+```python
+  ...
+  def validate(self):
+    return all(validate_leaf(leaf) for leaf in self.leafs) and len(self.leafs) > 2
+  ...
+```
+Each leaf is a `dicomnode.data_structures.storage.Storage` which is a very
+simple class, that doesn't support much more than iteration of the dataset
+stored in it.
+
+When you grind, you always get a dictionary with key-value pairs, where the key
+is the string key, while the value is the ground image from the inputs grinder.
 
 ## Historic Inputs
 
@@ -127,8 +153,6 @@ from pydicom import Dataset
 
     # Where the date is the study date and the string is the series description.
 ```
-
-
 
 ### Assumptions and restrictions
 

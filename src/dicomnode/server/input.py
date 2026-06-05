@@ -42,7 +42,8 @@ from dicomnode.server.grinders import Grinder, IdentityGrinder
 
 
 """
-# I added some validators, that sorta fixes - things
+# I added some state based validators, that sorta fixes - things
+# Anywho, the problem is that State based validation keeps showing up.
 
 class ValidationState(ABC):
   def __init__(self) -> None:

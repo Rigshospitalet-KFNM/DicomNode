@@ -184,7 +184,7 @@ class AbstractPipeline():
   Processor: Type[AbstractProcessor] = AbstractProcessor
   StorageType: Type[PipelineStorage] = ReactivePipelineStorage
 
-  def __init__(self, config: Optional[DicomnodeConfig] =None) -> None:
+  def __init__(self, config: Optional[DicomnodeConfig] = None) -> None:
     # This function starts and opens the server
     #
     # 1. Logging
@@ -730,4 +730,5 @@ class DaemonPipeline(AbstractPipeline):
 __all__ = (
   "AbstractPipeline",
   "AbstractQueuedPipeline",
+  "DaemonPipeline"
 )
