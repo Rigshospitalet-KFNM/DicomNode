@@ -421,7 +421,7 @@ class AbstractPipeline():
           event.assoc.requestor.ae_title
         )
 
-      logging_config = self.logManager.queue_logging_config() if self.logManager.should_queue_log() else self.logManager.logging_config()
+      logging_config = self.logManager.queue_logging_config() if self.logManager.should_queue_log() else self.logManager.get_logging_config()
 
       args = ProcessRunnerArgs(
         patient_id=patient_id,

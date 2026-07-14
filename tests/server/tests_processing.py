@@ -46,7 +46,7 @@ class ProcessorTestCase(DicomnodeTestCase):
       None, "Test"
     )
 
-    with patch('dicomnode.server.processor.set_logger'):
+    with patch('dicomnode.lib.logging.set_logger'):
       with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
         DummyProcessor(args)
 
@@ -60,7 +60,7 @@ class ProcessorTestCase(DicomnodeTestCase):
       None, "Test"
     )
 
-    with patch('dicomnode.server.processor.set_logger'):
+    with patch('dicomnode.lib.logging.set_logger'):
       with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
         RaisingProcessor(args)
 
@@ -76,7 +76,7 @@ class ProcessorTestCase(DicomnodeTestCase):
 
     before_cwd = os.getcwd()
 
-    with patch('dicomnode.server.processor.set_logger'):
+    with patch('dicomnode.lib.logging.set_logger'):
       with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
         LoggingProcessor(args)
 

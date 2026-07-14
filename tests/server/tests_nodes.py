@@ -108,5 +108,5 @@ class NonNetworkNodeTests(DicomnodeTestCase):
     if not isinstance(handler, logging.StreamHandler):
       raise AssertionError(f"Handler is not a Stream handler but a {type(handler)}")
 
-    self.assertEqual(handler.level, logging.ERROR)
+    self.assertEqual(pynetdicom_logger.level, logging.ERROR)
     self.assertEqual(handler.stream, log_output_)
