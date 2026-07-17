@@ -56,35 +56,34 @@ class LogFromAnotherProcess(DicomnodeTestCase):
   def test_end2end_log_from_another_process(self):
 
     with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
-      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as captured_process_logs:
-        with patch('dicomnode.lib.logging.set_logger'):
-          node = Pipeline(config_from_raw(DicomnodeConfigRaw(
-            PROCESSING_DIRECTORY=self._testMethodName
-          )))
+      with patch('dicomnode.lib.logging.set_logger'):
+        node = Pipeline(config_from_raw(DicomnodeConfigRaw(
+          PROCESSING_DIRECTORY=self._testMethodName
+        )))
 
-          node.open(blocking=False)
+        node.open(blocking=False)
 
-          images_1 = DicomTree(generate_numpy_datasets(10, PatientID = "1502799995"))
+        images_1 = DicomTree(generate_numpy_datasets(10, PatientID = "1502799995"))
 
-          images_1.map(personify(
-            tags=[
-              (0x00100010, "PN", "Odd Haugen Test"),
-              (0x00100040, "CS", "M")
-            ]
-          ))
+        images_1.map(personify(
+          tags=[
+            (0x00100010, "PN", "Odd Haugen Test"),
+            (0x00100040, "CS", "M")
+          ]
+        ))
 
-          send_images("TESTCASE", address, images_1)
+        send_images("TESTCASE", address, images_1)
 
-          node.close()
+        node.close()
 
-    self.assertRegexIn("Hello from", captured_process_logs.output)
-    self.assertRegexIn("Process has handled 1502799995", captured_process_logs.output)
+    self.assertRegexIn("Hello from", captured_logs.output)
+    self.assertRegexIn("Process has handled 1502799995", captured_logs.output)
 
     if config.PRINT_LOGS:
       from pprint import pp
 
       pp(captured_logs.output)
-      pp(captured_process_logs.output)
+      pp(captured_logs.output)
 
   def test_end2end_log_initial_start_up_logs(self):
     patient_id = "1502799995"
@@ -96,12 +95,11 @@ class LogFromAnotherProcess(DicomnodeTestCase):
       StorageType = InitialThing
 
     with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
-      with self.assertLogs(DICOMNODE_PROCESS_LOGGER) as captured_process_logs:
-        with patch('dicomnode.lib.logging.set_logger'):
-          # Side effect of object creation is that initial
-          PipelineWithInitialData(config_from_raw(DicomnodeConfigRaw(
-            PROCESSING_DIRECTORY=self._testMethodName
-          )))
+      with patch('dicomnode.lib.logging.set_logger'):
+        # Side effect of object creation is that initial
+        PipelineWithInitialData(config_from_raw(DicomnodeConfigRaw(
+          PROCESSING_DIRECTORY=self._testMethodName
+        )))
 
-    self.assertRegexIn("Hello from", captured_process_logs.output)
-    self.assertRegexIn("Process has handled 1502799995", captured_process_logs.output)
+    self.assertRegexIn("Hello from", captured_logs.output)
+    self.assertRegexIn("Process has handled 1502799995", captured_logs.output)

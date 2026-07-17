@@ -123,6 +123,8 @@ class InputTestCase(DicomnodeTestCase):
     a_mock = mock.Mock()
 
     class PETInput(AbstractInput):
+      required_tags = [0x0008_0018]
+
       required_values = {
         0x0008_0060 : "PT"
       }
@@ -131,6 +133,8 @@ class InputTestCase(DicomnodeTestCase):
         return True
 
     class CTInput(AbstractInput):
+      required_tags = [0x0008_0018]
+
       required_values = {
         0x0008_0060 : "CT"
       }

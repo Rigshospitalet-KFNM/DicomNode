@@ -31,12 +31,14 @@ class LoggerConfig:
 def get_logger():
   return getLogger(DICOMNODE_LOGGER_NAME)
 
-def set_logger(logger: Logger, config: LoggerConfig):
+def set_logger(logger: Logger, config: LoggerConfig, handler_: Optional[Handler] = None ):
   logger.handlers.clear()
 
   logger.setLevel(config.log_level)
 
-  if isinstance(config.log_output, TextIOBase):
+  if handler_ is not None:
+    handler = handler_
+  elif isinstance(config.log_output, TextIOBase):
     handler = StreamHandler(config.log_output)
   elif isinstance(config.log_output, Path) or isinstance(config.log_output, str):
     handler = TimedRotatingFileHandler(
@@ -59,7 +61,9 @@ def set_logger(logger: Logger, config: LoggerConfig):
   logger.addHandler(handler)
   logger.addFilter(_thread_id_filter)
 
-def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
+def queue_logger_thread_target(queue: Queue[LogRecord | None]):
+  logger = get_logger()
+
   while True:
     try:
       record = queue.get(timeout=0.1)
@@ -106,7 +110,7 @@ class LogManager:
     self._logging_thread: Optional[Thread] = None
     self.handler = self.destination_handler()
 
-    set_logger(self.get_logger(), self.get_logging_config())
+    set_logger(self.get_logger(), self.get_logging_config(), self.handler)
 
   def get_logger(self) -> Logger:
     return getLogger(DICOMNODE_LOGGER_NAME)
@@ -124,12 +128,9 @@ class LogManager:
     if self._log_queue is None:
       self._log_queue = multiprocessing_context.Queue()
 
-    process_logger = self.get_process_logger()
-    set_logger(process_logger, self.get_logging_config())
-
     self._logging_thread = Thread(
       target=queue_logger_thread_target,
-      args=(self._log_queue, getLogger(DICOMNODE_PROCESS_LOGGER)),
+      args=(self._log_queue,),
       name="Log Queue Reader Thread",
     )
 
@@ -197,18 +198,3 @@ class LogManager:
     if isinstance(self._log_queue, Queue):
       return QueueHandler(self._log_queue)
     return NullHandler()
-
-  def set_logger(self, logger: Logger, handler: Handler):
-    logger.handlers.clear()
-
-    logger.setLevel(self.logging_config.log_level)
-
-    formatter = Formatter(
-      fmt=self.logging_config.format,
-      datefmt=self.logging_config.date_format
-    )
-
-    handler.setFormatter(formatter)
-
-    logger.addHandler(handler)
-    logger.addFilter(_thread_id_filter)
