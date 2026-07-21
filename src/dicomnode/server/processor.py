@@ -4,21 +4,20 @@ from logging import getLogger
 
 from pathlib import Path
 import traceback
-import threading
 from typing import Type
 
 
 # Dicomnode imports
 from dicomnode.constants import DICOMNODE_LOGGER_NAME
 from dicomnode.lib.io import TemporaryWorkingDirectory
-from dicomnode.lib.logging import set_logger, LoggerConfig
+from dicomnode.lib import logging # This is for easier mocking
 from dicomnode.server.input_container import InputContainer
 from dicomnode.server.output import PipelineOutput, NoOutput
 
 @dataclass
 class ProcessRunnerArgs:
   input_container : InputContainer
-  log_config : LoggerConfig
+  log_config : logging.LoggerConfig
   process_path : Path | None
   patient_id : str
 
@@ -35,7 +34,7 @@ class AbstractProcessor():
     root_logger.handlers.clear() # Do not use the root logger
 
     self.logger = getLogger(DICOMNODE_LOGGER_NAME)
-    set_logger(self.logger, args.log_config)
+    logging.set_logger(self.logger, args.log_config)
 
     if args.process_path is None:
       self._main(args.patient_id, args.input_container)

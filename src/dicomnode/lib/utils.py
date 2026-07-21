@@ -226,5 +226,5 @@ def lazy_import(name):
     loader.exec_module(module)
     return module
 
-def ret_zero():
-  return 0
+def get_type_name(t: Type):
+  return t.__name__

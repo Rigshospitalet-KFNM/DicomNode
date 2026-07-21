@@ -91,58 +91,59 @@ class SignalKillsChildrenWritten(DicomnodeTestCase):
     logger = getLogger(DICOMNODE_LOGGER_NAME)
 
     logging_queue = get_context('spawn').Queue()
-    start_up_delay = 1.0
+    start_up_delay = 2.0
 
     test_port = randint(1024, 45000)
 
     with self.assertLogs(DICOMNODE_LOGGER_NAME, level=DEBUG) as captured_logs:
-      # So this line, somehow captures the logs from the other process, although
-      # it doesn't register that it did indeed catch them
+      with patch('dicomnode.lib.logging.set_logger'):
+        # So this line, somehow captures the logs from the other process, although
+        # it doesn't register that it did indeed catch them
 
-      victim_process = spawn_process(process_function, logging_queue, test_port)
+        victim_process = spawn_process(process_function, logging_queue, test_port)
 
-      victim_pid = victim_process.pid
-      if victim_pid is None:
-        raise AssertionError("Failed to start the process")
+        victim_pid = victim_process.pid
+        if victim_pid is None:
+          raise AssertionError("Failed to start the process")
 
-      dataset = Dataset()
-      dataset.SOPInstanceUID = gen_uid()
-      dataset.SOPClassUID = SecondaryCaptureImageStorage
-      dataset.PatientID = "Patient^ID"
-      dataset.InstanceNumber = 1
-      make_meta(dataset)
+        dataset = Dataset()
+        dataset.SOPInstanceUID = gen_uid()
+        dataset.SOPClassUID = SecondaryCaptureImageStorage
+        dataset.PatientID = "Patient^ID"
+        dataset.InstanceNumber = 1
+        make_meta(dataset)
 
-      # Need a small delay
-      sleep(start_up_delay)
+        # Need a small delay
+        sleep(start_up_delay)
 
-      send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
+        send_images("SENDER", Address('127.0.0.1', test_port, "TEST"), [dataset])
 
-      # Wait for processing to begin. Although I am not sure why there's 2?
-      sleep(start_up_delay)
+        # Wait for processing to begin. Although I am not sure why there's 2?
+        sleep(start_up_delay)
 
-      kill(victim_pid, signal.SIGINT)
+        kill(victim_pid, signal.SIGINT)
 
-      process_is_alive_count = 0
+        process_is_alive_count = 0
 
-      killed_successful = True
+        killed_successful = True
 
-      for process in PS_Process(victim_process.pid).children(True):
-        while process.is_running():
+        for process in PS_Process(victim_process.pid).children(True):
+          while process.is_running():
+            if process_is_alive_count < 100:
+              process_is_alive_count += 1
+              sleep(0.01)
+            else:
+              killed_successful = False
+              kill(process.pid, signal.SIGKILL)
+
+
+        while victim_process.is_alive():
           if process_is_alive_count < 100:
             process_is_alive_count += 1
             sleep(0.01)
           else:
             killed_successful = False
-            kill(process.pid, signal.SIGKILL)
-
-
-      while victim_process.is_alive():
-        if process_is_alive_count < 100:
-          process_is_alive_count += 1
-          sleep(0.01)
-        else:
-          killed_successful = False
-          kill(victim_pid, signal.SIGKILL)
+            kill(victim_pid, signal.SIGKILL)
 
     logging_queue.put_nowait(None)
     logging_queue.close()

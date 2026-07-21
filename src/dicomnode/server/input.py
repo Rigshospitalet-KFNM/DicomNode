@@ -33,13 +33,14 @@ from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   InvalidTreeNode, ContractViolation
 from dicomnode.lib.io import Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
-from dicomnode.lib.utils import name
+from dicomnode.lib.utils import name, get_type_name
 from dicomnode.config import DicomnodeConfig, config_from_raw
 from dicomnode.server.grinders import Grinder, IdentityGrinder
 
 
 """
-# I added some validators, that sorta fixes - things
+# I added some state based validators, that sorta fixes - things
+# Anywho, the problem is that State based validation keeps showing up.
 
 class ValidationState(ABC):
   def __init__(self) -> None:
@@ -619,6 +620,8 @@ class AbstractInputProxy(AbstractInput):
   def __len__(self):
     return 0
 
+  def __str__(self):
+    return f"Proxy input with types: {' '.join(map(get_type_name, self.type_options))}"
 
   def validate(self) -> bool:
       return False
@@ -652,6 +655,8 @@ class AbstractInputProxy(AbstractInput):
         type_option.__init__(self, config=self.input_options, node_path=self.node_path)
         return self.add_image(dicom)
     raise InvalidDataset
+
+
 
 __all__ = [
   'AbstractInput',

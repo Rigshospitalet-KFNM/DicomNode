@@ -53,7 +53,7 @@ from dicomnode.lib.parallelism import Parallel, ParallelPrimitive
 from dicomnode.lib.io import Directory, File, fill_patient_storage_from_file_system
 from dicomnode.lib.logging import set_logger,\
   LoggerConfig, log_traceback, LogManager
-from dicomnode.lib.utils import optionalAttribute, ret_zero
+from dicomnode.lib.utils import optionalAttribute
 from dicomnode.server.input import AbstractInput
 from dicomnode.config import DicomnodeConfig
 from dicomnode.server.pipeline_storage import PipelineStorage, ReactivePipelineStorage, PassivePipelineStorage
@@ -184,7 +184,7 @@ class AbstractPipeline():
   Processor: Type[AbstractProcessor] = AbstractProcessor
   StorageType: Type[PipelineStorage] = ReactivePipelineStorage
 
-  def __init__(self, config: Optional[DicomnodeConfig] =None) -> None:
+  def __init__(self, config: Optional[DicomnodeConfig] = None) -> None:
     # This function starts and opens the server
     #
     # 1. Logging
@@ -421,7 +421,7 @@ class AbstractPipeline():
           event.assoc.requestor.ae_title
         )
 
-      logging_config = self.logManager.queue_logging_config() if self.logManager.should_queue_log() else self.logManager.logging_config()
+      logging_config = self.logManager.queue_logging_config() if self.logManager.should_queue_log() else self.logManager.get_logging_config()
 
       args = ProcessRunnerArgs(
         patient_id=patient_id,
@@ -656,7 +656,7 @@ class AbstractQueuedPipeline(AbstractPipeline):
         pass
 
   def _handle_association_closed(self, event: evt.Event):
-    input_containers, failed_datasets = self.data_state.extract_input_container(id(event.assoc))
+    input_containers, failed_datasets = self.data_state.extract_input_container(event.assoc)
 
     if len(failed_datasets):
       dicom_collection = display_dicom_collection(failed_datasets)
@@ -730,4 +730,5 @@ class DaemonPipeline(AbstractPipeline):
 __all__ = (
   "AbstractPipeline",
   "AbstractQueuedPipeline",
+  "DaemonPipeline"
 )

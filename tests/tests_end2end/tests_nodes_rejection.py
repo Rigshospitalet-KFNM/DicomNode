@@ -4,7 +4,7 @@
 from logging import DEBUG, INFO
 from random import randint
 from time import sleep
-from unittest import TestCase
+from unittest.mock import patch
 # Third party modules
 from pydicom.uid import (
   ExplicitVRLittleEndian,
@@ -18,6 +18,7 @@ from pynetdicom.sop_class import Verification # type: ignore
 
 # Dicomnode Modules
 from dicomnode.constants import DICOMNODE_LOGGER_NAME, DICOMNODE_PROCESS_LOGGER
+from dicomnode.lib.logging import LoggerConfig
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.nodes import AbstractPipeline
 from dicomnode.server.output import PipelineOutput
@@ -40,7 +41,12 @@ class DummyRunner(AbstractProcessor):
 class RejectionAETitle(AbstractPipeline):
   input = {"BAH" : NeverValidatingInput}
   ae_title = "REJECT"
-  #pynetdicom_logger_level = INFO
+
+  pynetdicom_logger_config = LoggerConfig(
+    log_output=None
+  )
+
+
   log_output=None
   require_called_aet = True
   require_calling_aet = [ACCEPTED_AE_TITLE]
@@ -65,7 +71,10 @@ class RejectionTestCase(DicomnodeTestCase):
 
   @process_thread_check_leak
   def test_rejection(self):
-    node = RejectionAETitle()
+
+    with self.assertLogs(DICOMNODE_LOGGER_NAME):
+      with patch('dicomnode.lib.logging.set_logger'):
+        node = RejectionAETitle()
     port = randint(1025,65535)
     node.port = port
 
@@ -76,27 +85,31 @@ class RejectionTestCase(DicomnodeTestCase):
     sleep(0.005)
     ae.add_requested_context(Verification, transfer_syntax)
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
-      self.assertFalse(assoc.is_established)
+      with self.assertLogs("pynetdicom"):
+        assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
+        self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection NOT_KNOWN rejected a connection', recorded_logs.output)
 
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
-      self.assertFalse(assoc.is_established)
+      with self.assertLogs("pynetdicom"):
+        assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
+        self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection NOT_KNOWN rejected a connection', recorded_logs.output)
 
     ae.ae_title = ACCEPTED_AE_TITLE
     with self.assertLogs('dicomnode', DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
-      self.assertFalse(assoc.is_established)
+      with self.assertLogs("pynetdicom"):
+        assoc = ae.associate('127.0.0.1', port, ae_title="NOT TARGET")
+        self.assertFalse(assoc.is_established)
     self.assertIn(f'DEBUG:dicomnode:Connection {ACCEPTED_AE_TITLE} rejected a connection', recorded_logs.output)
 
     with self.assertLogs(node.logger, DEBUG) as recorded_logs:
-      assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
-      self.assertTrue(assoc.is_established)
-      responds = assoc.send_c_echo()
-      self.assertEqual(responds.Status, 0x0000)
-      assoc.release()
+      with self.assertLogs("pynetdicom"):
+        assoc = ae.associate('127.0.0.1', port, ae_title="REJECT")
+        self.assertTrue(assoc.is_established)
+        responds = assoc.send_c_echo()
+        self.assertEqual(responds.Status, 0x0000)
+        assoc.release()
     self.assertIn(f'DEBUG:dicomnode:Connection {ACCEPTED_AE_TITLE} send an echo', recorded_logs.output)
 
     with self.assertLogs(node.logger):

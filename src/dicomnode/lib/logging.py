@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from logging import DEBUG, Formatter, Logger, LogRecord, NullHandler, StreamHandler, getLogger
+from logging import DEBUG, Formatter, Logger, LogRecord, Handler, NullHandler,\
+  StreamHandler, getLogger
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from pathlib import Path
 import multiprocessing
@@ -30,12 +31,14 @@ class LoggerConfig:
 def get_logger():
   return getLogger(DICOMNODE_LOGGER_NAME)
 
-def set_logger(logger: Logger, config: LoggerConfig):
+def set_logger(logger: Logger, config: LoggerConfig, handler_: Optional[Handler] = None ):
   logger.handlers.clear()
 
   logger.setLevel(config.log_level)
 
-  if isinstance(config.log_output, TextIOBase):
+  if handler_ is not None:
+    handler = handler_
+  elif isinstance(config.log_output, TextIOBase):
     handler = StreamHandler(config.log_output)
   elif isinstance(config.log_output, Path) or isinstance(config.log_output, str):
     handler = TimedRotatingFileHandler(
@@ -58,7 +61,9 @@ def set_logger(logger: Logger, config: LoggerConfig):
   logger.addHandler(handler)
   logger.addFilter(_thread_id_filter)
 
-def queue_logger_thread_target(queue: Queue[LogRecord | None], logger: Logger):
+def queue_logger_thread_target(queue: Queue[LogRecord | None]):
+  logger = get_logger()
+
   while True:
     try:
       record = queue.get(timeout=0.1)
@@ -98,12 +103,14 @@ class LogManager:
         config (DicomnodeConfig): _description_
         existing_queue (Optional[Queue[LogRecord  |  None]]): _description_
     """
-    self.config = config
+    self.dicomnode_config = config
+    self.logging_config = self.get_logging_config()
     self._log_queue = existing_queue
     self._owning_queue = existing_queue is None
     self._logging_thread: Optional[Thread] = None
+    self.handler = self.destination_handler()
 
-    set_logger(self.get_logger(), self.logging_config())
+    set_logger(self.get_logger(), self.get_logging_config(), self.handler)
 
   def get_logger(self) -> Logger:
     return getLogger(DICOMNODE_LOGGER_NAME)
@@ -121,12 +128,9 @@ class LogManager:
     if self._log_queue is None:
       self._log_queue = multiprocessing_context.Queue()
 
-    process_logger = self.get_process_logger()
-    set_logger(process_logger, self.logging_config())
-
     self._logging_thread = Thread(
       target=queue_logger_thread_target,
-      args=(self._log_queue, getLogger(DICOMNODE_PROCESS_LOGGER)),
+      args=(self._log_queue,),
       name="Log Queue Reader Thread",
     )
 
@@ -145,35 +149,52 @@ class LogManager:
     self._log_queue = None
     self._logging_thread = None
 
-  def logging_config(self):
-    if isinstance(self.config.LOG_OUTPUT, str):
-      if self.config.LOG_OUTPUT == "stdout":
+  def get_logging_config(self):
+    if isinstance(self.dicomnode_config.LOG_OUTPUT, str):
+      if self.dicomnode_config.LOG_OUTPUT == "stdout":
         output = stdout
       else:
-        output = Path(self.config.LOG_OUTPUT)
-    elif isinstance(self.config.LOG_OUTPUT, TextIOBase):
-      output = self.config.LOG_OUTPUT
+        output = Path(self.dicomnode_config.LOG_OUTPUT)
+    elif isinstance(self.dicomnode_config.LOG_OUTPUT, TextIOBase):
+      output = self.dicomnode_config.LOG_OUTPUT
     else:
       output = None
 
     return LoggerConfig(
-      log_level=self.config.LOG_LEVEL,
-      date_format=self.config.LOG_DATE_FORMAT,
-      format=self.config.LOG_FORMAT,
+      log_level=self.dicomnode_config.LOG_LEVEL,
+      date_format=self.dicomnode_config.LOG_DATE_FORMAT,
+      format=self.dicomnode_config.LOG_FORMAT,
       log_output=output,
-      when=self.config.LOG_WHEN,
-      number_of_backups=self.config.LOG_NUMBER_OF_BACK_UPS,
+      when=self.dicomnode_config.LOG_WHEN,
+      number_of_backups=self.dicomnode_config.LOG_NUMBER_OF_BACK_UPS,
     )
 
   def queue_logging_config(self):
     return LoggerConfig(
-      log_level=self.config.LOG_LEVEL,
-      date_format=self.config.LOG_DATE_FORMAT,
-      format=self.config.LOG_FORMAT,
+      log_level=self.dicomnode_config.LOG_LEVEL,
+      date_format=self.dicomnode_config.LOG_DATE_FORMAT,
+      format=self.dicomnode_config.LOG_FORMAT,
       log_output=self._log_queue,
-      when=self.config.LOG_WHEN,
-      number_of_backups=self.config.LOG_NUMBER_OF_BACK_UPS
+      when=self.dicomnode_config.LOG_WHEN,
+      number_of_backups=self.dicomnode_config.LOG_NUMBER_OF_BACK_UPS
     )
 
   def should_queue_log(self) -> bool:
-    return bool(self.config.PROCESSING_DIRECTORY)
+    return bool(self.dicomnode_config.PROCESSING_DIRECTORY)
+
+  def destination_handler(self):
+    if isinstance(self.logging_config.log_output, TextIOBase):
+      return StreamHandler(self.logging_config.log_output)
+    elif isinstance(self.logging_config.log_output, Path) or isinstance(self.logging_config.log_output, str):
+      return TimedRotatingFileHandler(
+        self.logging_config.log_output,
+        when=self.logging_config.when,
+        backupCount=self.logging_config.number_of_backups
+      )
+    else: # config is None
+      return NullHandler()
+
+  def get_queue_handler(self):
+    if isinstance(self._log_queue, Queue):
+      return QueueHandler(self._log_queue)
+    return NullHandler()
