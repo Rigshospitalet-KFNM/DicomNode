@@ -8,12 +8,9 @@ __author__ = "Christoffer Vilstrup Jensen"
 
 # Python standard Library
 from abc import abstractmethod, ABC, ABCMeta
-from dataclasses import dataclass
-from datetime import date
 from enum import Enum
 from functools import reduce
-from logging import Logger, getLogger
-from pathlib import Path
+from logging import getLogger
 from operator import add
 from threading import Thread
 from typing import Any, Dict,List, Optional, Iterable, Tuple, Type, Union
@@ -34,7 +31,7 @@ from dicomnode.dicom.dimse import Address, QueryLevels,\
 from dicomnode.dicom.lazy_dataset import LazyDataset
 from dicomnode.lib.exceptions import InvalidDataset, IncorrectlyConfigured,\
   InvalidTreeNode, ContractViolation
-from dicomnode.lib.io import load_dicom, save_dicom, Directory
+from dicomnode.lib.io import Directory
 from dicomnode.lib.validators import get_validator_for_value, Validator
 from dicomnode.lib.utils import name
 from dicomnode.config import DicomnodeConfig, config_from_raw

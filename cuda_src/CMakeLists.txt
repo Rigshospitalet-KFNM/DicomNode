@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(FindCudaCompatibleGCC)
+
 set(CMAKE_CUDA_ARCHITECTURES native)
 project(dicomnode_c LANGUAGES CUDA CXX)
 
