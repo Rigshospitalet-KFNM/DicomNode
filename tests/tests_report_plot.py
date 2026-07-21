@@ -25,7 +25,7 @@ from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 
 
 class PlotTestCase(DicomnodeTestCase):
-  @skipUnless(config.USING_TEST_DATA, "Needs nifti data to plot")
+  @skipUnless(config.USING_TEST_DATA or test_data.TEST_DATA.HAS_DATA(), "Needs nifti data to plot")
   def test_triple_plot(self):
 
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/triple_plot.png')
@@ -33,7 +33,7 @@ class PlotTestCase(DicomnodeTestCase):
 
     tp.save()
 
-  @skipUnless(config.USING_TEST_DATA, "Needs nifti data to plot")
+  @skipUnless(config.USING_TEST_DATA or test_data.TEST_DATA.HAS_DATA(), "Needs nifti data to plot")
   def test_triple_plot_different_selectors(self):
     options = TriplePlot.Options(file_path=f'{library_paths.figure_directory}/different_triple_plot.png',
                                  selector=(PercentageSelector(0.30), MaxSelector(), AverageSelector()))
@@ -41,7 +41,7 @@ class PlotTestCase(DicomnodeTestCase):
 
     tp.save()
 
-  @skipUnless(config.USING_TEST_DATA, "Needs CT data")
+  @skipUnless(config.USING_TEST_DATA or test_data.TEST_DATA.HAS_DATA(), "Needs CT data")
   def test_triple_plot_dicom_data(self):
     ct_path = Path(f'{library_paths.report_data_directory}/CT')
     datasets = load_dicoms(ct_path)

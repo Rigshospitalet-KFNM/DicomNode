@@ -36,6 +36,9 @@ class _TestData:
 
     return self._mni_template
 
+  def HAS_DATA(self):
+    return CT_IMAGE_PATH.exists() and CT_IMAGE_SEGMENTATION_PATH.exists() and MNI_TEMPLATE_PATH.exists()
+
   def __init__(self) -> None:
     self._ct_image = None
     self._ct_image_segmentation = None

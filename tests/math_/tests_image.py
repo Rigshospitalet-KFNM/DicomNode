@@ -10,7 +10,8 @@ from dicomnode.lib.exceptions import DimensionalityError
 from dicomnode.math import Index
 from dicomnode.math.types import MirrorDirection
 from dicomnode.math.space import Space, ReferenceSpace
-from dicomnode.math.image import fit_image_into_unsigned_bit_range, Image
+from dicomnode.math.image import fit_image_into_unsigned_bit_range, Image,\
+  constrain, constrain_array, mask_image
 
 # Test helper modules
 from tests.helpers import generate_numpy_datasets
@@ -470,11 +471,13 @@ class ImageTestCase(DicomnodeTestCase):
     image_data = numpy.zeros((4,4,4))
     image = Image(image_data, self.space_ras)
 
+
     coord = Index(1,1,1)
     slice_to_embed = numpy.ones((5,5,5))
 
     image.embed_image(coord, slice_to_embed)
 
+    self.assertEqual(image.minimum_value, 0)
     self.assertTrue((image.raw == numpy.array([
       [[0, 0, 0, 0],
        [0, 0, 0, 0],
@@ -496,3 +499,68 @@ class ImageTestCase(DicomnodeTestCase):
        [0, 1, 1, 1],
        [0, 1, 1, 1]]
     ])).all() )
+
+  def test_constrain_array(self):
+    data = numpy.arange(4 * 4 * 4).reshape((4,4,4))
+
+    image = constrain_array(data, [(0,1),(1,2),(2,3)])
+
+    expected = numpy.array([
+      [[36, 37],
+       [40, 41]],
+
+      [[52, 53],
+       [56, 57]]
+    ])
+
+    self.assertTrue((image == expected).all())
+
+  def test_constrain_array_invalid_dimension(self):
+    data = numpy.arange(4 * 4 * 4).reshape((4,4,4))
+
+    self.assertRaises(ValueError, constrain_array, data, [])
+
+  def test_constrain_image(self):
+    data = numpy.arange(4 * 4 * 4).reshape((4,4,4))
+
+    og_image = Image(data, self.space_ras)
+
+    actual = constrain(og_image, [(1,2),(1,2),(1,2)])
+
+    expected = numpy.array([
+      [[21, 22],
+       [25, 26]],
+
+      [[37, 38],
+       [41, 42]]
+    ])
+
+    self.assertTrue((actual.raw == expected).all())
+
+  def test_mask_image(self):
+    data = numpy.arange(4 * 4 * 4).reshape((4,4,4))
+    og_image = Image(data, self.space_ras)
+
+    mask = numpy.array([[
+      [0,0,0,0],
+      [0,0,0,0],
+      [0,0,0,0],
+      [0,0,0,0]
+    ],[
+      [0,0,0,0],
+      [0,1,1,0],
+      [0,1,1,0],
+      [0,0,0,0]
+    ], [
+      [0,0,0,0],
+      [0,1,1,0],
+      [0,1,1,0],
+      [0,0,0,0]
+    ], [
+      [0,0,0,0],
+      [0,0,0,0],
+      [0,0,0,0],
+      [0,0,0,0]
+    ]])
+
+    mask_image(og_image, mask)

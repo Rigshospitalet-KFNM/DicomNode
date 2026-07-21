@@ -284,6 +284,7 @@ def constrain_array(data: ndarray, restraints: Sequence[Tuple[int, int]]) -> nda
       data (ndarray): The data to be restraint
       restraints (Tuple[Tuple[int, int], ...]): A tuple with restrains, not that
         these are Inclusive, which is not the default for python slice objects.
+        Note that these restraints are (...xs), (...ys), (...zs)
 
   Raises:
       ValueError: Raised if there is an incorrect amount of restraints to the dimensionality of the image
@@ -303,6 +304,30 @@ def constrain_array(data: ndarray, restraints: Sequence[Tuple[int, int]]) -> nda
   return data[slices]
 
 def constrain(image: Image, restraints: Sequence[Tuple[int, int]]):
+  """Limits an image to a region specified by the restraints
+
+  Note:
+    This function is designed to work with the bounding_box function from
+    dicomnode.math
+
+  Args:
+      image (image): The data to be restraint
+      restraints (Tuple[Tuple[int, int], ...]): A tuple with restrains, not that
+        these are Inclusive, which is not the default for python slice objects.
+        Note that these restraints are (...xs), (...ys), (...zs)
+
+  Raises:
+      ValueError: Raised if there is an incorrect amount of restraints to the
+                  dimensionality of the image
+
+  Returns:
+      Image: A constrained image
+
+  Example:
+  >>> constrain(numpy.arange(16).reshape((4,4)) + 1, ((1,2), (1,2)))
+  array([[ 6,  7],[10, 11]])
+  """
+
   return Image(
     constrain_array(image.raw, restraints),
     constrain_space(image.space, restraints),
