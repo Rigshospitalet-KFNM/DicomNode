@@ -108,6 +108,7 @@ if(CMAKE_CUDA_COMPILER)
 
   # In debug create tests:
   if(NOT DEFINED NO_TESTING)
+
     add_subdirectory(tests)
   endif()
 else()

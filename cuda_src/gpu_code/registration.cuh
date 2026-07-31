@@ -71,7 +71,6 @@ struct Optimizer {
     params.cost = cost_function(params);
   }
 
-
   T update_scale(auto cost_function) {
     OptimizerParam positive_param = params;
     OptimizerParam negative_param = params;
@@ -197,8 +196,6 @@ dicomNodeError_t register_to(
       }
     );
 
-
-
     Image<3, T>* device_source_image = nullptr;
     Image<3, T>* device_target_image = nullptr;
     Image<3, T>* device_intermediate_image = nullptr;
@@ -221,7 +218,7 @@ dicomNodeError_t register_to(
     DicomNodeRunner runner{[&](dicomNodeError_t error) {
       free_used_memory();
     }};
-    // Initialzation
+    // Initialization
     runner | [&]() {
       return cudaMalloc(&(intermediate_image.data()), intermediate_image.size());
     } | [&]() {
@@ -237,8 +234,9 @@ dicomNodeError_t register_to(
     } | [&]() {
       return CENTER_OF_GRAVITY::center_of_gravity(host_source_image.volume, source_center_of_gravity);
     } | [&]() {
-      return CENTER_OF_GRAVITY::center_of_gravity(host_source_image.volume, destination_center_of_gravity);
+      return CENTER_OF_GRAVITY::center_of_gravity(host_target_image.volume, destination_center_of_gravity);
     } | [&]() {
+        // TODO: apply the basis here (i'm pretty, that it's correct, since they might be different)
        intermediate_image.space.starting_point += source_center_of_gravity - destination_center_of_gravity;
 
       return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);

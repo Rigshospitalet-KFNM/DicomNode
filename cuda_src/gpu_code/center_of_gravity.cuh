@@ -46,8 +46,14 @@ namespace CENTER_OF_GRAVITY {
 
 
 template<typename T>
-  dicomNodeError_t center_of_gravity(
+  /**
+   * finds the center of gravity in a device volume
+   * @tparam T The d
+   * @param volume -
+   */
+  __host__ dicomNodeError_t center_of_gravity(
     const Volume<3, T>& volume,
+
     Point<3>& cog
   ) noexcept {
   T sum = 0;

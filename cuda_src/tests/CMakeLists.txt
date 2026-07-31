@@ -24,9 +24,13 @@ CPMAddPackage(
 enable_testing()
 include(GoogleTest)
 
-file(GLOB_RECURSE CUDA_TEST_SOURCES "tests/*.cu")
+file(GLOB_RECURSE CUDA_TEST_SOURCES "*.cu")
+message(STATUS ${CUDA_TEST_SOURCES})
+
 
 foreach(test_src ${CUDA_TEST_SOURCES})
+    message(STATUS ${test_src})
+
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} PRIVATE
@@ -35,6 +39,7 @@ foreach(test_src ${CUDA_TEST_SOURCES})
             Python::Python
             utilities)
     gtest_discover_tests(${test_name})
+    target_compile_options(${test_name} PRIVATE -g -G -Wno-deprecated-gpu-targets)
 endforeach()
 
 #  # Sadly Coverage for GPU code is not supported...
