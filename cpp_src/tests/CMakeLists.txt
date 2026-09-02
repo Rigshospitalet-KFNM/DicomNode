@@ -16,6 +16,10 @@ target_link_libraries(
   GTest::gtest_main
   pybind11::module
   Python::Python
+  cpp_registration
 )
+
 include(GoogleTest)
 gtest_discover_tests(cpp_tests)
+
+

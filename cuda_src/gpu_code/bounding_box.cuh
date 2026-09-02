@@ -11,10 +11,10 @@ struct BoundingBox_3D {
   uint16_t z_min;
   uint16_t z_max;
 
-  __device__ __host__ inline BoundingBox_3D() :
+  __device__ __host__ BoundingBox_3D() :
     x_min(UINT16_MAX), x_max(0), y_min(UINT16_MAX), y_max(0), z_min(UINT16_MAX), z_max(0) {}
 
-  __device__ __host__ inline BoundingBox_3D(
+  __device__ __host__ BoundingBox_3D(
     const uint16_t& x_min_,
     const uint16_t& x_max_,
     const uint16_t& y_min_,
@@ -23,7 +23,7 @@ struct BoundingBox_3D {
     const uint16_t& z_max_
 ) : x_min(x_min_), x_max(x_max_), y_min(y_min_), y_max(y_max_), z_min(z_min_), z_max(z_max_) {}
 
-  __device__ __host__ inline BoundingBox_3D(
+  __device__ __host__  BoundingBox_3D(
     volatile uint16_t& x_min_,
     volatile uint16_t& x_max_,
     volatile uint16_t& y_min_,
@@ -32,7 +32,7 @@ struct BoundingBox_3D {
     volatile uint16_t& z_max_
 ) : x_min(x_min_), x_max(x_max_), y_min(y_min_), y_max(y_max_), z_min(z_min_), z_max(z_max_) {}
 
-  __device__ __host__ inline BoundingBox_3D(const BoundingBox_3D& other) {
+  __device__ __host__ BoundingBox_3D(const BoundingBox_3D& other) {
     x_min = other.x_min;
     x_max = other.x_max;
     y_min = other.y_min;
@@ -41,7 +41,7 @@ struct BoundingBox_3D {
     z_max = other.z_max;
   };
 
-  __device__ __host__ inline void operator=(const BoundingBox_3D& other) volatile {
+  __device__ __host__  void operator=(const BoundingBox_3D& other) volatile {
     x_min = other.x_min;
     x_max = other.x_max;
     y_min = other.y_min;
@@ -50,7 +50,7 @@ struct BoundingBox_3D {
     z_max = other.z_max;
   };
 
-  __device__ __host__ inline void operator=(const BoundingBox_3D& other) {
+  __device__ __host__ void operator=(const BoundingBox_3D& other) {
     x_min = other.x_min;
     x_max = other.x_max;
     y_min = other.y_min;

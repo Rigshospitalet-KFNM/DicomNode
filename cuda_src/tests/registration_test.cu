@@ -2,13 +2,13 @@
 // Created by cjen0668 on 7/30/26.
 //
 
+#include "../gpu_code/core/core.cuh"
 #include "../gpu_code/registration.cuh"
 
 #include <array>
 
 #include <gtest/gtest.h>
 
-#include "../gpu_code/core/core.cuh"
 
 constexpr u64 x = 8;
 constexpr u64 y = 8;

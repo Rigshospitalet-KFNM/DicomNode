@@ -127,8 +127,8 @@ struct Extent {
    *
    * @return __device__ the number of elements
    */
-  size_t elements() const noexcept {
-    size_t size = 1;
+  constexpr u64 elements() const noexcept {
+    u64 size = 1;
 
     for(u8 i = 0; i < DIMENSIONS; i++){
       size *= sizes[i];

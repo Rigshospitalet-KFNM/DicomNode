@@ -9,48 +9,67 @@
 #include"linear_interpolation.cuh"
 #include"map_reduce.cuh"
 
+
 namespace REGISTRATION {
-  template<typename T>
-  struct VolumeDifference {
-    static __device__ __host__ T map_to(u64 global_index, const Volume<3, T>* volume_1, const Volume<3, T>* volume_2) noexcept {
-      // ASSERT volumes ARE OF THE SAME SIZE, and each thread shouldn't assert that
-      if (volume_1->elements() <= global_index){
-        return identity();
-      }
-      T t;
-      // This avoids underflow with unsigned numbers
-      if constexpr (cuda::std::is_unsigned_v<T>){
-        // This is a downcast of u64 to u32, but like u64 image values are fucking stupid
-        t = __usad(volume_1->data[global_index], volume_2->data[global_index], 0u);
-      } else {
-        t = cuda::std::abs(volume_1->data[global_index] - volume_2->data[global_index]);
-      }
-      return t * t;
-    }
-
-    static __device__ __host__ T apply(const T& a, const T& b) noexcept {
-      return a + b;
-    }
-
-    static __device__ __host__ bool equals(const T& a, const T& b) noexcept {
-      return a == b;
-    }
-
-    static __device__ __host__ T identity() noexcept {
-      return 0;
-    }
-
-    static __device__ __host__ T remove_volatile(volatile T& v) noexcept {
-      T vv = v;
-      return vv;
-    }
+  struct ImageTranslation {
+    // Scale is from the Center
+    f32 scale = 1.0f;
+    Point<3> translations = {0.0f,0.0f,0.0f};
+    // Rotation are from the center of the Image
+    cuda::std::array<f32, 3> rotations = {0.0f,0.0f,0.0f};
   };
 
-  template<typename T>
+
+template<typename T>
+struct VolumeDifference {
+  static __device__ __host__ T map_to(u64 global_index, const Volume<3, T>* volume_1, const Volume<3, T>* volume_2) noexcept {
+    // ASSERT volumes ARE OF THE SAME SIZE, and each thread shouldn't assert that
+    if (volume_1->elements() <= global_index){
+      return identity();
+    }
+    T t;
+    // This avoids underflow with unsigned numbers
+    if constexpr (cuda::std::is_unsigned_v<T>){
+      // This is a downcast of u64 to u32, but like u64 image values are fucking stupid
+      t = __usad(volume_1->data[global_index], volume_2->data[global_index], 0u);
+    } else {
+      t = cuda::std::abs(volume_1->data[global_index] - volume_2->data[global_index]);
+    }
+    return t * t;
+  }
+
+  static __device__ __host__ T apply(const T& a, const T& b) noexcept {
+    return a + b;
+  }
+
+  static __device__ __host__ bool equals(const T& a, const T& b) noexcept {
+    return a == b;
+  }
+
+  static __device__ __host__ T identity() noexcept {
+    return 0;
+  }
+
+  static __device__ __host__ T remove_volatile(volatile T& v) noexcept {
+    T vv = v;
+    return vv;
+  }
+};
+
+template<typename T>
+__host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
+  return reduce_no_mem<8, VolumeDifference<T>, T>(
+    elements,
+    &error,
+    volume_1,
+    volume_2
+  );
+}
+
+
+template<typename T>
 struct OptimizerParam {
-  f32 scale = 1.0f;
-  Point<3> translations = {0.0f,0.0f,0.0f};
-  cuda::std::array<f32, 3> rotations = {0.0f,0.0f,0.0f};
+  ImageTranslation affine;
   T cost = cuda::std::numeric_limits<T>::max();
 
     OptimizerParam& compare(OptimizerParam& other) noexcept {
@@ -62,9 +81,11 @@ template<typename T>
 struct Optimizer {
   OptimizerParam<T> params;
   OptimizerParam<T> max_step_size {
-    .scale = 0.025,
-    .translations = Point<3>{4.0f,4.0f,4.0f},
-    .rotations = {0.05f,0.05f,0.05f},
+    .affine = {
+      .scale = 0.025,
+      .translations = Point<3>{4.0f,4.0f,4.0f},
+      .rotations = {0.05f,0.05f,0.05f},
+    }
   };
 
   Optimizer(auto cost_function) {
@@ -76,8 +97,8 @@ struct Optimizer {
     OptimizerParam negative_param = params;
 
     // Check scale param
-    positive_param.scale += max_step_size.scale;
-    negative_param.scale -= max_step_size.scale;
+    positive_param.affine.scale += max_step_size.affine.scale;
+    negative_param.affine.scale -= max_step_size.affine.scale;
 
     positive_param.cost = cost_function(positive_param);
     negative_param.cost = cost_function(negative_param);
@@ -93,8 +114,8 @@ struct Optimizer {
     OptimizerParam negative_param = params;
 
     for (u8 dim = 0; dim < 3; dim++) {
-      positive_param.translations[dim] += max_step_size.translations[dim];
-      negative_param.translations[dim] -= max_step_size.translations[dim];
+      positive_param.affine.translations[dim] += max_step_size.affine.translations[dim];
+      negative_param.affine.translations[dim] -= max_step_size.affine.translations[dim];
 
       positive_param.cost = cost_function(positive_param);
       negative_param.cost = cost_function(negative_param);
@@ -116,8 +137,8 @@ struct Optimizer {
     OptimizerParam negative_param = params;
 
     for (u8 dim = 0; dim < 3; dim++) {
-      positive_param.rotations[dim] += max_step_size.rotations[dim];
-      negative_param.rotations[dim] -= max_step_size.rotations[dim];
+      positive_param.affine.rotations[dim] += max_step_size.affine.rotations[dim];
+      negative_param.affine.rotations[dim] -= max_step_size.affine.rotations[dim];
 
       positive_param.cost = cost_function(positive_param);
       negative_param.cost = cost_function(negative_param);
@@ -143,32 +164,34 @@ dicomNodeError_t modify_space(
   Space<3>* device_pointer
 ) {
 
-  SquareMatrix<3> scale {
-    modification.scale, 0.0f,0.0f,
-    0.0f, modification.scale, 0.0f,
-    0.0f, 0.0f, modification.scale
+  const SquareMatrix<3> scale {
+    modification.affine.scale, 0.0f,0.0f,
+    0.0f, modification.affine.scale, 0.0f,
+    0.0f, 0.0f, modification.affine.scale
   };
 
-  f32 cos_x = cos(modification.rotations[0]);
-  f32 cos_y = cos(modification.rotations[1]);
-  f32 cos_z = cos(modification.rotations[2]);
-  f32 sin_x = sin(modification.rotations[0]);
-  f32 sin_y = sin(modification.rotations[1]);
-  f32 sin_z = sin(modification.rotations[2]);
 
-  SquareMatrix<3> rotation_x = {
+
+  const f32 cos_x = cos(modification.affine.rotations[0]);
+  const f32 cos_y = cos(modification.affine.rotations[1]);
+  const f32 cos_z = cos(modification.affine.rotations[2]);
+  const f32 sin_x = sin(modification.affine.rotations[0]);
+  const f32 sin_y = sin(modification.affine.rotations[1]);
+  const f32 sin_z = sin(modification.affine.rotations[2]);
+
+  const SquareMatrix<3> rotation_x = {
     1.0,0.0,0.0,
     0.0, cos_x, sin_x,
     0.0, -sin_x, cos_x
   };
 
-  SquareMatrix<3> rotation_y = {
+  const SquareMatrix<3> rotation_y = {
     cos_y, 0.0f, sin_y,
     0.0, 1.0, 0.0,
     -sin_y, 0.0, cos_y
   };
 
-  SquareMatrix<3> rotation_z = {
+  const SquareMatrix<3> rotation_z = {
     cos_z, sin_y, 0.0f,
     -sin_z, cos_z, 0.0f,
     0.0f,0.0f,1.0f
@@ -176,7 +199,7 @@ dicomNodeError_t modify_space(
 
   host_space.basis *= scale * rotation_x * rotation_y * rotation_z;
   host_space.inverted_basis = host_space.basis.inverse();
-  host_space.starting_point += modification.translations;
+  host_space.starting_point += modification.affine.translations;
 
   return encode_cuda_error(cudaMemcpy(device_pointer, &host_space, sizeof(Space<3>), cudaMemcpyDefault));
 }
@@ -236,8 +259,9 @@ dicomNodeError_t register_to(
     } | [&]() {
       return CENTER_OF_GRAVITY::center_of_gravity(host_target_image.volume, destination_center_of_gravity);
     } | [&]() {
-        // TODO: apply the basis here (i'm pretty, that it's correct, since they might be different)
-       intermediate_image.space.starting_point += source_center_of_gravity - destination_center_of_gravity;
+      // TODO: apply the basis here (i'm pretty, that it's correct, since they might be different)
+      const Point<3> offset = destination_center_of_gravity - source_center_of_gravity;
+      intermediate_image.space.starting_point += offset;
 
       return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
     };
@@ -259,10 +283,12 @@ dicomNodeError_t register_to(
         return reduce_no_mem<8, VolumeDifference<T>, T>(
           intermediate_image.elements(),
           &difference,
-          &(device_intermediate_image->volume),
-          &(device_target_image->volume)
+          &device_intermediate_image->volume,
+          &device_target_image->volume
         );
       };
+
+      std::cout << "Cost function Error: " << difference << "\n";
       return difference;
     };
 

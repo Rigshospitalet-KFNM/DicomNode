@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
 project(dicomnode_c LANGUAGES CXX)
 
-
 message("Building with ${CMAKE_VERSION}")
+
+# This is kinda sketch but w/e
+set(CMAKE_MODULE_PATH "${CMAKE_ROOT}/../venv/lib/python3.12/site-packages/pybind11/share/cmake")
+
 
 if(CMAKE_VERSION GREATER_EQUAL "3.28")
   SET(CMAKE_CXX_SCAN_FOR_MODULES FALSE)
@@ -43,6 +46,7 @@ endfunction()
 
 set(CPP_LIBRARIES
   cpp_interpolation python_interpolation.cpp
+  cpp_registration python_registration.cpp
 )
 
 set(CPP_OBJECT_TARGETS)
