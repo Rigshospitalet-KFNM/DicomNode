@@ -16,6 +16,26 @@ struct bound {
   bool contains(const i32 i) const noexcept {
     return cuda::std::cmp_less_equal(lower, i) && cuda::std::cmp_less_equal(i, upper);
   }
+
+  struct iterator {
+    u32 value;
+    u32 operator*() const noexcept {
+      return value;
+    }
+    iterator& operator++() noexcept {
+      ++value; return *this;
+    }
+    bool operator==(const iterator& other) const noexcept {
+      return value == other.value;
+    }
+  };
+
+  iterator begin() noexcept {
+    return iterator{lower};
+  }
+  iterator end() noexcept {
+    return iterator{upper};
+  }
 };
 
 template<typename T, u8 dimensionality>
@@ -34,23 +54,19 @@ struct ArrayDataBlock {
   }
 };
 
-template<typename T, u64 len, u8 dimensionality>
-constexpr void apply_bound(cuda::std::array<T, len>& array, const Extent<dimensionality>& extent, const ArrayDataBlock<T, dimensionality>& block) {
-  std::array<i32, dimensionality> pivot_arr{};
-
+template<typename T, u64 len>
+constexpr std::array<T, len> apply_bound(cuda::std::array<T, len> array, const Extent<3>& extent, const ArrayDataBlock<T, 3>& block) {
   assert(extent.elements() == len);
 
-  for (int d = 0; d < dimensionality; d++) {
-    pivot_arr[d] = block.bounds[d].lower;
+  for (u32 z : block.bounds[2]) {
+    for (u32 y : block.bounds[1]) {
+      for (u32 x : block.bounds[0]) {
+         array[extent.flat_index(Index<3>{x,y,z})] = block.value;
+      }
+    }
   }
 
-  for (int d = 0; d < dimensionality; d++) {
-
-  }
-
-
-
-
+  return array;
 }
 
 

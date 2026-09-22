@@ -10,7 +10,7 @@ import psutil
 import threading
 from pathlib import Path
 from unittest import TextTestRunner, TestSuite, TestLoader, TestCase
-from typing import  Set, Union
+from typing import Set, Union
 
 starting_directory = os.getcwd()
 
@@ -116,9 +116,11 @@ if __name__ == "__main__":
     runner = TextTestRunner(verbosity=args.verbose)
 
   loader = TestLoader()
+  #loader.testNamePatterns = args.test_regex
   running_suite = DicomnodeTestSuite()
 
   added_tests = set()
+
 
   all_suite: TestSuite = loader.discover("tests")
 
@@ -139,9 +141,13 @@ if __name__ == "__main__":
 
   if args.profile:
     print("profiling")
-    from viztracer import VizTracer
-    with VizTracer(output_file=starting_directory + "/result.json", tracer_entries=2000000):
-      result = runner.run(running_suite)
+    try:
+      from viztracer import VizTracer
+
+      with VizTracer(output_file=starting_directory + "/result.json", tracer_entries=2000000):
+        result = runner.run(running_suite)
+    except ImportError:
+      raise ImportError("To profile install VizTracer - pip install VizTracer")
   else:
     result = runner.run(running_suite)
 

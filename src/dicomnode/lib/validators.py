@@ -66,6 +66,8 @@ class CaselessRegexValidator(RegexValidator):
 
 
 class OptionsValidator(Validator):
+  """A validator for a multiple value but single type of validator"""
+  # I should really just have made a AND / OR Validator
   def __init__(self, value: Iterable[Any], validator: Type[Validator] = EqualityValidator) -> None:
     super().__init__(value)
     self.options = value

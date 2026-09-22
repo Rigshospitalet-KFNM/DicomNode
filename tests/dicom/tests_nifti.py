@@ -25,9 +25,11 @@ from tests.helpers import test_data
 from tests.helpers.dicomnode_test_case import DicomnodeTestCase
 from tests.helpers import generate_numpy_datasets
 
-_REPORT_DATA_PATH =Path('report_data')
+_REPORT_DATA_PATH = Path('report_data')
 _CT_IMAGE_PATH = _REPORT_DATA_PATH / 'CT'
 _PATHS = [p.absolute() for p in _CT_IMAGE_PATH.glob('*.dcm')]
+
+ENHANCED_MR_PATH = (_REPORT_DATA_PATH / "enhancedMR" / "enhancedMR.dcm").absolute()
 
 CT_IMAGE_EXISTS = _CT_IMAGE_PATH.exists() and len(_PATHS) > 10
 
@@ -59,3 +61,12 @@ class DicomnodeDicomNifti(DicomnodeTestCase):
 
     self.assertEqual(switched.dtype, nifti_data.dtype)
     self.assertTrue((switched == nifti_data).all())
+
+
+  @skipUnless(config.USING_TEST_DATA and ENHANCED_MR_PATH.exists(), "Needs test data to run")
+  def test_dicom_2_nifti_enhanced_mr(self):
+    enhanced_mr = dcmread(ENHANCED_MR_PATH)
+
+    res = convert_to_nifti([enhanced_mr], None, False)
+
+    self.assertIsInstance(res, nifti1.Nifti1Image)

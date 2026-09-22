@@ -432,3 +432,107 @@ TEST(REGISTRATION, CENTER_OF_GRAVITY_MOVES_A_CUBE) {
   cudaFree(volume_1.data);
   cudaFree(volume_2.data);
 }
+
+TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
+  Volume<3, f32> image_volume {
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> out_volume {
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0.0f
+  };
+
+  cudaMalloc(&image_volume.data, image_volume.size());
+  cudaMalloc(&out_volume.data, out_volume.size());
+  cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
+
+  Image image_1{image_space, image_volume};
+
+  DicomNodeRunner runner;
+
+  REGISTRATION::interpolate_for_registration(
+    runner,
+    image_1,
+    {},
+    image_space,
+    out_volume
+  );
+
+  Volume<3, f32>* device_image_volume = nullptr;
+  cudaMalloc(&device_image_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_image_volume, &image_1.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+  Volume<3, f32>* device_out_volume = nullptr;
+  cudaMalloc(&device_out_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_out_volume, &out_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+  f32 error = NAN;
+  REGISTRATION::volume_difference_device(
+    image_volume.elements(),
+    device_image_volume,
+    device_out_volume,
+    error
+  );
+
+  EXPECT_EQ(0.0f, error);
+
+  cudaFree(image_volume.data);
+  cudaFree(out_volume.data);
+  cudaFree(device_out_volume);
+}
+
+constexpr cuda::std::array<f32, elements> ImageTranslatedByX1 = {};
+
+TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
+  Volume<3, f32> image_volume {
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> out_volume {
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0.0f
+  };
+
+  cudaMalloc(&image_volume.data, image_volume.size());
+  cudaMalloc(&out_volume.data, out_volume.size());
+  cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
+
+  Image image_1{image_space, image_volume};
+
+  DicomNodeRunner runner;
+
+  REGISTRATION::interpolate_for_registration(
+    runner,
+    image_1,
+    { // I think I should make some test cases, that highlight XYZ and ZYX difference
+      .translations = { 1, 0, 0 }
+    },
+    image_space,
+    out_volume
+  );
+
+  Volume<3, f32>* device_image_volume = nullptr;
+  cudaMalloc(&device_image_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_image_volume, &image_1.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+  Volume<3, f32>* device_out_volume = nullptr;
+  cudaMalloc(&device_out_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_out_volume, &out_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+  f32 error = NAN;
+  REGISTRATION::volume_difference_device(
+    image_volume.elements(),
+    device_image_volume,
+    device_out_volume,
+    error
+  );
+
+  EXPECT_EQ(0.0f, error);
+
+  cudaFree(image_volume.data);
+  cudaFree(out_volume.data);
+  cudaFree(device_out_volume);
+}
