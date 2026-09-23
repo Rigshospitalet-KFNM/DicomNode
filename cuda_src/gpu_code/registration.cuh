@@ -67,7 +67,7 @@ __host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* v
   ));
 }
 
-Space<3> translate_space(Space<3> space, const ImageTranslation& translation) {
+inline Space<3> translate_space(Space<3> space, const ImageTranslation& translation) {
   space.starting_point += translation.translations;
 
   return space;
