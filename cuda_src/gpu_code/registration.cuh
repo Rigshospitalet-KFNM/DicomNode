@@ -56,16 +56,54 @@ struct VolumeDifference {
   }
 };
 
+
 template<typename T>
 __host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
-  return reduce_no_mem<8, VolumeDifference<T>, T>(
+  return encode_cuda_error(reduce_no_mem<8, VolumeDifference<T>, T>(
     elements,
     &error,
     volume_1,
     volume_2
-  );
+  ));
 }
 
+Space<3> translate_space(Space<3> space, const ImageTranslation& translation) {
+  space.starting_point += translation.translations;
+
+  return space;
+}
+
+/** Interpolates the volume used for volume comparison in the registration.
+ *
+ * @tparam T The type of Image
+ * @param runner DicomRunner used to allocate the source image, destination Image and out volume
+ * @param source_image The volume where data is gathered from
+ * @param translation A translation of the source image
+ * @param destination_space The Space that the translated image should be interpolated to
+ * @param out_volume The volume that is interpolated into
+ * @return
+ */
+template<typename T>
+__host__ dicomNodeError_t interpolate_for_registration(
+  DicomNodeRunner& runner,
+  Image<3, T> host_source_image, // SHALLOW COPY!
+  [[maybe_unused]] const ImageTranslation& translation,
+  const Space<3>& host_destination_space,
+  Volume<3, T>& out_volume
+  ) {
+  host_source_image.space = translate_space(host_source_image.space, translation);
+
+
+  runner | [&]{
+    return gpu_interpolation_linear_shared_cheating(
+      host_source_image,
+      host_destination_space,
+      out_volume.data
+    );
+  };
+
+  return runner.error();
+}
 
 template<typename T>
 struct OptimizerParam {
@@ -169,8 +207,6 @@ dicomNodeError_t modify_space(
     0.0f, modification.affine.scale, 0.0f,
     0.0f, 0.0f, modification.affine.scale
   };
-
-
 
   const f32 cos_x = cos(modification.affine.rotations[0]);
   const f32 cos_y = cos(modification.affine.rotations[1]);

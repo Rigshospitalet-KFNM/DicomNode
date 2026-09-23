@@ -14,8 +14,7 @@ import pybind11
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
-
-VERSION = '0.0.41'
+from src.dicomnode.constants import DICOMNODE_VERSION
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
@@ -154,8 +153,12 @@ extensions = [
 if shutil.which("nvcc"):
   extensions.append(CMakeExtension("dicomnode.math._cuda", sourcedir="cuda_src"))
 
+TEST_REQUIRES = ["coverage", "coverage-lcov"]
+DOCS_REQUIRES = ["myst_parser", "sphinx-rtd-theme"]
+PROFILE_REQUIRES = ["viztracer"]
+
 setup(name='dicomnode',
-    version=VERSION,
+    version=DICOMNODE_VERSION,
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
@@ -177,8 +180,10 @@ setup(name='dicomnode',
       "rt_utils<2.0.0",
     ],
     extras_require = {
-     "test" : ["coverage", "coverage-lcov"],
-     "docs" : ["myst_parser", "sphinx-rtd-theme"],
+     "test" : TEST_REQUIRES,
+     "docs" : DOCS_REQUIRES,
+     "profile" : PROFILE_REQUIRES,
+     "all" : TEST_REQUIRES + DOCS_REQUIRES + PROFILE_REQUIRES
     },
 
     python_requires='>=3.12.0',

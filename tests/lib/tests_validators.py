@@ -90,3 +90,17 @@ class ValidatorsTestCases(DicomnodeTestCase):
     self.assertFalse(validator("asdf SPONGEBOB is in here"))
     self.assertTrue(validator("squidward"))
     self.assertTrue(validator("SQUIDWARD"))
+
+  def test_regex_options_validator(self):
+    validator = OptionsValidator(["SpongeBob", "Squidward"], CaselessRegexValidator)
+
+    self.assertTrue(validator("spongebob"))
+    self.assertTrue(validator("squidward"))
+    self.assertFalse(validator("patrick"))
+
+  def test_negated_regex_options_validator(self):
+    validator = NegatedValidator(OptionsValidator(["SpongeBob", "Squidward"], CaselessRegexValidator))
+
+    self.assertFalse(validator("spongebob"))
+    self.assertFalse(validator("squidward"))
+    self.assertTrue(validator("patrick"))

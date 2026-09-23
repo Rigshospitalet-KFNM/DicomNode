@@ -16,6 +16,26 @@ struct Bound {
   bool contains(const i32 i) const noexcept {
     return cuda::std::cmp_less_equal(lower, i) && cuda::std::cmp_less_equal(i, upper);
   }
+
+  struct iterator {
+    u32 value;
+    u32 operator*() const noexcept {
+      return value;
+    }
+    iterator& operator++() noexcept {
+      ++value; return *this;
+    }
+    bool operator==(const iterator& other) const noexcept {
+      return value == other.value;
+    }
+  };
+
+  iterator begin() noexcept {
+    return iterator{lower};
+  }
+  iterator end() noexcept {
+    return iterator{upper};
+  }
 };
 
 template<typename T, u8 dimensionality>
@@ -35,12 +55,15 @@ struct ArrayDataBlock {
 };
 
 template<typename T, u64 len>
-void apply_bound(cuda::std::array<T, len>& array, const Extent<3>& extent, const ArrayDataBlock<T, 3>& block) {
+constexpr void apply_bound(
+  cuda::std::array<T, len>& array,
+  const Extent<3>& extent, const ArrayDataBlock<T, 3>& block
+) {
   assert(extent.elements() == len);
 
-  for (int z = block.bounds[2].lower; z < block.bounds[2].upper; ++z) {
-    for (int y = block.bounds[1].lower; y < block.bounds[1].upper; ++y) {
-      for (int x = block.bounds[0].lower; x < block.bounds[0].upper; ++x) {
+  for (int z :  block.bounds[2]) {
+    for (int y : block.bounds[1]) {
+      for (int x : block.bounds[0]) {
         Index<3> index(x, y, z);
 
         array[extent.flat_index(index)] = block.value;
