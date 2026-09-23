@@ -3,6 +3,8 @@
 
 #include<gtest/gtest.h>
 
+#include"test_helper.cuh"
+
 #include "../gpu_code/center_of_gravity.cuh"
 
 namespace CENTER_OF_GRAVITY_TESTS {
@@ -141,39 +143,4 @@ namespace CENTER_OF_GRAVITY_TESTS {
       EXPECT_EQ(expected_z[i], actual_z[i]);
     }
   }
-  /*
-  TEST(CENTER_OF_GRAVITY_TEST, FIND_SYMETRIC_CENTER){
-    constexpr Extent<3> extent{4,4,4};
-
-    std::array<u32, extent.elements()> data {
-        1,0,0,1,
-        0,0,0,0,
-        0,0,0,0,
-        1,0,0,1,
-
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-        0,0,0,0,
-
-        1,0,0,1,
-        0,0,0,0,
-        0,0,0,0,
-        1,0,0,1
-    };
-
-    Volume<3, u32> vol {
-      .data = nullptr,
-      .m_extent = extent,
-      .default_value = 0
-    };
-
-  }
-
-  */
 }

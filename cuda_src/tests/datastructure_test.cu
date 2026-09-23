@@ -1,12 +1,12 @@
 #include<array>
+#include<cuda/std/array>
+#include<vector>
 
 #include<gtest/gtest.h>
 
-#include<vector>
-
-#include<cuda/std/array>
-
 #include"../gpu_code/dicom_node_gpu.cuh"
+
+#include"test_helper.cuh"
 
 namespace TEST_EXTENT {
   TEST(EXTENT, FLAT_INDEX){
@@ -612,3 +612,59 @@ TEST(VOLUME, SUB_VOLUME_GPU_SMALL_OUTSIDE){
  // End of name space TEST_VOLUME
 }
 
+TEST(TEST_HELPER, CREATE_BLANK_ARRAY) {
+  constexpr u64 array_length = 3 * 3 * 3;
+  constexpr cuda::std::array<i32, array_length> blank_array = create_blank_array<i32, array_length>();
+
+  for (const i32& i : blank_array) {
+    EXPECT_EQ(i, 0);
+  }
+}
+
+
+
+
+
+TEST(TEST_HELPER, CREATE_ARRAY_WITH_BLOCK) {
+  constexpr Extent<3> extent(4,4,4);
+  constexpr ArrayDataBlock<i32, 3> bounds {
+      .value = 1,
+      .bounds = {
+        Bound{.lower = 1, .upper = 3},
+                    Bound{.lower = 1, .upper = 3},
+                    Bound{.lower = 1, .upper = 3},
+      }
+    };
+  cuda::std::array<i32, extent.elements()> data = create_blank_array<i32, extent.elements()>();
+  apply_bound(data, extent, bounds);
+
+  constexpr cuda::std::array<i32, extent.elements()> expected_data = {
+
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0,
+
+      0,0,0,0,
+      0,1,1,0,
+      0,1,1,0,
+      0,0,0,0,
+
+      0,0,0,0,
+      0,1,1,0,
+      0,1,1,0,
+      0,0,0,0,
+
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0
+
+  };
+
+  for (u64 i = 0; i < extent.elements(); ++i) {
+    EXPECT_EQ(data[i], expected_data[i]);
+  }
+
+
+}

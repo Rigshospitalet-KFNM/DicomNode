@@ -9,7 +9,7 @@ constexpr cuda::std::array<T, length> create_blank_array() {
   return cuda::std::array<T, length>{};
 }
 
-struct bound {
+struct Bound {
   u32 lower = 0;
   u32 upper = 0;
 
@@ -21,7 +21,7 @@ struct bound {
 template<typename T, u8 dimensionality>
 struct ArrayDataBlock {
   T value;
-  cuda::std::array<bound, dimensionality> bounds; // X bounds, Y bounds, Z Bounds, ...
+  cuda::std::array<Bound, dimensionality> bounds; // X bounds, Y bounds, Z Bounds, ...
 
   bool contains(std::array<i32, dimensionality>& index) const {
     bool ret = true;
@@ -34,23 +34,19 @@ struct ArrayDataBlock {
   }
 };
 
-template<typename T, u64 len, u8 dimensionality>
-constexpr void apply_bound(cuda::std::array<T, len>& array, const Extent<dimensionality>& extent, const ArrayDataBlock<T, dimensionality>& block) {
-  std::array<i32, dimensionality> pivot_arr{};
-
+template<typename T, u64 len>
+void apply_bound(cuda::std::array<T, len>& array, const Extent<3>& extent, const ArrayDataBlock<T, 3>& block) {
   assert(extent.elements() == len);
 
-  for (int d = 0; d < dimensionality; d++) {
-    pivot_arr[d] = block.bounds[d].lower;
+  for (int z = block.bounds[2].lower; z < block.bounds[2].upper; ++z) {
+    for (int y = block.bounds[1].lower; y < block.bounds[1].upper; ++y) {
+      for (int x = block.bounds[0].lower; x < block.bounds[0].upper; ++x) {
+        Index<3> index(x, y, z);
+
+        array[extent.flat_index(index)] = block.value;
+      }
+    }
   }
-
-  for (int d = 0; d < dimensionality; d++) {
-
-  }
-
-
-
-
 }
 
 
