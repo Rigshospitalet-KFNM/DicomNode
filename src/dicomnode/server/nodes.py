@@ -545,6 +545,26 @@ class AbstractPipeline():
       evt_handlers=event_handlers
     )
 
+  def get_server_port(self):
+    """Method to get the port number - note that this can be different, that the
+    port attribute, because it may be 0, i/e any port
+
+    Returns:
+      int - port, that you can send data to.
+
+    Raises:
+      ValueError: if port is zero and it's not opened.
+    """
+
+    if self.port > 0:
+      return self.port
+
+    if self.server_thread is not None:
+      return self.server_thread.server_address[1]
+
+    raise ValueError("Pipeline is configures to request an arbitrary port, but"\
+                     " it's not open and therefore doesn't have a port")
+
   class ConnectionContextManager():
     def __init__(self, node: 'AbstractPipeline'):
       self.node = node

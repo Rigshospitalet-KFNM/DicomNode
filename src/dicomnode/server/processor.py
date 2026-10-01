@@ -43,7 +43,7 @@ class AbstractProcessor():
         self._main(args.patient_id, args.input_container)
 
 
-  def process_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
+  def _process_signal_handler_SIGINT(self, signal_, frame): #pragma: no cover
     # Same as above
     self.logger.critical("Process killed by Parent")
     exit(1)
@@ -59,8 +59,11 @@ class AbstractProcessor():
     except Exception as exception:
       self.logger.critical(f"Encountered an exception {exception} in process function")
       self.logger.critical(traceback.format_exc())
+      raise exception
 
   def process(self, input_container: InputContainer) -> PipelineOutput: #pragma: no cover
+    """User function, that should the image process."""
+
     return NoOutput()
 
   def _dispatch(self, output: PipelineOutput) -> bool:

@@ -550,7 +550,7 @@ class DicomIdentifier:
       return str(dataset[self.identifier].value)
 
     if self.fail_on_missing:
-      raise KeyError(f"{self.identifier} is missing from dataset")
+      raise KeyError(f"{hex(self.identifier)} is missing from dataset")
 
     return "Missing Identifier"
 
