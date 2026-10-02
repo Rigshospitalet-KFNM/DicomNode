@@ -14,8 +14,6 @@ import pybind11
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
-from src.dicomnode.constants import DICOMNODE_VERSION
-
 # Convert distutils Windows platform specifiers to CMake -A arguments
 PLAT_TO_CMAKE = {
   "win32": "Win32",
@@ -158,7 +156,7 @@ DOCS_REQUIRES = ["myst_parser", "sphinx-rtd-theme"]
 PROFILE_REQUIRES = ["viztracer"]
 
 setup(name='dicomnode',
-    version=DICOMNODE_VERSION,
+    version="0.0.43",
     description='A library for building processing SCUs',
     author='Christoffer Vilstrup Jensen',
     author_email='christoffer.vilstrup.jensen@regionh.dk',
