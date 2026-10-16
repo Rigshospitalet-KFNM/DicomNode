@@ -4,6 +4,7 @@
 
 #include "../gpu_code/core/core.cuh"
 #include "../gpu_code/registration.cuh"
+#include "test_helper.cuh"
 
 #include <array>
 
@@ -462,6 +463,9 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
     out_volume
   );
 
+  std::array<f32, z * y * x> host_out;
+  cudaMemcpy(host_out.data(), out_volume.data, out_volume.size(), cudaMemcpyDefault);
+
   Volume<3, f32>* device_image_volume = nullptr;
   cudaMalloc(&device_image_volume, sizeof(Volume<3, f32>));
   cudaMemcpy(device_image_volume, &image_1.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
@@ -483,11 +487,12 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
   cudaFree(image_volume.data);
   cudaFree(out_volume.data);
   cudaFree(device_out_volume);
+  cudaFree(device_image_volume);
 }
 
-constexpr cuda::std::array<f32, elements> ImageTranslatedByX1 = {};
 
 TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
+
   Volume<3, f32> image_volume {
     .m_extent = Extent<3>{z,y,x},
     .default_value = 0.0f
@@ -516,9 +521,31 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
     out_volume
   );
 
-  Volume<3, f32>* device_image_volume = nullptr;
-  cudaMalloc(&device_image_volume, sizeof(Volume<3, f32>));
-  cudaMemcpy(device_image_volume, &image_1.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+  // I'm having some issues with nvcc here
+  cuda::std::array<f32, elements> expected_array = create_blank_array<f32, elements>();
+
+  constexpr ArrayDataBlock<f32, 3> translateBy1Block = {
+    .value = 1.0f,
+    .bounds = {
+      Bound{ .lower = 2, .upper = 5},
+      Bound{ .lower = 1, .upper = 4},
+      Bound{ .lower = 1, .upper = 4},
+    }
+  };
+
+  apply_bound(expected_array, Extent<3>{z,y,x}, translateBy1Block);
+
+  Volume<3, f32> expected_volume = {
+    .m_extent = Extent<3>{z,y,x},
+    .default_value = 0.0f
+  };
+
+  cudaMalloc(&expected_volume.data, expected_volume.size());
+  cudaMemcpy(expected_volume.data, expected_array.data(), expected_volume.size(), cudaMemcpyDefault);
+
+  Volume<3, f32>* device_expected_volume = nullptr;
+  cudaMalloc(&device_expected_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_expected_volume, &expected_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
 
   Volume<3, f32>* device_out_volume = nullptr;
   cudaMalloc(&device_out_volume, sizeof(Volume<3, f32>));
@@ -527,7 +554,7 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   f32 error = NAN;
   REGISTRATION::volume_difference_device(
     image_volume.elements(),
-    device_image_volume,
+    device_expected_volume,
     device_out_volume,
     error
   );
@@ -536,7 +563,9 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
 
   cudaFree(image_volume.data);
   cudaFree(out_volume.data);
+  cudaFree(expected_volume.data);
   cudaFree(device_out_volume);
+  cudaFree(device_expected_volume);
 }
 
 TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
