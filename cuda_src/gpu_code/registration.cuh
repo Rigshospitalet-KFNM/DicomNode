@@ -67,111 +67,23 @@ __host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* v
   ));
 }
 
-inline Space<3> translate_space(Space<3>& space, const ImageTranslation& translation) {
-  space.starting_point += translation.translations;
-
-  return space;
-}
-
-/** Interpolates the volume used for volume comparison in the registration.
- *
- * @tparam T The type of Image
- * @param runner DicomRunner used to allocate the source image, destination Image and out volume
- * @param host_source_image The volume where data is gathered from
- * @param translation A translation of the source image
- * @param host_destination_space The Space that the translated image should be interpolated to
- * @param out_volume The volume that is interpolated into
- * @return
- */
-template<typename T>
-__host__ dicomNodeError_t interpolate_for_registration(
-  DicomNodeRunner& runner,
-  Image<3, T> host_source_image, // SHALLOW COPY!
-  [[maybe_unused]] const ImageTranslation& translation,
-  const Space<3>& host_destination_space,
-  Volume<3, T>& out_volume
-  ) {
-  host_source_image.space = translate_space(host_source_image.space, translation);
-
-  runner | [&]{
-    return gpu_interpolation_linear_shared_cheating(
-      host_source_image,
-      host_destination_space,
-      out_volume.data
-    );
-  };
-
-  return runner.error();
-}
-
-template<typename T>
-struct OptimizerParam {
-  ImageTranslation affine;
-  T cost = cuda::std::numeric_limits<T>::max();
-
-    OptimizerParam& compare(OptimizerParam& other) noexcept {
-      return cost < other.cost ? *this : other;
-    };
-};
-
-template<typename T>
-struct Optimizer {
-  OptimizerParam<T> best_params;
-  OptimizerParam<T> max_step_size {
-    .affine = {
-      .scale = 0.025,
-      .translations = Point<3>{4.0f,4.0f,4.0f},
-      .rotations = {0.05f,0.05f,0.05f},
-    }
-  };
-
-  Optimizer(auto cost_function) {
-    best_params.cost = cost_function(best_params);
-  }
-
-  T update_translation(auto cost_function) {
-    OptimizerParam positive_param = best_params;
-    OptimizerParam negative_param = best_params;
-
-    for (u8 dim = 0; dim < 3; dim++) {
-      positive_param.affine.translations[dim] += max_step_size.affine.translations[dim];
-      negative_param.affine.translations[dim] -= max_step_size.affine.translations[dim];
-
-      positive_param.cost = cost_function(positive_param);
-      negative_param.cost = cost_function(negative_param);
-
-      best_params = best_params.compare(positive_param);
-      best_params = best_params.compare(negative_param);
-
-      if (dim < 2) {
-        positive_param = best_params;
-        negative_param = best_params;
-      }
-    }
-
-    return best_params.cost;
-  }
-};
-
-template<typename T>
-dicomNodeError_t modify_space(
-  Space<3> host_space, // VERY INTENTIONAL NOT A &
-  OptimizerParam<T>& modification,
-  Space<3>* device_pointer
+constexpr Space<3> translate_space(
+  Space<3> space, // VERY INTENTIONAL NOT A &
+  const ImageTranslation& translation
 ) {
 
   const SquareMatrix<3> scale {
-    modification.affine.scale, 0.0f,0.0f,
-    0.0f, modification.affine.scale, 0.0f,
-    0.0f, 0.0f, modification.affine.scale
+    translation.scale, 0.0f, 0.0f,
+    0.0f, translation.scale, 0.0f,
+    0.0f, 0.0f, translation.scale
   };
 
-  const f32 cos_x = cos(modification.affine.rotations[0]);
-  const f32 cos_y = cos(modification.affine.rotations[1]);
-  const f32 cos_z = cos(modification.affine.rotations[2]);
-  const f32 sin_x = sin(modification.affine.rotations[0]);
-  const f32 sin_y = sin(modification.affine.rotations[1]);
-  const f32 sin_z = sin(modification.affine.rotations[2]);
+  const f32 cos_x = cos(translation.rotations[0]);
+  const f32 cos_y = cos(translation.rotations[1]);
+  const f32 cos_z = cos(translation.rotations[2]);
+  const f32 sin_x = sin(translation.rotations[0]);
+  const f32 sin_y = sin(translation.rotations[1]);
+  const f32 sin_z = sin(translation.rotations[2]);
 
   const SquareMatrix<3> rotation_x = {
     1.0,0.0,0.0,
@@ -191,12 +103,118 @@ dicomNodeError_t modify_space(
     0.0f,0.0f,1.0f
   };
 
-  host_space.basis *= scale * rotation_x * rotation_y * rotation_z;
-  host_space.inverted_basis = host_space.basis.inverse();
-  host_space.starting_point += modification.affine.translations;
+  space.basis *= scale * rotation_x * rotation_y * rotation_z;
+  space.inverted_basis = space.basis.inverse();
+  space.starting_point += translation.translations;
 
-  return encode_cuda_error(cudaMemcpy(device_pointer, &host_space, sizeof(Space<3>), cudaMemcpyDefault));
+  return space;
 }
+
+/** Interpolates the volume used for volume comparison in the registration.
+ *
+ * @tparam T The type of Image
+ * @param runner DicomRunner used to allocate the source image, destination Image and out volume
+ * @param host_source_image The volume where data is gathered from
+ * @param translation A translation of the source image
+ * @param host_destination_space The Space that the translated image should be interpolated to
+ * @param out_volume The volume that is interpolated into
+ * @return
+ */
+template<typename T>
+__host__ dicomNodeError_t interpolate_for_registration(
+  DicomNodeRunner& runner,
+  Image<3, T> host_source_image, // SHALLOW COPY!
+  const ImageTranslation& translation,
+  const Space<3>& host_destination_space,
+  Volume<3, T>& out_volume
+  ) {
+  host_source_image.space = translate_space(host_source_image.space, translation);
+
+  runner | [&]{
+    return gpu_interpolation_linear_shared_cheating(
+      host_source_image,
+      host_destination_space,
+      out_volume.data
+    );
+  };
+
+  return runner.error();
+}
+
+  /** Interpolates the volume used for volume comparison in the registration.
+ *
+ * @tparam T The type of Image
+ * @param runner DicomRunner used to allocate the source image, destination Image and out volume
+ * @param host_source_image The volume where data is gathered from
+ * @param translation A translation of the source image
+ * @param host_destination_space The Space that the translated image should be interpolated to
+ * @param out_volume The volume that is interpolated into
+ * @return
+ */
+template<typename T>
+__host__ dicomNodeError_t interpolate_for_registration(
+    Image<3, T> host_source_image, // SHALLOW COPY!
+    const ImageTranslation& translation,
+    const Space<3>& host_destination_space,
+    Volume<3, T>& out_volume
+    ) {
+  host_source_image.space = translate_space(host_source_image.space, translation);
+
+  return gpu_interpolation_linear_shared_cheating(
+    host_source_image,
+    host_destination_space,
+    out_volume.data
+  );
+}
+
+template<typename T>
+struct OptimizerParam {
+  ImageTranslation affine;
+  T cost = cuda::std::numeric_limits<T>::max();
+
+    OptimizerParam& compare(OptimizerParam& other) noexcept {
+      return cost < other.cost ? *this : other;
+    };
+};
+
+template<typename T>
+struct Optimizer {
+  OptimizerParam<T> best_params;
+  ImageTranslation max_step_size {
+      .scale = 0.025,
+      .translations = Point<3>{4.0f,4.0f,4.0f},
+      .rotations = {0.05f,0.05f,0.05f},
+  };
+
+  Optimizer(auto cost_function) {
+    best_params.cost = cost_function(best_params);
+  }
+
+  T update_translation(auto cost_function) {
+    OptimizerParam positive_param = best_params;
+    OptimizerParam negative_param = best_params;
+
+    for (u8 dim = 0; dim < 3; dim++) {
+      positive_param.affine.translations[dim] += max_step_size.translations[dim];
+      negative_param.affine.translations[dim] -= max_step_size.translations[dim];
+
+      positive_param.cost = cost_function(positive_param);
+      negative_param.cost = cost_function(negative_param);
+
+      best_params = best_params.compare(positive_param);
+      best_params = best_params.compare(negative_param);
+
+      if (dim < 2) {
+        positive_param = best_params;
+        negative_param = best_params;
+      }
+    }
+
+    return best_params.cost;
+  }
+};
+
+
 
 template<typename T>
 void OptimizerStep(Optimizer<T>& optimizer) {

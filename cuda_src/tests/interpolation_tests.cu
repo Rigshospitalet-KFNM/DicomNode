@@ -290,16 +290,6 @@ TEST(INTERPOLATION, INTERPOLATE_REAL_BIG){
 
 #endif
 
-constexpr size_t z = 4;
-constexpr size_t y = 4;
-constexpr size_t x = 4;
-
-constexpr size_t data_elements = z * y * x;
-
-constexpr size_t out_z = 3;
-constexpr size_t out_y = 3;
-constexpr size_t out_x = 3;
-
 __global__ void manual_interpolation(cudaTextureObject_t tex, float* out, float3* coords){
   const float lx = (static_cast<float>(threadIdx.x) + 0.5f);
   const float ly = (static_cast<float>(threadIdx.y) + 0.5f);

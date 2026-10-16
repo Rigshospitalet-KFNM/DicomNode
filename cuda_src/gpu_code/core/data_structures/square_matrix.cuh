@@ -91,6 +91,10 @@ struct SquareMatrix {
     return DIMENSIONS * DIMENSIONS;
   }
 
+  /** Computes the inversie
+   *
+   * @return
+   */
   constexpr __host__ __device__ SquareMatrix<DIMENSIONS> inverse() const noexcept {
     // Augmented matrix [A | I]
     f32 aug[DIMENSIONS * DIMENSIONS * 2]{};

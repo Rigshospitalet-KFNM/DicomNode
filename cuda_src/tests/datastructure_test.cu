@@ -417,7 +417,7 @@ TEST(VOLUME, SUB_VOLUME_HOST){
     3.0, 3.0, 3.0, 3.0
   }};
 
-  const Volume og_volume{
+  const Volume<3, f32> og_volume{
     .data=data.data(),
     .m_extent=extent,
     .default_value=-1.0f

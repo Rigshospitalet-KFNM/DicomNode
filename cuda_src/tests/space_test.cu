@@ -5,7 +5,6 @@ using Space3 = Space<3>;
 using Index3 = Index<3>;
 using Point3 = Point<3>;
 
-
 TEST(SPACE_INDEXING, REAL_LIFE_1){
   const float host_basis_xy_length = 1.5234375f;
 

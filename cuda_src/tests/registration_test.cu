@@ -507,7 +507,7 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cudaMalloc(&out_volume.data, out_volume.size());
   cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
 
-  Image image_1{image_space, image_volume};
+  const Image image_1{image_space, image_volume};
 
   DicomNodeRunner runner;
 
@@ -521,7 +521,7 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
     out_volume
   );
 
-  // I'm having some issues with nvcc here
+  // I'm having some issues with nvcc here and comptime
   cuda::std::array<f32, elements> expected_array = create_blank_array<f32, elements>();
 
   constexpr ArrayDataBlock<f32, 3> translateBy1Block = {
@@ -587,11 +587,81 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
       Bound{2,5}
   }});
 
-  auto cost_function = [](REGISTRATION::OptimizerParam<f32> params) {
-    return 0.0f;
+  Volume<3, f32> source_volume {
+    .data = nullptr,
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> target_volume {
+    .data = nullptr,
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> temp_volume {
+    .data = nullptr,
+    .m_extent=e,
+    .default_value = 0.0f
+  };
+
+  EXPECT_EQ(cudaMalloc(&source_volume.data, source_volume.size()), cudaSuccess);
+  EXPECT_EQ(cudaMalloc(&target_volume.data, target_volume.size()), cudaSuccess);
+  EXPECT_EQ(cudaMalloc(&temp_volume.data, temp_volume.size()), cudaSuccess);
+
+  EXPECT_EQ(cudaMemcpy(source_volume.data, source_data.data(), source_volume.size(), cudaMemcpyDefault ), cudaSuccess);
+  EXPECT_EQ(cudaMemcpy(target_volume.data, target_data.data(), target_volume.size(), cudaMemcpyDefault ), cudaSuccess);
+
+  Volume<3, f32>* device_source_volume = nullptr;
+  Volume<3, f32>* device_temp_volume = nullptr;
+
+  EXPECT_EQ(cudaMalloc(&device_source_volume, sizeof(Volume<3, f32>)), cudaSuccess);
+  EXPECT_EQ(cudaMalloc(&device_temp_volume, sizeof(Volume<3, f32>)), cudaSuccess);
+
+  EXPECT_EQ(cudaMemcpy(device_source_volume, &source_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault ), cudaSuccess);
+  EXPECT_EQ(cudaMemcpy(device_temp_volume, &temp_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault ), cudaSuccess);
+
+  Image<3, f32> source_image {image_space, source_volume};
+  Image<3, f32> target_image {image_space, source_volume};
+
+  DicomNodeRunner runner;
+
+  auto cost_function = [&](const REGISTRATION::OptimizerParam<f32>& params) {
+    f32 error = cuda::std::numeric_limits<f32>::max();
+    runner | [&]() {
+      return REGISTRATION::interpolate_for_registration(
+        target_image,
+        params.affine,
+        source_image.space,
+      temp_volume
+      );
+    } | [&](){return REGISTRATION::volume_difference_device(
+      e.elements(),
+      device_source_volume,
+      device_temp_volume,
+      error
+      );};
+
+    return error;
   };
 
   REGISTRATION::Optimizer<f32> optimizer(cost_function);
 
+  optimizer.max_step_size = REGISTRATION::ImageTranslation{
+    .scale = 1.0f,
+    .translations = Point<3>(1.0f,1.0f,1.0f),
+    .rotations = cuda::std::array{1.0f,1.0f,1.0f}
+  };
 
+  std::printf("Current Cost: %f\n", optimizer.best_params.cost);
+
+  optimizer.update_translation(cost_function);
+
+  std::printf("Current Cost: %f\n", optimizer.best_params.cost);
+
+  EXPECT_EQ(cudaFree(source_volume.data), cudaSuccess);
+  EXPECT_EQ(cudaFree(target_volume.data), cudaSuccess);
+  EXPECT_EQ(cudaFree(temp_volume.data), cudaSuccess);
+  EXPECT_EQ(cudaFree(device_source_volume), cudaSuccess);
+  EXPECT_EQ(cudaFree(device_temp_volume), cudaSuccess);
 }

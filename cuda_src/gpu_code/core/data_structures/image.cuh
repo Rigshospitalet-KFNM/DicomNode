@@ -103,3 +103,8 @@ __device__ __host__ Image<3, T> sub_image(
       )
     );
 }
+
+Image() -> Image<3, f32>;
+
+template<typename T>
+Image(T) -> Image<3, T>;
