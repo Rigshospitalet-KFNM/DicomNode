@@ -54,6 +54,11 @@ struct ArrayDataBlock {
   }
 };
 
+template<typename T>
+ArrayDataBlock(T) -> ArrayDataBlock<T, 3>;
+
+ArrayDataBlock() -> ArrayDataBlock<f32, 3>;
+
 template<typename T, u64 len>
 constexpr void apply_bound(
   cuda::std::array<T, len>& array,

@@ -117,7 +117,7 @@ struct OptimizerParam {
 
 template<typename T>
 struct Optimizer {
-  OptimizerParam<T> params;
+  OptimizerParam<T> best_params;
   OptimizerParam<T> max_step_size {
     .affine = {
       .scale = 0.025,
@@ -127,29 +127,12 @@ struct Optimizer {
   };
 
   Optimizer(auto cost_function) {
-    params.cost = cost_function(params);
-  }
-
-  T update_scale(auto cost_function) {
-    OptimizerParam positive_param = params;
-    OptimizerParam negative_param = params;
-
-    // Check scale param
-    positive_param.affine.scale += max_step_size.affine.scale;
-    negative_param.affine.scale -= max_step_size.affine.scale;
-
-    positive_param.cost = cost_function(positive_param);
-    negative_param.cost = cost_function(negative_param);
-
-    params = params.compare(positive_param);
-    params = params.compare(negative_param);
-
-    return params.cost;
+    best_params.cost = cost_function(best_params);
   }
 
   T update_translation(auto cost_function) {
-    OptimizerParam positive_param = params;
-    OptimizerParam negative_param = params;
+    OptimizerParam positive_param = best_params;
+    OptimizerParam negative_param = best_params;
 
     for (u8 dim = 0; dim < 3; dim++) {
       positive_param.affine.translations[dim] += max_step_size.affine.translations[dim];
@@ -158,39 +141,16 @@ struct Optimizer {
       positive_param.cost = cost_function(positive_param);
       negative_param.cost = cost_function(negative_param);
 
-      params = params.compare(positive_param);
-      params = params.compare(negative_param);
+      best_params = best_params.compare(positive_param);
+      best_params = best_params.compare(negative_param);
 
       if (dim < 2) {
-        positive_param = params;
-        negative_param = params;
+        positive_param = best_params;
+        negative_param = best_params;
       }
     }
 
-    return params.cost;
-  }
-
-  T update_rotations(auto cost_function) {
-    OptimizerParam positive_param = params;
-    OptimizerParam negative_param = params;
-
-    for (u8 dim = 0; dim < 3; dim++) {
-      positive_param.affine.rotations[dim] += max_step_size.affine.rotations[dim];
-      negative_param.affine.rotations[dim] -= max_step_size.affine.rotations[dim];
-
-      positive_param.cost = cost_function(positive_param);
-      negative_param.cost = cost_function(negative_param);
-
-      params = params.compare(positive_param);
-      params = params.compare(negative_param);
-
-      if (dim < 2) {
-        positive_param = params;
-        negative_param = params;
-      }
-    }
-
-    return params.cost;
+    return best_params.cost;
   }
 
 };
@@ -301,42 +261,6 @@ dicomNodeError_t register_to(
 
       return cudaMemcpy(device_intermediate_image, &intermediate_image, sizeof(Image<3, T>), cudaMemcpyDefault);
     };
-
-    auto cost_function = [&](OptimizerParam<T>& param) {
-      T difference = cuda::std::numeric_limits<T>::max();
-
-      runner | [&]() {
-        return modify_space<T>(intermediate_image.space, param, &(device_intermediate_image->space));
-      } | [&]() {
-        INTERPOLATION::kernel_interpolation_linear_shared<<<envelope, THREAD_BLOCK>>>(
-          device_source_image,
-          &(device_intermediate_image->space),
-          intermediate_image.data()
-        );
-
-        return cudaGetLastError();
-      } | [&]() {
-        return reduce_no_mem<8, VolumeDifference<T>, T>(
-          intermediate_image.elements(),
-          &difference,
-          &device_intermediate_image->volume,
-          &device_target_image->volume
-        );
-      };
-
-      std::cout << "Cost function Error: " << difference << "\n";
-      return difference;
-    };
-
-    Optimizer<T> optimizer(cost_function);
-
-    std::cout << "Start error: " << optimizer.params.cost << "\n";
-
-    optimizer.update_translation(cost_function);
-    optimizer.update_rotations(cost_function);
-    optimizer.update_scale(cost_function);
-
-    std::cout << "End error: " << optimizer.params.cost << "\n";
 
     runner | [&]() {
       free_used_memory();

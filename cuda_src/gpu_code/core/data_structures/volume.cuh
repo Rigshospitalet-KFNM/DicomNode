@@ -112,6 +112,11 @@ struct Volume {
 };
 
 template<typename T>
+Volume(T) -> Volume<3, T>;
+
+Volume() -> Volume<3, f32>;
+
+template<typename T>
 [[nodiscard]] __device__ __host__ Volume<3, T> sub_volume(
     const Volume<3, T>& original_volume,
     T* sub_volume_data_ptr,

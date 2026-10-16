@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "test_helper.cuh"
+
 
 constexpr u64 x = 8;
 constexpr u64 y = 8;
@@ -535,4 +537,32 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cudaFree(image_volume.data);
   cudaFree(out_volume.data);
   cudaFree(device_out_volume);
+}
+
+TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
+  constexpr Extent<3> e{8,8,8};
+
+  auto source_data = create_blank_array<f32, e.elements()>();
+  apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
+    .value = 1.0f, .bounds=cuda::std::array{
+      Bound{2,5},
+      Bound{2,5},
+      Bound{2,5}
+  }});
+
+  auto target_data = create_blank_array<f32, e.elements()>();
+  apply_bound(target_data, e, ArrayDataBlock<f32, 3>{
+    .value = 1.0f, .bounds=cuda::std::array{
+      Bound{3,6},
+      Bound{1,4},
+      Bound{2,5}
+  }});
+
+  auto cost_function = [](REGISTRATION::OptimizerParam<f32> params) {
+    return 0.0f;
+  };
+
+  REGISTRATION::Optimizer<f32> optimizer(cost_function);
+
+
 }

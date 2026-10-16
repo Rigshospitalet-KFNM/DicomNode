@@ -208,6 +208,8 @@ struct Extent {
 
 };
 
+Extent() -> Extent<3>;
+
 //static_assert(CExtent<Extent, 3>); // I think there's some template magic wrong here
 
 //}
