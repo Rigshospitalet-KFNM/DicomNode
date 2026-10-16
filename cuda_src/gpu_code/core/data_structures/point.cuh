@@ -92,7 +92,7 @@ struct Point {
   constexpr __device__ __host__ Point<DIMENSIONS>& operator +=(const Point<DIMENSIONS>& other) noexcept {
     #pragma unroll
     for(u8 i = 0; i < DIMENSIONS; i++){
-      points[i] = other[i];
+      points[i] += other[i];
     }
 
     return *this;

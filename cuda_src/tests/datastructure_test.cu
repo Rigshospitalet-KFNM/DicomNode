@@ -621,10 +621,6 @@ TEST(TEST_HELPER, CREATE_BLANK_ARRAY) {
   }
 }
 
-
-
-
-
 TEST(TEST_HELPER, CREATE_ARRAY_WITH_BLOCK) {
   constexpr Extent<3> extent(4,4,4);
   constexpr ArrayDataBlock<i32, 3> bounds {
@@ -665,6 +661,4 @@ TEST(TEST_HELPER, CREATE_ARRAY_WITH_BLOCK) {
   for (u64 i = 0; i < extent.elements(); ++i) {
     EXPECT_EQ(data[i], expected_data[i]);
   }
-
-
 }

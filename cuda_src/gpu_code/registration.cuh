@@ -67,7 +67,7 @@ __host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* v
   ));
 }
 
-inline Space<3> translate_space(Space<3> space, const ImageTranslation& translation) {
+inline Space<3> translate_space(Space<3>& space, const ImageTranslation& translation) {
   space.starting_point += translation.translations;
 
   return space;
@@ -77,9 +77,9 @@ inline Space<3> translate_space(Space<3> space, const ImageTranslation& translat
  *
  * @tparam T The type of Image
  * @param runner DicomRunner used to allocate the source image, destination Image and out volume
- * @param source_image The volume where data is gathered from
+ * @param host_source_image The volume where data is gathered from
  * @param translation A translation of the source image
- * @param destination_space The Space that the translated image should be interpolated to
+ * @param host_destination_space The Space that the translated image should be interpolated to
  * @param out_volume The volume that is interpolated into
  * @return
  */
@@ -92,7 +92,6 @@ __host__ dicomNodeError_t interpolate_for_registration(
   Volume<3, T>& out_volume
   ) {
   host_source_image.space = translate_space(host_source_image.space, translation);
-
 
   runner | [&]{
     return gpu_interpolation_linear_shared_cheating(
@@ -192,7 +191,6 @@ struct Optimizer {
 
     return params.cost;
   }
-
 };
 
 template<typename T>
@@ -240,6 +238,11 @@ dicomNodeError_t modify_space(
   return encode_cuda_error(cudaMemcpy(device_pointer, &host_space, sizeof(Space<3>), cudaMemcpyDefault));
 }
 
+template<typename T>
+void OptimizerStep(Optimizer<T>& optimizer) {
+
+
+}
 
 template<typename T>
 dicomNodeError_t register_to(
