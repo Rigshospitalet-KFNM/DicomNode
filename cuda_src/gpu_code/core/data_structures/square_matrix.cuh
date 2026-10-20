@@ -4,7 +4,7 @@
 
 
 template<u8 DIMENSIONS>
-struct SquareMatrix {
+struct SquareMatrix final {
   float points[DIMENSIONS * DIMENSIONS]{};
 
   static constexpr __device__ __host__ uint32_t idx(const i32 row, const i32 col){

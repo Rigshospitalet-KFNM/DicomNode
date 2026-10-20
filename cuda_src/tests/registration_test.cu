@@ -492,7 +492,6 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
 
 
 TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
-
   Volume<3, f32> image_volume {
     .m_extent = Extent<3>{z,y,x},
     .default_value = 0.0f
@@ -568,6 +567,242 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cudaFree(device_expected_volume);
 }
 
+TEST(REGISTRATION, DATA_BLOCK_IS_DIFERENT_THAN_0) {
+  constexpr Extent<3> e{8,8,8};
+  constexpr auto zeroes = create_blank_array<f32, e.elements()>();
+  auto source_data = create_blank_array<f32, e.elements()>();
+  apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
+    .value = 3.0f, .bounds=cuda::std::array{
+      Bound{2,5},
+      Bound{2,5},
+      Bound{2,5}
+    }}
+  );
+
+  Volume<3, f32> source_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> target_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> temp_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32>* device_source_volume = nullptr;
+  Volume<3, f32>* device_temp_volume = nullptr;
+
+  constexpr auto volume_size = sizeof(Volume<3, f32>);
+
+  DicomNodeRunner runner;
+
+  runner |
+    [&]() {
+      return cudaMalloc(&source_volume.data, source_volume.size());
+    } | [&]() {
+      return cudaMalloc(&target_volume.data, target_volume.size());
+    } | [&]() {
+      return cudaMalloc(&temp_volume.data, temp_volume.size());
+    } | [&]() {
+      return cudaMalloc(&device_source_volume, volume_size);
+    } | [&]() {
+      return cudaMalloc(&device_temp_volume, volume_size);
+    } | [&]() {
+      return cudaMemcpy(source_volume.data, source_data.data(), source_volume.size(), cudaMemcpyDefault);
+    } | [&]() {
+      return cudaMemcpy(target_volume.data, zeroes.data(), target_volume.size(), cudaMemcpyDefault);
+    } | [&](){
+      return cudaMemcpy(device_source_volume, &source_volume, volume_size, cudaMemcpyDefault);
+    } | [&](){
+      return cudaMemcpy(device_temp_volume, &temp_volume, volume_size, cudaMemcpyDefault);
+    };
+
+  const Image<3, f32> source_image = {
+    image_space,
+    source_volume
+  };
+
+  const Image<3, f32> target_image = {
+    image_space,
+    target_volume
+  };
+
+
+  f32 cost = cuda::std::numeric_limits<f32>::max();
+
+  REGISTRATION::cost_function<f32>(
+    runner,
+    source_image,
+    target_image, temp_volume,
+    device_source_volume,
+    device_temp_volume,
+    REGISTRATION::OptimizerParam<f32> {},
+  cost
+  );
+
+  EXPECT_EQ(runner.error(), SUCCESS);
+
+  EXPECT_FLOAT_EQ(cost, 243.0f); // ELEMENTS(3 * 3 * 3) * VALUE(3 ** 2)
+
+  cudaFree(device_source_volume);
+  cudaFree(device_temp_volume);
+  cudaFree(source_volume.data);
+  cudaFree(target_volume.data);
+  cudaFree(temp_volume.data);
+}
+
+TEST(REGISTRATION, DATA_BLOCK_TRANSLATION) {
+  constexpr Extent<3> e{8,8,8};
+  auto source_data = create_blank_array<f32, e.elements()>();
+  apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
+    .value = 1.0f, .bounds=cuda::std::array{
+      Bound{2,5},
+      Bound{2,5},
+      Bound{2,5}
+    }}
+  );
+  auto target_data = create_blank_array<f32, e.elements()>();
+  apply_bound(target_data, e, ArrayDataBlock<f32, 3>{
+  .value = 1.0f, .bounds=cuda::std::array{
+    Bound{3,6},
+    Bound{1,4},
+    Bound{2,5}
+  }});
+
+
+  Volume<3, f32> source_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> target_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32> temp_volume = {
+    .m_extent = e,
+    .default_value = 0.0f
+  };
+
+  Volume<3, f32>* device_source_volume = nullptr;
+  Volume<3, f32>* device_temp_volume = nullptr;
+
+  constexpr auto volume_size = sizeof(Volume<3, f32>);
+
+  DicomNodeRunner runner;
+
+  runner |
+    [&]() {
+      return cudaMalloc(&source_volume.data, source_volume.size());
+    } | [&]() {
+      return cudaMalloc(&target_volume.data, target_volume.size());
+    } | [&]() {
+      return cudaMalloc(&temp_volume.data, temp_volume.size());
+    } | [&]() {
+      return cudaMalloc(&device_source_volume, volume_size);
+    } | [&]() {
+      return cudaMalloc(&device_temp_volume, volume_size);
+    } | [&]() {
+      return cudaMemcpy(source_volume.data, source_data.data(), source_volume.size(), cudaMemcpyDefault);
+    } | [&]() {
+      return cudaMemcpy(target_volume.data, target_data.data(), target_volume.size(), cudaMemcpyDefault);
+    } | [&](){
+      return cudaMemcpy(device_source_volume, &source_volume, volume_size, cudaMemcpyDefault);
+    } | [&](){
+      return cudaMemcpy(device_temp_volume, &temp_volume, volume_size, cudaMemcpyDefault);
+    };
+
+  const Image<3, f32> source_image = {
+    image_space,
+    source_volume
+  };
+
+  const Image<3, f32> target_image = {
+    image_space,
+    target_volume
+  };
+
+  f32 cost = cuda::std::numeric_limits<f32>::max();
+
+  REGISTRATION::cost_function<f32>(
+    runner,
+    source_image,
+    target_image,
+    temp_volume,
+    device_source_volume,
+    device_temp_volume,
+    REGISTRATION::OptimizerParam<f32> {},
+  cost
+  );
+
+  EXPECT_EQ(runner.error(), SUCCESS);
+
+  EXPECT_FLOAT_EQ(cost, 30.0f);
+
+  cudaFree(device_source_volume);
+  cudaFree(device_temp_volume);
+  cudaFree(source_volume.data);
+  cudaFree(target_volume.data);
+  cudaFree(temp_volume.data);
+}
+
+TEST(REGISTRATION, centering_space) {
+  constexpr Point<3> s{100.0f,100.0f,100.0f};
+  constexpr Extent<3> e{512,512,512};
+
+  SquareMatrix<3> basis = {
+    1.0f, 0.0f, 6.0f,
+    1.0f, 2.0f, -0.5f,
+    0.0f, 3.0f, 1.0f
+  };
+
+  Space<3> space {
+    .starting_point = s,
+    .basis = basis,
+    .inverted_basis = basis.inverse(),
+    .extent = e
+  };
+
+  const auto r = space.center_space();
+
+  constexpr Point<3> zeros{
+    0.0f, 0.0f, 0.0f
+  };
+
+  EXPECT_EQ(space.at_index(space.extent.central_point()), zeros);
+}
+
+TEST(REGISTRATION, centering_space_with_reset) {
+  constexpr Point<3> s{100.0f,100.0f,100.0f};
+  constexpr Extent<3> e{512,512,512};
+
+  SquareMatrix<3> basis = {
+    1.0f, 0.0f, 6.0f,
+    1.0f, 2.0f, -0.5f,
+    0.0f, 3.0f, 1.0f
+  };
+
+  Space<3> space {
+    .starting_point = s,
+    .basis = basis,
+    .inverted_basis = basis.inverse(),
+    .extent = e
+  };
+
+  auto space_copy = space;
+  const auto r = space.center_space();
+
+  space.starting_point += r;
+
+  EXPECT_EQ(space.starting_point, space_copy.starting_point);
+}
+
 TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
   constexpr Extent<3> e{8,8,8};
 
@@ -605,6 +840,10 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
     .default_value = 0.0f
   };
 
+  Volume<3, f32>* device_source_volume = nullptr;
+  Volume<3, f32>* device_temp_volume = nullptr;
+
+
   EXPECT_EQ(cudaMalloc(&source_volume.data, source_volume.size()), cudaSuccess);
   EXPECT_EQ(cudaMalloc(&target_volume.data, target_volume.size()), cudaSuccess);
   EXPECT_EQ(cudaMalloc(&temp_volume.data, temp_volume.size()), cudaSuccess);
@@ -612,8 +851,6 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
   EXPECT_EQ(cudaMemcpy(source_volume.data, source_data.data(), source_volume.size(), cudaMemcpyDefault ), cudaSuccess);
   EXPECT_EQ(cudaMemcpy(target_volume.data, target_data.data(), target_volume.size(), cudaMemcpyDefault ), cudaSuccess);
 
-  Volume<3, f32>* device_source_volume = nullptr;
-  Volume<3, f32>* device_temp_volume = nullptr;
 
   EXPECT_EQ(cudaMalloc(&device_source_volume, sizeof(Volume<3, f32>)), cudaSuccess);
   EXPECT_EQ(cudaMalloc(&device_temp_volume, sizeof(Volume<3, f32>)), cudaSuccess);
@@ -622,13 +859,14 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
   EXPECT_EQ(cudaMemcpy(device_temp_volume, &temp_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault ), cudaSuccess);
 
   Image<3, f32> source_image {image_space, source_volume};
-  Image<3, f32> target_image {image_space, source_volume};
+  Image<3, f32> target_image {image_space, target_volume};
 
   DicomNodeRunner runner;
 
   auto cost_function = [&](const REGISTRATION::OptimizerParam<f32>& params) {
-    f32 error = cuda::std::numeric_limits<f32>::max();
+    f32 cost = cuda::std::numeric_limits<f32>::max();
     runner | [&]() {
+
       return REGISTRATION::interpolate_for_registration(
         target_image,
         params.affine,
@@ -639,25 +877,25 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
       e.elements(),
       device_source_volume,
       device_temp_volume,
-      error
+      cost
       );};
 
-    return error;
+    return cost;
   };
 
   REGISTRATION::Optimizer<f32> optimizer(cost_function);
 
-  optimizer.max_step_size = REGISTRATION::ImageTranslation{
+  EXPECT_FLOAT_EQ(optimizer.best_params.cost, 30.0f);
+
+  optimizer.step_size = REGISTRATION::ImageTranslation{
     .scale = 1.0f,
     .translations = Point<3>(1.0f,1.0f,1.0f),
     .rotations = cuda::std::array{1.0f,1.0f,1.0f}
   };
 
-  std::printf("Current Cost: %f\n", optimizer.best_params.cost);
-
   optimizer.update_translation(cost_function);
 
-  std::printf("Current Cost: %f\n", optimizer.best_params.cost);
+  EXPECT_FLOAT_EQ(optimizer.best_params.cost, 0.0f);
 
   EXPECT_EQ(cudaFree(source_volume.data), cudaSuccess);
   EXPECT_EQ(cudaFree(target_volume.data), cudaSuccess);

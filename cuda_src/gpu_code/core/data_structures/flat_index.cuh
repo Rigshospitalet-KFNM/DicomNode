@@ -2,7 +2,7 @@
 
 #include<cuda/std/limits>
 
-struct FlatIndex {
+struct FlatIndex final {
   u32 index = cuda::std::numeric_limits<u32>::max();
 
   constexpr __device__ __host__ bool has_value() const noexcept {

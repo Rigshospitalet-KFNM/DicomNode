@@ -20,7 +20,7 @@
  * @tparam DIMENSIONS
  */
 template<uint8_t DIMENSIONS>
-class Space {
+class Space final {
   public:
 
     /**
@@ -50,8 +50,22 @@ class Space {
     return extent.from_flat_index(flat_index);
   }
 
-  [[nodiscard]] constexpr __device__ __host__ size_t elements() const {
+  [[nodiscard]] constexpr __device__ __host__ size_t elements() const noexcept {
     return extent.elements();
+  }
+
+  /** Center the space such that midpoint
+    *
+    */
+  constexpr Point<DIMENSIONS> center_space() noexcept {
+    const Index<DIMENSIONS> index = extent.central_point();
+    const Point<DIMENSIONS> index_point = index;
+
+    const Point<DIMENSIONS> r = index_point * basis + starting_point;
+
+    starting_point -= r;
+
+    return r;
   }
 };
 

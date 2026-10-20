@@ -8,21 +8,18 @@
 namespace CENTER_OF_GRAVITY {
   template<typename T, DIMENSION REDUCING_DIMENSION>
   struct COG_REDUCE_FUNCTION {
-    constexpr static __device__ __host__ u32 index(u64 global_index, const Extent<3>& extent) noexcept {
-      u32 ret = 0;
-
+    constexpr static __device__ __host__ u32 index(const u64& global_index, const Extent<3>& extent) noexcept {
       if constexpr (REDUCING_DIMENSION == DIMENSION::X) { // X Dim
-        ret = global_index / (extent.x() * extent.y());
+        return global_index / (extent.x() * extent.y());
       } else if constexpr  (REDUCING_DIMENSION == DIMENSION::Y) { // Y DIM
-        ret = global_index / extent.x() % extent.y();
-      } else if constexpr (REDUCING_DIMENSION == DIMENSION::Z) { // Z DIM
-        ret = global_index % extent.x();
+        return global_index / extent.x() % extent.y();
+      } else  { // Z DIM
+        static_assert(REDUCING_DIMENSION == DIMENSION::Z, "Not valid reducing dimension");
+        return global_index % extent.x();
       }
-
-      return ret;
     }
 
-    constexpr static __device__ __host__ f32 map_to(u64 global_index, const Volume<3, T>& vol) noexcept {
+    constexpr static __device__ __host__ f32 map_to(const u64& global_index, const Volume<3, T>& vol) noexcept {
       return static_cast<f32>(index(global_index, vol.extent())) * static_cast<f32>(vol.at(global_index));
     }
 
@@ -48,13 +45,13 @@ namespace CENTER_OF_GRAVITY {
 template<typename T>
   /**
    * finds the center of gravity in a device volume
-   * @tparam T The d
+   * @tparam T The datatype of the volume
    * @param volume -
    */
   __host__ dicomNodeError_t center_of_gravity(
     const Volume<3, T>& volume,
 
-    Point<3>& cog
+    Point<3>& out_center_of_gravity
   ) noexcept {
   T sum = 0;
 
@@ -66,20 +63,20 @@ template<typename T>
     );
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::X>, float, Volume<3,T>>(
-      volume.elements(), &cog[0], volume);
+      volume.elements(), &out_center_of_gravity[0], volume);
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Y>, float, Volume<3, T>>(
-      volume.elements(), &cog[1], volume);
+      volume.elements(), &out_center_of_gravity[1], volume);
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Z>, float, Volume<3, T>>(
-      volume.elements(), &cog[2], volume);
+      volume.elements(), &out_center_of_gravity[2], volume);
   };
 
   float sumf = static_cast<float>(sum);
 
-  cog[0] = cog[0] / sumf;
-  cog[1] = cog[1] / sumf;
-  cog[2] = cog[2] / sumf;
+  out_center_of_gravity[0] = out_center_of_gravity[0] / sumf;
+  out_center_of_gravity[1] = out_center_of_gravity[1] / sumf;
+  out_center_of_gravity[2] = out_center_of_gravity[2] / sumf;
 
   return runner.error();
 }

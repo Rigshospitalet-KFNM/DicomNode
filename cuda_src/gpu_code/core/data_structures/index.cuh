@@ -11,7 +11,7 @@
  * @tparam DIMENSIONS - Number of Dimension of the index
  */
 template<u8 DIMENSIONS>
-struct Index {
+struct Index final {
   static_assert(DIMENSIONS > 0);
   // Negative number would indicate and out of image index
   i32 coordinates[DIMENSIONS]{};

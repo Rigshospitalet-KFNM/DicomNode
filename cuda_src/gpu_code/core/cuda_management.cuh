@@ -3,6 +3,7 @@
 #include<concepts>
 #include<functional>
 #include<tuple>
+#include<stack>
 #include"error.cuh"
 
 static bool is_host_pointer(const cudaPointerAttributes& attr){

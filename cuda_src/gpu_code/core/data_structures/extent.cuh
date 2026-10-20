@@ -17,7 +17,7 @@
  *  Data is stored in Z,Y,X
  */
 template<u8 DIMENSIONS>
-struct Extent {
+struct Extent final {
   static_assert(DIMENSIONS > 0);
   u32 sizes[DIMENSIONS]{}; // this zero initializes the array
 
@@ -47,6 +47,16 @@ struct Extent {
     }
 
     return true;
+  }
+
+  constexpr __device__ __host__ Index<DIMENSIONS> central_point() const noexcept {
+    Index<DIMENSIONS> index;
+
+    for (u8 i = 0; i < DIMENSIONS; i++) {
+      index[i] = (this->sizes[i] - 1) / 2;
+    }
+
+    return index;
   }
 
   /**

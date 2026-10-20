@@ -10,7 +10,7 @@
  * @tparam DIMENSIONS - The number of dimensions in the point.
  */
 template<uint8_t DIMENSIONS>
-struct Point {
+struct Point final {
   float points[DIMENSIONS]{};
 
   Point() noexcept = default;
@@ -79,6 +79,15 @@ struct Point {
     return v;
   }
 
+  constexpr __device__ __host__ Point operator-=(const Point& other) noexcept {
+    #pragma unroll
+    for(u8 i = 0; i < DIMENSIONS; i++){
+      points[i] -= other[i];
+    }
+
+    return *this;
+  }
+
   [[nodiscard]] constexpr __device__ __host__ Point<DIMENSIONS> operator+(const Point<DIMENSIONS>& other) const noexcept {
     Point<DIMENSIONS> v; // It's zero initialized!
     #pragma unroll
@@ -100,5 +109,25 @@ struct Point {
 
   [[nodiscard]] static constexpr __host__ __device__ size_t elements() {
     return DIMENSIONS;
+  }
+
+  constexpr __device__ __host__ Point<DIMENSIONS> operator/(const f32& value) const noexcept {
+    Point<DIMENSIONS> v;
+
+  #pragma unroll
+    for (u8 i = 0; i < DIMENSIONS; i++) {
+      v[i] = points[i] / value;
+    }
+
+    return v;
+  }
+
+  constexpr __device__ __host__ Point<DIMENSIONS>& operator/=(const f32& value) const noexcept {
+  #pragma unroll
+    for (u8 i = 0; i < DIMENSIONS; i++) {
+      points[i] /= points[i] / value;
+    }
+
+    return *this;
   }
 };

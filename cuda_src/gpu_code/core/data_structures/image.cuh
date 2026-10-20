@@ -20,7 +20,7 @@
 //template<template<uint8_t DIMENSIONS, typename T> typename VOLUME, uint8_t DIMENSIONS, typename T>
 //  requires CVolume<VOLUME, DIMENSIONS, T>
 template<u8 DIMENSIONS,typename T>
-class Image {
+class Image final {
   static_assert(0 < DIMENSIONS);
 
   public:

@@ -11,17 +11,17 @@
 
 
 namespace REGISTRATION {
-  struct ImageTranslation {
+  struct ImageTranslation final {
     // Scale is from the Center
     f32 scale = 1.0f;
     Point<3> translations = {0.0f,0.0f,0.0f};
-    // Rotation are from the center of the Image
+    // Rotation are from the center of the Image in radians
     cuda::std::array<f32, 3> rotations = {0.0f,0.0f,0.0f};
   };
 
 
 template<typename T>
-struct VolumeDifference {
+struct VolumeDifference final {
   static __device__ __host__ T map_to(u64 global_index, const Volume<3, T>* volume_1, const Volume<3, T>* volume_2) noexcept {
     // ASSERT volumes ARE OF THE SAME SIZE, and each thread shouldn't assert that
     if (volume_1->elements() <= global_index){
@@ -58,7 +58,16 @@ struct VolumeDifference {
 
 
 template<typename T>
-__host__ dicomNodeError_t volume_difference_device(u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
+auto centerImage(DicomNodeRunner& runner, Image<3, T>& host_image) {
+  Point<3> center_of_gravity;
+  runner | [&]{
+    return CENTER_OF_GRAVITY::center_of_gravity(host_image.volume, center_of_gravity);
+  };
+}
+
+template<typename T>
+__host__ dicomNodeError_t volume_difference_device(
+u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
   return encode_cuda_error(reduce_no_mem<8, VolumeDifference<T>, T>(
     elements,
     &error,
@@ -155,16 +164,22 @@ template<typename T>
 __host__ dicomNodeError_t interpolate_for_registration(
     Image<3, T> host_source_image, // SHALLOW COPY!
     const ImageTranslation& translation,
-    const Space<3>& host_destination_space,
+    Space<3> host_destination_space, // I modify it, so I need a copy.
     Volume<3, T>& out_volume
     ) {
+
+  const auto offset_source = host_source_image.space.center_space();
   host_source_image.space = translate_space(host_source_image.space, translation);
 
-  return gpu_interpolation_linear_shared_cheating(
+  const auto offset_destination = host_destination_space.center_space();
+
+  dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
     host_source_image,
     host_destination_space,
     out_volume.data
   );
+
+  return error;
 }
 
 template<typename T>
@@ -177,10 +192,15 @@ struct OptimizerParam {
     };
 };
 
+
+/**
+ *
+ * @tparam T type of the Cost
+ */
 template<typename T>
 struct Optimizer {
   OptimizerParam<T> best_params;
-  ImageTranslation max_step_size {
+  ImageTranslation step_size {
       .scale = 0.025,
       .translations = Point<3>{4.0f,4.0f,4.0f},
       .rotations = {0.05f,0.05f,0.05f},
@@ -195,8 +215,8 @@ struct Optimizer {
     OptimizerParam negative_param = best_params;
 
     for (u8 dim = 0; dim < 3; dim++) {
-      positive_param.affine.translations[dim] += max_step_size.translations[dim];
-      negative_param.affine.translations[dim] -= max_step_size.translations[dim];
+      positive_param.affine.translations[dim] += step_size.translations[dim];
+      negative_param.affine.translations[dim] -= step_size.translations[dim];
 
       positive_param.cost = cost_function(positive_param);
       negative_param.cost = cost_function(negative_param);
@@ -212,14 +232,45 @@ struct Optimizer {
 
     return best_params.cost;
   }
+
+  T optimize(auto cost_function) {
+    const f32 current_cost = best_params.cost;
+
+    if (update_translation(cost_function) < current_cost) {
+      return best_params.cost;
+    }
+
+    step_size.translations = step_size.translations / 2.0f;
+  }
 };
 
-
-
 template<typename T>
-void OptimizerStep(Optimizer<T>& optimizer) {
+dicomNodeError_t cost_function (
+  DicomNodeRunner& runner,
+  const Image<3, T>& host_source_image,
+  const Image<3, T>& host_target_image,
+  Volume<3, T>& temp_volume,
+  Volume<3, T>* device_source_volume,
+  Volume<3, T>* device_temp_volume,
+  const OptimizerParam<T>& params,
+  f32& out_cost
+  ){
 
+  runner | [&]() {
+    return REGISTRATION::interpolate_for_registration<T>(
+      host_target_image,
+      params.affine,
+      host_source_image.space,
+      temp_volume
+    );
+  } | [&](){return REGISTRATION::volume_difference_device<T>(
+    host_source_image.elements(),
+    device_source_volume,
+    device_temp_volume,
+    out_cost
+    );};
 
+  return runner.error();
 }
 
 template<typename T>
