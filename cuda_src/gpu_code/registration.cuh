@@ -168,10 +168,10 @@ __host__ dicomNodeError_t interpolate_for_registration(
     Volume<3, T>& out_volume
     ) {
 
-  const auto offset_source = host_source_image.space.center_space();
+  //const auto offset_source = host_source_image.space.center_space();
   host_source_image.space = translate_space(host_source_image.space, translation);
 
-  const auto offset_destination = host_destination_space.center_space();
+  //const auto offset_destination = host_destination_space.center_space();
 
   dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
     host_source_image,
@@ -199,12 +199,20 @@ struct OptimizerParam {
  */
 template<typename T>
 struct Optimizer {
+  static constexpr u32 max_iterations = 25;
+  static constexpr u8 max_step_size_reductions = 4;
+
   OptimizerParam<T> best_params;
   ImageTranslation step_size {
       .scale = 0.025,
-      .translations = Point<3>{4.0f,4.0f,4.0f},
+      .translations = Point<3>{8.0f,8.0f,8.0f},
       .rotations = {0.05f,0.05f,0.05f},
   };
+
+  u32 iterations = 0;
+  u8 step_size_reductions = 0;
+
+
 
   Optimizer(auto cost_function) {
     best_params.cost = cost_function(best_params);
@@ -233,14 +241,42 @@ struct Optimizer {
     return best_params.cost;
   }
 
+  void reduce_step_sizes() {
+    step_size.translations = step_size.translations / 2.0f;
+    step_size_reductions++;
+  }
+
   T optimize(auto cost_function) {
     const f32 current_cost = best_params.cost;
 
-    if (update_translation(cost_function) < current_cost) {
+    const f32 translation_cost = update_translation(cost_function);
+
+    std::printf("Current cost: %f, translation_cost %f\n" , current_cost, translation_cost);
+
+    if ( translation_cost < current_cost) {
       return best_params.cost;
     }
 
-    step_size.translations = step_size.translations / 2.0f;
+
+    reduce_step_sizes();
+
+    return best_params.cost;
+  }
+
+  /**
+   * Determines if the optimization loop should continue
+   *
+   * @example while(optimizer.should_continue()){
+   *  ... // Optimization loop
+   * }
+   * @return if you should continue the while loop
+   */
+  [[nodiscard]] bool should_continue() noexcept {
+    return cost() > 0.0f && step_size_reductions < max_step_size_reductions && ++iterations < max_iterations;
+  }
+
+  [[nodiscard]] T cost() const noexcept {
+    return best_params.cost;
   }
 };
 
