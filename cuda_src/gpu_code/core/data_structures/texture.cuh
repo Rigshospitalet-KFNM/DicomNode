@@ -3,6 +3,7 @@
 #include"../declarations.cuh"
 #include"../concepts.cuh"
 #include"space.cuh"
+#include"image.cuh"
 #include"../cuda_management.cuh"
 
 template<u8 DIMENSION, typename T>
@@ -12,6 +13,7 @@ class Texture final {
   public:
     cudaTextureObject_t texture;
     Space<DIMENSION> space;
+    Extent<DIMENSION> m_extent;
 
   __device__ T operator()(const Point<3>& point) const {
     const Point<DIMENSION> interpolated_coordinate = space.interpolate_point(point);
@@ -23,12 +25,12 @@ class Texture final {
     );
   }
 
-  const Extent<DIMENSION>& extent() const {
-    return space.extent();
+  __host__ __device__ const Extent<DIMENSION>& extent() const {
+    return m_extent;
   }
 
-  constexpr size_t elements() const {
-    return space.elements();
+  __host__ __device__ constexpr size_t elements() const {
+    return m_extent.elements();
   }
 };
 
@@ -37,20 +39,25 @@ static_assert(CImage<Texture<3, float>, 3>, "Texture is not a volume?");
 template<typename T>
 dicomNodeError_t load_texture(
   Texture<3, T>* texture,
-  const T* data,
-  const Space<3>& space
+  const Image<3, T>& image
 ){
-  cudaTextureDesc textureDescription;
+
+  const Space<3>& space = image.space;
+  cudaMemcpy(&texture->m_extent, &image.extent(), sizeof(Extent<3>), cudaMemcpyDefault);
+
+  cudaTextureDesc textureDescription{};
+  cudaResourceDesc resourceDescription{};
+
   memset(&textureDescription, 0, sizeof(textureDescription));
-  cudaResourceDesc resourceDescription;
   memset(&resourceDescription, 0, sizeof(resourceDescription));
+
   const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<T>();
   cudaTextureObject_t host_texture;
 
   const cudaExtent extent = make_cudaExtent(
-      space.extent[2],
-      space.extent[1],
-      space.extent[0]
+      image.extent().x(),
+      image.extent().y(),
+      image.extent().z()
   );
 
   DicomNodeRunner runner;
@@ -70,10 +77,10 @@ dicomNodeError_t load_texture(
     cudaMemcpy3DParms params = { 0 };
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(
-      (void*)data,
-      space.extent[2] * sizeof(T),
-      space.extent[2],
-      space.extent[1]
+      (void*)image.volume.data,
+      image.extent().x() * sizeof(T),
+      image.extent().x(),
+      image.extent().y()
     );
     params.extent = extent;
     params.kind = cudaMemcpyDefault;

@@ -106,7 +106,7 @@ struct Extent final {
     return flat_index(index);
   }
 
-  __device__ __host__ Index<DIMENSIONS> from_flat_index(u64 flat_index) const {
+  constexpr __device__ __host__ Index<DIMENSIONS> from_flat_index(u64 flat_index) const {
     int32_t coordinates[DIMENSIONS];
     uint64_t dimension_temp = 1;
 
@@ -136,16 +136,16 @@ struct Extent final {
     return Index<DIMENSIONS>(coordinates);
   }
 
-  constexpr __device__ __host__ const u32& x() const noexcept {
+  [[nodiscard]] constexpr __device__ __host__ const u32& x() const noexcept {
     return sizes[DIMENSIONS - 1];
   }
 
-  constexpr __device__ __host__ const u32& y() const noexcept{
+  [[nodiscard]] constexpr __device__ __host__ const u32& y() const noexcept {
     static_assert(DIMENSIONS > 1);
     return sizes[DIMENSIONS - 2];
   }
 
-  constexpr __device__ __host__ const u32& z() const noexcept {
+  [[nodiscard]] constexpr __device__ __host__ const u32& z() const noexcept {
     static_assert(DIMENSIONS > 2);
     return sizes[DIMENSIONS - 3];
   }
@@ -158,11 +158,11 @@ struct Extent final {
     return &sizes[DIMENSIONS - 1];
   }
 
-  constexpr __device__ __host__ const u32* begin() const noexcept{
+  [[nodiscard]] constexpr __device__ __host__ const u32* begin() const noexcept{
     return &sizes[0];
   }
 
-  constexpr __device__ __host__ const u32* end() const noexcept{
+  [[nodiscard]] constexpr __device__ __host__ const u32* end() const noexcept{
     return &sizes[DIMENSIONS - 1];
   }
 
@@ -171,7 +171,7 @@ struct Extent final {
    *
    * @return __device__ the number of elements
    */
-  constexpr __device__  __host__ size_t elements() const noexcept {
+  [[nodiscard]] constexpr __device__  __host__ size_t elements() const noexcept {
     size_t size = 1;
 
     #pragma unroll

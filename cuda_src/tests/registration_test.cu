@@ -319,7 +319,6 @@ static constexpr std::array<f32, elements> overlap_image_2 = {
 };
 
 
-
 constexpr static Space<3> image_space {
   .starting_point = Point<3>{1.0f,1.0f, 1.0f},
   .basis = {
@@ -332,7 +331,6 @@ constexpr static Space<3> image_space {
     0.0f,1.0f,0.0f,
     0.0f,0.0f,1.0f
   },
-  .extent = Extent<3>{z,y,x}
 };
 
 // End of test declaration
@@ -427,8 +425,8 @@ TEST(REGISTRATION, CENTER_OF_GRAVITY_MOVES_A_CUBE) {
   cudaMemcpy(volume_1.data, offset_image_data_1.data(), volume_1.size(), cudaMemcpyDefault);
   cudaMemcpy(volume_2.data, offset_image_data_2.data(), volume_2.size(), cudaMemcpyDefault);
 
-  Image image_1{image_space, volume_1};
-  Image image_2{image_space, volume_2};
+  Image<3, f32> image_1{image_space, volume_1};
+  Image<3, f32> image_2{image_space, volume_2};
 
   REGISTRATION::register_to(image_1, image_2);
 
@@ -451,7 +449,8 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
   cudaMalloc(&out_volume.data, out_volume.size());
   cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
 
-  Image image_1{image_space, image_volume};
+  Image<3, f32> image_1{image_space, image_volume};
+  Image<3, f32> image_2{image_space, out_volume};
 
   DicomNodeRunner runner;
 
@@ -459,7 +458,7 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
     runner,
     image_1,
     {},
-    image_space,
+    image_2,
     out_volume
   );
 
@@ -506,7 +505,8 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cudaMalloc(&out_volume.data, out_volume.size());
   cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
 
-  const Image image_1{image_space, image_volume};
+  const Image<3, f32> image_1{image_space, image_volume};
+  const Image<3, f32> image_2{image_space, out_volume};
 
   DicomNodeRunner runner;
 
@@ -516,7 +516,7 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
     { // I think I should make some test cases, that highlight XYZ and ZYX difference
       .translations = { 1, 0, 0 }
     },
-    image_space,
+    image_2,
     out_volume
   );
 
@@ -647,7 +647,7 @@ TEST(REGISTRATION, DATA_BLOCK_IS_DIFERENT_THAN_0) {
 
   EXPECT_EQ(runner.error(), SUCCESS);
 
-  EXPECT_FLOAT_EQ(cost, 243.0f); // ELEMENTS(3 * 3 * 3) * VALUE(3 ** 2)
+  EXPECT_FLOAT_EQ(cost, 243.0f); // ELEMENTS(3 * 3 * 3) * VALUE(abs(3 - 0) ** 2)
 
   cudaFree(device_source_volume);
   cudaFree(device_temp_volume);
@@ -766,16 +766,15 @@ TEST(REGISTRATION, centering_space) {
     .starting_point = s,
     .basis = basis,
     .inverted_basis = basis.inverse(),
-    .extent = e
   };
 
-  const auto r = space.center_space();
+  const auto r = space.center_space(e);
 
   constexpr Point<3> zeros{
     0.0f, 0.0f, 0.0f
   };
 
-  EXPECT_EQ(space.at_index(space.extent.central_point()), zeros);
+  EXPECT_EQ(space.at_index(e.central_point()), zeros);
 }
 
 TEST(REGISTRATION, centering_space_with_reset) {
@@ -792,11 +791,10 @@ TEST(REGISTRATION, centering_space_with_reset) {
     .starting_point = s,
     .basis = basis,
     .inverted_basis = basis.inverse(),
-    .extent = e
   };
 
   auto space_copy = space;
-  const auto r = space.center_space();
+  const auto r = space.center_space(e);
 
   space.starting_point += r;
 
@@ -870,7 +868,7 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
       return REGISTRATION::interpolate_for_registration(
         target_image,
         params.affine,
-        source_image.space,
+        source_image,
       temp_volume
       );
     } | [&](){return REGISTRATION::volume_difference_device(
@@ -895,6 +893,10 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
 
   optimizer.update_translation(cost_function);
 
+  EXPECT_FLOAT_EQ(optimizer.best_params.affine.translations[0], -1.0f);
+  EXPECT_FLOAT_EQ(optimizer.best_params.affine.translations[1],  1.0f);
+  EXPECT_FLOAT_EQ(optimizer.best_params.affine.translations[2],  0.0f);
+
   EXPECT_FLOAT_EQ(optimizer.best_params.cost, 0.0f);
 
   EXPECT_EQ(cudaFree(source_volume.data), cudaSuccess);
@@ -905,7 +907,7 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
 }
 
 TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
-  constexpr Extent<3> e{64,64,64};
+  constexpr Extent<3> e{16,16,16};
   auto source_data = create_blank_array<f32, e.elements()>();
   apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
     .value = 1.0f, .bounds=cuda::std::array{
@@ -977,24 +979,37 @@ TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
       return cudaMemcpy(device_temp_volume, &temp_volume, volume_size, cudaMemcpyDefault);
     };
 
+  constexpr static Space<3> space {
+    .starting_point = Point<3>{1.0f,1.0f, 1.0f},
+    .basis = {
+      1.0f,0.0f,0.0f,
+      0.0f,1.0f,0.0f,
+      0.0f,0.0f,1.0f
+    },
+    .inverted_basis = {
+      1.0f,0.0f,0.0f,
+      0.0f,1.0f,0.0f,
+      0.0f,0.0f,1.0f
+    },
+  };
+
   const Image<3, f32> source_image = {
-    image_space,
+    space,
     source_volume
   };
 
   const Image<3, f32> target_image = {
-    image_space,
+    space,
     target_volume
   };
 
   const auto cost_function = [&](REGISTRATION::OptimizerParam<f32>& params) -> f32 {
     f32 cost = cuda::std::numeric_limits<f32>::max();
     runner | [&]() {
-
       return REGISTRATION::interpolate_for_registration(
         target_image,
         params.affine,
-        source_image.space,
+        source_image,
       temp_volume
       );
     } | [&](){return REGISTRATION::volume_difference_device(
@@ -1019,6 +1034,13 @@ TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
 
   while (runner.error() == SUCCESS && optimizer.should_continue()) {
     optimizer.optimize(cost_function);
+    std::printf("Cost at: %f\n translations: (%f,%f,%f)\n",
+    optimizer.best_params.cost,
+    optimizer.best_params.affine.translations[0],
+    optimizer.best_params.affine.translations[1],
+    optimizer.best_params.affine.translations[2]
+  );
+
   }
 
   std::printf("Ran Iterations: %i\n", optimizer.iterations);

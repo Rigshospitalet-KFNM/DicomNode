@@ -4,10 +4,11 @@ from numpy import ndarray
 
 from dicomnode.math.image import Image
 from dicomnode.math.space import Space
+from dicomnode.math.extent import Extent
 
 from dicomnode.math._cuda import DicomnodeError
 
-def linear(source: Image, target: Space) -> Tuple[DicomnodeError, ndarray]:
+def linear(source: Image, target: Space, target_extent: Extent) -> Tuple[DicomnodeError, ndarray]:
   """Creates a linear interpolation over the source of the target space
 
   Source is found at low_level_src/python_interpolation.cu
@@ -22,5 +23,5 @@ def linear(source: Image, target: Space) -> Tuple[DicomnodeError, ndarray]:
   """
   ...
 
-def linear_image(source: Image, target: Space) -> Tuple[DicomnodeError, ndarray]:
+def linear_image(source: Image, target: Space, target_extent: Extent) -> Tuple[DicomnodeError, ndarray]:
   ...

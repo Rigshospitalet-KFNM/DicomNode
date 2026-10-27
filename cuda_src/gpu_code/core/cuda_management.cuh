@@ -178,6 +178,39 @@ dicomNodeError_t pointer_location_dependent_code(PTR_T* pointer, Args... args) {
   return runner.error();
 }
 
+/** A monadic operation, that is different dependent on the
+ *
+ * @tparam HostFunction The function that should run if the pointer is a host pointer
+ * @tparam DeviceFunction The function that should run if the pointer is a device pointer
+ * @tparam PTR_T The Type of pointer
+ * @tparam Args Arguments for the functions. Note that both functions should have the same arguments
+ * @param pointer A nonnull host or device pointer
+ * @param args Arguments for the
+ * @return
+ */
+template<auto HostFunction, auto DeviceFunction, typename PTR_T, typename... Args>
+  //requires std::invocable<decltype(HostFunction), PTR_T, Args...> &&
+  //         std::invocable<decltype(DeviceFunction), PTR_T, Args...> &&
+  //         std::same_as<std::invoke_result_t<decltype(HostFunction)>, dicomNodeError_t> &&
+  //         std::same_as<std::invoke_result_t<decltype(DeviceFunction)>, dicomNodeError_t>
+dicomNodeError_t pointer_location_dependent_code(DicomNodeRunner& runner, PTR_T* pointer, Args... args) {
+  cudaPointerAttributes attr;
+
+  runner | [&]() {
+    return cudaPointerGetAttributes(&attr, pointer);
+  } | [&](){
+    dicomNodeError_t error;
+    if (is_host_pointer(attr)) {
+      error = HostFunction(pointer, args...);
+    } else {
+      error = DeviceFunction(pointer, args...);
+    }
+    return error;
+  };
+
+  return runner.error();
+}
+
 
 static __device__ u64 get_gid(){
   return blockDim.x * blockIdx.x + threadIdx.x;

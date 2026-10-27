@@ -37,7 +37,7 @@ constexpr Extent<3> extent{3,3,3};
 
 TEST(REDUCE, IMAGE_REDUCTION) {
   Image<3,f32> image_1{
-    TEST_DATA::make_spaces(extent),
+    TEST_DATA::make_spaces(),
     Volume<3,f32>{
       .data= nullptr,
       .m_extent = extent
@@ -45,7 +45,7 @@ TEST(REDUCE, IMAGE_REDUCTION) {
     };
 
   Image<3,f32> image_2{
-    TEST_DATA::make_spaces(extent),
+    TEST_DATA::make_spaces(),
     Volume<3,f32>{
       .data=nullptr,
       .m_extent = extent
@@ -90,7 +90,7 @@ __global__ void image_registration_maps_to_kernel(T* output, Image<3, T>* image_
 
 TEST(REDUCE, COPY_INTO_SHARED_WORKS) {
   Image<3,f32> image_1{
-    TEST_DATA::make_spaces(extent),
+    TEST_DATA::make_spaces(),
     Volume<3,f32>{
       .data= nullptr,
       .m_extent = extent
@@ -98,7 +98,7 @@ TEST(REDUCE, COPY_INTO_SHARED_WORKS) {
   };
 
   Image<3,f32> image_2{
-    TEST_DATA::make_spaces(extent),
+    TEST_DATA::make_spaces(),
     Volume<3,f32>{
       .data=nullptr,
       .m_extent = extent

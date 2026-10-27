@@ -43,14 +43,14 @@ struct Index final {
     }
   }
 
-  __device__ __host__ Index(const FlatIndex& flat_index, const Extent<DIMENSIONS>& space){
+  __device__ __host__ Index(const FlatIndex& flat_index, const Extent<DIMENSIONS>& extent){
     u64 dimension_temp = 1;
 
     #pragma unroll
     for(u8 dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = (flat_index % (dimension_temp * space[dim]))
+      coordinates[dim] = (flat_index % (dimension_temp * extent[dim]))
         / dimension_temp;
-      dimension_temp *= space[dim];
+      dimension_temp *= extent[dim];
     }
   }
 

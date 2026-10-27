@@ -152,7 +152,6 @@ TEST(IMAGE, CUDA_INDEXING){
         0.0f, 0.0f, 1.0f
       },
     },
-    .extent = Extent<3>{z,y,x}
   };
 
   Image<3, f32> host_image{
@@ -254,7 +253,6 @@ TEST(IMAGE, CUDA_POINT_INDEXING){
         0.0f, 0.0f, 1.0f
       },
     },
-    .extent = Extent<3>{z,y,x}
   };
 
   Image<3, f32> ghost_image{
@@ -349,7 +347,6 @@ TEST(IMAGE, SUB_IMAGING_HOST) {
         0.0f, 0.0f, 1.0f
       },
     },
-    .extent=extent
   };
 
   Image<3, f32> image{
@@ -445,7 +442,6 @@ TEST(VOLUME, SUB_VOLUME_HOST){
   EXPECT_FLOAT_EQ(result_data[7],2.0f);
 }
 
-constexpr u64 ImageSize = sizeof(Image<3, f32>);
 
 __global__ void sub_volume_gpu_kernel(Volume<3, f32> volume, f32* out, Extent<3> new_extent, Index<3> offset){
   Volume<3, f32> vol = sub_volume(

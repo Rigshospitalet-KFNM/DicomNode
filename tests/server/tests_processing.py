@@ -62,7 +62,8 @@ class ProcessorTestCase(DicomnodeTestCase):
 
     with patch('dicomnode.lib.logging.set_logger'):
       with self.assertLogs(DICOMNODE_LOGGER_NAME) as captured_logs:
-        RaisingProcessor(args)
+        self.assertRaises(Exception, RaisingProcessor, args)
+
 
     self.assertRegexIn("HELLO I'm the problem", captured_logs.output)
     self.assertRegexIn("in process function", captured_logs.output)

@@ -93,17 +93,17 @@ public:
     cudaFree(device_ptr);
   }
 
-  T* get(){ return device_ptr; }
-  size_t size() { return elements * sizeof(T); }
+  [[nodiscard]] T* get() noexcept { return device_ptr; }
+  [[nodiscard]] size_t size() const noexcept { return elements * sizeof(T); }
 
   DeviceArray(const DeviceArray&) = delete;
   DeviceArray& operator=(const DeviceArray&) = delete;
-  DeviceArray(DeviceArray&& other): device_ptr(other.device_ptr), elements(other.elements) {
+  DeviceArray(DeviceArray&& other) noexcept : device_ptr(other.device_ptr), elements(other.elements) {
     other.device_ptr = nullptr;
     other.elements = 0;
   }
 
-  DeviceArray& operator=(DeviceArray&& other) {
+  DeviceArray& operator=(DeviceArray&& other) noexcept {
     if (device_ptr) {
       cudaFree(device_ptr);
     }
@@ -112,5 +112,7 @@ public:
 
     other.device_ptr = nullptr;
     other.elements = 0;
+
+    return *this;
   }
 };

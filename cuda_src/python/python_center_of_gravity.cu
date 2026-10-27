@@ -21,7 +21,7 @@ std::tuple<dicomNodeError_t, std::tuple<f32,f32,f32>> tpl_python_center_of_gravi
   }};
 
   runner | [&]() {
-    return load_volume_from_array(&volume, python_array);
+    return load_volume(&volume, python_array);
   } | [&]() {
     return CENTER_OF_GRAVITY::center_of_gravity<T>(volume, cog);
   } | [&]() {

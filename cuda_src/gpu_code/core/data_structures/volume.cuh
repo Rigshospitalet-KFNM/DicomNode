@@ -36,7 +36,7 @@ struct Volume {
     return m_extent.elements() * sizeof(T);
   }
 
-  constexpr  __device__ __host__  size_t elements() const noexcept {
+  [[nodiscard]] constexpr  __device__ __host__  size_t elements() const noexcept {
     return m_extent.elements();
   }
 
@@ -48,7 +48,7 @@ struct Volume {
     return m_extent.set_dimensions(dims);
   }
 
-  constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const noexcept {
+  [[nodiscard]] constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const noexcept {
     return m_extent;
   }
 
@@ -113,7 +113,6 @@ struct Volume {
 
 template<typename T>
 Volume(T) -> Volume<3, T>;
-
 Volume() -> Volume<3, f32>;
 
 template<typename T>

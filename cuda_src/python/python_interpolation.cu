@@ -10,18 +10,26 @@
 #include"../gpu_code/linear_interpolation.cuh"
 #include"utilities.cuh"
 
-using basis_t = pybind11::array_t<float>;
+using basis_t = pybind11::array_t<f32>;
 
 template<typename T>
 std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   const pybind11::object& image,
-  const pybind11::object& new_space
+  const pybind11::object& new_space,
+  const pybind11::object& py_extent
 ){
   Space<3> destination_space;
   dicomNodeError_t error = load_space(&destination_space, new_space);
   if (error){
     return {error , python_array<T>(1)};
   }
+
+  Extent<3> extent;
+  error = load_extent<3>(extent, py_extent);
+  if (error){
+    return {error , python_array<T>(1)};
+  }
+
   const size_t image_size = get_image_size<T>(image);
   const size_t out_image_size = get_image_size<T>(new_space);
 
@@ -30,15 +38,23 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   }
   const size_t out_image_elements = out_image_size / sizeof(T);
 
+
   const size_t shape[3] = {
-    destination_space.extent[0],
-    destination_space.extent[1],
-    destination_space.extent[2]
+    extent.z(),
+    extent.y(),
+    extent.x()
   };
   const size_t strides[3] = {
-    destination_space.extent[1] * destination_space.extent[2] * sizeof(T),
-    destination_space.extent[2] * sizeof(T),
+    extent.y() * extent.x() * sizeof(T),
+    extent.x() * sizeof(T),
     sizeof(T)
+  };
+
+  Image<3, T> out_image{
+    .space = destination_space,
+    .volume = {
+      .m_extent = extent,
+    }
   };
 
   pybind11::array_t<T> out_array(shape, strides);
@@ -67,7 +83,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
       return cudaMalloc(&device_out_image, out_image_size);}
     | [&](){ return gpu_interpolation_linear<T>(
       device_texture,
-      std::cref(destination_space),
+      out_image,
       device_out_image
     );}
     | [&](){
@@ -86,7 +102,8 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
 template<typename T>
 std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image(
   const pybind11::object& image,
-  const pybind11::object& new_space
+  const pybind11::object& new_space,
+  const pybind11::object& py_extent
 ){
   Space<3> destination_space;
   dicomNodeError_t error = load_space(&destination_space, new_space);
@@ -101,45 +118,58 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image
   }
   const size_t out_image_elements = out_image_size / sizeof(T);
 
+  Extent<3> extent;
+  error = load_extent<3>(extent, py_extent);
+  if (error){
+    return {error , python_array<T>(1)};
+  }
+
   const size_t shape[3] = {
-    destination_space.extent[0],
-    destination_space.extent[1],
-    destination_space.extent[2]
+    extent.z(),
+    extent.y(),
+    extent.x()
   };
   const size_t strides[3] = {
-    destination_space.extent[1] * destination_space.extent[2] * sizeof(T),
-    destination_space.extent[2] * sizeof(T),
+    extent.y() * extent.x() * sizeof(T),
+    extent.x() * sizeof(T),
     sizeof(T)
   };
 
   pybind11::array_t<T> out_array(shape, strides);
   pybind11::buffer_info out_buffer = out_array.request(true);
 
+
   Image<3, T> host_image;
-  T* device_out_image = nullptr;
+  Image<3, T> out_image {
+    .space=destination_space,
+    .volume={
+      .m_extent=extent
+    }
+  };
+
+
 
   auto error_function = [&](dicomNodeError_t _){
     std::cout << "Error Trigger!\n";
     free_image<T>(&host_image);
-    free_device_memory(&device_out_image);
+    free_image<T>(&out_image);
   };
 
   DicomNodeRunner runner{error_function};
   runner
-    | [&](){ return check_buffer_pointers(std::cref(out_buffer), out_image_elements);}
+    | [&](){ return check_buffer_pointers(out_buffer, out_image_elements);}
     | [&](){ return load_image<T>(&host_image, image); }
-    | [&](){ return cudaMalloc(&device_out_image, out_image_size);}
+    | [&](){ return cudaMalloc(&out_image.volume.data, out_image_size);}
     | [&](){ return gpu_interpolation_linear_shared_cheating<T>(
-      host_image, std::cref(destination_space), device_out_image
+      host_image, out_image, out_image.volume.data
     );}
     | [&](){
-      return cudaMemcpy(out_buffer.ptr, device_out_image, out_image_size, cudaMemcpyDefault);
+      return cudaMemcpy(out_buffer.ptr, out_image.volume.data, out_image_size, cudaMemcpyDefault);
     }
     | [&](){
       return free_image<T>(&host_image);}
     | [&](){
-      free_device_memory(&device_out_image);
-      return dicomNodeError_t::SUCCESS;
+      return free_image<T>(&out_image);
     };
 
   return {runner.error(), out_array};
@@ -148,26 +178,33 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image
 
 std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
     const pybind11::object& image,
-    const pybind11::object& new_space
+    const pybind11::object& new_space,
+    const pybind11::object& py_extent
   ){
   const pybind11::array& raw_image = image.attr("raw");
   const pybind11::dtype& image_dtype = raw_image.dtype();
 
   //Switch statement doesn't work because I am comparing strings
   if(image_dtype.equal(pybind11::dtype::of<f32>())){
-    return interpolate_linear_templated<f32>(image, new_space);
-  } else if (image_dtype.equal(pybind11::dtype::of<uint8_t>()) ) {
-    return interpolate_linear_templated<uint8_t>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<uint16_t>())) {
-    return interpolate_linear_templated<uint16_t>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<uint32_t>())) {
-    return interpolate_linear_templated<uint32_t>(image, new_space);
-  } else if (image_dtype.equal(pybind11::dtype::of<int8_t>())) {
-    return interpolate_linear_templated<int8_t>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<int16_t>())) {
-    return interpolate_linear_templated<int16_t>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<int32_t>())) {
-    return interpolate_linear_templated<int32_t>(image, new_space);
+    return interpolate_linear_templated<f32>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<uint8_t>()) ) {
+    return interpolate_linear_templated<uint8_t>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<uint16_t>())) {
+    return interpolate_linear_templated<uint16_t>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<uint32_t>())) {
+    return interpolate_linear_templated<uint32_t>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<int8_t>())) {
+    return interpolate_linear_templated<int8_t>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<int16_t>())) {
+    return interpolate_linear_templated<int16_t>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<int32_t>())) {
+    return interpolate_linear_templated<int32_t>(image, new_space, py_extent);
   }
 
   const std::string dtype = pybind11::str(raw_image.attr("dtype"));
@@ -177,26 +214,33 @@ std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear(
 
 std::tuple<dicomNodeError_t, pybind11::array> interpolate_linear_image(
     const pybind11::object& image,
-    const pybind11::object& new_space
+    const pybind11::object& new_space,
+    const pybind11::object& py_extent
   ){
   const pybind11::array& raw_image = image.attr("raw");
   const pybind11::dtype& image_dtype = raw_image.dtype();
 
   //Switch statement doesn't work because I am comparing strings
   if(image_dtype.equal(pybind11::dtype::of<f32>())){
-    return interpolate_linear_templated_image<f32>(image, new_space);
-  } else if (image_dtype.equal(pybind11::dtype::of<u8>()) ) {
-    return interpolate_linear_templated_image<u8>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<u16>())) {
-    return interpolate_linear_templated_image<u16>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<u32>())) {
-    return interpolate_linear_templated_image<u32>(image, new_space);
-  } else if (image_dtype.equal(pybind11::dtype::of<i8>())) {
-    return interpolate_linear_templated_image<i8>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<i16>())) {
-    return interpolate_linear_templated_image<i16>(image, new_space);
-  } if (image_dtype.equal(pybind11::dtype::of<i32>())) {
-    return interpolate_linear_templated_image<i32>(image, new_space);
+    return interpolate_linear_templated_image<f32>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<u8>()) ) {
+    return interpolate_linear_templated_image<u8>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<u16>())) {
+    return interpolate_linear_templated_image<u16>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<u32>())) {
+    return interpolate_linear_templated_image<u32>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<i8>())) {
+    return interpolate_linear_templated_image<i8>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<i16>())) {
+    return interpolate_linear_templated_image<i16>(image, new_space, py_extent);
+  }
+  if (image_dtype.equal(pybind11::dtype::of<i32>())) {
+    return interpolate_linear_templated_image<i32>(image, new_space, py_extent);
   }
 
   const std::string dtype = pybind11::str(raw_image.attr("dtype"));

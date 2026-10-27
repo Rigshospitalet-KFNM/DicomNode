@@ -44,7 +44,7 @@ def resample(source: ImageContainerType,
 
   if CUDA:
     from dicomnode.math import _cuda
-    error, interpolated =  _cuda.interpolation.linear(source, target)
+    error, interpolated =  _cuda.interpolation.linear(source, target, target.extent)
 
     if error: # pragma: no cover
       raise Exception(f"Cpp code encountered a lower level exception: {error}")
