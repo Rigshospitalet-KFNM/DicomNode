@@ -676,7 +676,7 @@ dicomNodeError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output,
   const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
-  auto error_function = [&](dicomNodeError_t error){
+  auto error_function = [&]([[maybe_unused]] const dicomNodeError_t& error){
     free_device_memory(&device_in, &device_out, &device_flags, &device_aggregates,
                        &device_prefixes, &device_counter);
   };
@@ -775,7 +775,7 @@ dicomNodeError_t reduce_no_mem(DicomNodeRunner& runner, const size_t data_size, 
               );
         return cudaGetLastError();
            }
-    | [&]() noexcept { return cudaMemcpy(output, device_out, sizeof(T_OUT), cudaMemcpyDefault);};
+    | [&]() noexcept { return cudaMemcpy(output, device_out.data, sizeof(T_OUT), cudaMemcpyDefault);};
 
   // Released for optimal reordering
   runner.release(device_counter);

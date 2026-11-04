@@ -124,7 +124,7 @@ dicomNodeError_t check_buffer_pointers(
     return UNABLE_TO_ACQUIRE_BUFFER;
   }
 
-  if (buffer.size != elements){
+  if (buffer.size != static_cast<i64>(elements)){
     std::cout << "buffer: " << buffer.size << " Elements:" << elements << "\n";
     return INPUT_SIZE_MISMATCH;
   }

@@ -6,13 +6,13 @@
 #include<stack>
 #include"error.cuh"
 
-static bool is_host_pointer(const cudaPointerAttributes& attr){
+inline bool is_host_pointer(const cudaPointerAttributes& attr){
   return
        attr.type == cudaMemoryType::cudaMemoryTypeUnregistered
     || attr.type == cudaMemoryType::cudaMemoryTypeHost;
 }
 
-static bool is_host_pointer(const void* ptr){
+inline bool is_host_pointer(const void* ptr){
   cudaPointerAttributes attr{};
   cudaPointerGetAttributes(&attr, ptr); // Fucked if this fails
   return is_host_pointer(attr);
@@ -36,6 +36,7 @@ struct GPUAllocation {
   u64 size = 0;
 
   GPUAllocation() = default;
+  GPUAllocation(void* data_, const u64 size_ ) noexcept : data(data_), size(size_) {}
   GPUAllocation(const GPUAllocation&) = delete;
   GPUAllocation& operator=(const GPUAllocation&) = delete;
   GPUAllocation(GPUAllocation&& other) noexcept : data(other.data), size(other.size)  {
@@ -150,16 +151,16 @@ class DicomNodeRunner{
     }
 
     return GPUSpan<T>{
-      .data = alloc.data,
+      .data = (T*)alloc.data,
       .size = size
     };
   }
 
   template<typename T>
   void release(GPUSpan<T> gpu_span) {
-    GPUAllocation alloc {
-      .data = gpu_span.data,
-      .size = gpu_span.size
+    GPUAllocation alloc{
+      (void*)gpu_span.data,
+      gpu_span.size
     };
 
     allocator.release(alloc);

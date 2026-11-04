@@ -207,15 +207,15 @@ dicomNodeError_t load_host_volume(Volume<DIMENSION, T>* out_volume, const pybind
   }
 
   DicomNodeRunner runner{
-    [&](dicomNodeError_t error) {
+    [&]([[maybe_unused]] const dicomNodeError_t& error) noexcept  {
       free_volume(out_volume);
     }
   };
   volume.set_extent(array_buffer.shape);
 
-  runner | [&]() {
+  runner | [&]() noexcept {
     return cudaMalloc(&volume.data, array_buffer.size * sizeof(T));
-  } | [&]() {
+  } | [&]() noexcept {
     return cudaMemcpy(volume.data, array_buffer.ptr, array_buffer.size * sizeof(T), cudaMemcpyDefault);
   };
 
@@ -226,9 +226,9 @@ template<typename T, u8 DIMENSION>
 dicomNodeError_t load_device_volume(Volume<DIMENSION, T>* out_volume, const pybind11::array_t<T>& python_array) {
   Volume<DIMENSION, T> volume;
   DicomNodeRunner runner;
-  runner | [&]() {
+  runner | [&]() noexcept {
     return load_host_volume(&volume, python_array);
-  } | [&](){
+  } | [&]() noexcept {
     return cudaMemcpy(out_volume, &volume, sizeof(Volume<DIMENSION, T>), cudaMemcpyDefault);
   };
 
@@ -254,15 +254,15 @@ dicomNodeError_t load_host_image(
   const pybind11::object& space = python_image.attr("space");
 
   DicomNodeRunner runner{
-    [&](dicomNodeError_t error){
+    [&]([[maybe_unused]] const dicomNodeError_t& error) noexcept {
       std::cout << "Load into host image encountered: " << error_to_human_readable(error) << "\n";
     }
   };
 
   runner
-    | [&](){
+    | [&]() noexcept {
     return load_into_host_space(&host_out_image->space, space);
-  } | [&](){
+  } | [&]() noexcept {
     return load_host_volume<T, 3>(&host_out_image->volume, raw_image);
   };
 
@@ -278,9 +278,9 @@ dicomNodeError_t load_device_image(
   Image<3, T> host_image;
   DicomNodeRunner runner;
 
-  runner | [&]() {
+  runner | [&]() noexcept {
     return load_host_image(&host_image, python_image);
-  } | [&]() {
+  } | [&]() noexcept {
     return cudaMemcpy(dev_out_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);
   };
 
@@ -332,7 +332,7 @@ size_t get_image_size(const pybind11::object& python_object){
     if (python_extent_buffer.ptr == nullptr) {
       return 0;
     }
-    EXTENT_DATA_TYPE* data = (EXTENT_DATA_TYPE*)python_extent_buffer.ptr;
+    const auto * const data = (EXTENT_DATA_TYPE*)python_extent_buffer.ptr;
 
     size_t size = sizeof(T);
     for(int i = 0; i < python_extent_buffer.size; i++){
@@ -359,14 +359,14 @@ dicomNodeError_t get_image_pointer(
   T** out
 ){
   DicomNodeRunner runner{
-    [](const dicomNodeError_t& error){
+    [](const dicomNodeError_t& error) noexcept {
       std::cout << "Get Image pointer encountered error: " << (uint32_t)error << "\n";
     }
   };
   runner
-    | [&](){
+    | [&]() noexcept {
       return is_instance(image, "dicomnode.math.image", "Image");
-    } | [&](){
+    } | [&]() noexcept {
       const python_array<T>& raw_image = image.attr("raw").cast<python_array<T>>();
       const pybind11::buffer_info& buffer = raw_image.request();
 
@@ -402,11 +402,11 @@ dicomNodeError_t load_texture_from_python_image(
   Image<3, T> image;
 
   runner
-    | [&](){
+    | [&]() noexcept {
       return is_instance(python_image, "dicomnode.math.image", "Image");
-    } | [&](){
+    } | [&]() noexcept {
       return load_image(&image, python_image);
-    } | [&](){
+    } | [&]() noexcept {
       return load_texture(texture, image);
     };
   return runner.error();

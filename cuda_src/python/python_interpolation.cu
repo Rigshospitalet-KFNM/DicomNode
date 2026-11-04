@@ -30,7 +30,6 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
     return {error , python_array<T>(1)};
   }
 
-  const size_t image_size = get_image_size<T>(image);
   const size_t out_image_size = get_image_size<T>(new_space);
 
   if(!out_image_size){
@@ -63,8 +62,8 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated(
   Texture<3, T> *device_texture = nullptr;
   T* device_out_image = nullptr;
 
-  auto error_function = [&](dicomNodeError_t _){
-    std::cout << "Error Trigger!\n";
+  auto error_function = [&](const dicomNodeError_t& causing_error){
+    print_error(causing_error);
     free_texture<T>(&device_texture);
     free_device_memory(&device_out_image);
   };
@@ -148,8 +147,7 @@ std::tuple<dicomNodeError_t, python_array<T>> interpolate_linear_templated_image
   };
 
 
-
-  auto error_function = [&](dicomNodeError_t _){
+  auto error_function = [&]([[maybe_unused]] dicomNodeError_t _){
     std::cout << "Error Trigger!\n";
     free_image<T>(&host_image);
     free_image<T>(&out_image);

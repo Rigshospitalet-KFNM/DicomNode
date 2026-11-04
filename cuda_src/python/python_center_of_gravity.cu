@@ -16,15 +16,15 @@ std::tuple<dicomNodeError_t, std::tuple<f32,f32,f32>> tpl_python_center_of_gravi
 
   Point<3> cog{-1.0f, -1.0f, -1.0f};
 
-  DicomNodeRunner runner{[&](dicomNodeError_t error) {
+  DicomNodeRunner runner{[&]([[maybe_unused]] dicomNodeError_t error) {
     free_volume(&volume);
   }};
 
-  runner | [&]() {
+  runner | [&]() noexcept {
     return load_volume(&volume, python_array);
-  } | [&]() {
+  } | [&]() noexcept {
     return CENTER_OF_GRAVITY::center_of_gravity<T>(volume, cog);
-  } | [&]() {
+  } | [&]() noexcept {
     return free_volume(&volume);
   };
 

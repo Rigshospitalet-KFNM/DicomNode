@@ -325,8 +325,6 @@ dicomNodeError_t register_to(
     Image<3, T>* device_target_image = nullptr;
     Image<3, T>* device_intermediate_image = nullptr;
 
-    constexpr static dim3 THREAD_BLOCK = THREAD_BLOCK_3D;
-    const dim3 envelope = get_envelope_grid<THREAD_BLOCK>(intermediate_image.extent());
 
     Point<3> source_center_of_gravity;
     Point<3> destination_center_of_gravity;
@@ -340,27 +338,27 @@ dicomNodeError_t register_to(
       );
     };
 
-    DicomNodeRunner runner{[&](dicomNodeError_t error) {
+    DicomNodeRunner runner{[&]([[maybe_unused]] dicomNodeError_t error) {
       free_used_memory();
     }};
     // Initialization
-    runner | [&]() {
+    runner | [&]() noexcept {
       return cudaMalloc(&(intermediate_image.data()), intermediate_image.size());
-    } | [&]() {
+    } | [&]() noexcept {
       return cudaMalloc(&(device_source_image), sizeof(Image<3, T>));
-    } | [&]() {
+    } | [&]() noexcept {
       return cudaMalloc(&(device_target_image), sizeof(Image<3, T>));
-    } | [&]() {
+    } | [&]() noexcept {
       return cudaMalloc(&(device_intermediate_image), sizeof(Image<3, T>));
-    } | [&]() {
+    } | [&]() noexcept {
       return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);
-    } | [&]() {
+    } | [&]() noexcept {
       return cudaMemcpy(device_target_image, &host_target_image, sizeof(Image<3, T>), cudaMemcpyDefault);
-    } | [&]() {
+    } | [&]() noexcept {
       return CENTER_OF_GRAVITY::center_of_gravity(host_source_image.volume, source_center_of_gravity);
-    } | [&]() {
+    } | [&]() noexcept {
       return CENTER_OF_GRAVITY::center_of_gravity(host_target_image.volume, destination_center_of_gravity);
-    } | [&]() {
+    } | [&]() noexcept {
       // TODO: apply the basis here (i'm pretty, that it's correct, since they might be different)
       const Point<3> offset = destination_center_of_gravity - source_center_of_gravity;
       intermediate_image.space.starting_point += offset;

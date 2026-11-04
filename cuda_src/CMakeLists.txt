@@ -62,6 +62,7 @@ if(CMAKE_CUDA_COMPILER)
   target_include_directories(utilities PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(utilities PRIVATE -O3)
   target_compile_options(utilities PRIVATE -Wno-deprecated-gpu-targets)
+  target_compile_options(utilities PRIVATE -Xcompiler=-Wall,-Wextra,-Wno-unknown-pragmas)
   set_property(TARGET utilities PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_precompile_headers(
     utilities
@@ -98,8 +99,9 @@ if(CMAKE_CUDA_COMPILER)
                       ${CUDA_OBJECT_TARGETS}
   )
 
-  target_compile_options(_cuda PRIVATE -O3)
   set_property(TARGET _cuda PROPERTY CUDA_ARCHITECTURES native)
+  target_compile_options(_cuda PRIVATE -O3)
+  target_compile_options(_cuda PRIVATE -Xcompiler=-Wall,-Wextra,-Wno-unknown-pragmas)
   target_compile_options(_cuda PRIVATE -Wno-deprecated-gpu-targets)
   target_precompile_headers(
     _cuda

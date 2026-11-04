@@ -155,7 +155,7 @@ dicomNodeError_t gpu_interpolation_linear(
 
   constexpr size_t THREADS = 1024;
 
-  DicomNodeRunner runner{[&](dicomNodeError_t _){
+  DicomNodeRunner runner{[&]([[maybe_unused]] dicomNodeError_t _){
     free_device_memory(&device_destination_image);
   }};
 
@@ -232,11 +232,11 @@ dicomNodeError_t gpu_interpolation_linear_t(
   }};
 
   runner
-  | [&](){ return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
-  | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
-  | [&](){ return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-  | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-  | [&](){
+  | [&]() noexcept { return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
+  | [&]() noexcept { return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+  | [&]() noexcept { return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&]() noexcept { return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&]()noexcept {
     const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3d_SMALLER>(host_destination_image.extent());
     Kernel<<<envelope_grid, THREAD_BLOCK_3d_SMALLER>>>(
       device_source_image,
@@ -245,7 +245,7 @@ dicomNodeError_t gpu_interpolation_linear_t(
     );
 
     return cudaGetLastError();
-  } | [&](){
+  } | [&]() noexcept {
     free_device_memory(&device_destination_image, &device_source_image);
     return dicomNodeError_t::SUCCESS;
   };

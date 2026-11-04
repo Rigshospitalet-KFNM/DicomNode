@@ -58,7 +58,7 @@ template<typename T>
 
   DicomNodeRunner runner;
 
-  runner | [&]() {
+  runner | [&]() noexcept {
     return reduce_no_mem<8, VOLUME_SUM_OP<3, T>, T, Volume<3,T>>(
       volume.elements(), &sum, volume
     );

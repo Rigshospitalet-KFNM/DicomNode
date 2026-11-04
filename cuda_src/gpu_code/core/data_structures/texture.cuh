@@ -74,7 +74,7 @@ dicomNodeError_t load_texture(
         cudaArrayDefault
       );
   } | [&]() noexcept {
-    cudaMemcpy3DParms params = { 0 };
+    cudaMemcpy3DParms params{};
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(
       (void*)image.volume.data,

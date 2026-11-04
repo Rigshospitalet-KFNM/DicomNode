@@ -7,7 +7,7 @@
 constexpr uint32_t cudaErrorFlag = 0x80000000;
 
 #define CUDA_CHECK(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
-static void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
+inline void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
    if (stat != cudaSuccess) {
       fprintf(stderr, "CUDA Error: %s %s %d\n", cudaGetErrorString(stat), file, line);
    }
@@ -48,7 +48,7 @@ static inline bool is_cuda_error(const dicomNodeError_t error) noexcept{
   return error & cudaErrorFlag;
 }
 
-static std::string error_to_human_readable(const dicomNodeError_t error) noexcept {
+static std::string error_to_human_readable(const dicomNodeError_t& error) noexcept {
   if(is_cuda_error(error)){
     return cudaGetErrorName(extract_cuda_error(error));
   }
@@ -69,7 +69,7 @@ static std::string error_to_human_readable(const dicomNodeError_t error) noexcep
   }
 }
 
-static void print_error(const dicomNodeError_t error) {
+static void print_error(const dicomNodeError_t& error) {
   std::string error_string = error_to_human_readable(error);
 
   std::cout << "Encountered: " << error_string << "\n";
