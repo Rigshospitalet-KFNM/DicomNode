@@ -46,11 +46,12 @@ template<typename T>
   /**
    * finds the center of gravity in a device volume
    * @tparam T The datatype of the volume
-   * @param volume -
+   * @param volume - Volume of data, that we wish to find the center of gravity of
+   * @param out_center_of_gravity - Out Variable for the point since the return
+   * value have been taken by the error code
    */
   __host__ dicomNodeError_t center_of_gravity(
     const Volume<3, T>& volume,
-
     Point<3>& out_center_of_gravity
   ) noexcept {
   T sum = 0;
@@ -63,16 +64,16 @@ template<typename T>
     );
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::X>, float, Volume<3,T>>(
-      volume.elements(), &out_center_of_gravity[0], volume);
+      runner, volume.elements(), &out_center_of_gravity[0], volume);
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Y>, float, Volume<3, T>>(
-      volume.elements(), &out_center_of_gravity[1], volume);
+      runner, volume.elements(), &out_center_of_gravity[1], volume);
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::Z>, float, Volume<3, T>>(
-      volume.elements(), &out_center_of_gravity[2], volume);
+      runner, volume.elements(), &out_center_of_gravity[2], volume);
   };
 
-  float sumf = static_cast<float>(sum);
+  f32 sumf = static_cast<f32>(sum);
 
   out_center_of_gravity[0] = out_center_of_gravity[0] / sumf;
   out_center_of_gravity[1] = out_center_of_gravity[1] / sumf;

@@ -35,7 +35,7 @@ function(add_cuda_library name source)
   target_include_directories(${name} PRIVATE ${pybind11_INCLUDE_DIRS} ${Python_INCLUDE_DIRS})
   target_compile_options(${name} PRIVATE -O3)
   target_compile_options(${name} PRIVATE -Wno-deprecated-gpu-targets)
-  target_compile_options(${name} PRIVATE -Xcompiler=-Wall,-Wextra,-Wno-unknowns-pragmas)
+  target_compile_options(${name} PRIVATE -Xcompiler=-Wall,-Wextra,-Wno-unknown-pragmas)
   set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_precompile_headers(
     ${name}
