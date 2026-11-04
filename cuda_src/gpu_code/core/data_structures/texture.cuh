@@ -25,11 +25,11 @@ class Texture final {
     );
   }
 
-  __host__ __device__ const Extent<DIMENSION>& extent() const {
+  [[nodiscard]] __host__ __device__ const Extent<DIMENSION>& extent() const noexcept {
     return m_extent;
   }
 
-  __host__ __device__ constexpr size_t elements() const {
+  [[nodiscard]] __host__ __device__ constexpr size_t elements() const noexcept {
     return m_extent.elements();
   }
 };
@@ -49,7 +49,6 @@ dicomNodeError_t load_texture(
   cudaResourceDesc resourceDescription{};
 
   memset(&textureDescription, 0, sizeof(textureDescription));
-  cudaResourceDesc resourceDescription;
   memset(&resourceDescription, 0, sizeof(resourceDescription));
 
   const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<T>();
@@ -64,9 +63,9 @@ dicomNodeError_t load_texture(
   DicomNodeRunner runner;
 
   runner
-    | [&](){
+    | [&]() noexcept {
       return cudaMemcpy(&(texture->space), &space, sizeof(Space<3>), cudaMemcpyDefault);
-  } | [&](){
+  } | [&]() noexcept{
       resourceDescription.resType = cudaResourceTypeArray;
       return cudaMalloc3DArray(
         &(resourceDescription.res.array.array),
@@ -74,7 +73,7 @@ dicomNodeError_t load_texture(
         extent,
         cudaArrayDefault
       );
-  } | [&](){
+  } | [&]() noexcept {
     cudaMemcpy3DParms params = { 0 };
     params.dstArray = resourceDescription.res.array.array;
     params.srcPtr = make_cudaPitchedPtr(
@@ -87,7 +86,7 @@ dicomNodeError_t load_texture(
     params.kind = cudaMemcpyDefault;
     return cudaMemcpy3D(&params);
 
-  } | [&]() {
+  } | [&]() noexcept {
       constexpr cudaTextureFilterMode filtermode = std::is_same_v<T, float>
         ? cudaFilterModeLinear
         : cudaFilterModePoint;
@@ -104,7 +103,7 @@ dicomNodeError_t load_texture(
         &textureDescription,
         NULL
       );
-  } | [&](){
+  } | [&]() noexcept {
     return cudaMemcpy(
       &(texture->texture),
       &host_texture,
@@ -118,22 +117,23 @@ dicomNodeError_t load_texture(
 
 template<typename T>
 dicomNodeError_t free_host_texture(Texture<3, T>& texture){
-  cudaResourceDesc res;
+  cudaResourceDesc res{};
 
   DicomNodeRunner runner{[](dicomNodeError_t error){
     std::cout << "free_host_texture encoutered an error:" << error_to_human_readable(error) << "\n";
   }};
 
-  runner | [&](){
+  runner | [&]()noexcept {
     return cudaGetTextureObjectResourceDesc(&res, texture.texture);
-  } | [&](){
+  } | [&]()noexcept {
     if(res.resType == cudaResourceTypeArray){
       return cudaFreeArray(res.res.array.array);
     } else {
       printf("Texture was not allocated with array?\n");
+      assert(false);
       return cudaError_t::cudaSuccess;
     }
-  } | [&](){
+  } | [&]() noexcept {
     return cudaDestroyTextureObject(texture.texture);
   };
 
@@ -149,7 +149,7 @@ dicomNodeError_t free_texture(Texture<3, T>** texture){
     return dicomNodeError_t::SUCCESS;
   }
 
-  cudaPointerAttributes attr;
+  cudaPointerAttributes attr{};
   Texture<3, T>* ptr = *texture;
 
   DicomNodeRunner runner([&](dicomNodeError_t error){
@@ -157,7 +157,7 @@ dicomNodeError_t free_texture(Texture<3, T>** texture){
   });
 
   runner
-    | [&](){
+    | [&]() noexcept {
       return cudaPointerGetAttributes(&attr, ptr);
     } | [&](){
       if(is_host_pointer(attr)){
