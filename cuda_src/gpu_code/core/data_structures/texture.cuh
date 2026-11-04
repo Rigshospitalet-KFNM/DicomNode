@@ -23,11 +23,11 @@ class Texture final {
     );
   }
 
-  const Extent<DIMENSION>& extent() const {
+  [[nodiscard]] const Extent<DIMENSION>& extent() const {
     return space.extent();
   }
 
-  constexpr size_t elements() const {
+  [[nodiscard]] constexpr size_t elements() const {
     return space.elements();
   }
 };
@@ -40,9 +40,9 @@ dicomNodeError_t load_texture(
   const T* data,
   const Space<3>& space
 ){
-  cudaTextureDesc textureDescription;
+  cudaTextureDesc textureDescription{};
   memset(&textureDescription, 0, sizeof(textureDescription));
-  cudaResourceDesc resourceDescription;
+  cudaResourceDesc resourceDescription{};
   memset(&resourceDescription, 0, sizeof(resourceDescription));
   const cudaChannelFormatDesc channelFormatDescription = cudaCreateChannelDesc<T>();
   cudaTextureObject_t host_texture;
@@ -110,22 +110,22 @@ dicomNodeError_t load_texture(
 
 template<typename T>
 dicomNodeError_t free_host_texture(Texture<3, T>& texture){
-  cudaResourceDesc res;
+  cudaResourceDesc res{};
 
-  DicomNodeRunner runner{[](dicomNodeError_t error){
+  DicomNodeRunner runner{[]([[maybe_unused]] const dicomNodeError_t error){
     std::cout << "free_host_texture encoutered an error:" << error_to_human_readable(error) << "\n";
   }};
 
-  runner | [&](){
+  runner | [&]() noexcept {
     return cudaGetTextureObjectResourceDesc(&res, texture.texture);
-  } | [&](){
+  } | [&]() noexcept {
     if(res.resType == cudaResourceTypeArray){
       return cudaFreeArray(res.res.array.array);
     } else {
       printf("Texture was not allocated with array?\n");
       return cudaError_t::cudaSuccess;
     }
-  } | [&](){
+  } | [&]() noexcept {
     return cudaDestroyTextureObject(texture.texture);
   };
 
@@ -141,7 +141,7 @@ dicomNodeError_t free_texture(Texture<3, T>** texture){
     return dicomNodeError_t::SUCCESS;
   }
 
-  cudaPointerAttributes attr;
+  cudaPointerAttributes attr{};
   Texture<3, T>* ptr = *texture;
 
   DicomNodeRunner runner([&](dicomNodeError_t error){
@@ -149,7 +149,7 @@ dicomNodeError_t free_texture(Texture<3, T>** texture){
   });
 
   runner
-    | [&](){
+    | [&]() noexcept {
       return cudaPointerGetAttributes(&attr, ptr);
     } | [&](){
       if(is_host_pointer(attr)){

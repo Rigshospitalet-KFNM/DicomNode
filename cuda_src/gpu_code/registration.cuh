@@ -68,12 +68,12 @@ auto centerImage(DicomNodeRunner& runner, Image<3, T>& host_image) {
 template<typename T>
 __host__ dicomNodeError_t volume_difference_device(
 u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
-  return encode_cuda_error(reduce_no_mem<8, VolumeDifference<T>, T>(
+  return reduce_no_mem<8, VolumeDifference<T>, T>(
     elements,
     &error,
     volume_1,
     volume_2
-  ));
+  );
 }
 
 constexpr Space<3> translate_space(

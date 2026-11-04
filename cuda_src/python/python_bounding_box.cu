@@ -5,7 +5,7 @@
 #include<tuple>
 
 template<typename T,  uint8_t CHUNK>
-std::tuple<cudaError_t, pybind11::list> bounding_box(python_array<T>& arr){
+std::tuple<dicomNodeError_t, pybind11::list> bounding_box(python_array<T>& arr){
   const pybind11::buffer_info& buffer = arr.request(false);
   if (buffer.ndim != 3){
     throw std::runtime_error("This function requires 3 dimensional input!");
@@ -22,7 +22,7 @@ std::tuple<cudaError_t, pybind11::list> bounding_box(python_array<T>& arr){
     buffer.shape[2], buffer.shape[1], buffer.shape[0]
   );
 
-  cudaError_t error = reduce<1, BoundingBoxOP_3D<T>, T, BoundingBox_3D, Extent<3>>(
+  dicomNodeError_t error = reduce<1, BoundingBoxOP_3D<T>, T, BoundingBox_3D, Extent<3>>(
     (T*)buffer.ptr,
     buffer_size,
     &out,

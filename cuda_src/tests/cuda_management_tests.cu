@@ -16,13 +16,13 @@ TEST(CUDA_MANAGEMENT_TESTS, Free_Device_memory) {
 
 TEST(CUDA_MANAGEMENT_TESTS, CUDA_RUNNER_TEST){
   int function_flag = 0;
-  cudaError_t error_flag = cudaSuccess;
+  dicomNodeError_t error_flag = dicomNodeError_t::SUCCESS;
 
-  auto error_function = [&](cudaError_t input){
+  auto error_function = [&]([[maybe_unused]] dicomNodeError_t input){
     error_flag = input;
   };
 
-  CudaRunner runner{error_function};
+  DicomNodeRunner runner{error_function};
   runner | [&](){
       function_flag = 1;
       return cudaSuccess;
@@ -34,6 +34,7 @@ TEST(CUDA_MANAGEMENT_TESTS, CUDA_RUNNER_TEST){
     };
 
   EXPECT_TRUE(function_flag == 1);
-  EXPECT_TRUE(error_flag == cudaErrorInitializationError);
-  EXPECT_TRUE(runner.error() == cudaErrorInitializationError);
+  EXPECT_TRUE(extract_cuda_error(error_flag) == cudaErrorInitializationError);
+  EXPECT_TRUE(extract_cuda_error(runner.error()) == cudaErrorInitializationError);
 }
+

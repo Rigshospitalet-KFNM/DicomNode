@@ -17,7 +17,7 @@ __host__ __device__ T invert_index(const T index, const T size){
 template<typename OP, typename T, typename... Args>
   requires Mirrors<OP, T, Args...>
 __global__ void mirror_kernel(
-    T* data_in, T* data_out, size_t num_elements, Args... args
+    T* data_in, T* data_out, const size_t num_elements, Args... args
   ){
 
   const uint64_t global_index = blockDim.x * blockIdx.x + threadIdx.x;
@@ -196,10 +196,11 @@ class Mirror_YZ {
 template<typename T>
 class Mirror_XYZ {
   public:
-    static __host__ __device__ T mirrors(const T* data_in,
-                                         const uint64_t flat_index,
-                                         const Extent<3> space
-                                        ) {
+    static __host__ __device__ T mirrors(
+        const T* data_in,
+        const uint64_t flat_index,
+        const Extent<3> space
+    ) {
       const Index<3> index = space.from_flat_index(flat_index);
 
       const Index<3> inverted_index(
@@ -223,18 +224,18 @@ class Mirror_XYZ {
 
 template<typename OP, typename T>
   requires Mirrors<OP, T, Extent<3>>
-__host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space){
+__host__ dicomNodeError_t mirror(const T* data_in, T* data_out, const Extent<3> space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
   const size_t data_size = space.elements();
 
-  auto error_function = [&](cudaError_t error){
+  auto error_function = [&]([[maybe_unused]] cudaError_t error){
     free_device_memory(&device_data_in, &device_data_out);
   };
 
   const dim3 grid = get_grid<1>(data_size, MAP_BLOCK_SIZE);
 
-  CudaRunner runner{error_function};
+  DicomNodeRunner runner{error_function};
 
   // So here there's a mirco optimization of just allocating once and indexing
   // I should write some benchmarks to measure just how much it effects stuff
@@ -258,18 +259,18 @@ __host__ cudaError_t mirror(const T* data_in, T* data_out, const Extent<3> space
 
 template<typename OP, typename T>
   requires Mirrors<OP, T, Extent<3>>
-__host__ cudaError_t mirror_in_place(T* data_in, const Extent<3>& space){
+__host__ dicomNodeError_t mirror_in_place(T* data_in, const Extent<3>& space){
   T* device_data_in = nullptr;
   T* device_data_out = nullptr;
   const size_t elements = space.elements();
 
-  auto error_function = [&](cudaError_t error){
+  auto error_function = [&]([[maybe_unused]] dicomNodeError_t error){
     free_device_memory(&device_data_in, &device_data_out);
   };
 
   const dim3 grid = get_grid<1>(elements, MAP_BLOCK_SIZE);
 
-  CudaRunner runner{error_function};
+  DicomNodeRunner runner{error_function};
 
   // So here there's a mirco optimization of just allocating once and indexing
   // I should write some benchmarks to measure just how much it effects stuff

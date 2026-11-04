@@ -20,7 +20,7 @@ __global__ void map_kernel(T_IN* in, T_OUT* out, size_t data_size, Args... args)
 
 template<typename OP, typename T_IN, typename T_OUT, typename... Args>
   requires Mapping<OP, T_IN, T_OUT, Args...>
-cudaError_t map(T_IN* data_in, T_OUT* data_out, size_t data_size, Args... args){
+dicomNodeError_t map(T_IN* data_in, T_OUT* data_out, size_t data_size, Args... args){
   T_IN* device_data_in = nullptr;
   T_OUT* device_data_out = nullptr;
 
@@ -30,7 +30,7 @@ cudaError_t map(T_IN* data_in, T_OUT* data_out, size_t data_size, Args... args){
 
   const dim3 grid = get_grid<1>(data_size, MAP_BLOCK_SIZE);
 
-  CudaRunner runner{error_function};
+  DicomNodeRunner runner{error_function};
 
   // So here there's a mirco optimization of just allocating once and indexing
   // I should write some benchmarks to measure just how much it effects stuff

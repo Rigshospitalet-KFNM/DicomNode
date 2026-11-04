@@ -19,7 +19,7 @@ int py_mirror(python_array<T> arr){
     throw std::runtime_error("Input shape must be 3");
   }
 
-  for(ssize_t size : arr_buffer.shape){
+  for(const ssize_t& size : arr_buffer.shape){
     if(size <= 0){
       throw std::runtime_error("One of the shapes does not have a dimension!");
     }
@@ -31,7 +31,7 @@ int py_mirror(python_array<T> arr){
     arr_buffer.shape[2]
   );
 
-  cudaError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, extent);
+  dicomNodeError_t error = mirror_in_place<OP, T>((T*)arr_buffer.ptr, extent);
 
   return (int)error;
 }

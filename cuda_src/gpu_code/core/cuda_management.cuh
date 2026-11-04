@@ -13,7 +13,7 @@ static bool is_host_pointer(const cudaPointerAttributes& attr){
 }
 
 static bool is_host_pointer(const void* ptr){
-  cudaPointerAttributes attr;
+  cudaPointerAttributes attr{};
   cudaPointerGetAttributes(&attr, ptr); // Fucked if this fails
   return is_host_pointer(attr);
 }
@@ -31,57 +31,81 @@ void free_device_memory(Ts** && ... device_pointer){
   }(), ...);
 }
 
+struct GPUAllocation {
+  void* data = nullptr;
+  u64 size = 0;
 
-class CudaRunner{
-  public:
-    CudaRunner(std::function<void(cudaError_t)> error_function)
-      : m_error_function(error_function){}
+  GPUAllocation() = default;
+  GPUAllocation(const GPUAllocation&) = delete;
+  GPUAllocation& operator=(const GPUAllocation&) = delete;
+  GPUAllocation(GPUAllocation&& other) noexcept : data(other.data), size(other.size)  {
+    other.data = nullptr;
+    other.size = 0;
+  }
+  GPUAllocation& operator=(GPUAllocation&& other) noexcept {
+    assert(data == nullptr);
 
-    CudaRunner()
-      : m_error_function([](cudaError_t error){}){}
+    data = other.data;
+    size = other.size;
 
-    cudaError_t error() const {
-      return m_error;
+    other.data = nullptr;
+
+    return *this;
+  }
+};
+
+template<typename T>
+struct GPUSpan {
+  T* data = nullptr;
+  u64 size = 0;
+};
+
+class GPUAllocator {
+  std::vector<GPUAllocation> allocations;
+
+public:
+  GPUAllocator() = default;
+  GPUAllocator(const GPUAllocator&) = delete;
+  GPUAllocator& operator=(const GPUAllocator&) = delete;
+  GPUAllocator(GPUAllocator&& other) noexcept = default;
+  GPUAllocator& operator=(GPUAllocator&& other) noexcept = default;
+
+  ~GPUAllocator() noexcept {
+    for (const auto& allocation : allocations) {
+      cudaFree(allocation.data);
+    }
+  }
+
+  cudaError_t allocate(GPUAllocation& requested_allocation) {
+    for (auto& allocation : allocations) {
+      if (allocation.size == requested_allocation.size) {
+        requested_allocation = std::move(allocation);
+        allocation = std::move(allocations.back());
+        allocations.pop_back(); // It's ok to invalidate the iterator here
+        return cudaSuccess;
+      }
     }
 
-    CudaRunner& operator|(std::function<cudaError_t()> func) {
-      if(m_error == cudaSuccess) [[likely]] {
-        m_error = func();
-        if (m_error != cudaSuccess) [[unlikely]] {
-          m_error_function(m_error);
-        }
-      }
-      return *this;
-    };
+    return cudaMalloc(&requested_allocation.data, requested_allocation.size);
+  }
 
-    template<typename F>
-      requires std::invocable<F> &&
-               std::same_as<std::invoke_result_t<F>, cudaError_t>
-    CudaRunner& operator|(F&& func) {
-      if(m_error == cudaSuccess) [[likely]]{
-        m_error = func();
-        if (m_error != cudaSuccess)[[unlikely]]{
-          m_error_function(m_error);
-        }
-      }
-      return *this;
-    };
-
-  private:
-    std::function<void(cudaError_t)> m_error_function;
-    cudaError_t m_error = cudaSuccess;
+  void release(GPUAllocation& allocation) {
+    allocations.emplace_back(std::move(allocation));
+  }
 };
 
 class DicomNodeRunner{
   public:
-    DicomNodeRunner() : m_error_function([](dicomNodeError_t _){}){}
+    DicomNodeRunner() : m_error_function(
+      []([[maybe_unused]] dicomNodeError_t _){}
+    ){}
 
     DicomNodeRunner(std::function<void(dicomNodeError_t)> error_function)
     : m_error_function(std::move(error_function)) {}
 
-  DicomNodeRunner& operator|(std::function<cudaError_t()> func){
+  DicomNodeRunner& operator|(const std::function<cudaError_t()>& func){
     if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
-      cudaError_t ret = func();
+      const cudaError_t ret = func();
       if(ret != cudaSuccess) [[unlikely]] {
         m_error = encode_cuda_error(ret);
         m_error_function(m_error);
@@ -90,7 +114,7 @@ class DicomNodeRunner{
     return *this;
   }
 
-  DicomNodeRunner& operator|(std::function<dicomNodeError_t()> func){
+  DicomNodeRunner& operator|(const std::function<dicomNodeError_t()>& func){
     if(m_error == dicomNodeError_t::SUCCESS) [[likely]]{
       m_error = func();
       if(m_error != dicomNodeError_t::SUCCESS) [[unlikely]]{
@@ -113,19 +137,44 @@ class DicomNodeRunner{
     return *this;
   }
 
-  constexpr dicomNodeError_t error() const noexcept {
+  [[nodiscard]] constexpr dicomNodeError_t error() const noexcept {
     return m_error;
+  }
+
+  template<typename T>
+  GPUSpan<T> allocate(u64 size) {
+    GPUAllocation alloc;
+
+    if (m_error == dicomNodeError_t::SUCCESS) {
+      m_error = encode_cuda_error(allocator.allocate(alloc));
+    }
+
+    return GPUSpan<T>{
+      .data = alloc.data,
+      .size = size
+    };
+  }
+
+  template<typename T>
+  void release(GPUSpan<T> gpu_span) {
+    GPUAllocation alloc {
+      .data = gpu_span.data,
+      .size = gpu_span.size
+    };
+
+    allocator.release(alloc);
   }
 
   private:
     std::function<void(dicomNodeError_t)> m_error_function;
     dicomNodeError_t m_error = dicomNodeError_t::SUCCESS;
+    GPUAllocator allocator;
 };
 
-static std::tuple<cudaError_t, cudaDeviceProp> get_current_device(){
-  CudaRunner runner;
-  cudaDeviceProp prop;
-  int current_device;
+static std::tuple<dicomNodeError_t, cudaDeviceProp> get_current_device(){
+  DicomNodeRunner runner;
+  cudaDeviceProp prop = {};
+  i32 current_device;
   runner
     | [&](){
       return cudaGetDevice(&current_device);
@@ -136,9 +185,9 @@ static std::tuple<cudaError_t, cudaDeviceProp> get_current_device(){
 }
 
 template<class R, class... Args>
-i32 maximize_shared_memory(R (kernel)(Args...)){
+u64 maximize_shared_memory(R (kernel)(Args...)){
   auto [error, dev_prop] = get_current_device();
-  if (error == cudaSuccess && dev_prop.major >= 7){
+  if (error == dicomNodeError_t::SUCCESS && dev_prop.major >= 7){
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, dev_prop.sharedMemPerBlockOptin);
   }
   return dev_prop.sharedMemPerBlockOptin;
@@ -161,7 +210,7 @@ template<auto HostFunction, auto DeviceFunction, typename PTR_T, typename... Arg
   //         std::same_as<std::invoke_result_t<decltype(DeviceFunction)>, dicomNodeError_t>
 dicomNodeError_t pointer_location_dependent_code(PTR_T* pointer, Args... args) {
   DicomNodeRunner runner;
-  cudaPointerAttributes attr;
+  cudaPointerAttributes attr{};
 
   runner | [&]() {
     return cudaPointerGetAttributes(&attr, pointer);
