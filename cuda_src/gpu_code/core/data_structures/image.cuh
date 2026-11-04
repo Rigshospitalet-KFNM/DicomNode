@@ -20,47 +20,40 @@
 //template<template<uint8_t DIMENSIONS, typename T> typename VOLUME, uint8_t DIMENSIONS, typename T>
 //  requires CVolume<VOLUME, DIMENSIONS, T>
 template<u8 DIMENSIONS,typename T>
-class Image final {
+struct Image final {
   static_assert(0 < DIMENSIONS);
 
-  public:
-    Space<DIMENSIONS> space;
-    Volume<DIMENSIONS, T> volume;
-
-  __device__ __host__ Image(){}
-  __device__ __host__ Image(Space<DIMENSIONS> a_space, Volume<DIMENSIONS, T> v_volume):
-    space(std::move(a_space)),
-    volume(std::move(v_volume))
-  {}
+  Space<DIMENSIONS> space;
+  Volume<DIMENSIONS, T> volume;
 
   //T operator()(Point<DIMENSIONS> point){}
-  constexpr __device__ __host__ T*& data() noexcept {
+  [[nodiscard]] constexpr __device__ __host__ T*& data() noexcept {
     return volume.data;
   }
 
-  constexpr __device__ __host__ const T* data() const noexcept {
+  [[nodiscard]] constexpr __device__ __host__ const T* data() const noexcept {
     return volume.data;
   }
 
-  constexpr const u32& num_cols() const {
-    return space.extent.sizes[0];
+  [[nodiscard]] constexpr __device__ __host__ const u32& num_cols() const noexcept {
+    return volume.extent().sizes[0];
   }
 
-  constexpr const u32& num_rows () const {
+  [[nodiscard]] constexpr __device__ __host__ const u32& num_rows () const noexcept {
     static_assert(1 < DIMENSIONS);
-    return space.extent.sizes[1];
+    return volume.extent().sizes[1];
   }
 
-  constexpr const u32& num_slices() const {
+  [[nodiscard]] constexpr __device__ __host__ const u32& num_slices() const noexcept {
     static_assert(2 < DIMENSIONS);
-    return space.extent.sizes[2];
+    return volume.extent().sizes[2];
   }
 
-  constexpr const Extent<DIMENSIONS>& extent() const {
-    return space.extent;
+  [[nodiscard]] constexpr __device__ __host__ const Extent<DIMENSIONS>& extent() const {
+    return volume.extent();
   }
 
-  [[nodiscard]] constexpr __host__ __device__ const Point<DIMENSIONS> at(const Point<DIMENSIONS>& p) const noexcept  {
+  [[nodiscard]] constexpr __host__ __device__  Point<DIMENSIONS> at(const Point<DIMENSIONS>& p) const noexcept  {
     return p * space.basis + space.starting_point;
   }
 
@@ -69,7 +62,7 @@ class Image final {
    *
    * @return
    */
-  constexpr size_t size() const {
+  [[nodiscard]] constexpr size_t size() const noexcept {
     return volume.size();
   }
 
@@ -77,7 +70,7 @@ class Image final {
    *
    * @return
    */
-  constexpr __device__ __host__ size_t elements() const {
+  [[nodiscard]] constexpr __device__ __host__ size_t elements() const noexcept {
     return volume.elements();
   }
 };
@@ -92,7 +85,6 @@ __device__ __host__ Image<3, T> sub_image(
     return Image<3, T>(
       offset_space(
         original.space,
-        new_extent,
         offset_index
     ),
     sub_volume(

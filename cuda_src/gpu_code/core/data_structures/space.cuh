@@ -29,35 +29,26 @@ class Space final {
      */
     Point<DIMENSIONS> starting_point;
     SquareMatrix<DIMENSIONS> basis;
-    SquareMatrix<DIMENSIONS> inverted_basis;
-    Extent<DIMENSIONS> extent;
+    SquareMatrix<DIMENSIONS> inverted_basis; // This is just saved to avoid recomputing the inverse every time it's needed
 
     /** Transforms an index into the point in side
      *
      * @param index
      * @return
      */
-    __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
+    constexpr __device__ __host__ Point<DIMENSIONS> at_index(const Index<DIMENSIONS>& index) const {
     Point<DIMENSIONS> point{index};
     return point * basis + starting_point;
   }
 
-  __device__ __host__ Point<DIMENSIONS> interpolate_point(const Point<DIMENSIONS>& point) const {
+  constexpr __device__ __host__ Point<DIMENSIONS> interpolate_point(const Point<DIMENSIONS>& point) const {
     return (point - starting_point) * inverted_basis;
-  }
-
-  __device__ __host__ Index<DIMENSIONS> index(const u64& flat_index) const {
-    return extent.from_flat_index(flat_index);
-  }
-
-  [[nodiscard]] constexpr __device__ __host__ size_t elements() const noexcept {
-    return extent.elements();
   }
 
   /** Center the space such that midpoint
     *
     */
-  constexpr Point<DIMENSIONS> center_space() noexcept {
+  constexpr Point<DIMENSIONS> center_space(const Extent<DIMENSIONS>& extent) noexcept {
     const Index<DIMENSIONS> index = extent.central_point();
     const Point<DIMENSIONS> index_point = index;
 
@@ -72,14 +63,12 @@ class Space final {
 
 __device__ __host__ inline Space<3> offset_space(
     const Space<3>& original_space,
-    const Extent<3>& new_extent,
     const Index<3>& offset
 ) {
   return Space{
       .starting_point=original_space.at_index(offset),
       .basis=original_space.basis,
       .inverted_basis=original_space.inverted_basis,
-      .extent=new_extent
     };
 }
 

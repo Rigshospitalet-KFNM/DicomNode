@@ -125,7 +125,7 @@ constexpr Space<3> translate_space(
  * @param runner DicomRunner used to allocate the source image, destination Image and out volume
  * @param host_source_image The volume where data is gathered from
  * @param translation A translation of the source image
- * @param host_destination_space The Space that the translated image should be interpolated to
+ * @param host_destination_image The Space that the translated image should be interpolated to
  * @param out_volume The volume that is interpolated into
  * @return
  */
@@ -134,7 +134,7 @@ __host__ dicomNodeError_t interpolate_for_registration(
   DicomNodeRunner& runner,
   Image<3, T> host_source_image, // SHALLOW COPY!
   const ImageTranslation& translation,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_destination_image,
   Volume<3, T>& out_volume
   ) {
   host_source_image.space = translate_space(host_source_image.space, translation);
@@ -142,7 +142,7 @@ __host__ dicomNodeError_t interpolate_for_registration(
   runner | [&]{
     return gpu_interpolation_linear_shared_cheating(
       host_source_image,
-      host_destination_space,
+      host_destination_image,
       out_volume.data
     );
   };
@@ -156,7 +156,7 @@ __host__ dicomNodeError_t interpolate_for_registration(
  * @param runner DicomRunner used to allocate the source image, destination Image and out volume
  * @param host_source_image The volume where data is gathered from
  * @param translation A translation of the source image
- * @param host_destination_space The Space that the translated image should be interpolated to
+ * @param host_destination_image The Space that the translated image should be interpolated to
  * @param out_volume The volume that is interpolated into
  * @return
  */
@@ -164,18 +164,18 @@ template<typename T>
 __host__ dicomNodeError_t interpolate_for_registration(
     Image<3, T> host_source_image, // SHALLOW COPY!
     const ImageTranslation& translation,
-    Space<3> host_destination_space, // I modify it, so I need a copy.
+    Image<3, T> host_destination_image, // I modify it, so I need a copy.
     Volume<3, T>& out_volume
-    ) {
+  ) {
 
   //const auto offset_source = host_source_image.space.center_space();
   host_source_image.space = translate_space(host_source_image.space, translation);
 
   //const auto offset_destination = host_destination_space.center_space();
 
-  dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
+  const dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
     host_source_image,
-    host_destination_space,
+    host_destination_image,
     out_volume.data
   );
 
@@ -193,7 +193,7 @@ struct OptimizerParam {
 };
 
 
-/**
+/** s
  *
  * @tparam T type of the Cost
  */
@@ -211,8 +211,6 @@ struct Optimizer {
 
   u32 iterations = 0;
   u8 step_size_reductions = 0;
-
-
 
   Optimizer(auto cost_function) {
     best_params.cost = cost_function(best_params);
@@ -296,7 +294,7 @@ dicomNodeError_t cost_function (
     return REGISTRATION::interpolate_for_registration<T>(
       host_target_image,
       params.affine,
-      host_source_image.space,
+      host_source_image,
       temp_volume
     );
   } | [&](){return REGISTRATION::volume_difference_device<T>(

@@ -6,17 +6,16 @@ namespace INTERPOLATION {
   template<typename T>
   __global__ void kernel_interpolation_linear(
     const Texture<3, T>* src_image,
-    const Space<3>* dst_space,
+    const Image<3, T>* destination_image,
     T* destination_data
   ){
     const Texture<3, T>& texture = *src_image;
-    const Space<3>& destination_space = *dst_space;
 
-    const uint64_t gid = get_gid();
+    const u64 gid = get_gid();
 
-    if(gid < destination_space.elements()){
-      const Index<3> index = destination_space.index(gid);
-      const Point<3> point = destination_space.at_index(index);
+    if(gid < destination_image->elements()){
+      const Index<3> index = destination_image->volume.extent().from_flat_index(gid);
+      const Point<3> point = destination_image->space.at_index(index);
       destination_data[gid] = texture(point);
     }
   }
@@ -24,16 +23,16 @@ namespace INTERPOLATION {
   template<typename T>
   __global__ void kernel_interpolation_linear(
     const Image<3, T>* src_image,
-    const Space<3>* dst_space,
+    const Image<3, T>* destination_image,
     T* destination_data
   ) {
 
-    const size_t destination_elements = dst_space->elements();
+    const size_t destination_elements = destination_image->elements();
     const u64 gid = get_gid();
 
     if (gid < destination_elements) {
-      const Index<3> gid_index = dst_space->index(gid);
-      const Point<3> point_in_destination_space = dst_space->at_index(gid_index);
+      const Index<3> gid_index = destination_image->extent().from_flat_index(gid);
+      const Point<3> point_in_destination_space = destination_image->space.at_index(gid_index);
       const Point<3> point_in_source_space = src_image->space.interpolate_point(point_in_destination_space);
       destination_data[gid] = src_image->volume.interpolate_at_index_point(point_in_source_space);
     }
@@ -42,16 +41,16 @@ namespace INTERPOLATION {
   template<typename T>
   __global__ void kernel_interpolation_linear_blocked(
     const Image<3, T>* src_image,
-    const Space<3>* dst_space,
+    const Image<3, T>* destination_image,
     T* destination_data
   ) {
 
     const Index<3> global_index = get_gidx();
 
-    const FlatIndex gid = dst_space->extent.flat_index(global_index);
+    const FlatIndex gid = destination_image->extent().flat_index(global_index);
 
     if (gid.has_value()) {
-      const Point<3> point_in_destination_space = dst_space->at_index(global_index);
+      const Point<3> point_in_destination_space = destination_image->space.at_index(global_index);
       const Point<3> point_in_source_space = src_image->space.interpolate_point(point_in_destination_space);
       destination_data[gid] = src_image->volume.interpolate_at_index_point(point_in_source_space);
     }
@@ -60,12 +59,11 @@ namespace INTERPOLATION {
   template<typename T>
   __global__ void kernel_interpolation_linear_shared(
     const Image<3, T>* src_image,
-    const Space<3>* dst_space,
+    const Image<3, T>* destination_image,
     T* destination_data
   ) {
     // Just for my sanity
     const Image<3,T>& source_image = *src_image;
-    const Space<3>& destination_space = *dst_space;
 
     constexpr Extent<3> shared_extent{THREAD_BLOCK_3D.z + 1, THREAD_BLOCK_3D.y + 1, THREAD_BLOCK_3D.x + 1 };
     __shared__ T shared_image_ptr[(THREAD_BLOCK_3D.x + 1)*(THREAD_BLOCK_3D.y + 1)*(THREAD_BLOCK_3D.z + 1)];
@@ -82,9 +80,9 @@ namespace INTERPOLATION {
       offset_index
     );
 
-    FlatIndex flat_global_index = destination_space.extent.flat_index(get_gidx());
+    FlatIndex flat_global_index = destination_image->extent().flat_index(get_gidx());
     if (flat_global_index.has_value()) {
-      const Point<3> point_in_source_space = shared_image.space.interpolate_point(destination_space.at_index(get_gidx()));
+      const Point<3> point_in_source_space = shared_image.space.interpolate_point(destination_image->space.at_index(get_gidx()));
       destination_data[flat_global_index] = shared_image.volume.interpolate_at_index_point(point_in_source_space);
     }
   }
@@ -150,31 +148,31 @@ namespace INTERPOLATION {
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear(
   const Texture<3, T>* device_texture,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_destination_image,
   T* device_out_data
 ){
-  Space<3>* device_space = nullptr;
+  Image<3, T>* device_destination_image = nullptr;
 
   constexpr size_t THREADS = 1024;
 
   DicomNodeRunner runner{[&](dicomNodeError_t _){
-    free_device_memory(&device_space);
+    free_device_memory(&device_destination_image);
   }};
 
   runner
-    | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
-    | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+    | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+    | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3,T>), cudaMemcpyDefault);}
     | [&](){
-      const u32 block_count = envelope_length<THREADS>(host_destination_space.elements());
+      const u32 block_count = envelope_length<THREADS>(host_destination_image.elements());
       INTERPOLATION::kernel_interpolation_linear<T><<<block_count, THREADS>>>(
         device_texture,
-        device_space,
+        device_destination_image,
         device_out_data
       );
       return cudaGetLastError();
     }
     | [&](){
-      free_device_memory(&device_space);
+      free_device_memory(&device_destination_image);
       return dicomNodeError_t::SUCCESS;
     };
 
@@ -183,36 +181,36 @@ dicomNodeError_t gpu_interpolation_linear(
 
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear(
-  const Image<3, T>& host_image,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_source_image,
+  const Image<3, T>& host_destination_image,
   T* device_out_data
 ){
 
   constexpr u64 THREADS = 1024;
 
-  Space<3>* device_space = nullptr;
-  Image<3, T>* device_image = nullptr;
+  Image<3, T>* device_source_image = nullptr;
+  Image<3, T>* device_destination_image = nullptr;
 
   DicomNodeRunner runner{[&](const dicomNodeError_t error){
     print_error(error);
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
   }};
 
   runner
-    | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
-    | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
-    | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-    | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+    | [&](){ return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
+    | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+    | [&](){ return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+    | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
     | [&](){
-      const u32 block_count = envelope_length<THREADS>(host_destination_space.elements());
+      const u32 block_count = envelope_length<THREADS>(host_destination_image.elements());
       INTERPOLATION::kernel_interpolation_linear<T><<<block_count, THREADS>>>(
-        device_image,
-        device_space,
+        device_source_image,
+        device_destination_image,
         device_out_data
       );
       return cudaGetLastError();
     } | [&](){
-      free_device_memory(&device_space, &device_image);
+      free_device_memory(&device_destination_image, &device_source_image);
       return dicomNodeError_t::SUCCESS;
     };
 
@@ -221,34 +219,34 @@ dicomNodeError_t gpu_interpolation_linear(
 
 template<typename T, auto Kernel>
 dicomNodeError_t gpu_interpolation_linear_t(
-  const Image<3, T>& host_image,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_source_image,
+  const Image<3, T>& host_destination_image,
   T* device_out_data
 ) {
-  Space<3>* device_space = nullptr;
-  Image<3, T>* device_image = nullptr;
+  Image<3, T>* device_source_image = nullptr;
+  Image<3, T>* device_destination_image = nullptr;
 
   DicomNodeRunner runner{[&](const dicomNodeError_t error){
     print_error(error);
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
   }};
 
   runner
-  | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
-  | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
-  | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-  | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+  | [&](){ return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
+  | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+  | [&](){ return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
   | [&](){
-    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3d_SMALLER>(host_destination_space.extent);
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3d_SMALLER>(host_destination_image.extent());
     Kernel<<<envelope_grid, THREAD_BLOCK_3d_SMALLER>>>(
-      device_image,
-      device_space,
+      device_source_image,
+      device_destination_image,
       device_out_data
     );
 
     return cudaGetLastError();
   } | [&](){
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
     return dicomNodeError_t::SUCCESS;
   };
   return runner.error();
@@ -256,40 +254,40 @@ dicomNodeError_t gpu_interpolation_linear_t(
 
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear_cheating(
-  const Image<3, T>& host_image,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_source_image,
+  const Image<3, T>& host_destination_image,
   T* device_out_data
 ) {
-  Space<3>* device_space = nullptr;
-  Image<3, T>* device_image = nullptr;
+  Image<3, T>* device_source_image = nullptr;
+  Image<3, T>* device_destination_image = nullptr;
 
   INTERPOLATION::InterpolationIntermediateCalculation intermediate {
-    .composed_basis = host_destination_space.basis * host_image.space.inverted_basis,
-    .composed_offset = (host_destination_space.starting_point - host_image.space.starting_point) * host_image.space.inverted_basis
+    .composed_basis = host_destination_image.space.basis * host_source_image.space.inverted_basis,
+    .composed_offset = (host_destination_image.space.starting_point - host_source_image.space.starting_point) * host_source_image.space.inverted_basis
   };
 
   DicomNodeRunner runner{[&](const dicomNodeError_t error){
     print_error(error);
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
   }};
 
   runner
-  | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
-  | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
-  | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-  | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+  | [&](){ return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
+  | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+  | [&](){ return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
   | [&](){
-    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_image.extent());
     INTERPOLATION::kernel_interpolation_linear_cheating<<<envelope_grid, THREAD_BLOCK_3D>>>(
-      host_image.volume,
-      host_destination_space.extent,
+      host_source_image.volume,
+      host_destination_image.extent(),
       intermediate,
       device_out_data
     );
 
     return cudaGetLastError();
   } | [&](){
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
     return dicomNodeError_t::SUCCESS;
   };
   return runner.error();
@@ -297,40 +295,40 @@ dicomNodeError_t gpu_interpolation_linear_cheating(
 
 template<typename T>
 dicomNodeError_t gpu_interpolation_linear_shared_cheating(
-  const Image<3, T>& host_image,
-  const Space<3>& host_destination_space,
+  const Image<3, T>& host_source_image,
+  const Image<3, T>& host_destination_image,
   T* device_out_data
 ) {
-  Space<3>* device_space = nullptr;
-  Image<3, T>* device_image = nullptr;
+  Image<3, T>* device_source_image = nullptr;
+  Image<3, T>* device_destination_image = nullptr;
 
   INTERPOLATION::InterpolationIntermediateCalculation intermediate {
-    .composed_basis = host_destination_space.basis * host_image.space.inverted_basis,
-    .composed_offset = (host_destination_space.starting_point - host_image.space.starting_point) * host_image.space.inverted_basis
+    .composed_basis = host_destination_image.space.basis * host_source_image.space.inverted_basis,
+    .composed_offset = (host_destination_image.space.starting_point - host_source_image.space.starting_point) * host_source_image.space.inverted_basis
   };
 
   DicomNodeRunner runner{[&](const dicomNodeError_t error){
     print_error(error);
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
   }};
 
   runner
-  | [&](){ return cudaMalloc(&device_image, sizeof(Image<3, T>)); }
-  | [&](){ return cudaMalloc(&device_space, sizeof(Space<3>));}
-  | [&](){ return cudaMemcpy(device_image, &host_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
-  | [&](){ return cudaMemcpy(device_space, &host_destination_space, sizeof(Space<3>), cudaMemcpyDefault);}
+  | [&](){ return cudaMalloc(&device_source_image, sizeof(Image<3, T>)); }
+  | [&](){ return cudaMalloc(&device_destination_image, sizeof(Image<3, T>));}
+  | [&](){ return cudaMemcpy(device_source_image, &host_source_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
+  | [&](){ return cudaMemcpy(device_destination_image, &host_destination_image, sizeof(Image<3, T>), cudaMemcpyDefault);}
   | [&](){
-    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_space.extent);
+    const dim3 envelope_grid = get_envelope_grid<THREAD_BLOCK_3D>(host_destination_image.extent());
     INTERPOLATION::kernel_interpolation_linear_shared_cheating<<<envelope_grid, THREAD_BLOCK_3D>>>(
-      host_image.volume,
-      host_destination_space.extent,
+      host_source_image.volume,
+      host_destination_image.extent(),
       intermediate,
       device_out_data
     );
 
     return cudaGetLastError();
   } | [&](){
-    free_device_memory(&device_space, &device_image);
+    free_device_memory(&device_destination_image, &device_source_image);
     return dicomNodeError_t::SUCCESS;
   };
   return runner.error();

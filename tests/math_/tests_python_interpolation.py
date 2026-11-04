@@ -119,7 +119,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     image = Image(data, space)
 
-    error, arr = _cuda.interpolation.linear(image, space)
+    error, arr = _cuda.interpolation.linear(image, space, space.extent)
 
     self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
     self.assertTrue((arr == data).all())
@@ -142,7 +142,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     image = Image(data, space)
 
-    error, arr = _cuda.interpolation.linear(image, space)
+    error, arr = _cuda.interpolation.linear(image, space, space.extent)
 
     self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
     self.assertTrue((arr == data).all())
@@ -163,7 +163,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     out_space = Space(numpy.eye(3, dtype=numpy.float32), [1,1,1], out_shape)
 
-    error, arr = _cuda.interpolation.linear(image, out_space)
+    error, arr = _cuda.interpolation.linear(image, out_space, out_space.extent)
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
@@ -188,7 +188,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
     out_shape = (3,3, 5)
     out_space = Space(numpy.eye(3, dtype=numpy.float32), [0.5,0,0], out_shape)
 
-    error, arr = _cuda.interpolation.linear(image, out_space)
+    error, arr = _cuda.interpolation.linear(image, out_space, out_space.extent)
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
@@ -214,7 +214,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
     out_shape = (4,4,4)
     out_space = Space((numpy.eye(3, dtype=numpy.float32) * 2), [0.0,0.0,0.0], out_shape)
 
-    error, arr = _cuda.interpolation.linear(image, out_space)
+    error, arr = _cuda.interpolation.linear(image, out_space, out_space.extent)
 
     self.assertFalse(error)
     self.assertEqual(arr.shape, out_shape)
@@ -239,7 +239,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
     out_shape = (4,4,4)
     out_space = Space((numpy.eye(3, dtype=numpy.float32) / (1/2)), [0.0,0.0,0.0], out_shape)
 
-    error, arr = _cuda.interpolation.linear(image, out_space)
+    error, arr = _cuda.interpolation.linear(image, out_space, out_space.extent)
 
     cpu_version = cpu_interpolate(
         image,
@@ -348,7 +348,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
     out_space = Space(numpy.eye(3, dtype=numpy.float32), (0.5,0,0), out_shape)
 
     s, out = _cuda.interpolation.linear_image(
-      image, out_space
+      image, out_space, out_space.extent
     )
 
     self.assertFalse(s)
@@ -366,7 +366,7 @@ class GPUInterpolationTest(DicomnodeTestCase):
 
     image = Image(data, space)
 
-    error, arr = _cuda.interpolation.linear_image(image, space)
+    error, arr = _cuda.interpolation.linear_image(image, space, space.extent)
 
     self.assertFalse(error) # Here dicomnodeError = 0 so this should be false.
     self.assertTrue((arr == data).all())
