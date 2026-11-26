@@ -1,7 +1,104 @@
 #include <gtest/gtest.h>
+#include <array>
+#include <memory>
+#include <random>
 
 #include "test_data.cuh"
 #include"../gpu_code/dicom_node_gpu.cuh"
+
+
+namespace SCAN {
+  template<typename T>
+  struct ADD {
+    static __host__ __device__ T identity() noexcept {
+      return 0;
+    }
+
+    static __host__ __device__ bool equals(const T lhs, const T rhs) {
+      return lhs == rhs;
+    }
+
+    static __host__ __device__ T map_to(const T in, [[maybe_unused]] u64 flat_index) {
+      return in;
+    }
+
+    static __host__ __device__ T apply(const T a, const T b) {
+      return a + b;
+    }
+
+    static __host__ __device__ T remove_volatile(volatile T& x) {
+      T xx = x;
+      return xx;
+    }
+  };
+
+  TEST(SCAN, STANDARD_SCAN_U32) {
+    using TestType = u32;
+    constexpr auto INPUT_RAND_MAX = 1 << 16;
+    constexpr auto DATA_SIZE = 1 << 16;
+
+    std::random_device dev{};
+    std::mt19937 rng{dev()};
+    std::uniform_int_distribution<TestType> distribution(0, INPUT_RAND_MAX);
+
+    const auto host_input_data = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    for (auto& i : *host_input_data) {
+      i = distribution(rng);
+    }
+
+    const auto host_expected = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    TestType accum = 0;
+    for (u64 idx = 0; idx < DATA_SIZE; idx++) {
+      accum += (*host_input_data)[idx];
+      (*host_expected)[idx] = accum;
+    }
+
+    const auto host_output = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    dicomNodeError_t error = scan<8, ADD<TestType>, TestType, TestType> (host_input_data->data(), DATA_SIZE, host_output->data());
+    ASSERT_EQ(error, dicomNodeError_t::SUCCESS);
+
+    for (u64 idx = 0; idx < DATA_SIZE; idx++) {
+      ASSERT_EQ((*host_output)[idx], (*host_expected)[idx]);
+    }
+  }
+
+  TEST(SCAN, STANDARD_SCAN_F64) {
+    // This test doesn't really work for f32 because addition fucks up.
+    using TestType = f64;
+    constexpr auto INPUT_RAND_MAX = 1 << 4;
+    constexpr auto DATA_SIZE = 1 << 16;
+
+    std::random_device dev{};
+    std::mt19937 rng{dev()};
+    std::uniform_real_distribution<TestType> distribution(0, INPUT_RAND_MAX);
+
+    const auto host_input_data = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    for (auto& i : *host_input_data) {
+      i = distribution(rng);
+    }
+
+    const auto host_expected = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    TestType accum = 0;
+    for (u64 idx = 0; idx < DATA_SIZE; idx++) {
+      accum += (*host_input_data)[idx];
+      (*host_expected)[idx] = accum;
+    }
+
+    const auto host_output = std::make_unique<std::array<TestType, DATA_SIZE>>();
+
+    const dicomNodeError_t error = scan<4, ADD<TestType>, TestType, TestType> (host_input_data->data(), DATA_SIZE, host_output->data());
+    ASSERT_EQ(error, dicomNodeError_t::SUCCESS);
+
+    for (u64 idx = 0; idx < DATA_SIZE; idx++) {
+      ASSERT_FLOAT_EQ((*host_output)[idx],(*host_expected)[idx]);
+    }
+  }
+}
 
 namespace REDUCE {
   constexpr std::array<f32, 3 * 3 * 3> image_1_data = {
@@ -138,8 +235,9 @@ TEST(REDUCE, COPY_INTO_SHARED_WORKS) {
   cudaFree(image_2.data());
   cudaFree(device_image_1);
   cudaFree(device_image_2);
-
 }
+
+
 
 
 }

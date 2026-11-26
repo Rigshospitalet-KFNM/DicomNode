@@ -140,7 +140,7 @@ __host__ dicomNodeError_t interpolate_for_registration(
   host_source_image.space = translate_space(host_source_image.space, translation);
 
   runner | [&]{
-    return gpu_interpolation_linear_shared_cheating(
+    return gpu_interpolation_linear(
       host_source_image,
       host_destination_image,
       out_volume.data
@@ -173,7 +173,7 @@ __host__ dicomNodeError_t interpolate_for_registration(
 
   //const auto offset_destination = host_destination_space.center_space();
 
-  const dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
+  const dicomNodeError_t error = gpu_interpolation_linear(
     host_source_image,
     host_destination_image,
     out_volume.data
@@ -199,7 +199,7 @@ struct OptimizerParam {
  */
 template<typename T>
 struct Optimizer {
-  static constexpr u32 max_iterations = 25;
+  static constexpr u32 max_iterations = 250;
   static constexpr u8 max_step_size_reductions = 4;
 
   OptimizerParam<T> best_params;
@@ -247,14 +247,10 @@ struct Optimizer {
   T optimize(auto cost_function) {
     const f32 current_cost = best_params.cost;
 
-    const f32 translation_cost = update_translation(cost_function);
-
-    std::printf("Current cost: %f, translation_cost %f\n" , current_cost, translation_cost);
-
-    if ( translation_cost < current_cost) {
+    // Update translation update best_params, and therefore update the cost.
+    if ( update_translation(cost_function) < current_cost ) {
       return best_params.cost;
     }
-
 
     reduce_step_sizes();
 

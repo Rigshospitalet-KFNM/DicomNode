@@ -123,6 +123,7 @@ foreach(_ver ${ALL_FOUND_GCC_VERSIONS})
         set(CUDA_HOST_GXX_FOUND TRUE)
         set(CUDA_HOST_GXX_PATH "${_GCC_${_ver}_CXX_PATH}")
         set(CUDA_HOST_GXX_VERSION "${_ver}")
+
         break()
     endif()
 endforeach()
@@ -134,6 +135,8 @@ if(CUDA_HOST_GXX_FOUND)
                     "(${CUDA_HOST_GXX_PATH}) as CUDA host compiler "
                     "[supported range: ${CUDA_GCC_MIN}-${CUDA_GCC_MAX}]")
     set(CMAKE_CUDA_HOST_COMPILER "${CUDA_HOST_GXX_PATH}" CACHE FILEPATH "CUDA host compiler" FORCE)
+    set(CMAKE_C_COMPILER "/usr/bin/gcc-${CUDA_HOST_GXX_VERSION}" CACHE FILEPATH "C host compiler" FORCE)
+    set(CMAKE_CXX_COMPILER "/usr/bin/g++-${CUDA_HOST_GXX_VERSION}" CACHE FILEPATH "C++ host compiler" FORCE)
 else()
     message(WARNING
         "FindCudaCompatibleGCC: no installed GCC falls within the supported "

@@ -9,7 +9,6 @@
 #include"map_reduce.cuh"
 
 
-namespace { // Private function
 
 enum STATUS_FLAGS: uint8_t {
   STATUS_INVALID=0,
@@ -24,24 +23,24 @@ struct FlagVal {
     T val;
     Flag flag;
 
-    __host__ __device__ inline FlagVal() : val(), flag(STATUS_INVALID) {}
-    __host__ __device__ inline FlagVal(const Flag& _flag, const T& value) {
+    __host__ __device__ FlagVal() : val(), flag(STATUS_INVALID) {}
+    __host__ __device__ FlagVal(const Flag& _flag, const T& value) {
       val = value;
       flag = _flag;
     }
 
-    __host__ __device__ inline FlagVal(volatile FlagVal& flag_val) {
+    __host__ __device__ FlagVal(volatile FlagVal& flag_val) {
       val = OP::remove_volatile(flag_val.val);
       flag = flag_val.flag;
     }
 
-    __host__ __device__ inline void operator=(const FlagVal& flag_val) volatile {
+    __host__ __device__ void operator=(const FlagVal& flag_val) volatile {
       val = flag_val.val;
       flag = flag_val.flag;
     }
 };
 
-__device__ uint32_t get_shared_id(uint32_t* counter){
+__device__ inline uint32_t get_shared_id(uint32_t* counter){
   __shared__ uint32_t address;
   if(threadIdx.x == 0){
     address = atomicAdd(counter, 1);;
@@ -90,7 +89,7 @@ class FlagOp {
 
 
 template<typename T, uint8_t CHUCK = 1>
-__device__ inline void copy_to_shared_memory(volatile T* dst_shared, T* src_global, size_t number_of_elements, T default_element=0, size_t offset=0){
+__device__ void copy_to_shared_memory(volatile T* dst_shared, T* src_global, size_t number_of_elements, T default_element=0, size_t offset=0){
   #pragma unroll
   for(uint8_t i=0; i < CHUCK; i++){
     const uint16_t local_index = threadIdx.x + blockDim.x * i;
@@ -198,6 +197,7 @@ __device__ inline T reduce_inclusive_block(volatile T* shared_memory, const uint
     T res = shared_memory[blockDim.x - 1];
     return res;
 }
+
 
 template<uint8_t CHUNK, typename OP, typename T_IN, typename T_OUT,  typename... Args>
   requires MappingBinaryOperator<OP, T_IN, T_OUT, Args...>
@@ -346,7 +346,7 @@ __global__ void reduce_kernel(T_IN* src,
                      ){
   // So this kernel is borderline
 
-  // We are reusing the space as once it's boardcast, we not longer need the space
+  // We are reusing the space as once it's broadcast, we not longer need the space
   extern __shared__ char shared_memory[];
   volatile T_OUT* shared_input = (T_OUT*)shared_memory;
   volatile FlagVal<T_OUT, OP>* shared_flags = (FlagVal<T_OUT, OP>*)shared_memory;
@@ -583,8 +583,6 @@ __global__ void reduce_kernel_no_src(
   }
 }
 
-} // End of anonymous namespace
-
 
 /**
  * @brief performs a scan on the data array
@@ -615,12 +613,13 @@ dicomNodeError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, c
   uint32_t* device_counter = nullptr;
 
 
-  constexpr size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const size_t shared_memory_size = std::max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
-  auto error_function = [&](cudaError_t error){
-    free_device_memory(device_in, device_out, device_flags, device_aggregates,
-                       device_prefixes, device_counter);
+  auto error_function = [&](const dicomNodeError_t& error){
+    print_error(error);
+    free_device_memory(&device_in, &device_out, &device_flags, &device_aggregates,
+                       &device_prefixes, &device_counter);
   };
 
   DicomNodeRunner runner{error_function};
@@ -641,9 +640,9 @@ dicomNodeError_t scan(const T_IN* data, const size_t data_size, T_OUT* output, c
             return cudaGetLastError();
            }
     | [&](){return cudaMemcpy(output, device_out, sizeof(T_OUT) * data_size, cudaMemcpyDeviceToHost);}
-    | [&](){free_device_memory(device_in, device_out, device_flags,
-                                device_aggregates, device_prefixes,
-                                device_counter);
+    | [&](){free_device_memory(&device_in, &device_out, &device_flags,
+                                &device_aggregates, &device_prefixes,
+                                &device_counter);
             return cudaSuccess;};
 
   return runner.error();
@@ -673,7 +672,7 @@ dicomNodeError_t reduce(const T_IN* data, const size_t data_size, T_OUT* output,
   T_OUT*    device_prefixes = nullptr;
   uint32_t* device_counter = nullptr;
 
-  const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const size_t shared_memory_size = std::max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
   auto error_function = [&]([[maybe_unused]] const dicomNodeError_t& error){
@@ -716,7 +715,7 @@ dicomNodeError_t reduce_no_mem(const size_t data_size, T_OUT* output, const Args
   T_OUT*    device_prefixes = nullptr;
   uint32_t* device_counter = nullptr;
 
-  const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const size_t shared_memory_size = std::max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
   auto error_function = [&]([[maybe_unused]] dicomNodeError_t error){
@@ -751,7 +750,7 @@ dicomNodeError_t reduce_no_mem(const size_t data_size, T_OUT* output, const Args
 
 template<uint8_t chunk, typename OP, typename T_OUT, typename... Args>
 dicomNodeError_t reduce_no_mem(DicomNodeRunner& runner, const size_t data_size, T_OUT* output, const Args... args){
-  const size_t shared_memory_size = max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
+  const size_t shared_memory_size = std::max(chunk * sizeof(T_OUT) * SCAN_BLOCK_SIZE, SCAN_BLOCK_SIZE * sizeof(FlagVal<T_OUT, OP>));
   const dim3 grid = get_grid<chunk>(data_size, SCAN_BLOCK_SIZE);
 
   GPUSpan<T_OUT> device_out = runner.allocate<T_OUT>(sizeof(T_OUT));
@@ -761,7 +760,7 @@ dicomNodeError_t reduce_no_mem(DicomNodeRunner& runner, const size_t data_size, 
   GPUSpan<u32> device_counter = runner.allocate<u32>(sizeof(u32));
 
   runner
-    | [&]() noexcept { return cudaMemset(device_counter.data, 0, sizeof(uint32_t));}
+    | [&]() noexcept { return cudaMemset(device_counter.data, 0, sizeof(u32));}
     | [&]() noexcept {
       reduce_kernel_no_src<chunk, OP, T_OUT, Args...>
               <<<grid, SCAN_BLOCK_SIZE, shared_memory_size>>>(

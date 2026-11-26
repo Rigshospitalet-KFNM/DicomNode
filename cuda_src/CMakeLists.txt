@@ -6,7 +6,10 @@ set(CMAKE_CUDA_COMPILER ${CUDACXX})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 include(FindCudaCompatibleGCC)
 
-set(CMAKE_CUDA_ARCHITECTURES native)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES native)
+endif()
+
 project(dicomnode_c LANGUAGES CUDA CXX)
 
 include(FetchContent)
@@ -55,7 +58,6 @@ if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
   set(CMAKE_CUDA_STANDARD 20)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-  set(CMAKE_CUDA_ARCHITECTURES native)
 
   add_library(utilities OBJECT python/utilities.cu)
   target_link_libraries(utilities PRIVATE pybind11::module Python::Python)

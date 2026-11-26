@@ -9,11 +9,14 @@ constexpr cuda::std::array<T, length> create_blank_array() {
   return cuda::std::array<T, length>{};
 }
 
+/**
+ * Inclusive bound for indexes
+ */
 struct Bound {
   u32 lower = 0;
   u32 upper = 0;
 
-  constexpr bool contains(const i32 i) const noexcept {
+  [[nodiscard]] constexpr bool contains(const i32 i) const noexcept {
     return cuda::std::cmp_less_equal(lower, i) && cuda::std::cmp_less_equal(i, upper);
   }
 
@@ -30,27 +33,35 @@ struct Bound {
     }
   };
 
-  constexpr iterator begin() noexcept {
+  [[nodiscard]] constexpr iterator begin() const noexcept {
     return iterator{lower};
   }
-  constexpr iterator end() noexcept {
-    return iterator{upper};
+  [[nodiscard]] constexpr iterator end() const noexcept {
+    return iterator{upper + 1};
   }
 };
 
 template<typename T, u8 dimensionality>
 struct ArrayDataBlock {
-  T value;
   cuda::std::array<Bound, dimensionality> bounds; // X bounds, Y bounds, Z Bounds, ...
+  T value;
 
-  bool contains(std::array<i32, dimensionality>& index) const {
-    bool ret = true;
-
+  [[nodiscard]] constexpr bool contains(std::array<i32, dimensionality>& index) const noexcept {
     for (int d = 0; d < dimensionality; ++d) {
-      ret &= bounds.contains(index[d]);
+      if (!bounds[d].contains(index[d])) {
+        return false;
+      }
     }
 
-    return ret;
+    return true;
+  }
+
+  [[nodiscard]] constexpr bool contains(const Index<dimensionality>& index) const noexcept {
+    for (i32 d = 0; d < dimensionality; ++d) {
+      if (!bounds[d].contains(index[d])) { return false; }
+    }
+
+    return true;
   }
 };
 
@@ -67,9 +78,9 @@ constexpr void apply_bound(
 ) {
   assert(extent.elements() == len);
 
-  for (int z = block.bounds[2].lower; z < block.bounds[2].upper; ++z) {
-    for (int y = block.bounds[1].lower; y < block.bounds[1].upper; ++y) {
-      for (int x = block.bounds[0].lower; x < block.bounds[0].upper; ++x) {
+  for (const int z : block.bounds[2]) {
+    for (const int y : block.bounds[1]) {
+      for (const int x : block.bounds[0]) {
         Index<3> index(x, y, z);
 
         array[extent.flat_index(index)] = block.value;

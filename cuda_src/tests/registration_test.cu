@@ -7,6 +7,8 @@
 #include "test_helper.cuh"
 
 #include <array>
+#include <memory>
+#include <c++/16/memory>
 
 #include <gtest/gtest.h>
 
@@ -20,6 +22,10 @@ constexpr u64 z = 8;
 constexpr u64 elements = x * y * z;
 // This is just a 3x3x3 cube at 2 different indexes.
 // I should create some functions for easy array creation, but i'm feeling that i'm missing c++23/c++26 features :(
+
+constexpr Extent<3> extent8{8,8,8};
+constexpr Extent<3> extent64{64,64,64};
+constexpr Extent<3> extent512{512,512,512};
 
 static constexpr std::array<f32, elements> offset_image_data_1{
   // image 1
@@ -336,19 +342,19 @@ constexpr static Space<3> image_space {
 // End of test declaration
 TEST(REGISTRATION, VOLUME_SUBTRACT_OF_SAME_IS_ZERO) {
   Volume<3, f32> volume {
-    .m_extent = Extent<3>{z,y,x},
+    .m_extent = extent8,
     .default_value = 0.0f
   };
 
   Volume<3, f32>* device_volume;
 
-  f32 difference = -1.0f;
 
   cudaMalloc(&device_volume, sizeof(Volume<3, f32>));
   cudaMalloc(&volume.data, volume.size());
   cudaMemcpy(volume.data, offset_image_data_1.data(), volume.size(), cudaMemcpyDefault);
   cudaMemcpy(device_volume, &volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
 
+  f32 difference = NAN;
   reduce_no_mem<8, REGISTRATION::VolumeDifference<f32>, f32>(
     volume.elements(),
     &difference,
@@ -436,12 +442,12 @@ TEST(REGISTRATION, CENTER_OF_GRAVITY_MOVES_A_CUBE) {
 
 TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
   Volume<3, f32> image_volume {
-    .m_extent = Extent<3>{z,y,x},
+    .m_extent = extent8,
     .default_value = 0.0f
   };
 
   Volume<3, f32> out_volume {
-    .m_extent = Extent<3>{z,y,x},
+    .m_extent = extent8,
     .default_value = 0.0f
   };
 
@@ -524,12 +530,12 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cuda::std::array<f32, elements> expected_array = create_blank_array<f32, elements>();
 
   constexpr ArrayDataBlock<f32, 3> translateBy1Block = {
-    .value = 1.0f,
     .bounds = {
       Bound{ .lower = 2, .upper = 5},
       Bound{ .lower = 1, .upper = 4},
       Bound{ .lower = 1, .upper = 4},
-    }
+    },
+    .value = 1.0f
   };
 
   apply_bound(expected_array, Extent<3>{z,y,x}, translateBy1Block);
@@ -567,16 +573,107 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
   cudaFree(device_expected_volume);
 }
 
+TEST(REGISTRATION, INTERPOLATING_FOR_REGISTRATION_TRANSLATION) {
+  auto source_data_ptr = std::make_unique<cuda::std::array<f32, extent64.elements()>>();
+  auto& source_data = *source_data_ptr;
+
+  for (auto& p : source_data) { p = 0.0f; }
+
+  apply_bound(source_data, extent64, ArrayDataBlock<f32, 3>{
+    .bounds=cuda::std::array{
+      Bound{1,31},
+      Bound{1,31},
+      Bound{1,31}
+    }, .value = 1.0f}
+  );
+
+  Image<3, f32> image_source{image_space,
+  {
+    .m_extent = extent64,
+    .default_value = 0.0f
+  }};
+
+  Image<3, f32> interpolated_image{image_space, {
+    .m_extent = extent64,
+    .default_value = 0.0f
+  }};
+
+  cudaMallocManaged(&image_source.data(), image_source.size());
+  cudaMallocManaged(&interpolated_image.data(), interpolated_image.size());
+  cudaMemcpy(image_source.data(), source_data.data(), image_source.size(), cudaMemcpyDefault);
+
+
+  DicomNodeRunner runner;
+
+  REGISTRATION::interpolate_for_registration(
+    runner,
+    image_source,
+    { // I think I should make some test cases, that highlight XYZ and ZYX difference
+      .translations = { 29, 29, 29 }
+    },
+    interpolated_image,
+    interpolated_image.volume
+  );
+
+  Volume<3, f32> expected_volume = {
+    .m_extent = extent64,
+    .default_value = 0.0f
+  };
+
+
+  auto expected_data_ptr = std::make_unique<cuda::std::array<f32, 64 * 64 * 64>>();
+  auto& expected_data = *expected_data_ptr;
+  for (auto& p : expected_data) { p = 0.0f; }
+
+
+  apply_bound(expected_data, extent64, ArrayDataBlock<f32, 3>{
+  .value = 1.0f, .bounds=cuda::std::array{
+    Bound{30,60},
+    Bound{30,60},
+    Bound{30,60}
+  }});
+
+
+  cudaMalloc(&expected_volume.data, expected_volume.size());
+  cudaMemcpy(expected_volume.data, expected_data.data(), expected_volume.size(), cudaMemcpyDefault);
+
+  Volume<3, f32>* device_expected_volume = nullptr;
+  cudaMalloc(&device_expected_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_expected_volume, &expected_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+  Volume<3, f32>* device_interpolated_volume = nullptr;
+  cudaMalloc(&device_interpolated_volume, sizeof(Volume<3, f32>));
+  cudaMemcpy(device_interpolated_volume, &interpolated_image.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+
+
+  f32 error = NAN;
+  REGISTRATION::volume_difference_device(
+    interpolated_image.elements(),
+    device_expected_volume,
+    device_interpolated_volume,
+    error
+  );
+
+  EXPECT_EQ(0.0f, error);
+
+  cudaFree(image_source.data());
+  cudaFree(interpolated_image.data());
+  cudaFree(expected_volume.data);
+  cudaFree(device_interpolated_volume);
+  cudaFree(device_expected_volume);
+}
+
+
 TEST(REGISTRATION, DATA_BLOCK_IS_DIFERENT_THAN_0) {
   constexpr Extent<3> e{8,8,8};
   constexpr auto zeroes = create_blank_array<f32, e.elements()>();
   auto source_data = create_blank_array<f32, e.elements()>();
   apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
-    .value = 3.0f, .bounds=cuda::std::array{
+     .bounds=cuda::std::array{
       Bound{2,5},
       Bound{2,5},
       Bound{2,5}
-    }}
+    }, .value = 3.0f}
   );
 
   Volume<3, f32> source_volume = {
@@ -632,7 +729,6 @@ TEST(REGISTRATION, DATA_BLOCK_IS_DIFERENT_THAN_0) {
     target_volume
   };
 
-
   f32 cost = cuda::std::numeric_limits<f32>::max();
 
   REGISTRATION::cost_function<f32>(
@@ -660,19 +756,19 @@ TEST(REGISTRATION, DATA_BLOCK_TRANSLATION) {
   constexpr Extent<3> e{8,8,8};
   auto source_data = create_blank_array<f32, e.elements()>();
   apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
-    .value = 1.0f, .bounds=cuda::std::array{
+    .bounds=cuda::std::array{
       Bound{2,5},
       Bound{2,5},
       Bound{2,5}
-    }}
+    }, .value = 1.0f }
   );
   auto target_data = create_blank_array<f32, e.elements()>();
   apply_bound(target_data, e, ArrayDataBlock<f32, 3>{
-  .value = 1.0f, .bounds=cuda::std::array{
+    .bounds=cuda::std::array{
     Bound{3,6},
     Bound{1,4},
     Bound{2,5}
-  }});
+  }, .value = 1.0f});
 
 
   Volume<3, f32> source_volume = {
@@ -754,7 +850,7 @@ TEST(REGISTRATION, DATA_BLOCK_TRANSLATION) {
 
 TEST(REGISTRATION, centering_space) {
   constexpr Point<3> s{100.0f,100.0f,100.0f};
-  constexpr Extent<3> e{512,512,512};
+
 
   SquareMatrix<3> basis = {
     1.0f, 0.0f, 6.0f,
@@ -768,13 +864,13 @@ TEST(REGISTRATION, centering_space) {
     .inverted_basis = basis.inverse(),
   };
 
-  const auto r = space.center_space(e);
+  const auto r = space.center_space(extent512);
 
   constexpr Point<3> zeros{
     0.0f, 0.0f, 0.0f
   };
 
-  EXPECT_EQ(space.at_index(e.central_point()), zeros);
+  EXPECT_EQ(space.at_index(extent512.central_point()), zeros);
 }
 
 TEST(REGISTRATION, centering_space_with_reset) {
@@ -806,19 +902,19 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
 
   auto source_data = create_blank_array<f32, e.elements()>();
   apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
-    .value = 1.0f, .bounds=cuda::std::array{
+    .bounds=cuda::std::array{
       Bound{2,5},
       Bound{2,5},
       Bound{2,5}
-  }});
+  }, .value = 1.0f,});
 
   auto target_data = create_blank_array<f32, e.elements()>();
   apply_bound(target_data, e, ArrayDataBlock<f32, 3>{
-    .value = 1.0f, .bounds=cuda::std::array{
+    .bounds=cuda::std::array{
       Bound{3,6},
       Bound{1,4},
       Bound{2,5}
-  }});
+  }, .value = 1.0f,});
 
   Volume<3, f32> source_volume {
     .data = nullptr,
@@ -907,47 +1003,37 @@ TEST(REGISTRATION, OPTIMIZER_CAN_OPTIMIZE_WITH_TRANSLATION) {
 }
 
 TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
-  constexpr Extent<3> e{16,16,16};
-  auto source_data = create_blank_array<f32, e.elements()>();
-  apply_bound(source_data, e, ArrayDataBlock<f32, 3>{
-    .value = 1.0f, .bounds=cuda::std::array{
-      Bound{2,5},
-      Bound{2,5},
-      Bound{2,5}
-  /*
+  const auto source_data_ptr = std::make_unique<cuda::std::array<f32, extent64.elements()>>();
+  auto& source_data = *source_data_ptr;
+
+  apply_bound(source_data, extent64, ArrayDataBlock<f32, 3>{
+     .bounds=cuda::std::array{
       Bound{1,32},
       Bound{1,32},
       Bound{1,32}
-  */
-    }}
+    }, .value = 1.0f}
   );
-  auto target_data = create_blank_array<f32, e.elements()>();
-  apply_bound(target_data, e, ArrayDataBlock<f32, 3>{
-  .value = 1.0f, .bounds=cuda::std::array{
-      Bound{3,6},
-      Bound{1,4},
-      Bound{2,5}
-
-  /*
+  auto target_data = create_blank_array<f32, extent64.elements()>();
+  apply_bound(target_data, extent64, ArrayDataBlock<f32, 3>{
+  .bounds=cuda::std::array{
     Bound{29,60},
     Bound{29,60},
     Bound{29,60}
-  */
-  }});
+  }, .value = 1.0f});
 
 
   Volume<3, f32> source_volume = {
-    .m_extent = e,
+    .m_extent = extent64,
     .default_value = 0.0f
   };
 
   Volume<3, f32> target_volume = {
-    .m_extent = e,
+    .m_extent = extent64,
     .default_value = 0.0f
   };
 
   Volume<3, f32> temp_volume = {
-    .m_extent = e,
+    .m_extent = extent64,
     .default_value = 0.0f
   };
 
@@ -1013,7 +1099,7 @@ TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
       temp_volume
       );
     } | [&](){return REGISTRATION::volume_difference_device(
-      e.elements(),
+      extent64.elements(),
       device_source_volume,
       device_temp_volume,
       cost
@@ -1024,22 +1110,24 @@ TEST(REGISTRATION, REGISTRATION_FULL_EXAMPLE_TRANSLATION_ONLY) {
 
   REGISTRATION::Optimizer<f32> optimizer(cost_function);
 
+  /*
   optimizer.step_size = REGISTRATION::ImageTranslation{
     .scale = 1.0f,
     .translations = Point<3>(1.0f,1.0f,1.0f),
-    .rotations = cuda::std::array{1.0f,1.0f,1.0f}
+    .rotations = cuda::std::array{0.0f,0.0f,0.0f}
   };
+  */
 
   std::printf("Cost: %f\n", optimizer.cost());
 
   while (runner.error() == SUCCESS && optimizer.should_continue()) {
     optimizer.optimize(cost_function);
     std::printf("Cost at: %f\n translations: (%f,%f,%f)\n",
-    optimizer.best_params.cost,
-    optimizer.best_params.affine.translations[0],
-    optimizer.best_params.affine.translations[1],
-    optimizer.best_params.affine.translations[2]
-  );
+      optimizer.best_params.cost,
+      optimizer.best_params.affine.translations[0],
+      optimizer.best_params.affine.translations[1],
+      optimizer.best_params.affine.translations[2]
+    );
 
   }
 

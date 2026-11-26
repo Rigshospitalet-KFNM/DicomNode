@@ -32,34 +32,37 @@ struct Index final {
     static_assert(sizeof...(args) == DIMENSIONS);
   };
 
-  constexpr __device__ __host__ Index(const u64& flat_index, const Extent<DIMENSIONS>& space){
+  constexpr __device__ __host__ Index(const u64& flat_index, const Extent<DIMENSIONS>& extent) noexcept {
     u64 dimension_temp = 1;
 
     #pragma unroll
     for(u8 dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = (flat_index % (dimension_temp * space[dim]))
+      const u32& extent_dim = extent[DIMENSIONS - (dim + 1)]; // Extent store z,y,x while indexes are x,y,z
+      coordinates[dim] = (flat_index % (dimension_temp * extent_dim))
         / dimension_temp;
-      dimension_temp *= space[dim];
+      dimension_temp *= extent_dim;
     }
   }
 
-  __device__ __host__ Index(const FlatIndex& flat_index, const Extent<DIMENSIONS>& extent){
+  constexpr __device__ __host__ Index(const FlatIndex& flat_index, const Extent<DIMENSIONS>& extent) noexcept{
     u64 dimension_temp = 1;
 
     #pragma unroll
     for(u8 dim = 0; dim < DIMENSIONS; dim++){
-      coordinates[dim] = (flat_index % (dimension_temp * extent[dim]))
+      const u32& extent_dim = extent[DIMENSIONS - (dim + 1)]; // Extent store z,y,x while indexes are x,y,z
+
+      coordinates[dim] = (flat_index % (dimension_temp * extent_dim))
         / dimension_temp;
-      dimension_temp *= extent[dim];
+      dimension_temp *= extent_dim;
     }
   }
 
-  constexpr __device__ __host__  i32& operator[](const u8 idx){
+  constexpr __device__ __host__  i32& operator[](const u8 idx) noexcept {
     // you can't put a static assert in here :(
     return coordinates[idx];
   }
 
-  constexpr __device__ __host__ i32 operator[](const u8 idx) const {
+  constexpr __device__ __host__ i32 operator[](const u8 idx) const noexcept {
     return coordinates[idx];
   }
 
@@ -74,16 +77,16 @@ struct Index final {
     return return_index;
   }
 
-  constexpr __device__ __host__ const i32& x() const {
+  [[nodiscard]] constexpr __device__ __host__ const i32& x() const {
     return coordinates[0];
   }
 
-  constexpr __device__ __host__ const i32& y() const {
+  [[nodiscard]] constexpr __device__ __host__ const i32& y() const {
     static_assert(DIMENSIONS > 1);
     return coordinates[1];
   }
 
-  constexpr __device__ __host__ const i32& z() const {
+  [[nodiscard]] constexpr __device__ __host__ const i32& z() const {
     static_assert(DIMENSIONS > 2);
     return coordinates[2];
   }

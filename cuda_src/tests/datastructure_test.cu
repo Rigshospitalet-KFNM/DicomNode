@@ -618,14 +618,15 @@ TEST(TEST_HELPER, CREATE_BLANK_ARRAY) {
 }
 
 TEST(TEST_HELPER, CREATE_ARRAY_WITH_BLOCK) {
-  constexpr Extent<3> extent(4,4,4);
+  constexpr Extent<3> extent{4,4,4};
   constexpr ArrayDataBlock<i32, 3> bounds {
-      .value = 1,
+
       .bounds = {
-        Bound{.lower = 1, .upper = 3},
-                    Bound{.lower = 1, .upper = 3},
-                    Bound{.lower = 1, .upper = 3},
-      }
+        Bound{.lower = 1, .upper = 2},
+        Bound{.lower = 1, .upper = 2},
+        Bound{.lower = 1, .upper = 2},
+      },
+      .value = 1,
     };
   cuda::std::array<i32, extent.elements()> data = create_blank_array<i32, extent.elements()>();
   apply_bound(data, extent, bounds);

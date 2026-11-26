@@ -145,6 +145,7 @@ class DicomNodeRunner{
   template<typename T>
   GPUSpan<T> allocate(u64 size) {
     GPUAllocation alloc;
+    alloc.size = size;
 
     if (m_error == dicomNodeError_t::SUCCESS) {
       m_error = encode_cuda_error(allocator.allocate(alloc));

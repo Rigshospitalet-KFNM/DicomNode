@@ -26,8 +26,8 @@ struct Extent final {
   constexpr Extent() = default;
 
   template<typename... Args>
-  constexpr __device__ __host__ Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
-    static_assert(sizeof...(args) == DIMENSIONS);
+  constexpr __device__ __host__ explicit Extent(Args... args) noexcept : sizes{static_cast<u32>(args)...}{
+    static_assert(sizeof...(args) == DIMENSIONS, "Got an incorrect number of args");
   };
 
   constexpr __device__ __host__ uint32_t& operator[](const uint8_t i) {
@@ -121,7 +121,7 @@ struct Extent final {
     return Index<DIMENSIONS>(coordinates);
   }
 
-  __device__ __host__ Index<DIMENSIONS> from_flat_index(FlatIndex flat_index) const {
+  constexpr __device__ __host__ Index<DIMENSIONS> from_flat_index(FlatIndex flat_index) const {
     int32_t coordinates[DIMENSIONS];
     uint64_t dimension_temp = 1;
 
@@ -163,7 +163,7 @@ struct Extent final {
   }
 
   [[nodiscard]] constexpr __device__ __host__ const u32* end() const noexcept{
-    return &sizes[DIMENSIONS - 1];
+    return sizes + DIMENSIONS;
   }
 
   /**
@@ -232,3 +232,41 @@ constexpr dim3 get_envelope_grid(const Extent<3> extent) noexcept {
     envelope_length<THREAD_BLOCK.z>(extent.z()),
   };
 }
+
+template<u8 DIMENSIONS>
+struct IndexIterator {
+  Extent<DIMENSIONS> extent;
+
+  struct iterator {
+    Extent<DIMENSIONS> extent;
+    u64 flat_index = 0;
+
+    constexpr Index<DIMENSIONS> operator*() const noexcept {
+      return Index<DIMENSIONS>(flat_index, extent);
+    };
+
+    constexpr iterator& operator++() noexcept {
+      flat_index++;
+      return *this;
+    }
+
+    constexpr iterator operator++(int) noexcept {
+      iterator old = *this;
+      ++*this;
+      return old;
+    }
+
+    constexpr bool operator==(const iterator& other) const noexcept {
+      return flat_index == other.flat_index;
+    }
+  };
+  constexpr iterator begin() const noexcept {
+    return iterator{.extent = extent};
+  }
+
+  constexpr iterator end() const noexcept {
+    return iterator{ .extent = extent, .flat_index=extent.elements()};
+  }
+};
+
+

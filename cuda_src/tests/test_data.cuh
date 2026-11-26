@@ -3,7 +3,7 @@
 #include "../gpu_code/core/core.cuh"
 
 namespace TEST_DATA {
-  inline Space<3> make_spaces() {
+  constexpr Space<3> make_spaces() {
     return {
       .starting_point = Point<3>{1.0f,1.0f, 1.0f},
       .basis = {

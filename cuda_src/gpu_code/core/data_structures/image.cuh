@@ -62,7 +62,7 @@ struct Image final {
    *
    * @return
    */
-  [[nodiscard]] constexpr size_t size() const noexcept {
+  [[nodiscard]] constexpr __device__ __host__ size_t size() const noexcept {
     return volume.size();
   }
 
@@ -73,6 +73,8 @@ struct Image final {
   [[nodiscard]] constexpr __device__ __host__ size_t elements() const noexcept {
     return volume.elements();
   }
+
+
 };
 
 template<typename T>

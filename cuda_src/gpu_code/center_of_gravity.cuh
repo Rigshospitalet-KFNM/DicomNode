@@ -60,7 +60,7 @@ template<typename T>
 
   runner | [&]() noexcept {
     return reduce_no_mem<8, VOLUME_SUM_OP<3, T>, T, Volume<3,T>>(
-      volume.elements(), &sum, volume
+      runner, volume.elements(), &sum, volume
     );
   } | [&](){
     return reduce_no_mem<8, CENTER_OF_GRAVITY::COG_REDUCE_FUNCTION<T, DIMENSION::X>, float, Volume<3,T>>(

@@ -19,7 +19,7 @@ TEST(BOUNDING_BOX, Box_25x25x25_with_10_11_12_20_19_18){
   BoundingBox_3D out;
 
   const dicomNodeError_t status = reduce<1, BoundingBoxOP_3D<uint8_t>, uint8_t, BoundingBox_3D, Extent<3>>(
-    host_data, data_size, &out, {25,25,25}
+    host_data, data_size, &out, Extent<3>{25,25,25}
   );
 
   EXPECT_EQ(status, cudaSuccess);

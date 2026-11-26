@@ -397,7 +397,7 @@ TEST(INTERPOLATION, INTERPOLATE_UINT8){
   constexpr u32 uy = y - 1;
   constexpr u32 uz = z - 1;
 
-  constexpr Extent<3> target_extent = { uz, uy, ux};
+  constexpr Extent<3> target_extent{ uz, uy, ux};
 
   std::array<u8, source_extent.elements()> host_data;
 
@@ -716,8 +716,8 @@ TEST(INTERPOLATION, SHARED_MEMORY_INTERPOLATION) {
   auto host_data = DEFAULT_TEST_OBJECTS::host_image_data();
 
   Image<3, DataType> host_image{
-    DEFAULT_TEST_OBJECTS::source_space,
-    Volume<3, DataType>{
+    .space=DEFAULT_TEST_OBJECTS::source_space,
+    .volume=Volume<3, DataType>{
       .m_extent = DEFAULT_TEST_OBJECTS::source_extent,
       .default_value = -1
     }
@@ -726,8 +726,8 @@ TEST(INTERPOLATION, SHARED_MEMORY_INTERPOLATION) {
   constexpr Extent<3> target_extent{5,5,5};
 
   Image<3, DataType> target_image{
-    DEFAULT_TEST_OBJECTS::destination_space,
-    Volume<3, DataType>{
+    .space=DEFAULT_TEST_OBJECTS::destination_space,
+    .volume=Volume<3, DataType>{
       .m_extent = target_extent
     }
   } ;
@@ -841,9 +841,9 @@ TEST(INTERPOLATION, INTERPOLATION_CHEATING) {
 
 TEST(INTERPOLATION, DIFFERENT_SPACES) {
   using DataType = f32;
-  constexpr Extent<3> extent = {3,3,3};
+  constexpr Extent<3> extent{3,3,3};
 
-  auto data = [&]() {
+  auto data = [&]() constexpr noexcept {
     std::array<DataType,extent.elements()> host_data;
 
     for (u32 i = 0; i < extent.elements(); i++) {
@@ -853,11 +853,11 @@ TEST(INTERPOLATION, DIFFERENT_SPACES) {
     return host_data;
   }();
 
-  Space<3> starting_space = TEST_DATA::make_spaces();
+  constexpr Space<3> starting_space = TEST_DATA::make_spaces();
 
   Image<3, DataType> host_image{
-    starting_space,
-    Volume<3, DataType>{
+    .space=starting_space,
+    .volume=Volume<3, DataType>{
       .data = nullptr,
       .m_extent = extent,
       .default_value = 0.0
@@ -867,7 +867,7 @@ TEST(INTERPOLATION, DIFFERENT_SPACES) {
   cudaMalloc(&host_image.data(), host_image.size());
   cudaMemcpy(host_image.data(), data.data(), host_image.size(), cudaMemcpyDefault);
 
-  Space<3> ending_space{
+  constexpr Space<3> ending_space{
     .starting_point = {2.0,2.0,2.0},
     .basis = {
       0.2f,-1.0f,0.0f,
@@ -892,7 +892,6 @@ TEST(INTERPOLATION, DIFFERENT_SPACES) {
   };
 
   cudaMalloc(&target_image.data(), target_image.size());
-
   dicomNodeError_t error = gpu_interpolation_linear_shared_cheating(
     host_image,
     target_image,
@@ -922,6 +921,43 @@ TEST(INTERPOLATION, DIFFERENT_SPACES) {
   for (u32 i = 0; i < extent.elements(); i++) {
     EXPECT_FLOAT_EQ(host_out[i], host_out_shared[i]);
   }
+
+  cudaFree(host_image.data());
+  cudaFree(target_image.data());
+}
+
+TEST(INTERPOLATION, SAME_RESULTS_FROM_INTERPOLATION_METHODS) {
+  using DataType = f32;
+
+  constexpr static Extent<3> extent_64{64,64,64};
+  constexpr static ArrayDataBlock<DataType, 3> source_data_block{
+    .bounds = {
+      Bound{1,31},
+      Bound{1,31},
+      Bound{1,31}
+    },
+    .value = 1.0f
+  };
+  // I hit constexpr limits - no fucking clue why they are there because it kinda invalidates the use of constexpr
+  const auto source_data_ptr = std::make_unique<cuda::std::array<DataType, extent_64.elements()>>();
+  auto& source_data = *source_data_ptr;
+  for (auto& d : source_data) { d = 0.0f; }
+  apply_bound(source_data, extent_64, source_data_block);
+
+  constexpr static ArrayDataBlock<DataType, 3> target_data_block{
+      .bounds = {
+        Bound{30,60},
+        Bound{30,60},
+        Bound{30,60}
+      },
+      .value = 1.0f
+    };
+
+  const auto target_data_ptr = std::make_unique<cuda::std::array<DataType, extent_64.elements()>>();
+  auto& target_data = *target_data_ptr;
+  for (auto& d : target_data) { d = 0.0f; }
+  apply_bound(target_data, extent_64, target_data_block);
+
 
 }
 

@@ -41,7 +41,7 @@ namespace TEST_INDEXING {
   }
 
 TEST(INDEXING, CREATION_TEST_LIST){
-  const Extent<3> extent({3,4,5});
+  const Extent<3> extent{3,4,5};
 
   EXPECT_EQ(extent.x(), 5);
   EXPECT_EQ(extent.y(), 4);
@@ -55,7 +55,7 @@ TEST(INDEXING, CREATION_TEST_LIST){
 }
 
 TEST(INDEXING, INDEXING_INTO_DATA_STRUCTURES){
-  const Extent<3> extent({3,4,5});
+  const Extent<3> extent{3,4,5};
 
   EXPECT_EQ(extent.x(), extent[2]);
   EXPECT_EQ(extent.y(), extent[1]);
