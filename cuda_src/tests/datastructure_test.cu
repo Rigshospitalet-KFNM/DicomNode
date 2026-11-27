@@ -50,16 +50,16 @@ namespace TEST_EXTENT {
   }
 
   TEST(EXTENT, ENVELOPING) {
-    Extent<3> dummy_size{10,10,10};
+    constexpr Extent<3> dummy_size{10,10,10};
 
-    dim3 envelope = get_envelope_grid<THREAD_BLOCK_3D>(dummy_size);
+    const dim3 envelope = get_envelope_grid<THREAD_BLOCK_3D>(dummy_size);
 
     EXPECT_EQ(envelope.x, 1);
     EXPECT_EQ(envelope.y, 2);
     EXPECT_EQ(envelope.z, 3);
 
-    Extent<3> bigger_dummy_size{100,100,100};
-    dim3 bigger_envelope = get_envelope_grid<THREAD_BLOCK_3D>(bigger_dummy_size);
+    constexpr Extent<3> bigger_dummy_size{100,100,100};
+    const dim3 bigger_envelope = get_envelope_grid<THREAD_BLOCK_3D>(bigger_dummy_size);
 
     EXPECT_EQ(bigger_envelope.x, 4);
     EXPECT_EQ(bigger_envelope.y, 13);
@@ -605,8 +605,99 @@ TEST(VOLUME, SUB_VOLUME_GPU_SMALL_OUTSIDE){
   cudaFree(ghost_volume.data);
   cudaFree(dev_out_pointer);
 }
- // End of name space TEST_VOLUME
+
+TEST(VOLUME, SUB_VOLUME_GPU_LARGER_THAN_THREAD_BLOCK) {
+  constexpr static Extent<3> extent_64{64,64,64};
+  constexpr static Extent<3> extent_10{10,10,10};
+
+  constexpr static u32 BOXES = 8;
+
+  const auto data_ptr = std::make_unique<cuda::std::array<f32, extent_64.elements()>>();
+  auto& data = *data_ptr;
+
+  constexpr static Bound lo{.lower = 10, .upper = 20};
+  constexpr static Bound hi{.lower = 40, .upper = 50};
+
+  // Create 8 smaller boxes with 1,2,3,... in values inside of the big box
+  for (i32 i = 0; i < BOXES; ++i) {
+    apply_bound(data, extent_64, {.bounds = {i & 1 ? hi : lo, i & 2 ? hi : lo, i & 4 ? hi : lo},
+    .value = static_cast<f32>(i + 1)});
+  }
+
+  // Host Setup
+  const Volume<3, f32> host_volume{
+    .data=data.data(),
+    .m_extent=extent_64,
+    .default_value=-1.0f
+  };
+
+  constexpr static u32 index_low = 10;
+  constexpr static u32 index_high = 40;
+
+  const auto sub_data_ptr = std::make_unique<cuda::std::array<cuda::std::array<f32, extent_10.elements()>, BOXES>>();
+  auto& sub_data = *sub_data_ptr;
+  cuda::std::array<Volume<3, f32>, BOXES> sub_volumes = {};
+  for (i32 i = 0; i < BOXES; ++i) {
+    sub_volumes[i] = sub_volume(
+      host_volume,
+      sub_data[i].data(),
+      extent_10,
+      Index<3>(
+        i & 1 ? index_high : index_low,
+        i & 2 ? index_high : index_low,
+        i & 4 ? index_high : index_low
+      )
+    );
+  }
+
+  auto sum_host_volume = [](const Volume<3, f32>& volume) -> f32 {
+    f32 sum = 0.0f;
+
+    for (u64 i = 0; i < volume.elements(); ++i) {
+      sum += volume.data[i];
+    }
+
+    return sum;
+  };
+
+  cuda::std::array<f32,BOXES> expected {
+    1000.0f,
+    2000.0f,
+    3000.0f,
+    4000.0f,
+    5000.0f,
+    6000.0f,
+    7000.0f,
+    8000.0f,
+  };
+
+  for (i32 i = 0; i < BOXES; ++i) {
+    EXPECT_FLOAT_EQ(sum_host_volume(sub_volumes[i]), expected[i]);
+  }
+
+  Volume<3, f32> volume{
+    .m_extent = extent_64,
+    .default_value = -1.0f
+  };
+
+  cudaMalloc(volume.data(), volume.size());
+
+  cuda::std::array<Volume<3, f32>*, BOXES> device_volumes = {};
+  cuda::std::array<f32*, extent_10.elements()> device_data = {};
+  for (auto& device_volume_ptr : device_volumes) {
+    cudaMalloc(&device_volume_ptr, sizeof(device_volume_ptr));
+  }
+
+  cudaFree(volume.data);
+  for (const auto& device_volume_ptr : device_volumes) {
+    cudaFree(device_volume_ptr);
+  }
+
+
 }
+
+
+} // End of name space TEST_VOLUME
 
 TEST(TEST_HELPER, CREATE_BLANK_ARRAY) {
   constexpr u64 array_length = 3 * 3 * 3;

@@ -929,6 +929,33 @@ TEST(INTERPOLATION, DIFFERENT_SPACES) {
 TEST(INTERPOLATION, SAME_RESULTS_FROM_INTERPOLATION_METHODS) {
   using DataType = f32;
 
+  constexpr static Space<3> source_space{
+      .starting_point = {1.0f,1.0f,1.0f},
+      .basis = {
+        1.0f, 0.0f,0.0f,
+        0.0f, 1.0f,0.0f,
+        0.0f, 0.0f,1.0f,
+      },
+      .inverted_basis = {
+        1.0f, 0.0f,0.0f,
+        0.0f, 1.0f,0.0f,
+        0.0f, 0.0f,1.0f,
+      }
+    };
+
+  constexpr static Space<3> target_space{
+    .starting_point = { -28.0f, -28.0f, -28.0f},
+    .basis = {
+      1.0f, 0.0f,0.0f,
+      0.0f, 1.0f,0.0f,
+      0.0f, 0.0f,1.0f,
+    },
+    .inverted_basis = {
+      1.0f, 0.0f,0.0f,
+      0.0f, 1.0f,0.0f,
+      0.0f, 0.0f,1.0f,
+    }
+  };
   constexpr static Extent<3> extent_64{64,64,64};
   constexpr static ArrayDataBlock<DataType, 3> source_data_block{
     .bounds = {
@@ -938,6 +965,7 @@ TEST(INTERPOLATION, SAME_RESULTS_FROM_INTERPOLATION_METHODS) {
     },
     .value = 1.0f
   };
+
   // I hit constexpr limits - no fucking clue why they are there because it kinda invalidates the use of constexpr
   const auto source_data_ptr = std::make_unique<cuda::std::array<DataType, extent_64.elements()>>();
   auto& source_data = *source_data_ptr;
@@ -954,11 +982,84 @@ TEST(INTERPOLATION, SAME_RESULTS_FROM_INTERPOLATION_METHODS) {
     };
 
   const auto target_data_ptr = std::make_unique<cuda::std::array<DataType, extent_64.elements()>>();
-  auto& target_data = *target_data_ptr;
-  for (auto& d : target_data) { d = 0.0f; }
-  apply_bound(target_data, extent_64, target_data_block);
+  auto& expected_data = *target_data_ptr;
+  for (auto& d : expected_data) { d = 0.0f; }
+  apply_bound(expected_data, extent_64, target_data_block);
+
+  Volume<3, f32> expected_volume {
+    .m_extent = extent_64,
+    .default_value = 0.0f
+  };
 
 
+  cudaError_t err = cudaMalloc(&expected_volume.data, expected_volume.size());
+  EXPECT_EQ(err, cudaSuccess);
+  err = cudaMemcpy(expected_volume.data, expected_data.data(), expected_volume.size(), cudaMemcpyDefault);
+  EXPECT_EQ(err, cudaSuccess);
+
+  Image<3, f32> source_image{
+    .space = source_space,
+    .volume = {
+      .m_extent = extent_64,
+      .default_value = 0.0f
+    }
+  };
+
+  err = cudaMalloc(&source_image.data(), source_image.size());
+  EXPECT_EQ(err, cudaSuccess);
+  err = cudaMemcpy(source_image.data(), source_data.data(), source_image.size(), cudaMemcpyDefault);
+  EXPECT_EQ(err, cudaSuccess);
+
+  Image<3, f32> actual_image{
+    .space = target_space,
+    .volume = {
+      .m_extent = extent_64,
+      .default_value = 0.0f
+    }
+  };
+
+  err = cudaMalloc(&actual_image.data(), actual_image.size());
+  EXPECT_EQ(err, cudaSuccess);
+
+  f32 difference = NAN;
+  Volume<3, f32>* device_expected_volume = nullptr;
+  err = cudaMalloc(&device_expected_volume, sizeof(Volume<3, f32>));
+  EXPECT_EQ(err, cudaSuccess);
+  err = cudaMemcpy(device_expected_volume, &expected_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+  EXPECT_EQ(err, cudaSuccess);
+
+  Volume<3, f32>* device_target_volume = nullptr;
+  err = cudaMalloc(&device_target_volume, sizeof(Volume<3, f32>));
+  EXPECT_EQ(err, cudaSuccess);
+  err = cudaMemcpy(device_target_volume, &actual_image.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+  EXPECT_EQ(err, cudaSuccess);
+
+
+  auto interpolation_check = [&]( dicomNodeError_t(*interpolation_method)(const Image<3, f32>&, const Image<3, f32>&, f32*)) {
+    interpolation_method(source_image, actual_image, actual_image.data());
+
+    REGISTRATION::volume_difference_device(
+    extent_64.elements(),
+    device_expected_volume,
+    device_target_volume,
+    difference
+  );
+
+    EXPECT_FLOAT_EQ(difference, 0.0f);
+  };
+
+  interpolation_check(gpu_interpolation_linear);
+
+  interpolation_check(gpu_interpolation_linear_cheating);
+
+  interpolation_check(gpu_interpolation_linear_shared_cheating);
+
+
+  cudaFree(source_image.data());
+  cudaFree(actual_image.data());
+  cudaFree(expected_volume.data);
+  cudaFree(device_expected_volume);
+  cudaFree(device_target_volume);
 }
 
 }

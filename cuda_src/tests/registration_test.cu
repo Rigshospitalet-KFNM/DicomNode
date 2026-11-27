@@ -8,7 +8,6 @@
 
 #include <array>
 #include <memory>
-#include <c++/16/memory>
 
 #include <gtest/gtest.h>
 
@@ -441,47 +440,48 @@ TEST(REGISTRATION, CENTER_OF_GRAVITY_MOVES_A_CUBE) {
 }
 
 TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
-  Volume<3, f32> image_volume {
-    .m_extent = extent8,
-    .default_value = 0.0f
+  Image<3, f32> source_image{
+    .space=image_space,
+    .volume={
+      .m_extent = extent8,
+      .default_value = 0.0f
+    }
   };
+  Image<3, f32> target_image{
+    .space=image_space,
+    .volume={
+      .m_extent = extent8,
+      .default_value = 0.0f
+  }};
 
-  Volume<3, f32> out_volume {
-    .m_extent = extent8,
-    .default_value = 0.0f
-  };
-
-  cudaMalloc(&image_volume.data, image_volume.size());
-  cudaMalloc(&out_volume.data, out_volume.size());
-  cudaMemcpy(image_volume.data, offset_image_data_1.data(), image_volume.size(), cudaMemcpyDefault);
-
-  Image<3, f32> image_1{image_space, image_volume};
-  Image<3, f32> image_2{image_space, out_volume};
-
+  cudaMalloc(&source_image.data(), source_image.size());
+  cudaMalloc(&target_image.data(), target_image.size());
+  cudaMemcpy(source_image.data(), offset_image_data_1.data(), source_image.size(), cudaMemcpyDefault);
+  
   DicomNodeRunner runner;
 
   REGISTRATION::interpolate_for_registration(
     runner,
-    image_1,
+    source_image,
     {},
-    image_2,
-    out_volume
+    target_image,
+    target_image.volume
   );
 
-  std::array<f32, z * y * x> host_out;
-  cudaMemcpy(host_out.data(), out_volume.data, out_volume.size(), cudaMemcpyDefault);
+  std::array<f32, extent8.elements()> host_out;
+  cudaMemcpy(host_out.data(), target_image.data(), target_image.size(), cudaMemcpyDefault);
 
   Volume<3, f32>* device_image_volume = nullptr;
   cudaMalloc(&device_image_volume, sizeof(Volume<3, f32>));
-  cudaMemcpy(device_image_volume, &image_1.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+  cudaMemcpy(device_image_volume, &source_image.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
 
   Volume<3, f32>* device_out_volume = nullptr;
   cudaMalloc(&device_out_volume, sizeof(Volume<3, f32>));
-  cudaMemcpy(device_out_volume, &out_volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
+  cudaMemcpy(device_out_volume, &target_image.volume, sizeof(Volume<3, f32>), cudaMemcpyDefault);
 
   f32 error = NAN;
   REGISTRATION::volume_difference_device(
-    image_volume.elements(),
+    source_image.elements(),
     device_image_volume,
     device_out_volume,
     error
@@ -489,8 +489,8 @@ TEST(REGISTRATION, INTERPOLATING_IDENTITY_TRANSLATION_IDENTITY_SPACE) {
 
   EXPECT_EQ(0.0f, error);
 
-  cudaFree(image_volume.data);
-  cudaFree(out_volume.data);
+  cudaFree(source_image.data());
+  cudaFree(target_image.data());
   cudaFree(device_out_volume);
   cudaFree(device_image_volume);
 }
@@ -574,29 +574,26 @@ TEST(REGISTRATION, INTERPOLATING_X_TRANSLATION_IDENTITY_SPACE) {
 }
 
 TEST(REGISTRATION, INTERPOLATING_FOR_REGISTRATION_TRANSLATION) {
-  auto source_data_ptr = std::make_unique<cuda::std::array<f32, extent64.elements()>>();
+  const auto source_data_ptr = std::make_unique<cuda::std::array<f32, extent64.elements()>>();
   auto& source_data = *source_data_ptr;
 
   for (auto& p : source_data) { p = 0.0f; }
 
   apply_bound(source_data, extent64, ArrayDataBlock<f32, 3>{
     .bounds=cuda::std::array{
-      Bound{1,31},
-      Bound{1,31},
-      Bound{1,31}
+      Bound{.lower = 1, .upper = 31},
+      Bound{.lower = 1, .upper = 31},
+      Bound{.lower = 1, .upper = 31}
     }, .value = 1.0f}
   );
 
-  Image<3, f32> image_source{image_space,
-  {
-    .m_extent = extent64,
-    .default_value = 0.0f
-  }};
+  Image<3, f32> image_source{
+      .space = image_space,
+      .volume = {.m_extent = extent64, .default_value = 0.0f}};
 
-  Image<3, f32> interpolated_image{image_space, {
-    .m_extent = extent64,
-    .default_value = 0.0f
-  }};
+  Image<3, f32> interpolated_image{
+      .space = image_space,
+      .volume = {.m_extent = extent64, .default_value = 0.0f}};
 
   cudaMallocManaged(&image_source.data(), image_source.size());
   cudaMallocManaged(&interpolated_image.data(), interpolated_image.size());
@@ -621,17 +618,17 @@ TEST(REGISTRATION, INTERPOLATING_FOR_REGISTRATION_TRANSLATION) {
   };
 
 
-  auto expected_data_ptr = std::make_unique<cuda::std::array<f32, 64 * 64 * 64>>();
+  const auto expected_data_ptr = std::make_unique<cuda::std::array<f32, extent64.elements()>>();
   auto& expected_data = *expected_data_ptr;
   for (auto& p : expected_data) { p = 0.0f; }
 
 
   apply_bound(expected_data, extent64, ArrayDataBlock<f32, 3>{
-  .value = 1.0f, .bounds=cuda::std::array{
-    Bound{30,60},
-    Bound{30,60},
-    Bound{30,60}
-  }});
+  .bounds=cuda::std::array{
+    Bound{.lower = 30, .upper = 60},
+    Bound{.lower = 30, .upper = 60},
+    Bound{.lower = 30, .upper = 60}
+  }, .value = 1.0f });
 
 
   cudaMalloc(&expected_volume.data, expected_volume.size());

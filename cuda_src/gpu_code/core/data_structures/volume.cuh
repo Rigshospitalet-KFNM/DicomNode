@@ -132,7 +132,6 @@ template<typename T>
     const Index<3> original_index = offset_index + local_index;
 
     sub_volume_data_ptr[flat_index] = original_volume.at(original_index);
-
   }
   __syncthreads();
   #else

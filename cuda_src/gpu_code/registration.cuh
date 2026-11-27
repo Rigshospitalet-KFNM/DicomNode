@@ -65,14 +65,17 @@ auto centerImage(DicomNodeRunner& runner, Image<3, T>& host_image) {
   };
 }
 
+/*
+ *
+ */
 template<typename T>
 __host__ dicomNodeError_t volume_difference_device(
-u64 elements, Volume<3, T>* volume_1, Volume<3, T>* volume_2, f32& error) noexcept {
+u64 elements, Volume<3, T>* device_volume_1, Volume<3, T>* device_volume_2, f32& out_difference) noexcept {
   return reduce_no_mem<8, VolumeDifference<T>, T>(
     elements,
-    &error,
-    volume_1,
-    volume_2
+    &out_difference,
+    device_volume_1,
+    device_volume_2
   );
 }
 
